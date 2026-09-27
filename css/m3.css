@@ -967,20 +967,40 @@
     position: relative;
     height: 10px;
     border-radius: 0;
+    background: none;
+    /* Where the wave stops: the last crest or trough that leaves room for the whole dot. The wave repeats every 20px from
+       the left, a crest at 5px, a trough at 15px, so one comes every 10px */
+    --wave-end: calc(round(down, 100% - 7.5px, 10px) + 5px);
+}
+/* The wave and the dot are two layers, each with its own mask. The dot layer holds a dot on every
+   crest and in every trough; a 10px window around the end shows just the one where the wave stops,
+   so it sits on top or at the bottom, wherever the wave ends (our choice; M3 puts a dot at the end
+   of the track instead) */
+:root[data-design="m3"] .progress-bar-fill::before,
+:root[data-design="m3"] .progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    inset: 0;
     background: var(--md-primary);
-    /* Three layers, bottom up: everything but the last 7px, the wave cut to that, a dot at the end.
-       So the wave stops just before where you are and the dot marks it (our choice; M3 puts the
-       dot at the end of the track instead) */
-    -webkit-mask:
-        radial-gradient(circle 2.5px at calc(100% - 2.5px) 50%, #000 95%, transparent) no-repeat,
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x,
-        linear-gradient(to right, #000 calc(100% - 7px), transparent 0) no-repeat;
-    -webkit-mask-composite: source-over, source-in;
-    mask:
-        radial-gradient(circle 2.5px at calc(100% - 2.5px) 50%, #000 95%, transparent) no-repeat,
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x,
-        linear-gradient(to right, #000 calc(100% - 7px), transparent 0) no-repeat;
-    mask-composite: add, intersect;
+}
+:root[data-design="m3"] .progress-bar-fill::before {
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x, linear-gradient(to right, #000 var(--wave-end), transparent 0);
+    -webkit-mask-composite: source-in;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x, linear-gradient(to right, #000 var(--wave-end), transparent 0);
+    mask-composite: intersect;
+}
+:root[data-design="m3"] .progress-bar-fill::after {
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Ccircle cx='5' cy='3' r='2.5'/%3E%3Ccircle cx='15' cy='7' r='2.5'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x,
+        linear-gradient(to right, transparent calc(var(--wave-end) - 5px), #000 0 calc(var(--wave-end) + 5px), transparent 0);
+    -webkit-mask-composite: source-in;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Ccircle cx='5' cy='3' r='2.5'/%3E%3Ccircle cx='15' cy='7' r='2.5'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x,
+        linear-gradient(to right, transparent calc(var(--wave-end) - 5px), #000 0 calc(var(--wave-end) + 5px), transparent 0);
+    mask-composite: intersect;
+}
+/* Browsers without round(): the whole wave, no dot */
+@supports not (width: round(down, 15px, 10px)) {
+    :root[data-design="m3"] .progress-bar-fill::before { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x; }
+    :root[data-design="m3"] .progress-bar-fill::after { content: none; }
 }
 /* No endless wave on hover: stopping an endless animation when the pointer leaves stalls a frame */
 /* Continue Watching: the bar sits at the bottom of the card, inset like M3 cards do */
