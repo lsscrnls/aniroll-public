@@ -1,0 +1,8 @@
+{
+  "name": "aniroll-obfuscate",
+  "private": true,
+  "description": "Obfuscates the protected modules at deploy time (scripts/deploy.sh)",
+  "dependencies": {
+    "javascript-obfuscator": "4.1.1"
+  }
+}

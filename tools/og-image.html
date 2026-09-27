@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AniRoll OG image generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,800;14..32,900&display=swap" rel="stylesheet">
+<style>
+    body { margin: 0; background: #111; color: #eee; font-family: Inter, system-ui, sans-serif; padding: 16px; }
+    canvas { width: 600px; height: 315px; border: 1px solid #333; display: block; }
+    p { font-size: 13px; color: #999; max-width: 600px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<!--
+  Draws the Open Graph preview (1200x630) used by Discord, Twitter and friends.
+
+  Regenerate: open this page, then from the console send the canvas straight to a file,
+  e.g. with a tiny local receiver (see scratchpad/ogreceiver.js):
+      const b = await new Promise(r => document.getElementById('c').toBlob(r, 'image/jpeg', 0.9));
+      await fetch('http://127.0.0.1:8099/og', { method: 'POST', body: b });
+  Always write a NEW file name (og-image-v4.jpg, ...) — Discord caches the old image for a
+  long time — and point the meta tags in index.html and the fallback in api/server.js at it.
+-->
+<canvas id="c" width="1200" height="630"></canvas>
+<p>Canvas is 1200×630 (shown at half size). JPEG at quality 0.9 lands around 75 KB; the same
+drawing as PNG is roughly six times that, which is why the shipped file is a JPEG.</p>
+
+<script>
+const ACCENT = '#d13438';
+const c = document.getElementById('c');
+const x = c.getContext('2d');
+
+function roundRect(ctx, rx, ry, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(rx + r, ry);
+    ctx.arcTo(rx + w, ry, rx + w, ry + h, r);
+    ctx.arcTo(rx + w, ry + h, rx, ry + h, r);
+    ctx.arcTo(rx, ry + h, rx, ry, r);
+    ctx.arcTo(rx, ry, rx + w, ry, r);
+    ctx.closePath();
+}
+
+function chip(ctx, label, cx, cy, filled) {
+    ctx.font = '600 26px Inter, sans-serif';
+    const w = ctx.measureText(label).width + 44;
+    const h = 52;
+    roundRect(ctx, cx, cy, w, h, h / 2);
+    if (filled) {
+        ctx.fillStyle = ACCENT;
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+    } else {
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    }
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, cx + 22, cy + h / 2 + 1);
+    return w + 14;
+}
+
+// Narutomaki — the same motif as the favicon, drawn with the site accent.
+// Wavy outer edge (the scalloped kamaboko rim) plus a thick spiral swirl.
+function naruto(ctx, cx, cy, radius, angle) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+
+    ctx.shadowColor = 'rgba(209,52,56,0.40)';
+    ctx.shadowBlur = 80;
+
+    const lobes = 13;
+    const amp = radius * 0.042;
+    ctx.beginPath();
+    for (let deg = 0; deg <= 360; deg++) {
+        const t = deg * Math.PI / 180;
+        const r = radius + amp * Math.sin(lobes * t);
+        const px = Math.cos(t) * r;
+        const py = Math.sin(t) * r;
+        deg === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#f7f2e8';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // faint rim so the disc reads on a dark background
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    const turns = 2.55;
+    const outer = radius * 0.76;
+    ctx.beginPath();
+    const steps = 720;
+    for (let i = 0; i <= steps; i++) {
+        const p = i / steps;
+        const t = p * turns * Math.PI * 2;
+        const r = outer * (1 - p * 0.9);
+        const px = Math.cos(t) * r;
+        const py = Math.sin(t) * r;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = ACCENT;
+    ctx.lineWidth = radius * 0.19;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+function draw() {
+    // background
+    x.fillStyle = '#0a0a0a';
+    x.fillRect(0, 0, 1200, 630);
+    const glow = x.createRadialGradient(980, 180, 20, 980, 180, 620);
+    glow.addColorStop(0, 'rgba(209,52,56,0.30)');
+    glow.addColorStop(1, 'rgba(209,52,56,0)');
+    x.fillStyle = glow;
+    x.fillRect(0, 0, 1200, 630);
+
+    x.strokeStyle = 'rgba(255,255,255,0.05)';
+    x.lineWidth = 1;
+    for (let i = 1; i < 6; i++) {
+        x.beginPath();
+        x.moveTo(0, i * 105);
+        x.lineTo(1200, i * 105);
+        x.stroke();
+    }
+
+    naruto(x, 970, 250, 175, -0.18);
+
+    // wordmark
+    x.textBaseline = 'alphabetic';
+    x.fillStyle = '#fff';
+    x.font = '900 44px Inter, sans-serif';
+    x.fillText('AniRoll', 80, 116);
+    x.fillStyle = ACCENT;
+    x.beginPath();
+    x.arc(258, 102, 7, 0, Math.PI * 2);
+    x.fill();
+
+    // headline
+    x.fillStyle = '#fff';
+    x.font = '900 86px Inter, sans-serif';
+    x.fillText('Watch Together.', 80, 268);
+    x.fillText('Track Together.', 80, 360);
+
+    // sub
+    x.fillStyle = 'rgba(255,255,255,0.62)';
+    x.font = '400 30px Inter, sans-serif';
+    x.fillText("Your AniList, with watch parties and a roll for what's next.", 80, 420);
+
+    // feature chips
+    let cx = 80;
+    cx += chip(x, 'Watch Party', cx, 480, true);
+    cx += chip(x, 'Roll', cx, 480, true);
+    cx += chip(x, 'Recommendations', cx, 480, false);
+    chip(x, 'Calendar', cx, 480, false);
+
+    x.fillStyle = 'rgba(255,255,255,0.45)';
+    x.font = '600 24px Inter, sans-serif';
+    x.fillText('aniroll.app', 80, 578);
+}
+
+document.fonts.ready.then(() => {
+    draw();
+    window.__ready = true;
+});
+
+window.__png = () => c.toDataURL('image/png').split(',')[1];
+window.__chunk = (i, size = 60000) => {
+    const b64 = window.__png();
+    return { part: b64.slice(i * size, (i + 1) * size), total: b64.length, parts: Math.ceil(b64.length / size) };
+};
+</script>
+</body>
+</html>

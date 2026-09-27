@@ -1,0 +1,7 @@
+# What makes AniRoll AniRoll. scripts/deploy.sh uploads the js/ files obfuscated; scripts/publish-public.sh
+# replaces every file here with a stub that only keeps the rest of the app running.
+js/pages/roll.js
+js/reel.js
+js/pages/watchparty.js
+js/taste.js
+api/party.js
