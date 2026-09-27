@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=102';
-import { enhanceSelect } from '../select.js?v=102';
-import { tasteMatch } from '../taste.js?v=102';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, scoreToRaw, scoreValue, scoreFormat, fmtScore, emitWatched } from '../store.js?v=102';
-import { getToken, isLoggedIn } from '../auth.js?v=102';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=102';
-import { showConfirm } from '../a11y.js?v=102';
+import * as api from '../api.js?v=103';
+import { enhanceSelect } from '../select.js?v=103';
+import { tasteMatch } from '../taste.js?v=103';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=103';
+import { getToken, isLoggedIn } from '../auth.js?v=103';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=103';
+import { showConfirm } from '../a11y.js?v=103';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -350,7 +350,7 @@ function setupListActions(media, token, root = document) {
         saveProgress();
     });
 
-    // Score in the user's own format (store.js); saved as 0–100
+    // Scores are out of 100 in AniRoll, whatever the AniList format (store.js)
     const saveScore = async (scoreRaw) => {
         try {
             await api.saveMediaListEntry({ id: entry.id, scoreRaw }, token);
@@ -359,16 +359,8 @@ function setupListActions(media, token, root = document) {
         } catch (err) { toast(err.message, 'error'); }
     };
     q('#score-input')?.addEventListener('change', (e) => {
-        const scoreRaw = scoreToRaw(Math.max(0, parseFloat(e.target.value) || 0));
-        e.target.value = scoreRaw ? (scoreFormat() === 'POINT_10_DECIMAL' ? scoreValue(scoreRaw).toFixed(1) : scoreValue(scoreRaw)) : '';
-        saveScore(scoreRaw);
-    });
-    q('.score-pick')?.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-score-raw]');
-        if (!btn) return;
-        const picked = Number(btn.dataset.scoreRaw);
-        const scoreRaw = scoreValue(entry.score) === scoreValue(picked) ? 0 : picked;   // tap again: clear
-        btn.parentElement.outerHTML = scoreInputHtml(scoreRaw);
+        const scoreRaw = Math.min(100, Math.round(Math.max(0, parseFloat(e.target.value) || 0)));
+        e.target.value = scoreRaw || '';
         saveScore(scoreRaw);
     });
 
