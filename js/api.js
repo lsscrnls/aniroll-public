@@ -1,4 +1,4 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=101';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=102';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -675,7 +675,7 @@ export async function saveMediaListEntry(variables, token, { queue = true } = {}
 
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
     if (saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=101').then(m =>
+        import('./jellyfin.js?v=102').then(m =>
             m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
     }
 
