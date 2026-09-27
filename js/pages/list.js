@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=98';
-import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched } from '../store.js?v=98';
-import { getToken, isLoggedIn } from '../auth.js?v=98';
-import { enhanceSelect } from '../select.js?v=98';
+import * as api from '../api.js?v=99';
+import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched } from '../store.js?v=99';
+import { getToken, isLoggedIn } from '../auth.js?v=99';
+import { enhanceSelect } from '../select.js?v=99';
 
 // View, sort and the airing filter are remembered per browser; the search text is not
 const VIEW_KEY = 'aniroll_list_view';

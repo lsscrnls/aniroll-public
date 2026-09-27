@@ -1,4 +1,4 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=98';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=99';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -15,6 +15,12 @@ const RATE_LIMIT_PAUSE = 5 * 60 * 1000;
 let rateLimitedUntil = 0;
 
 export function isRateLimited() { return Date.now() < rateLimitedUntil; }
+
+// The account whose data this is (the viewer stored by js/auth.js), so one browser never mixes two
+// accounts: cache keys and queued saves carry it. 'new' right after login, before the viewer is known.
+function accountId() {
+    try { return JSON.parse(localStorage.getItem('aniroll_user'))?.id ?? 'new'; } catch { return 'new'; }
+}
 
 // ===== Request budget =====
 // A hard ceiling on AniList requests, shared across all open tabs via localStorage.
@@ -41,17 +47,24 @@ export function requestsLastMinute() {
     return readTimes().filter(t => t > cutoff).length;
 }
 
+// Read, check and write of the shared list in one step: without the lock two tabs could read the same
+// list, each add their request and write it back, and one of the two requests would go uncounted
+function claimSlot() {
+    const cutoff = Date.now() - 60000;
+    const times = readTimes().filter(t => t > cutoff);
+    if (times.length >= MAX_REQUESTS_PER_MIN) return times;
+    times.push(Date.now());
+    writeTimes(times.slice(-MAX_REQUESTS_PER_MIN * 2));
+    return null;
+}
+const lockedClaim = () => navigator.locks?.request ? navigator.locks.request('aniroll-request-budget', claimSlot) : claimSlot();
+
 // Takes a slot, waiting for one if the last minute is already full
 async function takeRequestSlot(maxWaitMs = 15000) {
     const started = Date.now();
     for (;;) {
-        const cutoff = Date.now() - 60000;
-        const times = readTimes().filter(t => t > cutoff);
-        if (times.length < MAX_REQUESTS_PER_MIN) {
-            times.push(Date.now());
-            writeTimes(times.slice(-MAX_REQUESTS_PER_MIN * 2));
-            return;
-        }
+        const times = await lockedClaim();
+        if (!times) return;
         const waitFor = Math.min(Math.max(times[0] + 60000 - Date.now() + 50, 200), 2000);
         if (Date.now() - started + waitFor > maxWaitMs) {
             const err = new Error('Too many AniList requests just now — AniRoll is holding back, try again in a moment');
@@ -83,15 +96,24 @@ function markRateLimited(retryAfterSec) {
     window.dispatchEvent(new CustomEvent(RATE_LIMIT_EVENT, { detail: { until: rateLimitedUntil } }));
 }
 
-function loadPending() {
+// Every queued change belongs to the account that made it: after switching accounts in the same
+// browser, the other account's changes wait for it instead of going out with the new login.
+// Older items carry no account; one with a list entry id is safe (AniList only lets the owner change
+// that entry), one that would add a show by mediaId could land on the wrong list and is dropped.
+function loadAll() {
     try {
         const raw = JSON.parse(localStorage.getItem(PENDING_KEY));
-        return Array.isArray(raw) ? raw : [];
+        return Array.isArray(raw) ? raw.filter(item => item.user != null || item.vars?.id) : [];
     } catch { return []; }
 }
+const mine = (item, me = accountId()) => item.user == null || String(item.user) === String(me);
 
+function loadPending() { return loadAll().filter(item => mine(item)); }
+
+// Replaces this account's part of the queue, leaves every other account's as it is
 function savePending(list) {
-    try { localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-50))); } catch { /* storage blocked */ }
+    const others = loadAll().filter(item => !mine(item));
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify([...others, ...list.slice(-50)])); } catch { /* storage blocked */ }
 }
 
 export function pendingSaveCount() { return loadPending().length; }
@@ -100,7 +122,7 @@ export function pendingSaveCount() { return loadPending().length; }
 function queuePendingSave(variables) {
     const key = String(variables.id || `media-${variables.mediaId}`);
     const list = loadPending().filter(item => item.key !== key);
-    list.push({ key, vars: variables, ts: Date.now() });
+    list.push({ key, user: accountId(), vars: variables, ts: Date.now() });
     savePending(list);
 }
 
@@ -108,7 +130,8 @@ let flushing = false;
 
 // Pushes queued changes once AniList answers again; called on start and every few minutes
 export async function flushPendingSaves(token) {
-    if (!token || flushing || shouldHoldBackground()) return 0;
+    // Not before the viewer is known: until then the queue can't tell whose changes are whose
+    if (!token || flushing || shouldHoldBackground() || accountId() === 'new') return 0;
     const list = loadPending();
     if (!list.length) return 0;
 
@@ -151,11 +174,18 @@ const TTL = {
 };
 const CACHE_MAX_ENTRIES = 5000;
 let _cacheBytes = 0;
-const CACHE_MAX_BYTES = 500 * 1024 * 1024;
+const CACHE_MAX_BYTES = 50 * 1024 * 1024;
 
 function estimateSize(obj) {
     const str = typeof obj === 'string' ? obj : JSON.stringify(obj);
     return str ? str.length * 2 : 0;
+}
+
+// A Map keeps insertion order and every hit re-inserts its entry (touch), so the first keys are the
+// ones used longest ago
+function touch(key, entry) {
+    _cache.delete(key);
+    _cache.set(key, entry);
 }
 
 function evictCache() {
@@ -173,9 +203,17 @@ function evictCache() {
 const _inFlight = new Map();
 
 export async function cachedQuery(q, variables = {}, token = null, ttl = CACHE_TTL) {
-    const key = JSON.stringify({ q: q.replace(/\s+/g, ' ').trim(), variables, t: !!token });
+    // Logged in, answers depend on the account (mediaListEntry, isFollowing, ...): the key says whose
+    // they are, never the token itself (keys are stored in IndexedDB)
+    const account = accountId();
+    // Right after login, before the viewer is known, nothing is cached: it would belong to nobody
+    if (token && account === 'new') return query(q, variables, token);
+    const key = JSON.stringify({ q: q.replace(/\s+/g, ' ').trim(), variables, scope: token ? `user:${account}` : 'public' });
     const hit = _cache.get(key);
-    if (hit && Date.now() - hit.ts < ttl) return hit.data;
+    if (hit && Date.now() - hit.ts < ttl) {
+        touch(key, hit);
+        return hit.data;
+    }
 
     const pending = _inFlight.get(key);
     if (pending) return pending;
@@ -204,7 +242,7 @@ async function cachedQueryUncoalesced(q, variables, token, ttl, key, hit) {
         const bytes = estimateSize(data);
         if (hit) _cacheBytes -= hit.bytes || 0;
         const entry = { data, ts: Date.now(), bytes };
-        _cache.set(key, entry);
+        touch(key, entry);
         _cacheBytes += bytes;
         evictCache();
         idbSet(key, entry).then(() => { if (Math.random() < 0.02) idbEvict(); });
@@ -237,6 +275,14 @@ export function reportIssue(message) {
         });
         navigator.sendBeacon('/api/log', new Blob([payload], { type: 'application/json' }));
     } catch { /* logging must never break the page */ }
+}
+
+// Logout: what AniRoll cached for this account goes with it (RAM and IndexedDB), so the next person on
+// this browser finds none of it. Queued saves stay; they wait for the account that made them.
+export async function forgetAccountCache() {
+    const scope = `"scope":"user:${accountId()}"`;
+    clearCache(scope);
+    await idbDeleteMatching(scope);
 }
 
 export function clearCache(pattern) {
@@ -629,7 +675,7 @@ export async function saveMediaListEntry(variables, token, { queue = true } = {}
 
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
     if (saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=98').then(m =>
+        import('./jellyfin.js?v=99').then(m =>
             m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
     }
 
@@ -1153,7 +1199,7 @@ export async function getKitsuEpisodes(malId) {
 const IDB_NAME = 'aniroll_cache';
 const IDB_STORE = 'entries';
 const IDB_VERSION = 2;
-const CACHE_VERSION = 6;
+const CACHE_VERSION = 7; // 7: keys carry the account (scope) instead of a logged-in flag
 
 let _idbReady = null;
 function openIdb() {
@@ -1229,19 +1275,23 @@ async function idbEvict() {
         const db = await openIdb();
         const estimate = await navigator.storage?.estimate?.();
         const usage = estimate?.usage || 0;
-        const IDB_MAX = 10 * 1024 * 1024 * 1024;
+        const IDB_MAX = 200 * 1024 * 1024;
         if (usage < IDB_MAX) return;
 
+        // The oldest quarter by fetch time goes (the version marker stays)
         const tx = db.transaction(IDB_STORE, 'readwrite');
         const store = tx.objectStore(IDB_STORE);
+        const entries = [];
         const req = store.openCursor();
-        let deleted = 0;
         req.onsuccess = () => {
             const cursor = req.result;
-            if (!cursor || deleted >= 500) return;
-            cursor.delete();
-            deleted++;
-            cursor.continue();
+            if (cursor) {
+                if (cursor.key !== '__cache_version__') entries.push([cursor.key, cursor.value?.ts || 0]);
+                cursor.continue();
+                return;
+            }
+            entries.sort((a, b) => a[1] - b[1]);
+            for (const [key] of entries.slice(0, Math.max(1, Math.ceil(entries.length / 4)))) store.delete(key);
         };
     } catch { /* best effort */ }
 }
