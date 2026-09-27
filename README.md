@@ -23,6 +23,8 @@ AniRoll *AniRoll*. Their files are here as stubs with the same exports, so you c
 they plug in and what they get to work with. How they work inside is the part you have to think
 through yourself. [More on the cut](#the-deliberate-cut).
 
+New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start reading.
+
 ## What it does
 
 - **Roll**: a slot-machine reel picks from your Planning list, filtered by length, score and genre,
@@ -119,7 +121,7 @@ GSAP and Lenis entirely.
 
 **Start here:** `index.html` loads `js/app.js`, which sets up the shell (navigation, avatar menu,
 settings, background jobs) and hands the URL to `js/router.js`. The router maps `#/list`, `#/roll`, …
-to a module in `js/pages/`, and each page exports one `render({ content, query })`.
+to a module in `js/pages/`, and each page exports one `render({ content, params, query })`.
 
 | Where | What it holds |
 |---|---|
