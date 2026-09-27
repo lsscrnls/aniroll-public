@@ -226,71 +226,23 @@ export function statusLabel(status, type = 'ANIME') {
     return labels[status] || status;
 }
 
-// ===== Scores in the user's own AniList format (Settings → Lists on AniList) =====
-// Scores are always fetched and saved as 0–100 (`score(format: POINT_100)` / `scoreRaw`), so taste,
-// sorting and compare keep one scale. Only what is shown and typed follows the user's format.
-export function scoreFormat() {
-    return getState().user?.mediaListOptions?.scoreFormat || 'POINT_100';
+// ===== Scores: always out of 100 =====
+// AniRoll shows and takes every score out of 100, whatever format someone picked on AniList. List
+// scores are fetched as `score(format: POINT_100)` and saved as `scoreRaw`; the few statistics that
+// come in the owner's own format are converted in js/api.js (scoresTo100).
+
+// Display text: "85"; '' when unscored
+export function fmtScore(raw) {
+    return raw ? String(Math.round(raw)) : '';
 }
 
-// 0–100 → the number in that format (AniList's own rounding; smileys: 1 = :(, 2 = :|, 3 = :))
-export function scoreValue(raw, format = scoreFormat()) {
-    if (!raw) return 0;
-    switch (format) {
-        case 'POINT_10_DECIMAL': return Math.round(raw) / 10;
-        case 'POINT_10': return Math.max(1, Math.round(raw / 10));
-        case 'POINT_5': return Math.max(1, Math.round(raw / 20));
-        case 'POINT_3': return raw >= 61 ? 3 : raw >= 36 ? 2 : 1;
-        default: return Math.round(raw);
-    }
+// A difference between two scores ("+15", "-5")
+export function fmtScoreDiff(a, b) {
+    const n = Math.round(a || 0) - Math.round(b || 0);
+    return { value: n, text: `${n > 0 ? '+' : n < 0 ? '-' : ''}${Math.abs(n)}` };
 }
 
-// The number in that format → 0–100
-export function scoreToRaw(value, format = scoreFormat()) {
-    const v = Number(value) || 0;
-    if (v <= 0) return 0;
-    switch (format) {
-        case 'POINT_10_DECIMAL': return Math.min(100, Math.round(v * 10));
-        case 'POINT_10': return Math.min(100, Math.round(v) * 10);
-        case 'POINT_5': return Math.min(100, Math.round(v) * 20);
-        case 'POINT_3': return [0, 35, 60, 85][Math.min(3, Math.round(v))];
-        default: return Math.min(100, Math.round(v));
-    }
-}
-
-const SMILEYS = ['', ':(', ':|', ':)'];
-
-// Display text: "85", "8.5", "9", "4★", ":)"; '' when unscored
-export function fmtScore(raw, format = scoreFormat()) {
-    if (!raw) return '';
-    const v = scoreValue(raw, format);
-    if (format === 'POINT_10_DECIMAL') return v.toFixed(1);
-    if (format === 'POINT_5') return `${v}★`;
-    if (format === 'POINT_3') return SMILEYS[v];
-    return String(v);
-}
-
-// A difference between two 0–100 scores, in the user's format ("+1.5", "-2", "+1★")
-export function fmtScoreDiff(a, b, format = scoreFormat()) {
-    const d = scoreValue(a, format) - scoreValue(b, format);
-    const n = format === 'POINT_10_DECIMAL' ? Number(d.toFixed(1)) : d;
-    const text = format === 'POINT_10_DECIMAL' ? Math.abs(n).toFixed(1) : String(Math.abs(n));
-    return { value: n, text: `${n > 0 ? '+' : n < 0 ? '-' : ''}${text}${format === 'POINT_5' && n ? '★' : ''}` };
-}
-
-// The score control for an entry: a number field for point scales, stars or smileys to tap otherwise.
-// Stars/smileys carry data-score-raw; tapping the chosen one again clears the score.
-export function scoreInputHtml(raw, format = scoreFormat()) {
-    const v = scoreValue(raw, format);
-    if (format === 'POINT_5' || format === 'POINT_3') {
-        const n = format === 'POINT_5' ? 5 : 3;
-        const label = (i) => format === 'POINT_5' ? `${i} of 5 stars` : ['', 'Disliked', 'Average', 'Liked'][i];
-        return `<div class="score-pick score-pick-${n}" role="radiogroup" aria-label="Score">${Array.from({ length: n }, (_, k) => k + 1).map(i => {
-            const on = format === 'POINT_5' ? i <= v : i === v;
-            return `<button type="button" class="score-pick-btn${on ? ' on' : ''}" role="radio" aria-checked="${i === v}" data-score-raw="${scoreToRaw(i, format)}" title="${label(i)}" aria-label="${label(i)}">${format === 'POINT_5' ? '★' : SMILEYS[i]}</button>`;
-        }).join('')}</div>`;
-    }
-    const [max, step] = format === 'POINT_10_DECIMAL' ? [10, 0.1] : format === 'POINT_10' ? [10, 1] : [100, 1];
-    const shown = !v ? '' : format === 'POINT_10_DECIMAL' ? v.toFixed(1) : v;
-    return `<input type="number" class="glass-input" id="score-input" min="0" max="${max}" step="${step}" value="${shown}" placeholder="—" style="width:70px;text-align:center" aria-label="Score out of ${max}">`;
+// The score field for an entry: 0–100, the scale written next to it
+export function scoreInputHtml(raw) {
+    return `<span class="score-field"><input type="number" class="glass-input" id="score-input" min="0" max="100" step="1" value="${raw ? Math.round(raw) : ''}" placeholder="—" style="width:70px;text-align:center" aria-label="Score out of 100"><span class="score-scale">/ 100</span></span>`;
 }

@@ -1,4 +1,4 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=102';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=103';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -376,7 +376,7 @@ fragment mediaCard on Media {
     season
     seasonYear
     nextAiringEpisode { episode timeUntilAiring airingAt }
-    mediaListEntry { id status score progress }
+    mediaListEntry { id status score(format: POINT_100) progress }
     type
     genres
     isAdult
@@ -539,6 +539,22 @@ export async function getGenres() {
     return data.GenreCollection;
 }
 
+// AniRoll shows every score out of 100. Lists come that way (score(format: POINT_100)), and so does
+// every meanScore. The score distribution (statistics.*.scores) doesn't: for the 10 point, 5 star and
+// smiley formats AniList sends it in the owner's own scale (checked 2026-09-27; 100 point and 10 point
+// decimal come out of 100). Converted here, on a copy, so the cache keeps AniList's answer.
+const DISTRIBUTION_TO_100 = { POINT_10: v => v * 10, POINT_5: v => v * 20, POINT_3: v => [0, 35, 60, 85][v] ?? v };
+
+function scoresTo100(user) {
+    const convert = DISTRIBUTION_TO_100[user?.mediaListOptions?.scoreFormat];
+    if (!convert || !user.statistics) return user;
+    const statistics = {};
+    for (const [type, stats] of Object.entries(user.statistics)) {
+        statistics[type] = stats?.scores ? { ...stats, scores: stats.scores.map(x => ({ ...x, score: convert(x.score) })) } : stats;
+    }
+    return { ...user, statistics };
+}
+
 export async function getViewer(token) {
     const data = await query(`
         query {
@@ -576,7 +592,7 @@ export async function getViewer(token) {
             }
         }
     `, {}, token);
-    return data.Viewer;
+    return scoresTo100(data.Viewer);
 }
 
 export async function getUserProfile(name, token = null) {
@@ -604,11 +620,12 @@ export async function getUserProfile(name, token = null) {
                     manga(page: 1, perPage: 10) { nodes { id title { userPreferred english romaji native } coverImage { large } } }
                     characters(page: 1, perPage: 10) { nodes { id name { full } image { medium } } }
                 }
+                mediaListOptions { scoreFormat }
                 siteUrl
             }
         }
     `, { name }, token, TTL.profile);
-    return data.User;
+    return scoresTo100(data.User);
 }
 
 export async function getMediaList(userId, type = 'ANIME', token = null) {
@@ -622,7 +639,7 @@ export async function getMediaList(userId, type = 'ANIME', token = null) {
                         id
                         mediaId
                         status
-                        score
+                        score(format: POINT_100)
                         progress
                         progressVolumes
                         repeat
@@ -645,7 +662,7 @@ export async function getMediaList(userId, type = 'ANIME', token = null) {
     return data.MediaListCollection.lists;
 }
 
-// Scores: always pass `scoreRaw` (0-100). `score` would be interpreted in the user's own scoreFormat.
+// Scores: always pass `scoreRaw` (0-100). `score` would be read in the user's own AniList format.
 export async function saveMediaListEntry(variables, token, { queue = true } = {}) {
     const data = await queryOrQueue(variables, token, queue, `
         mutation (
@@ -675,7 +692,7 @@ export async function saveMediaListEntry(variables, token, { queue = true } = {}
 
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
     if (saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=102').then(m =>
+        import('./jellyfin.js?v=103').then(m =>
             m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
     }
 
