@@ -8,8 +8,20 @@ Live at **[aniroll.app](https://aniroll.app)**. Log in with AniList; your list s
 
 ![Roll: the reel spins through your Planning list and lands on tonight's show](docs/screenshots/clip-roll.webp)
 
-This repository is here so you can **read how AniRoll works**. It is not a kit for running your own
-copy: Roll, the Watch Party and the taste match are left out (see [What's not in here](#whats-not-in-here)).
+## Read this first
+
+This repository is a **showcase, not a kit**. It shows how AniRoll is built. It is not meant to be
+cloned and run as your own copy.
+
+**Everything AniRoll stands on is here**: talking to a rate-limited API with no backend of its own
+in between, caching that keeps working offline, keeping two accounts in one browser apart, writing to
+someone's list only when that is safe, a small server that holds secrets, two complete designs, and
+no bundler anywhere.
+
+**Three pieces are cut on purpose**: Roll, the Watch Party and the taste match. They are what makes
+AniRoll *AniRoll*. Their files are here as stubs with the same exports, so you can see exactly where
+they plug in and what they get to work with. How they work inside is the part you have to think
+through yourself. [More on the cut](#the-deliberate-cut).
 
 ## What it does
 
@@ -42,10 +54,68 @@ copy: Roll, the Watch Party and the taste match are left out (see [What's not in
 
 Screenshots and clips show a made-up demo account; the shows are real, from AniList.
 
-## How the code is laid out
+## How it is built
 
-Plain JavaScript ES modules, loaded by the browser as they are: no framework, no bundler, no build
-step. Every import carries `?v=N`, raised on each release, so browsers never mix old and new modules.
+Each section below is a problem AniRoll has to solve, how it solves it, and where to read the code.
+
+### A rate-limited API as the only backend
+
+The browser talks straight to the [AniList GraphQL API](https://docs.anilist.co). AniList allows about
+30 requests a minute when it is under load, and every open tab counts against that. So `js/api.js`
+does not just send queries:
+
+- **A budget shared by every tab**: at most 20 requests per rolling minute, counted in `localStorage`
+  and claimed under `navigator.locks`, so two tabs can't both take the last slot.
+- **Caching in two layers**: RAM (LRU, 50 MB) and IndexedDB (200 MB, oldest first), each kind of data
+  with its own lifetime. If a refresh fails, the old answer is shown instead of an empty page.
+- **One request for identical queries** that are in flight at the same time.
+- **A pause on 429**: for five minutes nothing goes out, reads come from the cache, and changes wait in
+  a queue that drains a few at a time once AniList answers again.
+
+### One browser, more than one account
+
+Everything an account caches or queues is marked with that account. Cache keys carry the account id
+(never the token), so a different login on the same browser never sees someone else's list state. A
+queued save only goes out for the account that made it. Logging out deletes that account's cache.
+
+### Writing to someone's list only when it is safe
+
+Jellyfin playback moves your AniList forward (`js/jellyfin.js`, and the same rules in `api/server.js`).
+A wrong guess would change someone's list on the wrong show, so matching is strict: a year in either
+title has to agree, the episode has to fit, shows that share a name are told apart first, and if in
+doubt nothing is written. A correction by hand wins over a later playback.
+
+### A small server that holds secrets
+
+`api/server.js` is plain Node without a framework. It serves the Jellyfin relay and webhook, background
+sync, share pages and an error log. Jellyfin keys and AniList tokens are encrypted with AES-256-GCM,
+and the key comes from outside the data volume (the server refuses to start without it). Data files
+are written atomically. The relay forwards only the few Jellyfin endpoints AniRoll uses, and it refuses
+private addresses at connect time, so DNS tricks can't point it at localhost.
+
+### No bundler
+
+Plain ES modules, loaded by the browser as they are. Every import carries `?v=N`, raised on each
+release, so a browser never mixes old and new modules. With no bundler and no inline script, the
+Content Security Policy can say `script-src 'self'`: only AniRoll's own files run, even if a bug ever
+let markup through the escaping.
+
+### Two designs, one app
+
+`js/design.js` switches between AniRoll's own look and Material 3 Expressive. Material 3's whole
+light and dark scheme comes from one seed colour, the cover colour of the show you watched last,
+through Google's Material Color Utilities. Its wallpaper is that cover, blurred once on a tiny canvas
+instead of with an expensive CSS blur. `js/m3.js` adds what CSS alone can't: the hero, the widgets
+and a cursor that takes the shape of what it points at.
+
+### Pages that don't trip over each other
+
+`js/router.js` gives every navigation a number. A slow page that answers after you already moved on
+cleans up after itself instead of drawing over the page you are on now. Dialogs (`js/a11y.js`) trap
+focus, close on Escape, stack, and return focus to what opened them. *Reduce motion* turns off
+GSAP and Lenis entirely.
+
+## Finding your way around
 
 **Start here:** `index.html` loads `js/app.js`, which sets up the shell (navigation, avatar menu,
 settings, background jobs) and hands the URL to `js/router.js`. The router maps `#/list`, `#/roll`, …
@@ -53,16 +123,16 @@ to a module in `js/pages/`, and each page exports one `render({ content, query }
 
 | Where | What it holds |
 |---|---|
-| `js/api.js` | Everything that talks to the [AniList GraphQL API](https://docs.anilist.co): queries, the request budget, the cache, the queue for saves |
+| `js/api.js` | Everything that talks to AniList: queries, the request budget, the cache, the queue for saves |
 | `js/store.js` | Small shared state (user, settings), escaping, toasts, score formats, events other modules listen to |
 | `js/auth.js` | The AniList login token, kept in `localStorage` |
 | `js/pages/*.js` | One module per page: `home`, `list`, `calendar`, `detail` (the slide-in panel), `social`, `search`, … |
 | `js/upnext.js`, `js/home-cinema.js` | What Home says about your list (next episode, what's waiting, the week) and AniRoll's Home on top of it |
-| `js/design.js`, `js/m3.js`, `css/m3.css` | The design switch; Material 3's palette, generated from one seed colour, and its extra pieces (hero, widgets, cursor) |
+| `js/design.js`, `js/m3.js`, `css/m3.css` | The design switch, Material 3's generated palette and its extra pieces |
 | `js/jellyfin.js`, `js/nowplaying.js` | Jellyfin: matching what you played to an AniList entry, the *Now watching* chip |
-| `js/a11y.js`, `js/select.js` | Dialogs that trap focus and close on Escape, keyboard activation, styled selects |
+| `js/a11y.js`, `js/select.js` | Dialogs, keyboard activation, styled selects |
 | `js/whatsnew.js` | The changelog and the pop-up for returning visitors |
-| `api/server.js` | The small Node backend: Jellyfin relay and webhook, background sync, share pages, error log |
+| `api/server.js` | The Node backend |
 | `css/style.css` | AniRoll's own design; `css/m3.css` is only loaded in Material 3 |
 
 ### One action, followed through the code
@@ -75,39 +145,30 @@ Pressing **+1** on a Continue Watching card (`js/pages/home.js`):
    then `api.saveMediaListEntry()` sends it.
 3. Saves for the same entry are chained, so three quick clicks arrive at AniList in order, and only the
    newest target is sent.
-4. `api.js` takes a slot from the request budget. If AniList is rate limiting, the save waits in a queue
-   in `localStorage` and goes out later; the card keeps the new number.
+4. `api.js` takes a slot from the request budget. If AniList is rate limiting, the save waits in the
+   account's queue and goes out later; the card keeps the new number.
 5. The card emits `aniroll:watched` (`js/store.js`): Material 3 listens and re-colours the app from
    the show you just watched. Home's hero presses this same card's button, so there is one code path for saving.
 
-### Ideas worth reading
+## The deliberate cut
 
-- **A request budget shared by every tab** (`js/api.js`): at most 20 AniList requests per rolling
-  minute, counted in `localStorage`. On a 429 everything pauses for five minutes; reads come from a
-  RAM + IndexedDB cache, writes wait in a queue that drains slowly. Identical queries in flight share one request.
-- **Strict Jellyfin matching** (`js/jellyfin.js`, the same rules in `api/server.js`): a wrong guess
-  would move someone's list on the wrong show, so a year in either title has to agree, the episode has to
-  fit, and shows that share a name are told apart before anything is written. A correction by hand wins
-  over a later playback.
-- **Secrets at rest** (`api/server.js`): Jellyfin keys and AniList tokens for background sync are
-  stored encrypted, with the key outside the data volume; data files are written atomically.
-- **A relay that can't be turned inward** (`api/server.js`): it only forwards the few Jellyfin endpoints
-  AniRoll calls, and refuses private addresses in the connection itself, so DNS can't be used to reach localhost.
-- **Material 3 from one colour** (`js/design.js`): Google's Material Color Utilities turn the cover
-  colour of your last show into a full light and dark scheme; the wallpaper is that cover, blurred once
-  on a tiny canvas instead of with a costly CSS blur.
-- **Motion that respects you** (`js/animations.js`): GSAP and Lenis, off entirely with *Reduce motion*.
+| Piece | Files | What it builds on, all of it here |
+|---|---|---|
+| **Roll** | `js/pages/roll.js`, `js/reel.js` | `api.getMediaList()` and `api.getRecommendations()`, `api.saveMediaListEntry()`, the detail panel |
+| **Watch Party** | `js/pages/watchparty.js`, `api/party.js` | `api.getUserMediaProgress()` and `api.saveMediaListEntry()`, background sync (`js/background.js`, `api/server.js`) |
+| **Taste match** | `js/taste.js` | Your list with its scores, genres and tags; `api.getTasteProfile()`, the recommendations and the detail page call it |
 
-## What's not in here
+The stubs keep every export, so the rest of the app loads and runs without them. The server runs
+without `api/party.js`, too. This repository only ever held published snapshots, so older commits don't
+contain these pieces either. To see them in action, [try AniRoll](https://aniroll.app).
 
-The parts that make AniRoll AniRoll are not published:
+## How it is checked
 
-- **Roll** (`js/pages/roll.js`, `js/reel.js`)
-- **Watch Party** (`js/pages/watchparty.js`, and its server side `api/party.js`)
-- **Taste match** (`js/taste.js`)
-
-In this repository they are stubs with the same exports, so the rest of the app still loads and reads
-coherently. This repository only ever held published snapshots, so older commits don't have them either.
+- `tools/e2e/`: every page in Chromium (Playwright) against a mocked AniList: navigation, dialogs and
+  keyboard, both designs, the changelog, and a check that two accounts in one browser never share
+  cached answers or queued saves
+- `tools/api-test/`: the Jellyfin matcher in the server and the browser gives the same answer for the
+  same cases, the relay refuses private addresses, posts are escaped, data files survive a crash mid-write
 
 AniRoll is built with Vanilla JS, [GSAP](https://gsap.com), [Lenis](https://lenis.darkroom.engineering),
 the self-hosted [Inter](https://rsms.me/inter/) font and Material Symbols. All anime data comes from AniList.
