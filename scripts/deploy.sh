@@ -5,6 +5,7 @@
 #   scripts/deploy.sh --api       also api/server.js + api/party.js: rebuild the image, restart the container
 #   scripts/deploy.sh --nginx     also deploy/nginx/aniroll.conf: nginx -t, reload, roll back on error
 #   scripts/deploy.sh --dry-run   run the checks, upload nothing
+#   scripts/deploy.sh --no-e2e    skip the browser checks against the obfuscated build (not recommended)
 #
 # Before uploading it checks that every ?v= import and APP_VERSION agree and that every
 # module parses — both were manual steps that were easy to forget.
@@ -20,12 +21,13 @@ mapfile -t PROTECTED < <(grep -E '^js/.*\.js$' "$(dirname "$0")/protected.txt")
 
 cd "$(dirname "$0")/.."
 
-WITH_API=0; WITH_NGINX=0; DRY=0
+WITH_API=0; WITH_NGINX=0; DRY=0; E2E=1
 for arg in "$@"; do
     case "$arg" in
         --api) WITH_API=1 ;;
         --nginx) WITH_NGINX=1 ;;
         --dry-run) DRY=1 ;;
+        --no-e2e) E2E=0 ;;
         -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
     esac
@@ -77,6 +79,16 @@ for f in "${PROTECTED[@]}"; do
     cp "$stage/$f" "$stage/check.mjs" && node --check "$stage/check.mjs" || fail "obfuscated $f does not parse"
 done
 rm -f "$stage/check.mjs"
+# What goes up is what gets tested: every page against a mocked AniList, on the obfuscated copy.
+# Obfuscation once broke joining a Watch Party while the readable source worked (v99)
+if [ "$E2E" -eq 1 ]; then
+    echo "browser checks on the obfuscated build..."
+    docker run --rm -v "$stage:/work:ro" -v "$PWD/tools/e2e:/e2e:ro" mcr.microsoft.com/playwright:v1.63.0-noble sh -c \
+        "cp -r /e2e /tmp/e2e && cd /tmp/e2e && npm ci --silent >/dev/null 2>&1 && sed -i \"s#path.join(__dirname, '..', '..')#'/work'#\" run.js && node run.js" \
+        > "$stage.e2e.log" 2>&1 || { grep -v '^PASS' "$stage.e2e.log" >&2; rm -f "$stage.e2e.log"; fail "browser checks failed on the obfuscated build, nothing uploaded"; }
+    echo "$(grep -c '^PASS' "$stage.e2e.log") browser checks passed"
+    rm -f "$stage.e2e.log"
+fi
 tar -cf - -C "$stage" "${files[@]}" | ssh "$SERVER" "tar -xf - -C '$WEBROOT' && echo uploaded: ${files[*]}"
 
 # Files that exist on the server but no longer in the repo are left alone — list them instead
