@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>AniRoll</title>
+    <meta property="og:title" content="AniRoll">
+    <meta property="og:description" content="Your AniList with watch parties, a random pick for what to watch next, recommendations and an airing calendar.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://aniroll.hxlx.de/">
+    <!-- New file name on purpose: Discord caches preview images for a long time -->
+    <meta property="og:image" content="https://aniroll.hxlx.de/og-image-v3.jpg">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="AniRoll — narutomaki spiral on dark background, with watch parties, roll, recommendations and calendar">
+    <meta property="og:site_name" content="AniRoll">
+    <meta name="theme-color" content="#d13438">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="AniRoll">
+    <meta name="twitter:description" content="Your AniList with watch parties, a random pick for what to watch next, recommendations and an airing calendar.">
+    <meta name="twitter:image" content="https://aniroll.hxlx.de/og-image-v3.jpg">
+    <link rel="stylesheet" href="css/style.css?v=76">
+    <link rel="preload" href="fonts/inter-latin-opsz-5.3.0.woff2" as="font" type="font/woff2" crossorigin>
+    <!-- Own narutomaki instead of the 🍥 emoji; ?v= because browsers cache favicons stubbornly -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1">
+    <!-- Installable app (home screen): manifest for Android/desktop, apple-touch-icon + metas for iOS -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="AniRoll">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+    <div id="cursor" class="cursor"></div>
+
+    <div id="app">
+        <nav id="navbar" class="glass-nav">
+            <div class="nav-inner">
+                <a href="#/" class="nav-logo magnetic">
+                    <span class="logo-text">AniRoll</span>
+                </a>
+                <div class="nav-links">
+                    <a href="#/" class="nav-link magnetic" data-page="home"><span class="nav-link-inner"><span>Home</span><span>Home</span></span></a>
+                    <a href="#/list" class="nav-link magnetic" data-page="list"><span class="nav-link-inner"><span>My List</span><span>My List</span></span></a>
+                    <a href="#/roll" class="nav-link magnetic" data-page="roll"><span class="nav-link-inner"><span>Roll</span><span>Roll</span></span></a>
+                    <a href="#/search" class="nav-link magnetic" data-page="discover"><span class="nav-link-inner"><span>Discover</span><span>Discover</span></span></a>
+                    <a href="#/social" class="nav-link magnetic" data-page="social"><span class="nav-link-inner"><span>Social</span><span>Social</span></span></a>
+                </div>
+                <div class="nav-actions">
+                    <button id="jf-now-chip" class="jf-now-chip" hidden>
+                        <span class="jf-now-chip-dot"></span><span class="jf-now-chip-text"></span>
+                    </button>
+                    <button id="search-btn" class="nav-icon-btn magnetic" aria-label="Search">
+                        <svg data-icon="search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><path d="M21 21l-5.2-5.2"/></svg>
+                    </button>
+                    <button id="notif-btn" class="nav-icon-btn magnetic" aria-label="Notifications">
+                        <svg data-icon="notifications" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0112 0c0 3.5 1.5 5.5 2.5 7H3.5c1-1.5 2.5-3.5 2.5-7z"/><path d="M10 18a2.5 2.5 0 005 0"/></svg>
+                        <span id="notif-badge" class="badge" hidden></span>
+                    </button>
+                    <div id="user-menu" class="user-menu">
+                        <button id="user-btn" class="nav-icon-btn user-avatar-btn magnetic" aria-label="Profile">
+                            <svg data-icon="person" id="user-icon-default" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="8" r="4.5"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                            <img id="user-avatar" class="avatar-img" hidden alt="Avatar">
+                        </button>
+                        <div id="user-dropdown" class="glass-dropdown" hidden>
+                            <a href="#/profile" class="dropdown-item">My Profile</a>
+                            <a href="#/settings" class="dropdown-item">Settings</a>
+                            <hr class="dropdown-divider">
+                            <div class="dropdown-item jf-status-item" id="pending-status-item" hidden>
+                                <span class="jf-dot" id="pending-status-dot"></span><span id="pending-status-text"></span>
+                            </div>
+                            <a href="#/settings?tab=jellyfin" class="dropdown-item jf-status-item" id="jf-status-item" hidden>
+                                <span class="jf-dot" id="jf-status-dot"></span><span id="jf-status-text">Jellyfin</span>
+                            </a>
+                            <button type="button" class="dropdown-item whatsnew-link">What's new</button>
+                            <button id="theme-toggle" class="dropdown-item">Toggle Theme</button>
+                            <button id="logout-btn" class="dropdown-item danger">Log Out</button>
+                        </div>
+                    </div>
+                    <button id="login-btn" class="glass-btn glass-btn-primary magnetic" hidden>Log In</button>
+                </div>
+            </div>
+        </nav>
+
+        <div id="maintenance-banner" class="maintenance-banner" hidden></div>
+
+        <main id="content" class="main-content">
+            <div id="page-loader" class="page-loader">
+                <div class="loader-spinner"></div>
+            </div>
+        </main>
+    </div>
+
+    <nav id="tabbar" class="mobile-tabbar">
+        <a href="#/" class="mobile-tab" data-page="home">
+            <svg data-icon="home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/></svg>
+            Home
+        </a>
+        <a href="#/list" class="mobile-tab" data-page="list">
+            <svg data-icon="video_library" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            My List
+        </a>
+        <a href="#/roll" class="mobile-tab" data-page="roll">
+            <svg data-icon="cyclone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.9A3.4 3.4 0 0 1 16.23 3.94A3.4 3.4 0 0 1 19.49 6.83A3.4 3.4 0 0 1 21.03 10.9A3.4 3.4 0 0 1 20.51 15.23A3.4 3.4 0 0 1 18.03 18.81A3.4 3.4 0 0 1 14.18 20.84A3.4 3.4 0 0 1 9.82 20.84A3.4 3.4 0 0 1 5.97 18.81A3.4 3.4 0 0 1 3.49 15.23A3.4 3.4 0 0 1 2.97 10.9A3.4 3.4 0 0 1 4.51 6.83A3.4 3.4 0 0 1 7.77 3.94A3.4 3.4 0 0 1 12 2.9Z"/><path d="M17.9 12A5.9 5.9 0 0 1 6.1 12A4.45 4.45 0 0 1 15 12A3 3 0 0 1 9 12A1.55 1.55 0 0 1 12.1 12"/></svg>
+            Roll
+        </a>
+        <a href="#/search" class="mobile-tab" data-page="discover">
+            <svg data-icon="explore" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><path d="M21 21l-5.2-5.2"/></svg>
+            Discover
+        </a>
+        <a href="#/social" class="mobile-tab" data-page="social">
+            <svg data-icon="group" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            Social
+        </a>
+    </nav>
+
+    <div id="search-overlay" class="glass-overlay" hidden>
+        <div class="overlay-backdrop"></div>
+        <div class="search-container">
+            <div class="search-header">
+                <svg data-icon="search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="search-icon"><circle cx="10.5" cy="10.5" r="7"/><path d="M21 21l-5.2-5.2"/></svg>
+                <input id="search-input" type="text" placeholder="Search anime or manga..." autocomplete="off">
+                <button id="search-close" class="glass-icon-btn magnetic">
+                    <svg data-icon="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="search-results" class="search-results"></div>
+        </div>
+    </div>
+
+    <div id="detail-panel-overlay" class="detail-panel-overlay" inert>
+        <div class="detail-panel-backdrop"></div>
+        <div class="detail-panel">
+            <div class="detail-panel-actions">
+                <button id="detail-panel-fullscreen-btn" class="detail-panel-action-btn magnetic" aria-label="Fullscreen">
+                    <svg data-icon="open_in_full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                </button>
+                <button id="detail-panel-close-btn" class="detail-panel-action-btn magnetic" aria-label="Close">
+                    <svg data-icon="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="detail-panel-body" class="detail-panel-body"></div>
+        </div>
+    </div>
+
+    <div id="modal-container" hidden></div>
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Hosted here, unmodified from the npm packages: a compromised CDN could otherwise read the AniList token -->
+    <script src="js/vendor/gsap-3.12.5.min.js"></script>
+    <script src="js/vendor/ScrollTrigger-3.12.5.min.js"></script>
+    <script src="js/vendor/lenis-1.1.13.min.js"></script>
+    <script type="module" src="js/app.js?v=98"></script>
+</body>
+</html>
