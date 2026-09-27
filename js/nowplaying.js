@@ -1,4 +1,4 @@
-import { esc } from './store.js?v=99';
+import { esc } from './store.js?v=100';
 
 // What Jellyfin is playing right now (from the webhook state in js/jellyfin.js):
 // the chip in the navbar and the card on Home.
