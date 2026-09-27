@@ -351,6 +351,66 @@ function staticServer() {
     check("watch party: the host's view with its episode counter", /You are the host/.test(hosting) && /EPISODE COUNTER/i.test(hosting), hosting.slice(0, 160));
     await wp.close();
 
+    // What came from comparing notes with a friend's app: shows from Planning that start soon (Home), format
+    // chips (My List), studios as cards with a page of their own and related shows as covers (detail)
+    const nx = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    nx.on('pageerror', e => errors.push(`new pieces: ${e.message}`));
+    await nx.route('https://graphql.anilist.co/**', route => {
+        const answer = respond(route.request().postDataJSON());
+        // The mock has every show airing and every show on TV: one planned show premieres in 8 days, one is a movie
+        for (const list of answer.data?.MediaListCollection?.lists || []) {
+            if (list.status === 'PLANNING' && list.entries[0]) {
+                Object.assign(list.entries[0].media, { status: 'NOT_YET_RELEASED', nextAiringEpisode: { episode: 1, airingAt: Math.floor(Date.now() / 1000) + 8 * 86400, timeUntilAiring: 8 * 86400 } });
+            }
+            if (list.status === 'CURRENT' && list.entries[1]) list.entries[1].media.format = 'MOVIE';
+        }
+        route.fulfill({ contentType: 'application/json', body: JSON.stringify(answer) });
+    });
+    await nx.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false}' }));
+    await nx.route(/cdn|googleapis|gstatic/, route => route.abort());
+    await nx.addInitScript(({ id, name }) => {
+        localStorage.setItem('aniroll_token', 'e2e-token');
+        localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+        localStorage.setItem('aniroll_user_ts', String(Date.now()));
+        localStorage.setItem('aniroll_seen_changes', '9999');
+    }, VIEWER);
+    const nxGo = async (hash) => { await nx.evaluate(h => { localStorage.removeItem('aniroll_req_times'); location.hash = h; }, hash); await nx.waitForTimeout(2500); };
+    await nx.goto(base + '/#/');
+    await nx.waitForTimeout(3000);
+    const soon = await nx.evaluate(() => ({ shown: !document.getElementById('starting-soon')?.hidden,
+        text: document.querySelector('#starting-soon-row .starting-soon-when')?.textContent.replace(/\s+/g, ' ').trim() }));
+    check('home: a planned show that premieres soon, with its date', soon.shown && /^Episode 1 in 8d/.test(soon.text || ''), soon);
+
+    await nxGo('#/list');
+    const chips = await nx.evaluate(() => Object.fromEntries([...document.querySelectorAll('#list-formats [data-format]')].map(b => [b.dataset.format, !b.hidden])));
+    const count = () => nx.evaluate(() => document.querySelectorAll('#list-content [data-media-id]').length);
+    const all = await count();
+    await nx.click('#list-formats [data-format="MOVIE"]');
+    const movies = await count();
+    await nx.click('#list-formats [data-format="MOVIE"]');
+    const again = await count();
+    check('my list: format chips only for formats on the list; one filters, clicked again shows all',
+        chips.TV && chips.MOVIE && !chips.OVA && movies === 1 && all > 1 && again === all, { chips, all, movies, again });
+
+    await nxGo('#/anime/101/full');
+    const detail = await nx.evaluate(() => ({ studios: [...document.querySelectorAll('.detail-studio')].map(a => a.getAttribute('href')),
+        related: document.querySelectorAll('.detail-related-item[data-open]').length }));
+    check('detail: studios as cards that open their page, related shows as covers',
+        detail.studios.length > 0 && detail.studios.every(h => /^#\/studio\/\d+$/.test(h)) && detail.related > 0, detail);
+    await nx.click('.detail-studio');
+    await nx.waitForTimeout(2500);
+    const studio = await nx.evaluate(() => ({ hash: location.hash, title: document.getElementById('studio-title')?.textContent.trim(),
+        cards: document.querySelectorAll('#studio-grid .media-card').length, discover: document.querySelector('.nav-links [data-page="discover"]')?.classList.contains('active') }));
+    // From the side panel: the studio page opens and the panel goes
+    await nx.evaluate(() => window.__openDetailPanel(101));
+    await nx.waitForTimeout(2500);
+    await nx.click('#detail-panel-overlay .detail-studio');
+    await nx.waitForTimeout(2000);
+    const fromPanel = await nx.evaluate(() => ({ hash: location.hash, panelOpen: document.getElementById('detail-panel-overlay').classList.contains('open') }));
+    check('detail panel: a studio card opens the studio page and closes the panel', /^#\/studio\//.test(fromPanel.hash) && !fromPanel.panelOpen, fromPanel);
+    check('studio page: its name and its anime, under Discover', /^#\/studio\/\d+$/.test(studio.hash) && !!studio.title && studio.cards > 0 && studio.discover, studio);
+    await nx.close();
+
     // "Reduce motion": no smooth scrolling (Lenis marks <html>), no cards flying in, no count-up
     const calm = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
     await calm.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));

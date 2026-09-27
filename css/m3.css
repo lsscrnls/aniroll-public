@@ -1,5 +1,5 @@
 /* Material Symbols for every data-icon (generated, see tools/m3/icons.py) */
-@import url('m3-icons.css?v=1');
+@import url('m3-icons.css?v=2');
 @import url('m3-shapes.css?v=1');
 
 /* Material 3 Expressive — AniRoll's second design (Settings → Appearance → Design, logged in only).
@@ -1865,3 +1865,14 @@
 :root[data-design="m3"]:not(.m3-cursor-on) :is(a, button, [role="button"], [role="link"], [data-open], [data-go], label) { cursor: pointer; }
 /* AniRoll's own Home hero and strip (js/home-cinema.js): Material 3 shows its own instead */
 :root[data-design="m3"] .ar-home { display: none !important; }
+
+/* ----- Detail: studio cards and related covers, in M3's tonal containers ----- */
+:root[data-design="m3"] .detail-studio { border: 0; background: var(--md-surface-container); border-radius: var(--radius-xl); transition: background-color .2s var(--md-standard), border-radius .45s var(--ease); }
+:root[data-design="m3"] .detail-studio:hover { background: var(--md-surface-container-high); border-radius: var(--md-shape-xxl); }
+:root[data-design="m3"] .detail-studio-icon { color: var(--md-primary); }
+:root[data-design="m3"] .detail-studio-role { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .detail-related-title { text-transform: none; letter-spacing: 0; font-size: 0.875rem; font-weight: 500; color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .detail-related-item img { border-radius: var(--radius-lg); }
+:root[data-design="m3"] .detail-related-item:hover img { border-radius: var(--md-shape-xxl); }
+:root[data-design="m3"] .studio-kicker { color: var(--md-primary); }
+

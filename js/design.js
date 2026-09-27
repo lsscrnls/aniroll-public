@@ -10,7 +10,7 @@ const VARIANT_KEY = 'aniroll_m3_variant';   // 'tonal' | 'vibrant' | 'expressive
 const SEED_KEY = 'aniroll_m3_seed';         // M3 has its own palette, unrelated to AniRoll's accent colour
 const CACHE_KEY = 'aniroll_m3_scheme3';     // { key, css } — new name when the generated CSS changes
 const SHOW_KEY = 'aniroll_m3_show';         // { color, cover } of the show you're on: the app's "wallpaper" 
-const CSS_HREF = 'css/m3.css?v=20';
+const CSS_HREF = 'css/m3.css?v=21';
 
 // 'show' themes the whole app from the show you're watching, like a desktop themed from its wallpaper
 // (js/m3.js applies it); the others are seeds in the spirit of Google's own M3 palettes
@@ -100,7 +100,7 @@ export async function applyDesign(loggedIn) {
     }
     // Page additions only M3 has (hero, search bar, rail FAB ...)
     if (enhancer) enhancer.then(m => m.refresh());
-    enhancer ??= import('./m3.js?v=104').then(m => { m.setup(); return m; });
+    enhancer ??= import('./m3.js?v=105').then(m => { m.setup(); return m; });
 
     // Stylesheet first; keep the page hidden until it's there, so AniRoll's look never flashes
     let sheet = null;

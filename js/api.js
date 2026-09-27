@@ -1,4 +1,4 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=104';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=105';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -355,7 +355,6 @@ fragment mediaFields on Media {
     mediaListEntry { id status score(format: POINT_100) progress repeat notes startedAt { year month day } completedAt { year month day } }
     type
     description(asHtml: false)
-    studios(isMain: true) { nodes { id name } }
     source
     duration
     countryOfOrigin
@@ -401,6 +400,23 @@ export async function searchMedia(search, type = null, page = 1, perPage = 20, t
     return data.Page;
 }
 
+// A studio and its anime, most popular first (the Studio page)
+export async function getStudio(id, page = 1, token = null) {
+    const data = await cachedQuery(`
+        ${MEDIA_FRAGMENT}
+        query ($id: Int, $page: Int) {
+            Studio(id: $id) {
+                id name isAnimationStudio
+                media(page: $page, perPage: 30, sort: [POPULARITY_DESC]) {
+                    pageInfo { hasNextPage total }
+                    edges { isMainStudio node { ...mediaFields } }
+                }
+            }
+        }
+    `, { id, page }, token, TTL.discovery);
+    return data.Studio;
+}
+
 export async function getMedia(id, token = null) {
     const data = await cachedQuery(`
         ${MEDIA_FRAGMENT}
@@ -413,6 +429,9 @@ export async function getMedia(id, token = null) {
                         mediaRecommendation { id title { userPreferred english romaji native } coverImage { large } meanScore format type }
                     }
                 }
+                # Every studio with its role, in one field: AniList answers a second studios(...) in the same
+                # query with the first one's arguments (checked 2026-09-27), so it is asked once, here
+                studios { edges { isMain node { id name isAnimationStudio } } }
                 relations { edges {
                     relationType(version: 2)
                     node { id title { userPreferred english romaji native } coverImage { large } format type status meanScore }
@@ -692,7 +711,7 @@ export async function saveMediaListEntry(variables, token, { queue = true } = {}
 
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
     if (saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=104').then(m =>
+        import('./jellyfin.js?v=105').then(m =>
             m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
     }
 

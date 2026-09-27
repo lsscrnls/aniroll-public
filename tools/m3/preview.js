@@ -78,6 +78,7 @@ const design = process.env.DESIGN || 'm3';
     await shot(p, 'settings', '#/settings?tab=appearance', { ms: 2500 });
     await shot(p, 'profile', '#/profile', { ms: 5000 });
     await shot(p, 'full', '#/anime/154587/full', { ms: 6000, full: true });
+    await shot(p, 'studio', '#/studio/11', { ms: 6000 });
     await shot(p, 'panel', '#/', { ms: 3000, act: q => q.evaluate(() => window.__openDetailPanel(154587)) });
     // A real click on a cover: the container transform runs (View Transitions); shot mid-way and at the end
     if (want('morph')) {
