@@ -1416,10 +1416,13 @@ input, select, textarea { font: inherit; color: inherit; }
     bottom: 0;
     left: 0;
     right: 0;
-    height: 60%;
-    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, transparent 100%);
+    height: 70%;
+    /* Into the page's own background, like the detail page: the name on it reads in light and dark */
+    background: linear-gradient(to top, var(--bg) 0%, rgba(0,0,0,0.3) 60%, transparent 100%);
     pointer-events: none;
 }
+/* No banner of their own: a plain surface needs no shading */
+.profile-banner:not(:has(img))::after { display: none; }
 
 .profile-banner img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -1431,7 +1434,6 @@ input, select, textarea { font: inherit; color: inherit; }
     margin-top: -60px;
     position: relative;
     z-index: 2;
-    text-shadow: 0 1px 6px rgba(0,0,0,0.6);
 }
 
 .profile-avatar {
@@ -4725,6 +4727,14 @@ html.m3-loading body { visibility: hidden; }
     cursor: pointer;
 }
 .landing-foot .whatsnew-link:hover { color: var(--text); text-decoration: underline; }
+.landing-foot { align-items: center; gap: var(--space-lg); }
+.landing-foot-link { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-secondary); text-decoration: none; }
+.landing-foot-link:hover { color: var(--text); text-decoration: underline; }
+.landing-foot-link svg { width: 14px; height: 14px; }
+/* The source on GitHub in the avatar menu: a quiet entry with the mark */
+.dropdown-item.github-link { display: flex; align-items: center; gap: 8px; }
+.dropdown-item.github-link svg { width: 15px; height: 15px; flex-shrink: 0; }
+.m3-rail-github { display: none; }
 
 /* After closing: the real tabs that moved light up for a moment */
 .whatsnew-hint { animation: whatsnewHint 1.3s var(--ease) 2; border-radius: var(--radius-full); }
