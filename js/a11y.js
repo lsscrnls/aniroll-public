@@ -1,5 +1,5 @@
 // Keyboard and screen reader support that every page shares.
-import { esc } from './store.js?v=105';
+import { esc } from './store.js?v=106';
 
 // ===== Dialogs =====
 // An open overlay behaves as a dialog: announced as one, focus moves in and stays inside
