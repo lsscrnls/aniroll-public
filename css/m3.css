@@ -1,0 +1,1822 @@
+/* Material Symbols for every data-icon (generated, see tools/m3/icons.py) */
+@import url('m3-icons.css?v=1');
+@import url('m3-shapes.css?v=1');
+
+/* Material 3 Expressive — AniRoll's second design (Settings → Appearance → Design, logged in only).
+   Loaded by js/design.js together with a generated colour scheme (--md-*). Everything here is scoped to
+   :root[data-design="m3"], so AniRoll's own design in style.css stays untouched.
+   Google Sans Flex 5.3.1 (weight axis) from @fontsource-variable/google-sans-flex, SIL OFL
+   (fonts/LICENSE-google-sans-flex.txt), hosted here like Inter: no request to Google. */
+@font-face {
+    font-family: 'Google Sans Flex';
+    font-style: normal;
+    font-weight: 1 1000;
+    font-display: swap;
+    src: url('../fonts/google-sans-flex-latin-wght-5.3.1.woff2') format('woff2');
+    unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face {
+    font-family: 'Google Sans Flex';
+    font-style: normal;
+    font-weight: 1 1000;
+    font-display: swap;
+    src: url('../fonts/google-sans-flex-latin-ext-wght-5.3.1.woff2') format('woff2');
+    unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
+/* ===== Tokens: AniRoll's variables mapped onto M3 roles, so every page follows ===== */
+:root[data-design="m3"] {
+    --font: 'Google Sans Flex', 'Roboto', system-ui, sans-serif;
+
+    --bg: var(--md-surface);
+    --bg-secondary: var(--md-surface-container);
+    --surface: var(--md-surface-container-low);
+    --surface-hover: var(--md-surface-container-highest);
+    --border: var(--md-outline-variant);
+    --border-subtle: var(--md-surface-container-high);
+    --text: var(--md-on-surface);
+    --text-secondary: var(--md-on-surface-variant);
+    --text-tertiary: var(--md-outline);
+    --accent: var(--md-primary);
+    --accent-hover: var(--md-primary);
+    --accent-text: var(--md-on-primary);
+    --user-accent: var(--md-primary);
+    --user-accent-dim: color-mix(in srgb, var(--md-primary) 12%, transparent);
+    --danger: var(--md-error);
+    --text-warning: var(--md-tertiary);
+    --text-success: var(--md-primary);
+
+    /* M3 Expressive shape scale */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 28px;
+    --radius-2xl: 32px;
+    --md-shape-xxl: 48px;
+
+    /* Springs, sampled from real damped springs (tools: zeta 0.55 / 0.78): things that move overshoot a
+       little and settle, like M3 Expressive's spatial springs. "standard" stays for colour and opacity */
+    --m3-bouncy: linear(0, 0.054, 0.185, 0.357, 0.538, 0.708, 0.853, 0.967, 1.047, 1.097, 1.122, 1.126, 1.116, 1.098, 1.075, 1.053, 1.032, 1.015, 1.001, 0.992, 0.987, 0.984, 0.984, 0.986, 0.988, 0.991, 0.994, 0.997, 0.999, 1);
+    --m3-gentle: linear(0, 0.038, 0.131, 0.251, 0.38, 0.505, 0.618, 0.716, 0.798, 0.864, 0.915, 0.953, 0.98, 0.998, 1.01, 1.016, 1.019, 1.02, 1.019, 1.017, 1.014, 1.012, 1.009, 1.007, 1.005, 1.004, 1.002, 1.001, 1);
+    --ease: var(--m3-bouncy);
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    --md-spring-slow: var(--m3-gentle);
+    --md-standard: cubic-bezier(0.2, 0, 0, 1);
+    --duration: 0.45s;
+    --duration-fast: 0.2s;
+
+    --md-state-hover: 8%;
+    --md-state-press: 10%;
+    --nav-height: 64px;
+    --md-rail: 96px;
+}
+
+:root[data-design="m3"] body {
+    background: var(--md-surface);
+    color: var(--md-on-surface);
+    cursor: auto;
+    letter-spacing: 0;
+}
+:root[data-design="m3"] button, :root[data-design="m3"] a, :root[data-design="m3"] .media-card,
+:root[data-design="m3"] .cw-inc, :root[data-design="m3"] .landing-feature-clickable { cursor: pointer; }
+:root[data-design="m3"] .cursor { display: none; }
+:root[data-design="m3"] ::selection { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+:root[data-design="m3"] :focus-visible { outline: 3px solid var(--md-secondary); outline-offset: 2px; }
+
+/* ===== Type scale (M3 Expressive: emphasized headlines, calm body) ===== */
+:root[data-design="m3"] .section-title,
+:root[data-design="m3"] .page-title,
+:root[data-design="m3"] h1.section-title {
+    font-size: 2rem;            /* headline-large */
+    line-height: 2.5rem;
+    font-weight: 600;
+    letter-spacing: 0;
+}
+:root[data-design="m3"] h2.section-title { font-size: 1.75rem; line-height: 2.25rem; }
+:root[data-design="m3"] .modal-title { font-size: 1.5rem; line-height: 2rem; font-weight: 500; letter-spacing: 0; }
+:root[data-design="m3"] .logo-text { font-weight: 700; letter-spacing: -0.01em; font-size: 1.375rem; }
+:root[data-design="m3"] .media-card-title { font-weight: 500; letter-spacing: 0.01em; }
+
+/* ===== Top app bar ===== */
+:root[data-design="m3"] .glass-nav { height: var(--nav-height); }
+:root[data-design="m3"] .glass-nav::before {
+    background: var(--md-surface-container);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-bottom: 0;
+    transition: opacity 0.2s var(--md-standard);
+}
+:root[data-design="m3"] .nav-inner { max-width: none; padding: 0 var(--space-md) 0 var(--space-lg); }
+:root[data-design="m3"] .nav-actions { gap: var(--space-xs); }
+:root[data-design="m3"] .nav-icon-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-full);
+    color: var(--md-on-surface-variant);
+    transition: background-color 0.2s var(--md-standard), border-radius 0.35s var(--ease);
+}
+:root[data-design="m3"] .nav-icon-btn:hover { background: color-mix(in srgb, var(--md-on-surface-variant) 8%, transparent); opacity: 1; }
+:root[data-design="m3"] .nav-icon-btn:active { border-radius: var(--radius-md); }
+:root[data-design="m3"] .nav-icon-btn svg { width: 24px; height: 24px; stroke-width: 1.8; }
+:root[data-design="m3"] .badge { background: var(--md-error); top: 10px; right: 10px; }
+
+/* Navigation bar (phone) and rail (desktop) share the markup: icon on a pill (active indicator), label below.
+   The pill is the link's ::before — the icon itself is a mask (m3-icons.css), it can't carry a background. */
+:root[data-design="m3"] .mobile-tabbar {
+    background: var(--md-surface-container);
+    border-top: 0;
+    height: calc(80px + env(safe-area-inset-bottom, 0px));
+    align-items: center;
+}
+:root[data-design="m3"] .mobile-tab {
+    position: relative;
+    gap: 4px;
+    padding: 0;
+    min-width: 64px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    color: var(--md-on-surface-variant);
+}
+:root[data-design="m3"] .mobile-tab::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 56px;
+    height: 32px;
+    margin-left: -28px;
+    border-radius: var(--radius-full);
+    transform: scaleX(0.4);
+    opacity: 0;
+    transition: transform 0.5s var(--ease), opacity 0.2s var(--md-standard), background-color 0.2s var(--md-standard);
+}
+:root[data-design="m3"] .mobile-tab:hover::before { opacity: 1; transform: none; background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+:root[data-design="m3"] .mobile-tab.active::before { opacity: 1; transform: none; background: var(--md-secondary-container); }
+:root[data-design="m3"] .mobile-tab svg { position: relative; width: 24px; height: 24px; margin: 4px 0; }
+:root[data-design="m3"] .mobile-tab.active { color: var(--md-on-surface); font-weight: 700; }
+:root[data-design="m3"] .mobile-tab.active svg { color: var(--md-on-secondary-container); }
+@media (max-width: 768px) {
+    :root[data-design="m3"] .main-content { padding-bottom: calc(var(--space-4xl) + 80px); }
+    :root[data-design="m3"] .toast-container { bottom: 96px; }
+    :root[data-design="m3"] .mobile-tab::before { width: 64px; margin-left: -32px; }
+}
+
+/* Desktop: navigation rail on the left, below the app bar (like Gmail and Drive) */
+@media (min-width: 769px) {
+    :root[data-design="m3"] .nav-links { display: none; }
+    :root[data-design="m3"] .mobile-tabbar {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: var(--space-md);
+        top: var(--nav-height);
+        bottom: 0;
+        right: auto;
+        width: var(--md-rail);
+        height: auto;
+        padding: var(--space-md) 0;
+        background: var(--md-surface);
+        border: 0;
+    }
+    :root[data-design="m3"] .main-content {
+        margin-left: calc(var(--md-rail) + max(0px, (100vw - var(--md-rail) - var(--content-max)) / 2));
+        margin-right: auto;
+    }
+}
+/* The wide Discover pages (style.css) measure from the window; here the rail takes its share */
+@media (min-width: 1265px) {
+    :root[data-design="m3"] .discover-page { --wide: min(1600px, calc(100vw - var(--md-rail) - 2 * var(--space-xl))); }
+}
+
+/* ===== Buttons: filled, tonal, outlined; the shape tightens while pressed ===== */
+:root[data-design="m3"] .glass-btn {
+    min-height: 40px;
+    padding: 10px 24px;
+    border-radius: var(--radius-full);
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    transition: background-color 0.2s var(--md-standard), color 0.2s var(--md-standard),
+        border-radius 0.4s var(--ease), box-shadow 0.2s var(--md-standard);
+}
+:root[data-design="m3"] .glass-btn:active { border-radius: var(--radius-md); }
+:root[data-design="m3"] .glass-btn-primary { background: var(--md-primary); color: var(--md-on-primary); }
+:root[data-design="m3"] .glass-btn-primary:hover {
+    background: color-mix(in srgb, var(--md-on-primary) var(--md-state-hover), var(--md-primary));
+    transform: none;
+    box-shadow: 0 1px 2px rgba(0,0,0,.3), 0 1px 3px 1px rgba(0,0,0,.15);
+}
+:root[data-design="m3"] .glass-btn-secondary {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+    border: 0;
+}
+:root[data-design="m3"] .glass-btn-secondary:hover {
+    background: color-mix(in srgb, var(--md-on-secondary-container) var(--md-state-hover), var(--md-secondary-container));
+}
+:root[data-design="m3"] .glass-btn-sm { min-height: 32px; padding: 6px 16px; font-size: 0.8125rem; }
+:root[data-design="m3"] .glass-btn:disabled, :root[data-design="m3"] .glass-btn[disabled] {
+    background: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+    color: color-mix(in srgb, var(--md-on-surface) 38%, transparent);
+    opacity: 1;
+}
+:root[data-design="m3"] .glass-icon-btn { border-radius: var(--radius-full); transition: background-color .2s var(--md-standard), border-radius .4s var(--ease); }
+:root[data-design="m3"] .glass-icon-btn:hover { opacity: 1; background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+:root[data-design="m3"] .glass-icon-btn:active { border-radius: var(--radius-md); }
+
+/* Big actions: Roll is a large button, like M3E's hero actions */
+:root[data-design="m3"] .roll-btn { min-height: 56px; padding: 16px 40px; font-size: 1rem; border-radius: var(--radius-lg); }
+:root[data-design="m3"] .roll-btn:active { border-radius: var(--radius-2xl); }
+
+/* ===== Connected button groups: tabs and segments ===== */
+/* Whatever holds the buttons: one connected row that scrolls sideways instead of wrapping */
+:root[data-design="m3"] :is(.list-tabs, .tab-group, .roll-segment, .page-switch, .friends-tabs, .list-controls),
+:root[data-design="m3"] :has(> .list-tab), :root[data-design="m3"] :has(> .tab-btn) {
+    gap: 2px;
+    background: none;
+    padding: 0;
+    border: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    max-width: 100%;
+}
+:root[data-design="m3"] .list-tab, :root[data-design="m3"] .tab-btn, :root[data-design="m3"] .page-switch > a,
+:root[data-design="m3"] .friends-tab {
+    min-height: 40px;
+    padding: 8px 18px;
+    border-radius: var(--radius-sm);
+    background: var(--md-surface-container-highest);
+    color: var(--md-on-surface-variant);
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    transition: background-color .2s var(--md-standard), color .2s var(--md-standard), border-radius .45s var(--ease);
+}
+:root[data-design="m3"] :is(.list-tab, .tab-btn, .page-switch > a, .friends-tab):first-child { border-top-left-radius: var(--radius-full); border-bottom-left-radius: var(--radius-full); }
+:root[data-design="m3"] :is(.list-tab, .tab-btn, .page-switch > a, .friends-tab):last-child { border-top-right-radius: var(--radius-full); border-bottom-right-radius: var(--radius-full); }
+:root[data-design="m3"] :is(.list-tab, .tab-btn, .page-switch > a, .friends-tab):hover {
+    background: color-mix(in srgb, var(--md-on-surface-variant) 8%, var(--md-surface-container-highest));
+    color: var(--md-on-surface);
+}
+/* Selected: fills with the primary colour and rounds fully */
+:root[data-design="m3"] :is(.list-tab, .tab-btn, .friends-tab).active,
+:root[data-design="m3"] .page-switch > a[aria-current] {
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+    border-radius: var(--radius-full);
+    font-weight: 600;
+}
+:root[data-design="m3"] :is(.list-tab, .tab-btn, .friends-tab, .page-switch > a) { flex-shrink: 0; white-space: nowrap; }
+:root[data-design="m3"] .list-tab small { margin-left: 4px; }
+
+/* ===== Chips ===== */
+:root[data-design="m3"] .genre-chip, :root[data-design="m3"] .detail-tag {
+    min-height: 32px;
+    padding: 6px 16px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: 1px solid var(--md-outline-variant) !important;
+    color: var(--md-on-surface-variant);
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background-color .2s var(--md-standard), border-radius .4s var(--ease);
+}
+:root[data-design="m3"] .genre-chip:hover { background: color-mix(in srgb, var(--md-on-surface-variant) 8%, transparent); }
+:root[data-design="m3"] .genre-chip.active {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+    border-color: transparent !important;
+    border-radius: var(--radius-md);
+}
+:root[data-design="m3"] .genre-chip.active::before {
+    content: '';
+    width: 16px;
+    height: 16px;
+    margin-left: -4px;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 16.2 5.3 12l-1.4 1.4 5.6 5.6 12-12-1.4-1.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.5 16.2 5.3 12l-1.4 1.4 5.6 5.6 12-12-1.4-1.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* ===== Text fields and search ===== */
+:root[data-design="m3"] .glass-input, :root[data-design="m3"] .glass-select, :root[data-design="m3"] .glass-menu-trigger {
+    min-height: 48px;
+    border-radius: var(--radius-full);
+    background-color: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+    border: 0;
+}
+:root[data-design="m3"] .glass-input:focus, :root[data-design="m3"] .glass-select:focus { box-shadow: inset 0 0 0 2px var(--md-primary); }
+:root[data-design="m3"] .search-container {
+    background: var(--md-surface-container-high);
+    border-radius: var(--radius-2xl);
+    border: 0;
+    box-shadow: 0 2px 6px 2px rgba(0,0,0,.15), 0 1px 2px rgba(0,0,0,.3);
+}
+:root[data-design="m3"] input[type="checkbox"], :root[data-design="m3"] input[type="radio"] { accent-color: var(--md-primary); }
+
+/* ===== Menus ===== */
+:root[data-design="m3"] .glass-dropdown, :root[data-design="m3"] .glass-menu-list {
+    background: var(--md-surface-container);
+    border: 0;
+    border-radius: var(--radius-lg);
+    padding: 4px;
+    box-shadow: 0 2px 6px 2px rgba(0,0,0,.15), 0 1px 2px rgba(0,0,0,.3);
+}
+:root[data-design="m3"] .dropdown-item, :root[data-design="m3"] .glass-menu-option {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    color: var(--md-on-surface);
+}
+:root[data-design="m3"] .dropdown-item:hover, :root[data-design="m3"] .glass-menu-option.active { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+:root[data-design="m3"] .glass-menu-option.selected { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+:root[data-design="m3"] .dropdown-item.danger { color: var(--md-error); }
+:root[data-design="m3"] .dropdown-divider { border-top-color: var(--md-outline-variant); margin: 4px 12px; }
+
+/* ===== Dialogs, sheets, snackbars ===== */
+:root[data-design="m3"] .modal-backdrop, :root[data-design="m3"] .overlay-backdrop, :root[data-design="m3"] .detail-panel-backdrop {
+    background: color-mix(in srgb, var(--md-scrim) 32%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+:root[data-design="m3"] .modal-content {
+    background: var(--md-surface-container-high);
+    border-radius: var(--md-shape-xxl);
+    padding: var(--space-lg);
+    box-shadow: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3);
+}
+:root[data-design="m3"] .detail-panel {
+    background: var(--md-surface-container-low);
+    border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+    box-shadow: none;
+    transition: transform .6s var(--md-spring-slow);
+}
+:root[data-design="m3"] .detail-panel-actions { background: var(--md-surface-container-low); }
+:root[data-design="m3"] .toast {
+    background: var(--md-inverse-surface);
+    color: var(--md-inverse-on-surface);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    font-size: 0.875rem;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3);
+}
+:root[data-design="m3"] .toast.success { background: var(--md-inverse-surface); }
+:root[data-design="m3"] .toast.error { background: var(--md-error-container); color: var(--md-on-error-container); }
+@media (min-width: 769px) {
+    :root[data-design="m3"] .toast-container { left: 50%; right: auto; transform: translateX(-50%); bottom: var(--space-lg); align-items: center; }
+}
+
+/* ===== Progress: rounded track with a gap and a stop dot ===== */
+:root[data-design="m3"] .progress-bar { height: 4px; background: var(--md-secondary-container); }
+:root[data-design="m3"] .progress-bar-fill { background: var(--md-primary); }
+
+/* ===== Loading indicator: a shape that morphs between M3 Expressive's cookie shapes while turning ===== */
+:root[data-design="m3"] .loader-spinner {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--md-primary-container);
+    animation: none;
+}
+:root[data-design="m3"] .loader-spinner::before {
+    content: '';
+    position: absolute;
+    inset: 7px;
+    background: var(--md-on-primary-container);
+    animation: m3Morph 2.6s var(--md-standard) infinite, spin 2.6s linear infinite;
+}
+
+/* ===== Smaller pieces ===== */
+/* Labels: M3 uses sentence case, no letter-spaced capitals */
+:root[data-design="m3"] :is(.dot-label, .roll-filter-label, .settings-sub-label) {
+    text-transform: none;
+    letter-spacing: 0.01em;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+:root[data-design="m3"] .roll-filter-label { color: var(--md-on-surface); }
+:root[data-design="m3"] .skeleton { background: var(--md-surface-container-high); border-radius: var(--radius-lg); }
+:root[data-design="m3"] .accent-swatch { border-radius: var(--radius-md); transition: border-radius .4s var(--ease), transform .4s var(--ease); }
+:root[data-design="m3"] .accent-swatch.active { border-radius: var(--radius-full); box-shadow: 0 0 0 3px var(--md-surface), 0 0 0 5px var(--md-on-surface); }
+:root[data-design="m3"] .roll-window { border-radius: var(--radius-xl); }
+:root[data-design="m3"] .roll-result-kicker { color: var(--md-primary); letter-spacing: .1em; }
+:root[data-design="m3"] .compare-fab, :root[data-design="m3"] .wp-fab {
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-radius: var(--radius-lg);
+    border: 0;
+    box-shadow: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3);
+    transition: border-radius .4s var(--ease);
+}
+:root[data-design="m3"] .compare-fab:active, :root[data-design="m3"] .wp-fab:active { border-radius: var(--radius-xl); }
+:root[data-design="m3"] .settings-card { background: var(--md-surface-container-low); border: 0; }
+:root[data-design="m3"] .settings-tabs { position: static; background: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] .loader-spinner::before { animation: m3Morph 6s linear infinite; }
+}
+/* The search bar is the field; no second ring around the input inside it */
+:root[data-design="m3"] .search-container input:focus-visible { outline: none; }
+
+
+/* =====================================================================================================
+   Surfaces and pages. M3 has no hairline frames: areas are tonal containers (surface-container-*), lists
+   are segmented (small gaps, big outer corners), media sits on cards with the text *below* the image.
+   ===================================================================================================== */
+
+/* Framed areas become filled containers */
+:root[data-design="m3"] :is(.box, .stat-chart, .settings-card, .wp-card, .jf-now-card, .roll-filters, .list-content,
+    .friend-tile, .login-card, .friend-status-card, .wp-bg-question, .calendar-week-day, .detail-stats) {
+    background: var(--md-surface-container-low) !important;
+    border: 0 !important;
+    border-radius: var(--radius-xl);
+}
+:root[data-design="m3"] .box-note { border-radius: var(--radius-lg); background: var(--md-surface-container) !important; }
+:root[data-design="m3"] .box-media { border-radius: var(--radius-xl); }
+
+/* ----- Section headers: title-large + a text button ----- */
+:root[data-design="m3"] .section-header { align-items: center; margin-bottom: var(--space-md); }
+:root[data-design="m3"] .home-section .section-title, :root[data-design="m3"] h2.section-title { font-size: 1.5rem; line-height: 2rem; font-weight: 600; }
+:root[data-design="m3"] :is(.section-link, .friends-head-actions .section-link) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: var(--radius-full);
+    color: var(--md-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: background-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .section-link:hover { background: color-mix(in srgb, var(--md-primary) 8%, transparent); color: var(--md-primary); }
+:root[data-design="m3"] .section-toggle { width: 40px; height: 40px; border-radius: var(--radius-full); color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .section-toggle:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+:root[data-design="m3"] .home-section { margin-bottom: var(--space-xl); }
+
+/* ----- Media cards: M3 filled card, cover on top, text below ----- */
+:root[data-design="m3"] .media-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--md-surface-container-low);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: background-color .2s var(--md-standard), border-radius .5s var(--ease), transform .5s var(--ease);
+}
+:root[data-design="m3"] .media-card:hover { transform: none; background: var(--md-surface-container-high); border-radius: var(--radius-xl); }
+:root[data-design="m3"] .media-card:active { transform: scale(.97); }
+:root[data-design="m3"] .media-card-img { border-radius: 0; transition: transform .6s var(--md-spring-slow); }
+:root[data-design="m3"] .media-card:hover .media-card-img { transform: scale(1.04); }
+:root[data-design="m3"] .media-card-overlay {
+    position: relative;
+    inset: auto;
+    padding: 10px 12px 12px;
+    min-height: 62px;
+    background: inherit;
+    color: var(--md-on-surface);
+    text-shadow: none;
+}
+:root[data-design="m3"] .media-card-title { font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; }
+:root[data-design="m3"] .media-card-sub { font-size: 0.75rem; line-height: 1rem; color: var(--md-on-surface-variant); opacity: 1; margin-top: 2px; }
+/* Badges on the cover: small tonal chips */
+:root[data-design="m3"] :is(.media-card-score, .media-card-status, .media-card-match) {
+    top: 8px;
+    padding: 0 8px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+:root[data-design="m3"] .media-card-score { background: var(--md-surface-container-highest); color: var(--md-on-surface); }
+:root[data-design="m3"] .media-card-score::before { color: var(--md-warning); }
+:root[data-design="m3"] .media-card-match { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+:root[data-design="m3"] .media-card-status { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+/* Progress on Continue Watching / My List cards sits between cover and text */
+:root[data-design="m3"] .media-card .progress-bar, :root[data-design="m3"] .media-card .list-card-progress { border-radius: 0; }
+:root[data-design="m3"] .skeleton-card { border-radius: var(--radius-lg); aspect-ratio: 2 / 3.55; }
+
+/* ----- Segmented lists: rows with 2px gaps, big corners only at the ends ----- */
+:root[data-design="m3"] :is(#notif-list, .list-content, #mal-list) { background: transparent !important; padding: 0 !important; display: flex; flex-direction: column; gap: 2px; }
+:root[data-design="m3"] :is(.notif-item, .list-entry, .mal-item, .schedule-item) {
+    background: var(--md-surface-container-low);
+    border-radius: 4px;
+    padding: 12px 16px;
+    min-height: 72px;
+    align-items: center;
+    transition: background-color .2s var(--md-standard), border-radius .4s var(--ease);
+}
+:root[data-design="m3"] :is(.notif-item, .list-entry, .mal-item, .schedule-item):first-child { border-top-left-radius: var(--radius-xl); border-top-right-radius: var(--radius-xl); }
+:root[data-design="m3"] :is(.notif-item, .list-entry, .mal-item, .schedule-item):last-child { border-bottom-left-radius: var(--radius-xl); border-bottom-right-radius: var(--radius-xl); }
+:root[data-design="m3"] :is(.notif-item, .list-entry, .schedule-item):hover { background: var(--md-surface-container-high); border-radius: var(--radius-lg); }
+:root[data-design="m3"] .notif-item img, :root[data-design="m3"] .list-entry img { border-radius: var(--radius-sm); }
+:root[data-design="m3"] .notif-time, :root[data-design="m3"] .activity-time { color: var(--md-on-surface-variant); font-size: 0.75rem; }
+:root[data-design="m3"] .progress-btn {
+    width: 40px;
+    height: 40px;
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+    font-weight: 500;
+    transition: border-radius .4s var(--ease), background-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .progress-btn:hover { background: color-mix(in srgb, var(--md-on-secondary-container) 8%, var(--md-secondary-container)); }
+:root[data-design="m3"] .progress-btn:active { border-radius: var(--radius-md); }
+
+/* ----- My List toolbar ----- */
+:root[data-design="m3"] .list-chip {
+    min-height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--md-outline-variant);
+    color: var(--md-on-surface-variant);
+    font-weight: 500;
+}
+:root[data-design="m3"] .list-chip.active, :root[data-design="m3"] .list-chip[aria-pressed="true"] {
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+    border-color: transparent;
+}
+:root[data-design="m3"] .list-roll {
+    border: 0;
+    background: var(--md-tertiary-container);
+    color: var(--md-on-tertiary-container);
+    border-radius: var(--radius-lg);
+    padding: 8px 8px 8px 20px;
+}
+:root[data-design="m3"] .list-roll .glass-btn { background: var(--md-tertiary); color: var(--md-on-tertiary); }
+
+/* ----- Detail (page and side sheet) ----- */
+:root[data-design="m3"] .detail-banner {
+    margin: 0 0 0;
+    height: 300px;
+    border-radius: var(--md-shape-xxl);
+}
+:root[data-design="m3"] .detail-panel .detail-banner { margin: 0 16px; height: 220px; border-radius: var(--radius-xl); }
+:root[data-design="m3"] .detail-banner-gradient { background: linear-gradient(to top, color-mix(in srgb, var(--md-surface) 85%, transparent) 0%, transparent 70%); }
+:root[data-design="m3"] .detail-panel .detail-banner-gradient { background: linear-gradient(to top, color-mix(in srgb, var(--md-surface-container-low) 85%, transparent) 0%, transparent 70%); }
+/* No text over the picture: the banner is a rounded hero, the header starts below it */
+:root[data-design="m3"] .detail-header { margin-top: var(--space-lg); padding: 0 var(--space-sm); }
+:root[data-design="m3"] .detail-panel .detail-header { padding: 0 var(--space-md); gap: var(--space-lg); }
+:root[data-design="m3"] .detail-panel .detail-cover { width: 120px; }
+:root[data-design="m3"] .detail-cover { width: 168px; }
+:root[data-design="m3"] .detail-info { padding-top: 0; }
+:root[data-design="m3"] .detail-banner-gradient { display: none; }
+:root[data-design="m3"] .detail-cover img { border-radius: var(--radius-xl); box-shadow: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3); }
+:root[data-design="m3"] .detail-title { font-size: clamp(1.75rem, 3vw, 2.25rem); line-height: 1.15; font-weight: 600; letter-spacing: 0; }
+:root[data-design="m3"] .detail-sub { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .detail-tag { border-radius: var(--radius-sm); }
+:root[data-design="m3"] .taste-match-badge {
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    border-radius: var(--radius-sm);
+    box-shadow: none;
+    font-weight: 600;
+}
+:root[data-design="m3"] .taste-match-why { color: var(--md-on-surface-variant); }
+/* Stats: three tonal tiles instead of one framed strip */
+:root[data-design="m3"] .detail-stats { background: transparent !important; padding: 0 !important; gap: 8px; }
+:root[data-design="m3"] .detail-stat {
+    padding: 20px 12px;
+    border-radius: var(--radius-xl);
+    background: var(--md-surface-container);
+}
+:root[data-design="m3"] .detail-stat:first-child { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+:root[data-design="m3"] .detail-stat-value { font-size: 2rem; line-height: 2.5rem; font-weight: 500; color: inherit !important; letter-spacing: 0; }
+:root[data-design="m3"] .detail-stat-label { text-transform: none; letter-spacing: .01em; font-size: .8125rem; font-weight: 500; color: inherit; opacity: .8; }
+:root[data-design="m3"] .detail-panel-actions { padding: 12px 16px 8px; background: transparent; }
+:root[data-design="m3"] .detail-panel-action-btn {
+    background: var(--md-surface-container-highest);
+    color: var(--md-on-surface-variant);
+    transition: border-radius .4s var(--ease), background-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .detail-panel-action-btn:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, var(--md-surface-container-highest)); transform: none; }
+:root[data-design="m3"] .detail-panel-action-btn:active { border-radius: var(--radius-md); }
+:root[data-design="m3"] .char-card { background: var(--md-surface-container-low); border-radius: var(--radius-lg); padding: 8px; }
+:root[data-design="m3"] .char-card:hover { background: var(--md-surface-container-high); }
+:root[data-design="m3"] .char-role { text-transform: none; letter-spacing: 0; }
+:root[data-design="m3"] .friend-status-card { border-radius: var(--radius-lg); }
+
+/* ----- Charts: M3 progress indicators, colours from the palette ----- */
+:root[data-design="m3"] .stat-chart { padding: var(--space-lg); }
+:root[data-design="m3"] .stat-chart-title { text-transform: none; letter-spacing: 0; font-size: 1rem; font-weight: 600; color: var(--md-on-surface); }
+:root[data-design="m3"] .stat-bar-track { height: 8px; background: var(--md-secondary-container); }
+:root[data-design="m3"] .stat-bar-fill { background: var(--md-primary); }
+:root[data-design="m3"] .stat-bar-label, :root[data-design="m3"] .stat-bar-value { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] {
+    --success: var(--md-success);
+    --warning: var(--md-warning);
+    --text-success: var(--md-success);
+    --text-warning: var(--md-warning);
+}
+
+/* ----- Profile ----- */
+:root[data-design="m3"] .profile-header { margin: 0 0 var(--space-xl); }
+:root[data-design="m3"] .profile-banner { border-radius: var(--md-shape-xxl); height: 240px; background: var(--md-surface-container-high); }
+:root[data-design="m3"] .profile-avatar { border: 4px solid var(--md-surface); border-radius: var(--md-shape-xxl); }
+:root[data-design="m3"] .profile-name { font-weight: 600; letter-spacing: 0; }
+:root[data-design="m3"] .profile-stat { background: var(--md-surface-container); border-radius: var(--radius-xl); padding: 16px 20px; }
+:root[data-design="m3"] .profile-stat-num { font-weight: 500; }
+:root[data-design="m3"] .profile-stat-label { text-transform: none; letter-spacing: 0; }
+
+/* ----- Social ----- */
+:root[data-design="m3"] .activity-card {
+    background: var(--md-surface-container-low);
+    border-radius: var(--radius-xl);
+    padding: 16px 20px;
+    margin-bottom: 8px;
+}
+:root[data-design="m3"] .activity-card:hover { background: var(--md-surface-container-low); }
+:root[data-design="m3"] .activity-user { font-weight: 600; }
+:root[data-design="m3"] .activity-media, :root[data-design="m3"] .activity-embed { background: var(--md-surface-container-high); border-radius: var(--radius-lg); }
+:root[data-design="m3"] .activity-media:hover { background: var(--md-surface-container-highest); }
+:root[data-design="m3"] .activity-link, :root[data-design="m3"] .activity-mention { color: var(--md-primary); }
+:root[data-design="m3"] .activity-quote { border-left-color: var(--md-primary); background: var(--md-surface-container); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+:root[data-design="m3"] .activity-spoiler { background: var(--md-surface-container-highest); border-radius: var(--radius-sm); }
+:root[data-design="m3"] .activity-action-btn {
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: var(--radius-full);
+    color: var(--md-on-surface-variant);
+    transition: background-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .activity-action-btn:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); color: var(--md-on-surface); }
+:root[data-design="m3"] .activity-action-btn.liked { color: var(--md-error); background: color-mix(in srgb, var(--md-error) 12%, transparent); }
+:root[data-design="m3"] .activity-replies { border-left: 0; background: var(--md-surface-container); border-radius: var(--radius-lg); padding: 8px 12px; }
+:root[data-design="m3"] .friends-posts-link { border: 0; background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+
+/* ----- Home: friends, now playing ----- */
+:root[data-design="m3"] .fr-card { border-radius: var(--radius-lg); background: var(--md-surface-container-low); }
+:root[data-design="m3"] .jf-now-card { max-width: none; }
+:root[data-design="m3"] .jf-now-cover { border-radius: var(--radius-md); }
+:root[data-design="m3"] .jf-now-bar { height: 4px; background: var(--md-secondary-container); }
+:root[data-design="m3"] .jf-now-bar span { background: var(--md-primary); }
+
+/* ----- Calendar ----- */
+:root[data-design="m3"] .calendar-week { gap: 8px; }
+:root[data-design="m3"] .calendar-week-day { border-radius: var(--radius-xl); padding: 12px 8px; }
+/* Today: a lighter column and the date in a primary circle, like Google Calendar */
+:root[data-design="m3"] .calendar-week-day.today { background: var(--md-surface-container-high) !important; }
+:root[data-design="m3"] .calendar-week-day.today .calendar-week-name { color: var(--md-primary); }
+:root[data-design="m3"] .calendar-week-head strong {
+    min-width: 36px;
+    height: 36px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: var(--radius-full);
+    font-weight: 500;
+    font-size: 1.25rem;
+}
+:root[data-design="m3"] .calendar-week-day.today .calendar-week-head strong { background: var(--md-primary); color: var(--md-on-primary); }
+:root[data-design="m3"] .calendar-week-item { border-radius: var(--radius-lg); }
+:root[data-design="m3"] .calendar-week-item:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+:root[data-design="m3"] .calendar-week-item img, :root[data-design="m3"] .calendar-entry-img { border-radius: var(--radius-sm); }
+:root[data-design="m3"] .calendar-week-head { border-bottom: 0; }
+:root[data-design="m3"] .calendar-cell { background: var(--md-surface-container-low); }
+:root[data-design="m3"] .calendar-grid { gap: 4px; background: transparent; border: 0; }
+:root[data-design="m3"] .season-nav-btn {
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--md-surface-container-highest);
+    color: var(--md-on-surface-variant);
+    transition: border-radius .4s var(--ease), background-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .season-nav-btn:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, var(--md-surface-container-highest)); }
+:root[data-design="m3"] .season-nav-btn:active { border-radius: var(--radius-md); }
+/* M3 switch: 52×32 track; the handle grows from 16 to 24 px when on */
+:root[data-design="m3"] .calendar-toggle-switch {
+    width: 52px;
+    height: 32px;
+    background: var(--md-surface-container-highest);
+    border: 2px solid var(--md-outline);
+    transition: background-color .2s var(--md-standard), border-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .calendar-toggle-switch::after {
+    top: 6px;
+    left: 6px;
+    width: 16px;
+    height: 16px;
+    background: var(--md-outline);
+    box-shadow: none;
+    transition: transform .45s var(--ease), width .3s var(--ease), height .3s var(--ease), top .3s var(--ease), background-color .2s;
+}
+:root[data-design="m3"] .calendar-toggle-switch.on { background: var(--md-primary); border-color: var(--md-primary); }
+:root[data-design="m3"] .calendar-toggle-switch.on::after {
+    top: 2px;
+    width: 24px;
+    height: 24px;
+    transform: translateX(18px);
+    background: var(--md-on-primary);
+}
+
+/* ----- Search view ----- */
+:root[data-design="m3"] .search-result-item { border-radius: var(--radius-lg); min-height: 64px; }
+:root[data-design="m3"] .search-result-item:hover, :root[data-design="m3"] .search-result-item.active { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+:root[data-design="m3"] .search-result-img { border-radius: var(--radius-sm); }
+
+/* ----- Watch Party ----- */
+:root[data-design="m3"] .wp-card { border-radius: var(--md-shape-xxl); }
+:root[data-design="m3"] .wp-host-counter-value { font-weight: 500; }
+:root[data-design="m3"] .wp-member { background: var(--md-surface-container); border-radius: var(--radius-lg); }
+:root[data-design="m3"] .wp-status-badge, :root[data-design="m3"] .wp-host-badge { border-radius: var(--radius-sm); background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+:root[data-design="m3"] .wp-sync-pill, :root[data-design="m3"] .wp-switch-pill { border: 0; background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+
+/* ----- Empty states: the icon on a tonal shape ----- */
+:root[data-design="m3"] .empty-state { padding: var(--space-3xl) var(--space-lg); }
+:root[data-design="m3"] .empty-state-icon {
+    width: 96px;
+    height: 96px;
+    margin: 0 auto var(--space-lg);
+    display: grid;
+    place-items: center;
+    border-radius: 36px;
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+}
+:root[data-design="m3"] .empty-state-icon svg { width: 40px; height: 40px; }
+:root[data-design="m3"] .empty-state-text { font-size: 1.375rem; line-height: 1.75rem; font-weight: 500; color: var(--md-on-surface); }
+:root[data-design="m3"] .empty-state-sub { color: var(--md-on-surface-variant); }
+
+/* ----- Settings ----- */
+:root[data-design="m3"] .settings-card-title { font-size: 1.125rem; font-weight: 600; }
+:root[data-design="m3"] .design-option {
+    border: 0;
+    background: var(--md-surface-container);
+    border-radius: var(--radius-xl);
+    transition: background-color .2s var(--md-standard), border-radius .45s var(--ease);
+}
+:root[data-design="m3"] .design-option:hover { background: var(--md-surface-container-high); }
+:root[data-design="m3"] .design-option.active { background: var(--md-secondary-container); color: var(--md-on-secondary-container); border-radius: var(--md-shape-xxl); }
+:root[data-design="m3"] .design-option.active .design-option-text { color: inherit; opacity: .8; }
+:root[data-design="m3"] .design-preview { border-radius: var(--radius-lg); }
+:root[data-design="m3"] .settings-choice { align-items: center; min-height: 48px; }
+
+/* ----- Scrollbars and page transitions ----- */
+:root[data-design="m3"] * { scrollbar-color: var(--md-outline-variant) transparent; }
+:root[data-design="m3"] .page-enter { animation: m3PageIn .5s var(--md-standard); }
+@keyframes m3PageIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ----- FABs: bottom right, primary container, 16 px corners; the Watch Party FAB extends with its label ----- */
+:root[data-design="m3"] .wp-fab {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-lg);
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    animation: none;
+}
+:root[data-design="m3"] .wp-fab::after { box-shadow: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3); }
+:root[data-design="m3"] .wp-fab:active { border-radius: var(--radius-xl); }
+:root[data-design="m3"] .wp-fab-icon { width: 24px; height: 24px; }
+@media (max-width: 768px) { :root[data-design="m3"] .wp-fab { bottom: 96px; right: 16px; } }
+
+/* Detail actions that carry their own inline colours */
+:root[data-design="m3"] #remove-entry {
+    color: var(--md-on-error-container) !important;
+    background: var(--md-error-container);
+    width: 40px;
+    min-height: 40px;
+    padding: 0 !important;
+}
+:root[data-design="m3"] #start-watchparty {
+    color: var(--md-on-tertiary-container) !important;
+    background: var(--md-tertiary-container);
+    border: 0 !important;
+}
+:root[data-design="m3"] :is(#remove-entry, #start-watchparty) svg { width: 18px; height: 18px; }
+
+/* =====================================================================================================
+   Expressive identity: what makes this design its own and not AniRoll in other colours.
+   Hero moments, emphasized type, the shape library, contrasting colour roles, wavy progress.
+   ===================================================================================================== */
+
+/* ----- App bar: a shape as the mark, search as a real search bar ----- */
+:root[data-design="m3"] .nav-inner { justify-content: flex-start; gap: var(--space-lg); }
+:root[data-design="m3"] .nav-actions { flex: 1; justify-content: flex-end; }
+:root[data-design="m3"] .nav-logo { display: inline-flex; align-items: center; gap: 10px; }
+:root[data-design="m3"] .nav-logo::before {
+    content: '';
+    width: 32px;
+    height: 32px;
+    background: var(--md-primary);
+    clip-path: var(--m3-shape-cookie9);
+    transition: clip-path .6s var(--ease), transform .8s var(--ease);
+}
+:root[data-design="m3"] .nav-logo:hover::before { clip-path: var(--m3-shape-flower); transform: rotate(45deg); }
+:root[data-design="m3"] .m3-searchbar {
+    width: min(560px, 42vw);
+    height: 48px;
+    margin-right: auto;
+    padding: 0 20px 0 16px;
+    justify-content: flex-start;
+    gap: 12px;
+    border-radius: var(--radius-full) !important;
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface-variant);
+}
+:root[data-design="m3"] .m3-searchbar:hover { background: var(--md-surface-container-highest); }
+:root[data-design="m3"] .m3-search-label { font-size: 1rem; white-space: nowrap; }
+@media (max-width: 768px) {
+    :root[data-design="m3"] .m3-search-label { display: none; }
+    :root[data-design="m3"] .m3-searchbar { width: 48px; margin-right: 0; padding: 0; justify-content: center; background: none; }
+}
+
+/* ----- Rail: Roll is the FAB on top ----- */
+:root[data-design="m3"] .m3-rail-fab { display: none; }
+@media (min-width: 769px) {
+    :root[data-design="m3"] .m3-rail-fab {
+        display: grid;
+        place-items: center;
+        width: 56px;
+        height: 56px;
+        margin: 4px auto 12px;
+        border-radius: var(--radius-lg);
+        background: var(--md-tertiary-container);
+        color: var(--md-on-tertiary-container);
+        box-shadow: 0 1px 3px 1px rgba(0,0,0,.15), 0 1px 2px rgba(0,0,0,.3);
+        transition: border-radius .5s var(--ease), background-color .2s var(--md-standard), transform .5s var(--ease);
+    }
+    :root[data-design="m3"] .m3-rail-fab:hover { border-radius: var(--radius-xl); transform: rotate(-8deg); }
+    :root[data-design="m3"] .m3-rail-fab.active { background: var(--md-tertiary); color: var(--md-on-tertiary); border-radius: var(--radius-xl); }
+    :root[data-design="m3"] .m3-rail-fab svg { width: 26px; height: 26px; }
+    :root[data-design="m3"] .mobile-tab[data-page="roll"] { display: none; }
+}
+
+/* ----- Emphasized page titles ----- */
+:root[data-design="m3"] h1.section-title, :root[data-design="m3"] .page-enter > h1:first-child {
+    font-size: clamp(2.25rem, 3.6vw, 3.25rem);
+    line-height: 1.1;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+}
+:root[data-design="m3"] .home-section .section-title { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.01em; }
+
+/* ----- Home hero: next episode as a huge number, the cover in a cookie, a sun turning behind it ----- */
+:root[data-design="m3"] .m3-hero {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: center;
+    gap: var(--space-lg);
+    min-height: 360px;
+    margin-bottom: var(--space-2xl);
+    padding: 40px 48px;
+    border-radius: var(--md-shape-xxl);
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    overflow: hidden;
+    animation: m3HeroIn .7s var(--md-spring-slow) both;
+}
+:root[data-design="m3"] .m3-hero-greet { font-size: 1rem; font-weight: 500; opacity: .85; margin-bottom: 8px; }
+:root[data-design="m3"] .m3-hero-ep { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; }
+:root[data-design="m3"] .m3-hero-ep-label {
+    align-self: center;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    background: var(--md-on-primary-container);
+    color: var(--md-primary-container);
+    font-size: .875rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+:root[data-design="m3"] .m3-hero-ep-num {
+    font-size: clamp(6rem, 11vw, 10rem);
+    line-height: .82;
+    font-weight: 850;
+    letter-spacing: -0.05em;
+    color: var(--md-primary);
+    font-variant-numeric: tabular-nums;
+}
+:root[data-design="m3"] .m3-hero-ep-of { font-size: 1.75rem; font-weight: 600; opacity: .7; }
+:root[data-design="m3"] .m3-hero-title, :root[data-design="m3"] .m3-hero-headline {
+    margin: 16px 0 12px;
+    font-size: clamp(1.5rem, 2.4vw, 2.1rem);
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+:root[data-design="m3"] .m3-hero-headline { font-size: clamp(2.5rem, 5vw, 4rem); }
+:root[data-design="m3"] .m3-hero-meta { margin-bottom: 24px; }
+:root[data-design="m3"] .m3-hero-chip {
+    display: inline-flex;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--md-tertiary);
+    color: var(--md-on-tertiary);
+    font-weight: 600;
+    font-size: .875rem;
+}
+:root[data-design="m3"] .m3-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+:root[data-design="m3"] .m3-btn-lg { min-height: 56px; padding: 16px 28px; font-size: 1rem; }
+:root[data-design="m3"] .m3-btn-lg:active { border-radius: var(--radius-lg); }
+:root[data-design="m3"] .m3-hero .glass-btn-secondary { background: var(--md-surface-container-lowest); color: var(--md-on-surface); }
+/* ----- Containment: recommendations sit in their own tonal block ----- */
+:root[data-design="m3"] .home-section:has(#recommendations-row) {
+    padding: 28px 28px 32px;
+    border-radius: var(--md-shape-xxl);
+    background: var(--md-surface-container);
+}
+:root[data-design="m3"] .home-section:has(#recommendations-row) .media-card { background: var(--md-surface-container-high); }
+
+/* ----- Progress: M3 Expressive wavy indicator with a stop dot ----- */
+:root[data-design="m3"] .progress-bar {
+    position: relative;
+    height: 10px;
+    background: none;
+    overflow: visible;
+}
+:root[data-design="m3"] .progress-bar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 3px;
+    height: 4px;
+    border-radius: var(--radius-full);
+    background: var(--md-secondary-container);
+}
+:root[data-design="m3"] .progress-bar::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 3px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--md-primary);
+}
+:root[data-design="m3"] .progress-bar-fill {
+    position: relative;
+    height: 10px;
+    border-radius: 0;
+    background: var(--md-primary);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x;
+}
+/* No endless wave on hover: stopping an endless animation when the pointer leaves stalls a frame */
+/* Continue Watching: the bar sits at the bottom of the card, inset like M3 cards do */
+:root[data-design="m3"] .media-card > .progress-bar { left: 12px !important; right: 12px !important; bottom: 6px !important; top: auto !important; }
+:root[data-design="m3"] #continue-watching .media-card-overlay { padding-bottom: 20px; }
+
+/* ----- Detail: emphasized title, stats in three colour roles ----- */
+:root[data-design="m3"] .detail-title { font-weight: 750; letter-spacing: -0.02em; }
+:root[data-design="m3"] .detail-stat:nth-child(1) { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+:root[data-design="m3"] .detail-stat:nth-child(2) { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+:root[data-design="m3"] .detail-stat:nth-child(3) { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+:root[data-design="m3"] .detail-stat:nth-child(1) .detail-stat-value { font-size: 2.75rem; font-weight: 800; }
+
+/* ----- Roll: the stage is a hero, lit by the rolled cover (js/m3.js puts a .m3-hero-glow in it) ----- */
+:root[data-design="m3"] .roll-stage {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    padding: 32px;
+    border-radius: var(--md-shape-xxl);
+    background: var(--md-tertiary-container);
+    color: var(--md-on-tertiary-container);
+    margin-bottom: var(--space-lg);
+}
+:root[data-design="m3"] .roll-machine { position: relative; }
+:root[data-design="m3"] .roll-window {
+    position: relative;
+    border: 0;
+    border-radius: var(--radius-xl);
+    background: var(--md-surface-container-highest);
+}
+:root[data-design="m3"] .roll-count { color: inherit; opacity: .8; }
+:root[data-design="m3"] .roll-result-kicker {
+    display: inline-flex;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    background: var(--md-tertiary);
+    color: var(--md-on-tertiary);
+    letter-spacing: .04em;
+}
+:root[data-design="m3"] .roll-result-title { font-size: clamp(2.25rem, 4vw, 3.5rem); line-height: 1.05; font-weight: 800; letter-spacing: -0.03em; margin: 12px 0; }
+:root[data-design="m3"] .roll-result-meta, :root[data-design="m3"] .roll-result-because { color: inherit; opacity: .85; }
+:root[data-design="m3"] .roll-stage .genre-chip { border-color: color-mix(in srgb, currentColor 35%, transparent) !important; color: inherit; }
+:root[data-design="m3"] .roll-stage .glass-btn-secondary { background: var(--md-surface-container-lowest); color: var(--md-on-surface); }
+:root[data-design="m3"] .roll-btn { background: var(--md-tertiary); color: var(--md-on-tertiary); }
+
+/* ----- My List: the tools float as an M3 Expressive toolbar ----- */
+:root[data-design="m3"] .list-toolbar {
+    position: sticky;
+    top: calc(var(--nav-height) + 8px);
+    z-index: 20;
+    padding: 8px;
+    border-radius: var(--radius-full);
+    background: var(--md-surface-container-high);
+    box-shadow: 0 2px 6px 2px rgba(0,0,0,.15), 0 1px 2px rgba(0,0,0,.3);
+}
+:root[data-design="m3"] .list-toolbar .glass-input { background: var(--md-surface-container-highest); }
+
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] .m3-hero-cover { transition: none; }
+}
+
+/* ----- Contrast inside coloured hero blocks: text follows the block's on-colour, secondary actions are outlined ----- */
+:root[data-design="m3"] .m3-hero-ep-num { color: var(--md-on-primary-container); }
+:root[data-design="m3"] :is(.m3-hero, .roll-stage) strong { color: inherit; }
+:root[data-design="m3"] :is(.m3-hero, .roll-stage) :is(.roll-friends-text, .roll-count) { color: inherit; opacity: .8; }
+:root[data-design="m3"] :is(.m3-hero, .roll-stage) .glass-btn-secondary {
+    background: transparent;
+    color: inherit;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 45%, transparent);
+}
+:root[data-design="m3"] :is(.m3-hero, .roll-stage) .glass-btn-secondary:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+:root[data-design="m3"] .m3-hero .glass-btn-primary, :root[data-design="m3"] .m3-hero .glass-btn-primary:hover { background: var(--md-primary); color: var(--md-on-primary); }
+:root[data-design="m3"] .roll-stage .glass-btn-primary, :root[data-design="m3"] .roll-stage .glass-btn-primary:hover,
+:root[data-design="m3"] .roll-btn:hover { background: var(--md-tertiary); color: var(--md-on-tertiary); }
+
+/* ----- Settings: palette swatches show seed + its pair, in shapes ----- */
+:root[data-design="m3"] .m3-seeds { display: flex; flex-wrap: wrap; gap: 10px; }
+:root[data-design="m3"] .m3-seed {
+    width: 48px;
+    height: 48px;
+    background: conic-gradient(from 225deg, var(--seed) 0 50%, color-mix(in srgb, var(--seed) 40%, white) 50% 75%, color-mix(in srgb, var(--seed) 60%, #000) 75%);
+    clip-path: var(--m3-shape-circle);
+    transition: clip-path .5s var(--ease), transform .5s var(--ease);
+}
+:root[data-design="m3"] .m3-seed:hover { clip-path: var(--m3-shape-cookie9); }
+:root[data-design="m3"] .m3-seed.active { clip-path: var(--m3-shape-flower); transform: rotate(22deg) scale(1.08); }
+
+
+/* =====================================================================================================
+   Colour from content, motion, editorial pages
+   ===================================================================================================== */
+
+/* Registered colours can be animated: a show's palette flows in instead of snapping (js/m3.js setScope) */
+@property --md-surface { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-on-surface { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-on-surface-variant { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-surface-container-lowest { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-surface-container-low { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-surface-container { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-surface-container-high { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-surface-container-highest { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-primary { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-on-primary { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-primary-container { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-on-primary-container { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-secondary { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-on-secondary { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-secondary-container { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-on-secondary-container { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-tertiary { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-on-tertiary { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-tertiary-container { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-on-tertiary-container { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-outline { syntax: '<color>'; inherits: true; initial-value: transparent; }
+@property --md-outline-variant { syntax: '<color>'; inherits: true; initial-value: transparent; }
+:root[data-design="m3"], :root[data-design="m3"] .m3-scope { transition: --md-surface .7s var(--md-standard), --md-on-surface .7s var(--md-standard), --md-on-surface-variant .7s var(--md-standard), --md-surface-container-lowest .7s var(--md-standard), --md-surface-container-low .7s var(--md-standard), --md-surface-container .7s var(--md-standard), --md-surface-container-high .7s var(--md-standard), --md-surface-container-highest .7s var(--md-standard), --md-primary .7s var(--md-standard), --md-on-primary .7s var(--md-standard), --md-primary-container .7s var(--md-standard), --md-on-primary-container .7s var(--md-standard), --md-secondary .7s var(--md-standard), --md-on-secondary .7s var(--md-standard), --md-secondary-container .7s var(--md-standard), --md-on-secondary-container .7s var(--md-standard), --md-tertiary .7s var(--md-standard), --md-on-tertiary .7s var(--md-standard), --md-tertiary-container .7s var(--md-standard), --md-on-tertiary-container .7s var(--md-standard), --md-outline .7s var(--md-standard), --md-outline-variant .7s var(--md-standard); }
+
+/* Inside a coloured part of the page, AniRoll's variables follow that part's palette */
+:root[data-design="m3"] .m3-scope {
+    --bg: var(--md-surface);
+    --bg-secondary: var(--md-surface-container);
+    --surface: var(--md-surface-container-low);
+    --surface-hover: var(--md-surface-container-highest);
+    --border: var(--md-outline-variant);
+    --border-subtle: var(--md-surface-container-high);
+    --text: var(--md-on-surface);
+    --text-secondary: var(--md-on-surface-variant);
+    --text-tertiary: var(--md-outline);
+    --accent: var(--md-primary);
+    --accent-hover: var(--md-primary);
+    --accent-text: var(--md-on-primary);
+    --user-accent: var(--md-primary);
+    --user-accent-dim: color-mix(in srgb, var(--md-primary) 12%, transparent);
+}
+:root[data-design="m3"] .detail-panel.m3-scope { background: var(--md-surface-container-low); color: var(--md-on-surface); }
+
+/* Container transform: the pressed cover grows into the panel's cover */
+::view-transition-group(m3-cover) { animation-duration: .6s; animation-timing-function: cubic-bezier(0.34, 1.3, 0.4, 1); }
+::view-transition-old(m3-cover), ::view-transition-new(m3-cover) { height: 100%; object-fit: cover; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .35s; }
+:root[data-design="m3"] .m3-vt .detail-panel { transition: none !important; }
+:root[data-design="m3"] .m3-vt, :root[data-design="m3"] .m3-vt * { transition: none !important; }
+
+/* Pages slide in along the shared X axis */
+:root[data-design="m3"] .page-enter { animation: m3SharedX .45s cubic-bezier(0.2, 0, 0, 1) both; }
+@keyframes m3SharedX { from { opacity: 0; transform: translateX(32px); } }
+
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"], :root[data-design="m3"] .m3-scope { transition: none; }
+    :root[data-design="m3"] .page-enter { animation: none; }
+}
+
+
+/* =====================================================================================================
+   Feel (v94): the app answers every touch. Ripples, springs that overshoot and settle, cards that deal
+   themselves in, covers that light up their surroundings, a small celebration for every episode.
+   Shapes only where they mean something (loader, logo, stickers, empty states) and never cut artwork.
+   ===================================================================================================== */
+
+/* ----- Ripple (js/m3.js): the touch spreads from the finger ----- */
+:root[data-design="m3"] .m3-ripple-box {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+:root[data-design="m3"] .m3-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .14;
+    transform: scale(0);
+    pointer-events: none;
+}
+
+/* ----- Press and hover: things squish under the finger and spring back ----- */
+:root[data-design="m3"] :is(.glass-btn, .list-tab, .tab-btn, .friends-tab, .page-switch > a, .genre-chip, .progress-btn,
+    .cw-inc, .nav-icon-btn, .m3-rail-fab, .wp-fab, .compare-fab, .season-nav-btn, .detail-panel-action-btn, .design-option, .m3-seed) {
+    transition: background-color .2s var(--md-standard), color .2s var(--md-standard), box-shadow .3s var(--md-standard),
+        border-radius .5s var(--m3-bouncy), transform .5s var(--m3-bouncy), padding .5s var(--m3-bouncy), clip-path .5s var(--m3-bouncy);
+}
+:root[data-design="m3"] :is(.glass-btn, .list-tab, .tab-btn, .friends-tab, .page-switch > a, .genre-chip, .progress-btn,
+    .cw-inc, .nav-icon-btn, .season-nav-btn, .detail-panel-action-btn):active {
+    transform: scale(.94);
+    transition-duration: .12s, .12s, .12s, .25s, .12s, .25s, .25s;
+}
+:root[data-design="m3"] :is(.m3-rail-fab, .wp-fab, .compare-fab):active { transform: scale(.9); }
+
+/* Cards lift towards you, press in, and take a rounder shape while held */
+:root[data-design="m3"] .media-card {
+    transition: background-color .2s var(--md-standard), border-radius .5s var(--m3-bouncy),
+        transform .55s var(--m3-bouncy), box-shadow .3s var(--md-standard);
+}
+:root[data-design="m3"] .media-card:hover {
+    transform: translateY(-6px);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 24px -6px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.18);
+}
+:root[data-design="m3"] .media-card:active { transform: scale(.95); border-radius: var(--radius-2xl); transition-duration: .2s, .3s, .15s, .2s; }
+:root[data-design="m3"] .media-card-img { transition: transform .8s var(--m3-gentle); }
+:root[data-design="m3"] .media-card:hover .media-card-img { transform: scale(1.06); }
+
+/* Cards deal themselves in, one after the other */
+:root[data-design="m3"] .media-card { animation: m3Deal .7s var(--m3-bouncy) backwards; }
+@keyframes m3Deal { from { opacity: 0; transform: translateY(28px) scale(.9); } }
+:root[data-design="m3"] .media-card:nth-child(2) { animation-delay: 40ms; }
+:root[data-design="m3"] .media-card:nth-child(3) { animation-delay: 80ms; }
+:root[data-design="m3"] .media-card:nth-child(4) { animation-delay: 120ms; }
+:root[data-design="m3"] .media-card:nth-child(5) { animation-delay: 160ms; }
+:root[data-design="m3"] .media-card:nth-child(6) { animation-delay: 200ms; }
+:root[data-design="m3"] .media-card:nth-child(7) { animation-delay: 240ms; }
+:root[data-design="m3"] .media-card:nth-child(8) { animation-delay: 280ms; }
+:root[data-design="m3"] .media-card:nth-child(n+9) { animation-delay: 320ms; }
+
+/* Sections rise in as the page opens */
+:root[data-design="m3"] .page-enter > * { animation: m3Rise .7s var(--m3-gentle) backwards; }
+:root[data-design="m3"] .page-enter > :nth-child(2) { animation-delay: 60ms; }
+:root[data-design="m3"] .page-enter > :nth-child(3) { animation-delay: 120ms; }
+:root[data-design="m3"] .page-enter > :nth-child(n+4) { animation-delay: 180ms; }
+@keyframes m3Rise { from { opacity: 0; transform: translateY(20px); } }
+:root[data-design="m3"] .page-enter { animation: m3Fade .3s var(--md-standard) both; }
+@keyframes m3Fade { from { opacity: 0; } }
+
+/* Button groups: the chosen one grows and rounds fully, its neighbours make room */
+:root[data-design="m3"] :is(.list-tab, .tab-btn, .friends-tab).active,
+:root[data-design="m3"] .page-switch > a[aria-current] { padding-left: 24px; padding-right: 24px; }
+
+/* Navigation: the active pill stretches in from the icon */
+:root[data-design="m3"] .mobile-tab::before { transition: transform .6s var(--m3-bouncy), opacity .2s var(--md-standard), background-color .2s var(--md-standard); }
+:root[data-design="m3"] .mobile-tab svg { transition: transform .5s var(--m3-bouncy); }
+:root[data-design="m3"] .mobile-tab:active svg { transform: scale(.85); }
+:root[data-design="m3"] .mobile-tab.active svg { animation: m3IconPop .6s var(--m3-bouncy); }
+@keyframes m3IconPop { 40% { transform: scale(1.18); } }
+
+/* ----- Home hero: lit by the cover, the next shows fanned out like a hand of cards ----- */
+:root[data-design="m3"] .m3-hero {
+    isolation: isolate;
+    min-height: 380px;
+    animation: m3HeroIn .9s var(--m3-gentle) both;
+}
+@keyframes m3HeroIn { from { opacity: 0; transform: translateY(32px) scale(.97); } }
+:root[data-design="m3"] .m3-hero > * { position: relative; z-index: 1; }
+:root[data-design="m3"] .m3-hero > .m3-hero-glow {
+    /* Stands still on purpose: a slow endless drift made the page stall a frame whenever the pointer left
+       the hero (the animated, filtered layer had to be rebuilt) */
+    position: absolute;
+    z-index: 0;
+    inset: -25%;
+    background: var(--cover) center / cover no-repeat;
+    filter: blur(64px) saturate(1.6);
+    opacity: .7;
+    -webkit-mask: radial-gradient(closest-side at 70% 50%, #000 25%, transparent 100%);
+    mask: radial-gradient(closest-side at 70% 50%, #000 25%, transparent 100%);
+    pointer-events: none;
+}
+:root[data-design="m3"] .m3-hero-art { display: grid; place-items: center; min-height: 300px; }
+:root[data-design="m3"] .m3-hero-deck { position: relative; width: 196px; aspect-ratio: 2 / 3; }
+:root[data-design="m3"] .m3-hero-cover {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: var(--radius-xl);
+    box-shadow: 0 18px 40px -12px rgba(0,0,0,.55), 0 4px 10px rgba(0,0,0,.2);
+    transform: var(--at);
+    transition: transform .7s var(--m3-bouncy), border-radius .5s var(--m3-bouncy);
+    animation: m3DealCover .9s var(--m3-bouncy) backwards;
+}
+@keyframes m3DealCover { from { opacity: 0; transform: translateY(60px) rotate(0deg) scale(.8); } }
+:root[data-design="m3"] .m3-hero-cover.is-front { --at: rotate(-3deg); z-index: 2; animation-delay: .25s; }
+:root[data-design="m3"] .m3-hero-cover.is-left { --at: translate(-62%, 6%) rotate(-12deg) scale(.84); animation-delay: .1s; filter: saturate(.85) brightness(.9); }
+:root[data-design="m3"] .m3-hero-cover.is-right { --at: translate(62%, 6%) rotate(11deg) scale(.84); animation-delay: .16s; filter: saturate(.85) brightness(.9); }
+:root[data-design="m3"] .m3-hero:hover .m3-hero-cover.is-front { --at: translateY(-8px) rotate(0deg) scale(1.04); border-radius: var(--radius-2xl); }
+:root[data-design="m3"] .m3-hero:hover .m3-hero-cover.is-left { --at: translate(-78%, 2%) rotate(-17deg) scale(.84); }
+:root[data-design="m3"] .m3-hero:hover .m3-hero-cover.is-right { --at: translate(78%, 2%) rotate(16deg) scale(.84); }
+/* Episodes waiting: a soft sticker on the front cover's corner */
+:root[data-design="m3"] .m3-hero-badge {
+    position: absolute;
+    z-index: 3;
+    top: -18px;
+    right: -22px;
+    width: 72px;
+    height: 72px;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    clip-path: var(--m3-shape-cookie9);
+    background: var(--md-tertiary);
+    color: var(--md-on-tertiary);
+    font-size: 1.6rem;
+    font-weight: 850;
+    line-height: 1;
+    animation: m3Sticker .8s var(--m3-bouncy) .7s backwards;
+}
+:root[data-design="m3"] .m3-hero-badge small { font-size: .6rem; font-weight: 700; letter-spacing: .02em; }
+@keyframes m3Sticker { from { transform: scale(0) rotate(-60deg); } }
+:root[data-design="m3"] .m3-hero-art-empty svg { position: relative; width: 120px; height: 120px; color: var(--md-on-primary-container); animation: m3Float 4s ease-in-out infinite alternate; }
+:root[data-design="m3"] .m3-hero-art-empty::before {
+    content: '';
+    position: absolute;
+    width: 200px;
+    aspect-ratio: 1;
+    clip-path: var(--m3-shape-cookie9);
+    background: var(--md-tertiary-container);
+}
+@keyframes m3Float { to { transform: translateY(-10px) rotate(-6deg); } }
+/* The number: counts up when the hero appears, pops when an episode is marked */
+:root[data-design="m3"] .m3-hero-ep-num { display: inline-block; transform-origin: 30% 80%; }
+:root[data-design="m3"] .m3-hero-ep-num.is-pop { animation: m3NumPop .7s var(--m3-bouncy); }
+@keyframes m3NumPop { 30% { transform: scale(1.18) rotate(-4deg); } }
+:root[data-design="m3"] .m3-hero .glass-btn-primary { box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--md-primary) 70%, transparent); }
+@media (max-width: 768px) {
+    :root[data-design="m3"] .m3-hero { grid-template-columns: 1fr; padding: 24px; border-radius: 32px; min-height: 0; }
+    :root[data-design="m3"] .m3-hero-art { order: -1; min-height: 250px; }
+    :root[data-design="m3"] .m3-hero-deck { width: 148px; }
+    :root[data-design="m3"] .m3-hero-badge { width: 58px; height: 58px; font-size: 1.25rem; }
+    :root[data-design="m3"] .m3-hero > .m3-hero-glow { -webkit-mask: radial-gradient(closest-side at 50% 30%, #000 25%, transparent 100%); mask: radial-gradient(closest-side at 50% 30%, #000 25%, transparent 100%); }
+}
+
+/* ----- Roll: the rolled cover lights the stage ----- */
+:root[data-design="m3"] .roll-stage::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: -25%;
+    background: var(--m3-glow, none) center / cover no-repeat;
+    filter: blur(64px) saturate(1.6);
+    opacity: .6;
+    -webkit-mask: radial-gradient(closest-side at 25% 50%, #000 25%, transparent 100%);
+    mask: radial-gradient(closest-side at 25% 50%, #000 25%, transparent 100%);
+    transition: opacity .6s var(--md-standard);
+    pointer-events: none;
+}
+:root[data-design="m3"] .roll-window { box-shadow: 0 18px 40px -12px rgba(0,0,0,.5); }
+:root[data-design="m3"] .roll-result-title { animation: m3Rise .7s var(--m3-bouncy) backwards; }
+
+/* ----- Stickers and avatars ----- */
+/* Taste match: a soft cookie sticker that wobbles when the card is hovered */
+:root[data-design="m3"] .media-card-match[data-match] {
+    top: 8px;
+    left: 8px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+    border-radius: 0;
+    clip-path: var(--m3-shape-cookie9);
+    background: var(--md-tertiary);
+    color: var(--md-on-tertiary);
+    transition: transform .6s var(--m3-bouncy);
+}
+:root[data-design="m3"] .media-card-match[data-match]::after { content: attr(data-match) '%'; font-size: .75rem; font-weight: 800; }
+:root[data-design="m3"] .media-card:hover .media-card-match[data-match] { transform: rotate(-14deg) scale(1.12); }
+:root[data-design="m3"] :is(.activity-avatar, .fr-avatar, .activity-reply-avatar, .wp-member-avatar, .friend-status-avatar, .wp-host-avatar, .profile-avatar) { border-radius: 50%; }
+:root[data-design="m3"] .detail-cover img { border-radius: var(--radius-xl); box-shadow: 0 18px 40px -12px rgba(0,0,0,.5); }
+:root[data-design="m3"] .empty-state-icon { border-radius: 0; clip-path: var(--m3-shape-cookie9); width: 112px; height: 112px; animation: m3Float 4s ease-in-out infinite alternate; }
+
+/* ----- Celebration (js/m3.js): little shapes fly off when an episode is marked ----- */
+.m3-confetti {
+    position: fixed;
+    z-index: 10000;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] :is(.media-card, .page-enter > *, .m3-hero, .m3-hero-cover, .m3-hero-badge, .roll-result-title) { animation: none; }
+    :root[data-design="m3"] :is(.empty-state-icon, .m3-hero-art-empty svg) { animation: none; }
+    :root[data-design="m3"] .media-card:hover { transform: none; }
+}
+
+/* ----- Stages lit by the cover: Home hero and Roll sit on a deep surface, the cover's blurred light
+   washes over it (like Android's media player). No flat neon block; the colour comes from the show ----- */
+:root[data-design="m3"] :is(.m3-hero, .roll-stage) {
+    background: var(--md-surface-container-low);
+    color: var(--md-on-surface);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-on-surface) 6%, transparent);
+}
+:root[data-design="m3"] .m3-hero > .m3-hero-glow, :root[data-design="m3"] .roll-stage::before {
+    opacity: .95;
+    filter: blur(72px) saturate(1.7) brightness(.8);
+    -webkit-mask: none;
+    mask: none;
+}
+:root[data-design="m3"] :is(.m3-hero, .roll-stage)::after {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    background: linear-gradient(100deg, color-mix(in srgb, var(--md-surface-container-low) 78%, transparent) 20%, transparent 75%);
+    pointer-events: none;
+}
+:root[data-design="m3"] .roll-stage::after { z-index: -1; background: linear-gradient(280deg, color-mix(in srgb, var(--md-surface-container-low) 78%, transparent) 25%, transparent 75%); }
+:root[data-design="m3"] .m3-hero-ep-num { color: var(--md-primary); }
+:root[data-design="m3"] .m3-hero-ep-label { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+:root[data-design="m3"] .m3-hero-ep-of { color: var(--md-on-surface-variant); opacity: 1; }
+:root[data-design="m3"] .m3-hero-greet { color: var(--md-on-surface-variant); opacity: 1; }
+:root[data-design="m3"] .roll-result-title { color: var(--md-on-surface); }
+:root[data-design="m3"] .roll-stage .glass-btn-primary, :root[data-design="m3"] .roll-stage .glass-btn-primary:hover,
+:root[data-design="m3"] .roll-btn, :root[data-design="m3"] .roll-btn:hover { background: var(--md-primary); color: var(--md-on-primary); }
+:root[data-design="m3"] .roll-result-kicker { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+@media (max-width: 768px) {
+    :root[data-design="m3"] .m3-hero::after { background: linear-gradient(to top, color-mix(in srgb, var(--md-surface-container-low) 85%, transparent) 35%, transparent 80%); }
+}
+@media (prefers-color-scheme: light) {
+    :root[data-design="m3"]:not([data-theme="dark"]) :is(.m3-hero > .m3-hero-glow, .roll-stage::before) { filter: blur(72px) saturate(1.5) brightness(1.1); opacity: .7; }
+}
+:root[data-design="m3"][data-theme="light"] :is(.m3-hero > .m3-hero-glow, .roll-stage::before) { filter: blur(72px) saturate(1.5) brightness(1.1); opacity: .7; }
+
+
+/* =====================================================================================================
+   Desktop feel (v94, after Lucid on Hyprland): the show you're on is the wallpaper, the bars float over
+   it as islands, the phone gets a floating dock, Home gets widgets. Everything wears one palette.
+   ===================================================================================================== */
+
+/* ----- Wallpaper (js/m3.js setWall): blurred, dimmed, crossfades when the show changes ----- */
+:root[data-design="m3"] body { position: relative; isolation: isolate; }
+:root[data-design="m3"] .m3-wall { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+:root[data-design="m3"] .m3-wall img {
+    position: absolute;
+    inset: -8%;
+    width: 116%;
+    height: 116%;
+    object-fit: cover;
+    filter: blur(44px) saturate(1.35);
+    opacity: 0;
+    transform: scale(1.06);
+    transition: opacity 1.4s var(--md-standard), transform 2.4s var(--m3-gentle);
+}
+:root[data-design="m3"] .m3-wall img.on { opacity: .55; transform: none; }
+:root[data-design="m3"] .m3-wall::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(120% 90% at 50% 0%, transparent 0%, color-mix(in srgb, var(--md-surface) 45%, transparent) 70%),
+        linear-gradient(color-mix(in srgb, var(--md-surface) 40%, transparent), color-mix(in srgb, var(--md-surface) 72%, transparent));
+}
+@media (prefers-color-scheme: light) { :root[data-design="m3"]:not([data-theme="dark"]) .m3-wall img.on { opacity: .45; } }
+:root[data-design="m3"][data-theme="light"] .m3-wall img.on { opacity: .45; }
+
+/* ----- Islands: frosted, in the palette, floating over the wallpaper ----- */
+:root[data-design="m3"] {
+    --m3-island: color-mix(in srgb, var(--md-surface-container-high) 80%, transparent);
+    --m3-island-blur: blur(28px) saturate(1.5);
+    --m3-island-shadow: 0 8px 28px -10px rgba(0,0,0,.45), inset 0 0 0 1px color-mix(in srgb, var(--md-on-surface) 7%, transparent);
+}
+:root[data-design="m3"] .glass-nav::before { display: none; }
+:root[data-design="m3"] .glass-nav { top: 8px; }
+:root[data-design="m3"] .nav-inner { padding: 0 12px; gap: 8px; }
+:root[data-design="m3"] :is(.nav-logo, .nav-actions) {
+    height: 48px;
+    padding: 0 6px;
+    border-radius: var(--radius-full);
+    background: var(--m3-island);
+    -webkit-backdrop-filter: var(--m3-island-blur);
+    backdrop-filter: var(--m3-island-blur);
+    box-shadow: var(--m3-island-shadow);
+}
+:root[data-design="m3"] .nav-logo { padding: 0 18px 0 10px; }
+:root[data-design="m3"] .nav-actions { flex: 0 0 auto; margin-left: auto; gap: 0; }
+:root[data-design="m3"] .nav-actions .nav-icon-btn:not(.m3-searchbar) { width: 40px; height: 40px; }
+:root[data-design="m3"] .m3-searchbar {
+    background: var(--m3-island);
+    -webkit-backdrop-filter: var(--m3-island-blur);
+    backdrop-filter: var(--m3-island-blur);
+    box-shadow: var(--m3-island-shadow);
+    order: 0;
+}
+:root[data-design="m3"] .m3-searchbar:hover { background: color-mix(in srgb, var(--md-surface-container-highest) 80%, transparent); }
+@media (min-width: 769px) {
+    /* The search island sits between the logo and the actions */
+    :root[data-design="m3"] .nav-actions { display: contents; }
+    :root[data-design="m3"] .nav-actions > :not(#search-btn) { order: 2; }
+    :root[data-design="m3"] #jf-now-chip { order: 1; margin-left: auto; }
+    :root[data-design="m3"] .nav-actions > #notif-btn { margin-left: auto; }
+    :root[data-design="m3"] #jf-now-chip:not([hidden]) ~ #notif-btn { margin-left: 0; }
+    :root[data-design="m3"] :is(#notif-btn, #user-menu) {
+        height: 48px;
+        display: grid;
+        place-items: center;
+        background: var(--m3-island);
+        -webkit-backdrop-filter: var(--m3-island-blur);
+        backdrop-filter: var(--m3-island-blur);
+        box-shadow: var(--m3-island-shadow);
+    }
+    :root[data-design="m3"] #notif-btn { width: 48px; border-radius: var(--radius-full); }
+    :root[data-design="m3"] #user-menu { width: 48px; border-radius: var(--radius-full); }
+    :root[data-design="m3"] #user-menu .nav-icon-btn { width: 40px; height: 40px; }
+
+    /* Rail: a floating island on the left, like a vertical dock */
+    :root[data-design="m3"] .mobile-tabbar {
+        top: calc(var(--nav-height) + 16px);
+        left: 12px;
+        bottom: auto;
+        width: calc(var(--md-rail) - 24px);
+        padding: 12px 0 16px;
+        gap: 10px;
+        border-radius: 36px;
+        background: var(--m3-island);
+        -webkit-backdrop-filter: var(--m3-island-blur);
+        backdrop-filter: var(--m3-island-blur);
+        box-shadow: var(--m3-island-shadow);
+    }
+    :root[data-design="m3"] .mobile-tab { min-width: 0; width: 100%; }
+    :root[data-design="m3"] .mobile-tab::before { width: 52px; margin-left: -26px; }
+    :root[data-design="m3"] .m3-rail-fab { margin: 0 auto 6px; }
+}
+/* Phone: the bottom bar floats as a dock */
+@media (max-width: 768px) {
+    :root[data-design="m3"] .mobile-tabbar {
+        left: 12px;
+        right: 12px;
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        height: 72px;
+        padding: 0 4px;
+        border-radius: 36px;
+        background: var(--m3-island);
+        -webkit-backdrop-filter: var(--m3-island-blur);
+        backdrop-filter: var(--m3-island-blur);
+        box-shadow: var(--m3-island-shadow);
+    }
+    :root[data-design="m3"] .main-content { padding-bottom: calc(var(--space-4xl) + 96px); }
+    :root[data-design="m3"] .wp-fab { bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+    :root[data-design="m3"] .nav-actions { padding: 0 4px; }
+    :root[data-design="m3"] .nav-logo .logo-text { font-size: 1.125rem; }
+}
+
+/* Containers over the wallpaper: a touch translucent, so the show shines through the edges */
+:root[data-design="m3"] :is(.roll-filters, .settings-card, .stat-chart, .activity-card, .home-section:has(#recommendations-row)) {
+    background: color-mix(in srgb, var(--md-surface-container-low) 86%, transparent) !important;
+}
+
+/* ----- Palette "From your show": the swatch is the show's cover ----- */
+:root[data-design="m3"] .m3-seed-show { background: var(--cover) center / cover, var(--md-primary-container); }
+
+/* ----- Home widgets (js/m3.js renderWidgets): a clock, a queue, a week ----- */
+:root[data-design="m3"] .m3-widgets {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.6fr;
+    gap: 12px;
+    margin: calc(-1 * var(--space-2xl) + 12px) 0 var(--space-2xl);
+}
+:root[data-design="m3"] .m3-widget {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 172px;
+    padding: 20px 22px;
+    border: 0;
+    border-radius: var(--radius-2xl);
+    background: color-mix(in srgb, var(--md-surface-container) 82%, transparent);
+    -webkit-backdrop-filter: var(--m3-island-blur);
+    backdrop-filter: var(--m3-island-blur);
+    box-shadow: var(--m3-island-shadow);
+    color: var(--md-on-surface);
+    text-align: left;
+    font: inherit;
+    overflow: hidden;
+    animation: m3Deal .8s var(--m3-bouncy) backwards;
+    transition: transform .5s var(--m3-bouncy), border-radius .5s var(--m3-bouncy), background-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .m3-widget:nth-child(2) { animation-delay: 70ms; }
+:root[data-design="m3"] .m3-widget:nth-child(3) { animation-delay: 140ms; }
+:root[data-design="m3"] .m3-widget:hover { transform: translateY(-4px); border-radius: var(--md-shape-xxl); background: color-mix(in srgb, var(--md-surface-container-high) 88%, transparent); }
+:root[data-design="m3"] .m3-widget:active { transform: scale(.96); }
+:root[data-design="m3"] .m3-widget-label { font-size: .8125rem; font-weight: 600; color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .m3-widget-sub { margin-top: auto; font-size: .8125rem; color: var(--md-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Clock: two big stacked lines in the primary colour */
+:root[data-design="m3"] .m3-widget-clock { background: color-mix(in srgb, var(--md-primary-container) 88%, transparent); color: var(--md-on-primary-container); }
+:root[data-design="m3"] .m3-widget-clock :is(.m3-widget-label, .m3-widget-sub) { color: inherit; opacity: .8; }
+:root[data-design="m3"] .m3-widget-clock-num { display: flex; flex-direction: column; font-size: 2.6rem; line-height: .95; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin: 4px 0 8px; }
+:root[data-design="m3"] .m3-widget-clock-num small { font-size: .45em; font-weight: 700; margin-left: 3px; opacity: .7; }
+/* Queue: a huge count, the shows as overlapping round faces */
+:root[data-design="m3"] .m3-widget-big { font-size: 4.25rem; line-height: 1; font-weight: 850; letter-spacing: -0.04em; color: var(--md-tertiary); }
+:root[data-design="m3"] .m3-widget-faces { position: absolute; right: 18px; top: 18px; display: flex; }
+:root[data-design="m3"] .m3-widget-faces img {
+    width: 34px; height: 34px; border-radius: 50%; object-fit: cover; margin-left: -10px;
+    box-shadow: 0 0 0 3px var(--md-surface-container);
+    transition: margin .5s var(--m3-bouncy), transform .5s var(--m3-bouncy);
+}
+:root[data-design="m3"] .m3-widget-queue:hover .m3-widget-faces img { margin-left: -4px; }
+:root[data-design="m3"] .m3-widget-queue:hover .m3-widget-faces img:nth-child(odd) { transform: translateY(-3px); }
+/* Week: seven days, today in a primary circle, the shows of each day as tiny covers */
+:root[data-design="m3"] .m3-widget-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 10px 0 8px; }
+:root[data-design="m3"] .m3-day { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+:root[data-design="m3"] .m3-day-name {
+    width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%;
+    font-size: .8125rem; font-weight: 700; color: var(--md-on-surface-variant);
+}
+:root[data-design="m3"] .m3-day.is-today .m3-day-name { background: var(--md-primary); color: var(--md-on-primary); }
+:root[data-design="m3"] .m3-day-dots { display: flex; flex-direction: column; align-items: center; min-height: 30px; }
+:root[data-design="m3"] .m3-day-dots img {
+    width: 28px; height: 28px; border-radius: 10px; object-fit: cover; margin-top: -8px;
+    box-shadow: 0 0 0 2px var(--md-surface-container);
+    transition: margin .5s var(--m3-bouncy), border-radius .5s var(--m3-bouncy);
+}
+:root[data-design="m3"] .m3-day-dots img:first-child { margin-top: 0; }
+:root[data-design="m3"] .m3-widget-week:hover .m3-day-dots img { margin-top: 2px; border-radius: 50%; }
+:root[data-design="m3"] .m3-day:not(.has) .m3-day-dots::before { content: ''; width: 5px; height: 5px; margin-top: 12px; border-radius: 50%; background: var(--md-outline-variant); }
+@media (max-width: 1100px) { :root[data-design="m3"] .m3-widgets { grid-template-columns: 1fr 1fr; } :root[data-design="m3"] .m3-widget-week { grid-column: 1 / -1; } }
+@media (max-width: 768px) {
+    :root[data-design="m3"] .m3-widget { min-height: 150px; padding: 16px 18px; border-radius: 28px; }
+    :root[data-design="m3"] .m3-widget-clock-num { font-size: 2.1rem; }
+    :root[data-design="m3"] .m3-widget-big { font-size: 3.25rem; }
+    :root[data-design="m3"] .m3-widget-faces img { width: 28px; height: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] .m3-widget { animation: none; }
+    :root[data-design="m3"] .m3-wall img { transition: opacity .3s linear; }
+}
+:root[data-design="m3"] .score-pick-btn { border-radius: var(--radius-full); transition: transform .5s var(--m3-bouncy), color .2s var(--md-standard), background-color .2s var(--md-standard); }
+:root[data-design="m3"] .score-pick-btn.on { color: var(--md-tertiary); }
+:root[data-design="m3"] .score-pick-3 .score-pick-btn.on { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+:root[data-design="m3"] .score-pick-btn.on { animation: m3IconPop .5s var(--m3-bouncy); }
+
+/* ----- Button groups as one pill track: the chosen option is a filled pill that sits inside it
+   (the connected-segment look read as cut off next to the fully round selection) ----- */
+:root[data-design="m3"] :is(.list-tabs, .tab-group, .roll-segment, .page-switch, .friends-tabs),
+:root[data-design="m3"] :has(> .list-tab), :root[data-design="m3"] :has(> .tab-btn), :root[data-design="m3"] :has(> .friends-tab) {
+    gap: 0;
+    padding: 4px;
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--md-surface-container-highest) 85%, transparent);
+    width: max-content;
+}
+:root[data-design="m3"] :is(.list-tab, .tab-btn, .page-switch > a, .friends-tab),
+:root[data-design="m3"] :is(.list-tab, .tab-btn, .page-switch > a, .friends-tab):is(:first-child, :last-child) {
+    min-height: 36px;
+    padding: 6px 16px;
+    border-radius: var(--radius-full);
+    background: transparent;
+}
+:root[data-design="m3"] :is(.list-tab, .tab-btn, .page-switch > a, .friends-tab):hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+/* :is() takes its heaviest argument (.page-switch > a), so the selected state has to name all of them */
+:root[data-design="m3"] :is(.list-tab, .tab-btn, .page-switch > a, .friends-tab):is(.active, [aria-current]) {
+    padding-left: 20px;
+    padding-right: 20px;
+    background: var(--md-primary);
+    color: var(--md-on-primary);
+    box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--md-primary) 60%, transparent);
+}
+
+/* ----- FABs (Watch Party, Compare): always laid out at full width, the label side is clipped away and
+   revealed on hover. Only clip-path and transform animate, never the width, so nothing reflows mid-way ----- */
+:root[data-design="m3"] :is(.wp-fab, .compare-fab) {
+    width: auto;
+    height: 56px;
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0 16px;
+    overflow: visible;
+    animation: none;
+    border-radius: var(--radius-lg);
+    clip-path: inset(0 0 0 calc(100% - 56px) round 16px);
+    transition: clip-path .6s cubic-bezier(0.2, 0, 0, 1), transform .5s var(--m3-gentle), background-color .2s var(--md-standard);
+    will-change: clip-path;
+}
+:root[data-design="m3"] :is(.wp-fab, .compare-fab)::after { display: none; }
+:root[data-design="m3"] :is(.wp-fab, .compare-fab):hover,
+:root[data-design="m3"] :is(.wp-fab, .compare-fab):focus-visible { clip-path: inset(0 0 0 0 round 16px); }
+:root[data-design="m3"] :is(.wp-fab, .compare-fab):active { transform: scale(.95); }
+:root[data-design="m3"] :is(.wp-fab-label, .compare-fab-label),
+:root[data-design="m3"] :is(.wp-fab, .compare-fab):hover :is(.wp-fab-label, .compare-fab-label) {
+    width: auto;
+    opacity: 0;
+    transform: translateX(12px);
+    transition: opacity .25s var(--md-standard), transform .6s cubic-bezier(0.2, 0, 0, 1);
+}
+:root[data-design="m3"] :is(.wp-fab, .compare-fab):is(:hover, :focus-visible) :is(.wp-fab-label, .compare-fab-label) {
+    opacity: 1;
+    transform: none;
+    transition: opacity .35s var(--md-standard) .1s, transform .6s cubic-bezier(0.2, 0, 0, 1);
+}
+:root[data-design="m3"] :is(.wp-fab-icon, .compare-fab-icon),
+:root[data-design="m3"] :is(.wp-fab, .compare-fab):hover :is(.wp-fab-icon, .compare-fab-icon) { transform: none; transition: transform .6s cubic-bezier(0.2, 0, 0, 1); }
+:root[data-design="m3"] :is(.wp-fab, .compare-fab):hover :is(.wp-fab-icon, .compare-fab-icon) { transform: rotate(-10deg); }
+@media (max-width: 768px) { :root[data-design="m3"] .compare-fab { bottom: calc(100px + env(safe-area-inset-bottom, 0px)); } }
+:root[data-design="m3"] .hex-swatch { border-radius: var(--radius-full); box-shadow: inset 0 0 0 1px var(--md-outline-variant); transition: border-radius .5s var(--m3-bouncy); }
+:root[data-design="m3"] .hex-swatch:hover { border-radius: var(--radius-md); }
+:root[data-design="m3"] .hex-input.invalid { box-shadow: inset 0 0 0 2px var(--md-error); }
+:root[data-design="m3"] .settings-hint { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .whatsnew-watch, :root[data-design="m3"] .whatsnew-video { border-radius: var(--radius-xl); }
+:root[data-design="m3"] .whatsnew-watch-label { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+:root[data-design="m3"] .whatsnew-watch-play { background: var(--md-primary); color: var(--md-on-primary); }
+
+/* Performance: widgets sit on an almost opaque surface instead of re-blurring the lit hero and the
+   wallpaper behind them on every hover (that stalled a frame when the pointer crossed them) */
+:root[data-design="m3"] .m3-widget {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: color-mix(in srgb, var(--md-surface-container) 94%, transparent);
+}
+:root[data-design="m3"] .m3-widget:hover { background: var(--md-surface-container-high); }
+:root[data-design="m3"] .m3-widget-clock, :root[data-design="m3"] .m3-widget-clock:hover { background: var(--md-primary-container); }
+
+/* AniRoll's accent is set inline on <html> (store.js applyAccentColor) and would win over the palette:
+   in M3 the accent is always the palette's primary */
+:root[data-design="m3"] {
+    --user-accent: var(--md-primary) !important;
+    --user-accent-dim: color-mix(in srgb, var(--md-primary) 12%, transparent) !important;
+}
+
+/* Landing in M3 (visitors can try it before logging in) */
+:root[data-design="m3"] .landing-title .lw-accent { color: var(--md-primary); }
+:root[data-design="m3"] .landing-feature {
+    border: 0 !important;
+    border-radius: var(--md-shape-xxl);
+    background: color-mix(in srgb, var(--md-surface-container-low) 90%, transparent);
+    transition: transform .6s var(--m3-bouncy), border-radius .6s var(--m3-bouncy), background-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .landing-feature:hover { border-radius: var(--radius-xl); background: var(--md-surface-container); }
+:root[data-design="m3"] .landing-tour-item.active { background: var(--md-surface-container); border-radius: var(--radius-xl); }
+:root[data-design="m3"] :is(.landing-stage-frame, .landing-tour-frame, .landing-design-frame) { border-color: transparent; border-radius: var(--md-shape-xxl); }
+:root[data-design="m3"] .landing-stage-glow { opacity: .6; }
+/* Hover on widgets only moves things (transform), it never changes layout or corner shapes mid-frame */
+:root[data-design="m3"] .m3-widget { transition: transform .5s var(--m3-bouncy), background-color .2s var(--md-standard); }
+:root[data-design="m3"] .m3-widget:hover { border-radius: var(--radius-2xl); }
+:root[data-design="m3"] .m3-day-dots img { transition: transform .5s var(--m3-bouncy); }
+:root[data-design="m3"] .m3-widget-week:hover .m3-day-dots img { margin-top: -8px; border-radius: 10px; transform: translateY(-3px) scale(1.08); }
+:root[data-design="m3"] .m3-widget-week:hover .m3-day-dots img:first-child { margin-top: 0; }
+:root[data-design="m3"] .m3-widget-faces img { transition: transform .5s var(--m3-bouncy); }
+:root[data-design="m3"] .m3-widget-queue:hover .m3-widget-faces img { margin-left: -10px; }
+:root[data-design="m3"] .m3-widget-queue:hover .m3-widget-faces img:nth-child(n) { transform: translateX(calc((var(--i, 0) - 2) * 3px)) translateY(-3px); }
+
+/* Wallpaper and hero light are tiny canvases stretched up (js/m3.js tinyCover): soft by themselves, so the
+   CSS blur on top stays small and cheap */
+:root[data-design="m3"] .m3-wall canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: saturate(1.35);
+    opacity: 0;
+    transform: scale(1.06);
+    transition: opacity 1.4s var(--md-standard), transform 2.4s var(--m3-gentle);
+}
+:root[data-design="m3"] .m3-wall canvas.on { opacity: .55; transform: none; }
+@media (prefers-color-scheme: light) { :root[data-design="m3"]:not([data-theme="dark"]) .m3-wall canvas.on { opacity: .45; } }
+:root[data-design="m3"][data-theme="light"] .m3-wall canvas.on { opacity: .45; }
+:root[data-design="m3"] :is(.m3-hero > .m3-hero-glow, .roll-stage > .m3-hero-glow) { background: none; filter: none !important; opacity: 1 !important; }
+/* Roll: the same light, from the rolled cover (replaces the stage's old ::before) */
+:root[data-design="m3"] .roll-stage::before { display: none; }
+:root[data-design="m3"] .roll-stage > .m3-hero-glow {
+    position: absolute;
+    z-index: -1;
+    inset: -25%;
+    pointer-events: none;
+    -webkit-mask: none;
+    mask: none;
+}
+:root[data-design="m3"] .m3-hero-glow canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: saturate(1.7) brightness(.8);
+    opacity: 0;
+    transition: opacity .8s var(--md-standard);
+}
+:root[data-design="m3"] .m3-hero-glow canvas.on { opacity: .95; }
+@media (prefers-color-scheme: light) { :root[data-design="m3"]:not([data-theme="dark"]) .m3-hero-glow canvas { filter: saturate(1.5) brightness(1.1); } :root[data-design="m3"]:not([data-theme="dark"]) .m3-hero-glow canvas.on { opacity: .7; } }
+:root[data-design="m3"][data-theme="light"] .m3-hero-glow canvas { filter: saturate(1.5) brightness(1.1); }
+:root[data-design="m3"][data-theme="light"] .m3-hero-glow canvas.on { opacity: .7; }
+
+/* Pressing a control inside a card (+1) must not squish the card: it would pull the button out from under the
+   finger, the release would land on the card, and the card's own click would open the detail panel */
+:root[data-design="m3"] .media-card:has(:is(button, a):hover),
+:root[data-design="m3"] .media-card:has(:is(button, a):active) { transform: translateY(-6px); border-radius: var(--radius-lg); }
+
+/* =====================================================================================================
+   Cursor (js/m3.js setupCursor): a dot and a tonal shape from the shape library. The shape says what a
+   click does. Everything here is transform, clip-path and colour; nothing loops.
+   ===================================================================================================== */
+:root[data-design="m3"].m3-cursor-on, :root[data-design="m3"].m3-cursor-on * { cursor: none !important; }
+:root[data-design="m3"] .m3-cursor { position: fixed; inset: 0; z-index: 2147483600; pointer-events: none; opacity: 0; transition: opacity .2s var(--md-standard); }
+:root[data-design="m3"] .m3-cursor.is-on { opacity: 1; }
+:root[data-design="m3"] .m3-cursor-dot {
+    position: absolute;
+    left: -4px;
+    top: -4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--md-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--md-surface) 85%, transparent);
+}
+:root[data-design="m3"] .m3-cursor-ring { position: absolute; left: -40px; top: -40px; width: 80px; height: 80px; }
+:root[data-design="m3"] .m3-cursor-shape {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--md-primary) 22%, transparent);
+    color: var(--md-on-primary-container);
+    clip-path: var(--m3-shape-circle);
+    transform: scale(.4);
+    transition: transform .55s var(--m3-bouncy), clip-path .55s var(--m3-bouncy), background-color .25s var(--md-standard);
+}
+:root[data-design="m3"] .m3-cursor-shape svg { width: 26px; height: 26px; opacity: 0; transform: scale(.4) rotate(-45deg); transition: opacity .2s var(--md-standard), transform .5s var(--m3-bouncy); }
+/* Anything you can press: a cookie, a little larger, turned */
+:root[data-design="m3"] .m3-cursor[data-state="press"] .m3-cursor-shape { clip-path: var(--m3-shape-cookie9); transform: scale(.62) rotate(20deg); background: color-mix(in srgb, var(--md-primary) 26%, transparent); }
+/* A show: a big flower in the container colour with an arrow — it opens */
+:root[data-design="m3"] .m3-cursor[data-state="show"] .m3-cursor-shape { clip-path: var(--m3-shape-flower); transform: scale(.9) rotate(-10deg); background: color-mix(in srgb, var(--md-primary-container) 88%, transparent); }
+:root[data-design="m3"] .m3-cursor[data-state="show"] .m3-cursor-shape svg { opacity: 1; transform: rotate(10deg); }
+:root[data-design="m3"] .m3-cursor[data-state="show"] .m3-cursor-dot { transform-origin: center; opacity: 0; }
+/* Text: a slim bar */
+:root[data-design="m3"] .m3-cursor[data-state="text"] .m3-cursor-shape { transform: scale(.05, .34); background: var(--md-primary); }
+:root[data-design="m3"] .m3-cursor[data-state="text"] .m3-cursor-dot { opacity: 0; }
+:root[data-design="m3"] .m3-cursor-dot { transition: opacity .15s var(--md-standard); }
+/* Pressed: the shape squishes, springs back on release */
+:root[data-design="m3"] .m3-cursor.is-down .m3-cursor-shape { transform: scale(.3); transition-duration: .15s; }
+:root[data-design="m3"] .m3-cursor.is-down[data-state="press"] .m3-cursor-shape { transform: scale(.46) rotate(50deg); }
+:root[data-design="m3"] .m3-cursor.is-down[data-state="show"] .m3-cursor-shape { transform: scale(.7) rotate(-30deg); }
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] .m3-cursor-shape, :root[data-design="m3"] .m3-cursor-shape svg { transition-duration: .01s; }
+}
+
+/* ----- The detail sheet makes room: the page slides a little to the left and settles back when it closes ----- */
+:root[data-design="m3"] .main-content { transition: transform .6s var(--m3-gentle), opacity .4s var(--md-standard); }
+@media (min-width: 769px) {
+    :root[data-design="m3"] body.m3-sheet-open .main-content { transform: translateX(-72px) scale(.985); transform-origin: 30% 30%; opacity: .92; }
+}
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] .main-content { transition: none; }
+    :root[data-design="m3"] body.m3-sheet-open .main-content { transform: none; }
+}
+/* Without its own cursor (no fine pointer): AniRoll's `cursor: none` must not hide the system one */
+:root[data-design="m3"]:not(.m3-cursor-on) *:not(a, button, [role="button"], [role="link"], [data-open], [data-go], label) { cursor: auto; }
+:root[data-design="m3"]:not(.m3-cursor-on) :is(a, button, [role="button"], [role="link"], [data-open], [data-go], label) { cursor: pointer; }
+/* AniRoll's own Home hero and strip (js/home-cinema.js): Material 3 shows its own instead */
+:root[data-design="m3"] .ar-home { display: none !important; }
