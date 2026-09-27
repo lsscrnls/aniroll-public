@@ -946,7 +946,7 @@
 }
 :root[data-design="m3"] .home-section:has(#recommendations-row) .media-card { background: var(--md-surface-container-high); }
 
-/* ----- Progress: M3 Expressive wavy indicator with a stop dot ----- */
+/* ----- Progress: M3 Expressive wavy indicator, a dot where it ends ----- */
 :root[data-design="m3"] .progress-bar {
     position: relative;
     height: 10px;
@@ -963,23 +963,24 @@
     border-radius: var(--radius-full);
     background: var(--md-secondary-container);
 }
-:root[data-design="m3"] .progress-bar::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 3px;
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: var(--md-primary);
-}
 :root[data-design="m3"] .progress-bar-fill {
     position: relative;
     height: 10px;
     border-radius: 0;
     background: var(--md-primary);
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x;
+    /* Three layers, bottom up: everything but the last 7px, the wave cut to that, a dot at the end.
+       So the wave stops just before where you are and the dot marks it (our choice; M3 puts the
+       dot at the end of the track instead) */
+    -webkit-mask:
+        radial-gradient(circle 2.5px at calc(100% - 2.5px) 50%, #000 95%, transparent) no-repeat,
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x,
+        linear-gradient(to right, #000 calc(100% - 7px), transparent 0) no-repeat;
+    -webkit-mask-composite: source-over, source-in;
+    mask:
+        radial-gradient(circle 2.5px at calc(100% - 2.5px) 50%, #000 95%, transparent) no-repeat,
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x,
+        linear-gradient(to right, #000 calc(100% - 7px), transparent 0) no-repeat;
+    mask-composite: add, intersect;
 }
 /* No endless wave on hover: stopping an endless animation when the pointer leaves stalls a frame */
 /* Continue Watching: the bar sits at the bottom of the card, inset like M3 cards do */
