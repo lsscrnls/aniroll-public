@@ -632,6 +632,9 @@
 /* ----- Profile ----- */
 :root[data-design="m3"] .profile-header { margin: 0 0 var(--space-xl); }
 :root[data-design="m3"] .profile-banner { border-radius: var(--md-shape-xxl); height: 240px; background: var(--md-surface-container-high); }
+/* No text over the picture, as on the detail page: the name and stats start below the banner */
+:root[data-design="m3"] .profile-banner::after { display: none; }
+:root[data-design="m3"] .profile-info { margin-top: var(--space-lg); align-items: center; }
 :root[data-design="m3"] .profile-avatar { border: 4px solid var(--md-surface); border-radius: var(--md-shape-xxl); }
 :root[data-design="m3"] .profile-name { font-weight: 600; letter-spacing: 0; }
 :root[data-design="m3"] .profile-stat { background: var(--md-surface-container); border-radius: var(--radius-xl); padding: 16px 20px; }
@@ -864,6 +867,31 @@
     :root[data-design="m3"] .m3-rail-fab.active { background: var(--md-tertiary); color: var(--md-on-tertiary); border-radius: var(--radius-xl); }
     :root[data-design="m3"] .m3-rail-fab svg { width: 26px; height: 26px; }
     :root[data-design="m3"] .mobile-tab[data-page="roll"] { display: none; }
+    :root[data-design="m3"] .m3-rail-github {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        margin: 12px auto 4px;
+        padding-top: 12px;
+        border-top: 1px solid var(--md-outline-variant);
+        width: 56px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--md-on-surface-variant);
+        text-decoration: none;
+    }
+    :root[data-design="m3"] .m3-rail-github svg {
+        width: 20px;
+        height: 20px;
+        padding: 6px 18px;
+        box-sizing: content-box;
+        border-radius: var(--radius-full);
+        transition: background-color .2s var(--md-standard);
+    }
+    :root[data-design="m3"] .m3-rail-github:hover svg { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+    :root[data-design="m3"] .m3-rail-github:hover { color: var(--md-on-surface); }
+    :root[data-design="m3"] .dropdown-item.github-link { display: none; }
 }
 
 /* ----- Emphasized page titles ----- */
