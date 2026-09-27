@@ -1,11 +1,11 @@
-import * as api from '../api.js?v=103';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched } from '../store.js?v=103';
-import { openDialog } from '../a11y.js?v=103';
-import { isLoggedIn, getToken } from '../auth.js?v=103';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=103';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=103';
-import { renderHeadline, renderStage, renderTour, renderDesigns, initLanding } from '../landing.js?v=103';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=103';
+import * as api from '../api.js?v=104';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=104';
+import { openDialog } from '../a11y.js?v=104';
+import { isLoggedIn, getToken } from '../auth.js?v=104';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=104';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=104';
+import { renderHeadline, renderStage, renderTour, renderDesigns, initLanding } from '../landing.js?v=104';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=104';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
@@ -76,7 +76,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=103'), import('../jellyfin.js?v=103')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=104'), import('../jellyfin.js?v=104')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
@@ -672,7 +672,7 @@ function renderLanding() {
             </div>
             <div id="landing-trending" class="scroll-row">${renderSkeletonCards(6)}</div>
         </div>
-        <div class="landing-foot"><button type="button" class="whatsnew-link">What's new</button></div>
+        <div class="landing-foot"><button type="button" class="whatsnew-link">What's new</button><a class="landing-foot-link" href="${GITHUB_URL}" target="_blank" rel="noopener">${GITHUB_ICON}Source on GitHub</a></div>
     </div>`;
 }
 

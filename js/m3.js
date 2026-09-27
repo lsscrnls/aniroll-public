@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT } from './store.js?v=103';
-import { upNext, glance, DAYS, greeting } from './upnext.js?v=103';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=103';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=104';
+import { upNext, glance, DAYS, greeting } from './upnext.js?v=104';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=104';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -57,6 +57,20 @@ export function setup() {
         mark();
         window.addEventListener('hashchange', mark);
         cleanups.push(() => { fab.remove(); window.removeEventListener('hashchange', mark); });
+    }
+
+    // The source on GitHub as the rail's last item, set apart from the destinations (desktop; on a phone
+    // it stays in the avatar menu)
+    if (tabbar) {
+        const gh = document.createElement('a');
+        gh.href = GITHUB_URL;
+        gh.target = '_blank';
+        gh.rel = 'noopener';
+        gh.className = 'm3-rail-github';
+        gh.innerHTML = `${GITHUB_ICON}<span>GitHub</span>`;
+        gh.setAttribute('aria-label', 'Source on GitHub');
+        tabbar.append(gh);
+        cleanups.push(() => gh.remove());
     }
 
     document.addEventListener('aniroll:continue-watching', onContinue);
