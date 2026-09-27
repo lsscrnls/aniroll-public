@@ -1619,10 +1619,6 @@
     :root[data-design="m3"] .m3-widget { animation: none; }
     :root[data-design="m3"] .m3-wall img { transition: opacity .3s linear; }
 }
-:root[data-design="m3"] .score-pick-btn { border-radius: var(--radius-full); transition: transform .5s var(--m3-bouncy), color .2s var(--md-standard), background-color .2s var(--md-standard); }
-:root[data-design="m3"] .score-pick-btn.on { color: var(--md-tertiary); }
-:root[data-design="m3"] .score-pick-3 .score-pick-btn.on { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
-:root[data-design="m3"] .score-pick-btn.on { animation: m3IconPop .5s var(--m3-bouncy); }
 
 /* ----- Button groups as one pill track: the chosen option is a filled pill that sits inside it
    (the connected-segment look read as cut off next to the fully round selection) ----- */

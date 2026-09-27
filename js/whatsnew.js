@@ -1,9 +1,9 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=102';
-import { openDialog } from './a11y.js?v=102';
-import { prefersReducedMotion } from './animations.js?v=102';
+import { esc } from './store.js?v=103';
+import { openDialog } from './a11y.js?v=103';
+import { prefersReducedMotion } from './animations.js?v=103';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More
@@ -13,8 +13,9 @@ const SEEN_KEY = 'aniroll_seen_changes';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        // '.2': joining a Watch Party broke after this entry went live; the fix brings it back to everyone
-        id: '2026-09-27.2',
+        // '.2': joining a Watch Party broke after this entry went live; the fix brings it back to everyone.
+        // '.3': scores out of 100 everywhere
+        id: '2026-09-27.3',
         title: 'A new Home, and Material 3 follows your pointer',
         video: { src: 'media/design-aniroll.mp4', poster: 'media/design-aniroll.jpg', label: 'The new Home in action' },
         items: [
@@ -25,6 +26,8 @@ const CHANGES = [
             'Material 3: every cover on Home opens its show, and the detail panel pushes the page aside.',
             'Material 3: the progress wave ends in a dot, on top or at the bottom, wherever the wave stops.',
             '<strong>Fixed:</strong> joining a Watch Party failed with an error for a few hours. It works again.',
+            'Scores are always <strong>out of 100</strong> in AniRoll. Scores kept as 10 points, 5 stars or smileys on AniList are converted.',
+            '<strong>Fixed:</strong> with a 10 point, 5 star or smiley format on AniList, My List showed some scores wrong.',
         ],
     },
     {
