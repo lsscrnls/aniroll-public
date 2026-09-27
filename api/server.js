@@ -123,7 +123,6 @@ function sharePage(entry, id) {
 </head>
 <body>
 <p>Opening <a href="${target}">${escapeHtml(entry ? entry.title : 'AniRoll')}</a> …</p>
-<script>location.replace(${JSON.stringify(target)});</script>
 </body>
 </html>`;
 }
@@ -154,35 +153,14 @@ function saveJellyfin(all) {
 
 // The Jellyfin API key is the user's own credential, so it is encrypted at rest: a copy of
 // the data volume (backup, snapshot) is useless without JF_SECRET, which lives outside it.
-// Without that env var a key is generated next to the data — better than plaintext, but it
-// no longer separates secret from ciphertext.
-const JF_SECRET_FILE = path.join(__dirname, 'data', '.jfsecret');
-let jfSecretCache = null;
-
-function jfSecret() {
-    if (jfSecretCache) return jfSecretCache;
-
-    const fromEnv = process.env.JF_SECRET;
-    if (fromEnv && fromEnv.length >= 32) {
-        jfSecretCache = crypto.createHash('sha256').update(fromEnv).digest();
-        return jfSecretCache;
-    }
-
-    try {
-        const onDisk = Buffer.from(fs.readFileSync(JF_SECRET_FILE, 'utf8').trim(), 'base64');
-        if (onDisk.length === 32) {
-            jfSecretCache = onDisk;
-            return jfSecretCache;
-        }
-    } catch { /* generate below */ }
-
-    jfSecretCache = crypto.randomBytes(32);
-    // Atomic above all here: half a key file would mean a new key next start, and every
-    // stored Jellyfin key and AniList token could no longer be decrypted
-    writeFileAtomic(JF_SECRET_FILE, jfSecretCache.toString('base64'), 0o600);
-    console.warn('JF_SECRET is not set - generated an encryption key inside the data directory');
-    return jfSecretCache;
+// There is no fallback key next to the data: without JF_SECRET the server does not start.
+const JF_SECRET = process.env.JF_SECRET || '';
+if (JF_SECRET.length < 32) {
+    console.error('JF_SECRET must be set (32+ characters): it encrypts the stored Jellyfin keys and AniList tokens');
+    process.exit(1);
 }
+const jfKey = crypto.createHash('sha256').update(JF_SECRET).digest();
+const jfSecret = () => jfKey;
 
 function encryptSecret(plain) {
     const iv = crypto.randomBytes(12);
@@ -830,9 +808,17 @@ function refuseAuth(res, auth) {
     return json(res, 401, { error: 'Login required' });
 }
 
+// A local dev server, on any port. Parsed, not prefix-matched: "http://localhost.evil.test" is not local
+function isLocalOrigin(origin) {
+    try {
+        const u = new URL(origin);
+        return u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1') && u.pathname === '/';
+    } catch { return false; }
+}
+
 function setCors(req, res) {
     const origin = req.headers.origin;
-    const allowed = (origin && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1'))) ? origin : ALLOWED_ORIGIN;
+    const allowed = isLocalOrigin(origin) ? origin : ALLOWED_ORIGIN;
     res.setHeader('Access-Control-Allow-Origin', allowed);
     res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Host-Key, X-Hook-Secret');
@@ -937,6 +923,9 @@ function publicLookup(hostname, options, callback) {
 }
 
 const RELAY_MAX_BYTES = 262144;
+// Relay calls while AniList can't confirm the caller (a Jellyfin pull is a few dozen requests)
+const RELAY_UNVERIFIED_PER_IP = 60;
+const RELAY_UNVERIFIED_TOTAL = 300;
 
 // One request to a Jellyfin server: no redirects, 8 s in total, at most 256 KB read
 function relayRequest(target, method, headers) {
@@ -1159,7 +1148,8 @@ async function handle(req, res) {
             };
             saveJellyfin(all);
             const { apiKeyEnc, ...stored } = all[key];
-            return json(res, 200, { configured: true, ...stored, apiKey });
+            // The browser sent the key a moment ago and keeps it; it never comes back in the answer
+            return json(res, 200, { configured: true, ...stored });
         }
 
         if (req.method === 'DELETE') {
@@ -1178,6 +1168,12 @@ async function handle(req, res) {
     if (pathname === '/api/jellyfin/proxy' && req.method === 'POST') {
         const auth = await verifyViewer(req);
         if (auth.status !== 'ok' && auth.status !== 'unreachable') return refuseAuth(res, auth);
+        // While AniList blocks this server nobody can be confirmed, and Jellyfin should keep working. Such
+        // unconfirmed calls get a small allowance per IP and in total, so the relay can't be used as a proxy.
+        if (auth.status === 'unreachable'
+            && (overLimit('relay-ip', clientIp(req), RELAY_UNVERIFIED_PER_IP, 60000) || overLimit('relay', 'all', RELAY_UNVERIFIED_TOTAL, 60000))) {
+            return json(res, 429, { error: 'AniList cannot confirm your account right now, try again in a few minutes' });
+        }
 
         const body = await readBody(req);
         // Prefer what the account has stored; a client may still pass its own server explicitly

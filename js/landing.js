@@ -1,5 +1,5 @@
-import { prefersReducedMotion } from './animations.js?v=98';
-import { getDesign, switchDesign } from './design.js?v=98';
+import { prefersReducedMotion } from './animations.js?v=99';
+import { getDesign, switchDesign } from './design.js?v=99';
 
 // Landing page motion: the headline arrives word by word, the big clip tilts upright while it scrolls in,
 // and the feature tour plays one clip after another. Clips (media/*.mp4) are recorded with tools/showcase.

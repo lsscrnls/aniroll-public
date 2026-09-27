@@ -284,6 +284,30 @@ function staticServer() {
         check('social: posts have a reply toggle', false);
     }
 
+    // One browser, two accounts: cached answers and queued saves never cross over (js/api.js)
+    const isolation = await page.evaluate(async () => {
+        const api = await import(document.querySelector('script[type="module"]').src.replace('app.js', 'api.js'));
+        const me = localStorage.getItem('aniroll_user');
+        const as = (id) => localStorage.setItem('aniroll_user', JSON.stringify({ ...JSON.parse(me), id }));
+        const q = 'query { Page(perPage: 1) { media(search: "isolation") { id mediaListEntry { status } } } }';
+        localStorage.removeItem('aniroll_req_times');
+        as(111); const a = await api.cachedQuery(q, {}, 'e2e-token', 60000);
+        as(222); const b = await api.cachedQuery(q, {}, 'e2e-token', 60000);
+        as(111); const a2 = await api.cachedQuery(q, {}, 'e2e-token', 60000);
+        localStorage.setItem('aniroll_pending_saves', JSON.stringify([
+            { key: 'x1', user: 111, vars: { mediaId: 1, progress: 1 }, ts: 1 },
+            { key: 'x2', vars: { mediaId: 2, progress: 1 }, ts: 1 },  // from before accounts: would add a show, dropped
+            { key: 'x3', vars: { id: 3, progress: 1 }, ts: 1 },       // from before accounts: an entry id, only its owner can save
+        ]));
+        as(222); const countB = api.pendingSaveCount();
+        as(111); const countA = api.pendingSaveCount();
+        localStorage.removeItem('aniroll_pending_saves');
+        localStorage.setItem('aniroll_user', me);
+        return { separate: a !== b, reused: a === a2, countA, countB };
+    });
+    check("accounts: another account never gets this one's cached answers or queued saves",
+        isolation.separate && isolation.reused && isolation.countA === 2 && isolation.countB === 1, isolation);
+
     // "Reduce motion": no smooth scrolling (Lenis marks <html>), no cards flying in, no count-up
     const calm = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
     await calm.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));

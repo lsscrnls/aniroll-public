@@ -1,6 +1,6 @@
-import * as api from '../api.js?v=98';
-import { getState, renderMediaCard, esc, emptyIcon } from '../store.js?v=98';
-import { getToken, isLoggedIn } from '../auth.js?v=98';
+import * as api from '../api.js?v=99';
+import { getState, renderMediaCard, esc, emptyIcon } from '../store.js?v=99';
+import { getToken, isLoggedIn } from '../auth.js?v=99';
 
 export async function render({ params, content }) {
     const token = getToken();
