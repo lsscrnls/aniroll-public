@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=105';
-import { enhanceSelect } from '../select.js?v=105';
-import { tasteMatch } from '../taste.js?v=105';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=105';
-import { getToken, isLoggedIn } from '../auth.js?v=105';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=105';
-import { showConfirm } from '../a11y.js?v=105';
+import * as api from '../api.js?v=106';
+import { enhanceSelect } from '../select.js?v=106';
+import { tasteMatch } from '../taste.js?v=106';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=106';
+import { getToken, isLoggedIn } from '../auth.js?v=106';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=106';
+import { showConfirm } from '../a11y.js?v=106';
 
 export async function renderPanel(id, container) {
     const token = getToken();

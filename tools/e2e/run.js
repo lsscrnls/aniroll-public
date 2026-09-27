@@ -193,6 +193,16 @@ function staticServer() {
     } else {
         check('Roll: a recommended pick comes up within 12 rolls', false, countRecs);
     }
+    // A round of rolls hands out every show once before any comes again (a shuffle bag, remembered in
+    // aniroll_roll_seen): four rolls from a fresh start, four different shows
+    await page.evaluate(() => localStorage.removeItem('aniroll_roll_seen'));
+    const winners = [];
+    for (let i = 0; i < 4; i++) {
+        await page.evaluate(() => { localStorage.removeItem('aniroll_req_times'); document.getElementById('roll-btn').click(); });
+        await page.waitForSelector('#roll-result:not([hidden])', { timeout: 15000 });
+        winners.push(await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_roll_seen') || '[]').at(-1)));
+    }
+    check('Roll: no show comes up twice until the others had their turn', new Set(winners).size === winners.length && winners.every(Boolean), winners);
     await page.evaluate(() => localStorage.removeItem('aniroll_roll_filters'));
 
     // My List: −/+ changes progress and must not open the detail panel; the card itself does
