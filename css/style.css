@@ -4025,6 +4025,9 @@ input, select, textarea { font: inherit; color: inherit; }
 .design-option.active { border-color: var(--user-accent); }
 .design-option-name { font-weight: 700; margin-top: var(--space-sm); }
 .design-option-text { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; }
+/* The score field on an entry: 0–100 with its scale written next to it */
+.score-field { display: inline-flex; align-items: baseline; gap: 4px; }
+.score-scale { font-size: 0.85rem; color: var(--text-secondary); }
 .design-preview { display: flex; align-items: center; gap: 8px; width: 100%; height: 72px; padding: 0 16px; border-radius: 14px; }
 .design-preview i { display: block; }
 .design-preview-aniroll { background: #0a0a0a; }
@@ -4738,26 +4741,6 @@ html.m3-loading body { visibility: hidden; }
 .whatsnew-heading { font-size: 0.95rem; font-weight: 700; margin-bottom: var(--space-sm); }
 .schedule-item .calendar-week-you { font-size: 0.72rem; white-space: nowrap; }
 
-/* Score as stars (POINT_5) or smileys (POINT_3), when that is the user's AniList score format */
-.score-pick { display: inline-flex; gap: 2px; }
-.score-pick-btn {
-    min-width: 32px;
-    height: 32px;
-    padding: 0 6px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-tertiary);
-    font: inherit;
-    font-size: 1.05rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast);
-}
-.score-pick-btn:hover { background: var(--surface-hover); color: var(--text); }
-.score-pick-btn.on { color: var(--warning); }
-.score-pick-3 .score-pick-btn.on { color: var(--user-accent); background: var(--user-accent-dim); }
-.score-pick-btn:active { transform: scale(.9); }
 
 /* Colour by hex code (Settings → Appearance): the swatch opens the system picker, the field takes a code */
 .settings-hint { margin: -2px 0 var(--space-sm); font-size: 0.85rem; color: var(--text-secondary); }
