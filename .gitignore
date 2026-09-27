@@ -1,2 +1,8 @@
 tools/showcase/out/
 tools/m3/out/
+
+# The backend's data: tokens, Jellyfin keys, webhooks, logs (never commit, even by accident)
+api/data/
+.env
+.env.*
+*.log
