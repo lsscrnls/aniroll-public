@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AniList search — demo</title>
+    <link rel="stylesheet" href="search-overlay.css">
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 640px; margin: 64px auto; padding: 0 24px; line-height: 1.5; }
+        button { padding: 10px 18px; border-radius: 999px; border: 1px solid #ccc; background: none; font: inherit; cursor: pointer; }
+        kbd { padding: 2px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85em; }
+        pre { background: rgba(127, 127, 127, 0.12); padding: 16px; border-radius: 12px; overflow-x: auto; font-size: 0.8rem; }
+        @media (prefers-color-scheme: dark) { body { background: #0a0a0a; color: #eee; } button { color: inherit; border-color: #444; } }
+    </style>
+</head>
+<body>
+    <h1>AniList search</h1>
+    <p>Click the button or press <kbd>Ctrl</kbd>+<kbd>K</kbd> (<kbd>⌘</kbd>+<kbd>K</kbd> on macOS).</p>
+    <button id="open-search" type="button">Search anime or manga</button>
+    <h2>Selected</h2>
+    <pre id="selected">Nothing selected yet.</pre>
+
+    <script type="module">
+        import { mountSearchOverlay } from './search-overlay.js';
+
+        const search = mountSearchOverlay({
+            onSelect: (media) => {
+                // In a tracker this would open the detail page or add the show to a list
+                document.getElementById('selected').textContent = JSON.stringify(media, null, 2);
+            },
+        });
+        document.getElementById('open-search').addEventListener('click', search.open);
+    </script>
+</body>
+</html>
