@@ -1,11 +1,11 @@
-import * as api from '../api.js?v=104';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=104';
-import { openDialog } from '../a11y.js?v=104';
-import { isLoggedIn, getToken } from '../auth.js?v=104';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=104';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=104';
-import { renderHeadline, renderStage, renderTour, renderDesigns, initLanding } from '../landing.js?v=104';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=104';
+import * as api from '../api.js?v=105';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=105';
+import { openDialog } from '../a11y.js?v=105';
+import { isLoggedIn, getToken } from '../auth.js?v=105';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=105';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=105';
+import { renderHeadline, renderStage, renderTour, renderDesigns, initLanding } from '../landing.js?v=105';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=105';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
@@ -24,6 +24,13 @@ export async function render({ content }) {
                 <a href="#/list" class="section-link">View All</a>
             </div>
             <div id="continue-watching" class="scroll-row">${renderSkeletonCards(6)}</div>
+        </section>
+        <section class="home-section starting-soon" id="starting-soon" hidden>
+            <div class="section-header">
+                <h2 class="section-title">Starting soon</h2>
+                <a href="#/list" class="section-link">Planning</a>
+            </div>
+            <div id="starting-soon-row" class="scroll-row"></div>
         </section>
         <section class="home-section home-popular-friends" style="margin-top:var(--space-xl)">
             <div class="section-header">
@@ -76,7 +83,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=104'), import('../jellyfin.js?v=104')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=105'), import('../jellyfin.js?v=105')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
@@ -158,11 +165,38 @@ function removeContinueCard(row, card) {
     setTimeout(done, 700);
 }
 
+const ICON_EVENT = '<svg data-icon="event" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>';
+
+// Shows on the Planning list that haven't started yet but have a date: the next premieres, soonest first
+function renderStartingSoon(planning) {
+    const section = document.getElementById('starting-soon');
+    const row = document.getElementById('starting-soon-row');
+    if (!section || !row) return;
+    const now = Date.now() / 1000;
+    const soon = planning
+        .filter(e => e.media.status === 'NOT_YET_RELEASED' && e.media.nextAiringEpisode?.airingAt > now)
+        .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt)
+        .slice(0, 12);
+    section.hidden = !soon.length;
+    row.innerHTML = soon.map(e => {
+        const m = e.media;
+        const next = m.nextAiringEpisode;
+        return `<div class="media-card starting-soon-card" style="flex:0 0 150px" data-media-id="${m.id}" data-open="${m.id}" role="button" tabindex="0">
+            <img class="media-card-img" src="${esc(m.coverImage?.large || '')}" alt="${esc(titlePref(m.title))}" loading="lazy">
+            <div class="media-card-overlay">
+                <div class="media-card-title">${esc(titlePref(m.title))}</div>
+                <div class="media-card-sub starting-soon-when">${ICON_EVENT}<span><strong>Episode ${next.episode}</strong> in ${api.timeUntil(api.untilAiring(next))}</span></div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
 async function loadContinueWatching(token) {
     try {
         const user = getState().user;
         if (!user) return;
         const lists = await api.getMediaList(user.id, 'ANIME', token);
+        renderStartingSoon(lists.find(l => l.status === 'PLANNING')?.entries || []);
         const current = lists.find(l => l.status === 'CURRENT');
         const entries = (current?.entries || [])
             .sort((a, b) => b.updatedAt - a.updatedAt)
