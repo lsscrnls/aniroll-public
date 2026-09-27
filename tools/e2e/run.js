@@ -308,6 +308,49 @@ function staticServer() {
     check("accounts: another account never gets this one's cached answers or queued saves",
         isolation.separate && isolation.reused && isolation.countA === 2 && isolation.countB === 1, isolation);
 
+    // Watch Party as a guest: the invite link shows the host's party, joining starts the sync; then the
+    // host's own view. Runs against the obfuscated build too (scripts/deploy.sh), where joining once broke
+    const wp = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    wp.on('pageerror', e => errors.push(`watch party: ${e.message}`));
+    const party = { hostName: 'Hosty', mediaId: 21, mediaTitle: 'One Piece', active: true, members: [], hostProgress: 3, hostProgressAt: Date.now(), startedAt: Date.now(), startEp: 2 };
+    await wp.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
+    await wp.route(`${base}/api/**`, route => {
+        const p = new URL(route.request().url()).pathname;
+        if (p.startsWith('/api/party/')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify(party) });
+        route.fulfill({ status: p === '/api/maintenance' ? 200 : 404, contentType: 'application/json', body: '{"maintenance":false}' });
+    });
+    await wp.route(/cdn|googleapis|gstatic/, route => route.abort());
+    await wp.addInitScript(({ id, name }) => {
+        localStorage.setItem('aniroll_token', 'e2e-token');
+        localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+        localStorage.setItem('aniroll_user_ts', String(Date.now()));
+        localStorage.setItem('aniroll_seen_changes', '9999');
+    }, VIEWER);
+    const wpText = () => wp.evaluate(() => document.getElementById('content').innerText.replace(/\s+/g, ' '));
+    await wp.goto(base + '/#/watchparty?host=Hosty&anime=21');
+    await wp.waitForTimeout(3000);
+    const invited = await wpText();
+    // Clicked only when there: a broken page must fail this check, not stop the whole run
+    const joinBtn = wp.locator('button:has-text("Join Watch Party")');
+    if (await joinBtn.count()) {
+        await joinBtn.first().click();
+        await wp.waitForTimeout(1000);
+        if (await wp.locator('#wp-bg-open').count()) await wp.click('#wp-bg-open');
+        await wp.waitForTimeout(2500);
+    }
+    const joined = await wpText();
+    check('watch party: an invite shows the host, joining starts the sync',
+        /Host progress/.test(invited) && /Auto-sync active/.test(joined) && !/is not a function/.test(invited + joined), { invited: invited.slice(0, 160), joined: joined.slice(0, 160) });
+    Object.assign(party, { hostName: VIEWER.name, hostKey: 'k' });
+    await wp.evaluate(n => {
+        localStorage.setItem('aniroll_watchparty', JSON.stringify({ hostName: n, mediaId: 21, hostKey: 'k', mediaTitle: 'One Piece', startEp: 2 }));
+        location.hash = `/watchparty?host=${n}&anime=21`;
+    }, VIEWER.name);
+    await wp.waitForTimeout(3000);
+    const hosting = await wpText();
+    check("watch party: the host's view with its episode counter", /You are the host/.test(hosting) && /EPISODE COUNTER/i.test(hosting), hosting.slice(0, 160));
+    await wp.close();
+
     // "Reduce motion": no smooth scrolling (Lenis marks <html>), no cards flying in, no count-up
     const calm = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
     await calm.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));

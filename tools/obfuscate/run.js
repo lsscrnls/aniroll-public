@@ -15,11 +15,12 @@ const OPTIONS = {
     stringArrayThreshold: 0.8,
     splitStrings: true,
     splitStringsChunkLength: 10,
-    transformObjectKeys: true,
     numbersToExpressions: true,
-    // Light enough for the reel's animation frames
-    controlFlowFlattening: true,
-    controlFlowFlatteningThreshold: 0.25,
+    // Off: control-flow flattening wraps calls in helper objects, and in watchparty.js one of those
+    // wrappers ended up calling something that was no function (joining a party failed, v99).
+    // transformObjectKeys belongs to the same family of rewrites. Names and strings stay unreadable.
+    controlFlowFlattening: false,
+    transformObjectKeys: false,
     deadCodeInjection: false,
     selfDefending: false,
     debugProtection: false,
