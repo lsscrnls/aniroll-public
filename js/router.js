@@ -1,4 +1,4 @@
-import { esc, emptyIcon } from './store.js?v=101';
+import { esc, emptyIcon } from './store.js?v=102';
 
 const routes = [];
 let currentCleanup = null;
