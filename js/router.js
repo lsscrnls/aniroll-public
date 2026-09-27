@@ -1,4 +1,4 @@
-import { esc, emptyIcon } from './store.js?v=104';
+import { esc, emptyIcon } from './store.js?v=105';
 
 const routes = [];
 let currentCleanup = null;
@@ -80,7 +80,8 @@ export async function resolve() {
 
 function updateActiveNav(path) {
     const page = path === '/' ? 'home' : path.split('/')[1];
-    const group = DISCOVER_PAGES.includes(page) ? 'discover' : null;
+    // A studio page is reached from a detail page, but belongs with discovering shows
+    const group = DISCOVER_PAGES.includes(page) || page === 'studio' ? 'discover' : null;
     document.querySelectorAll('[data-page]').forEach(el => {
         el.classList.toggle('active', el.dataset.page === page || el.dataset.page === group);
     });

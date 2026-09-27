@@ -1,12 +1,16 @@
-import * as api from '../api.js?v=104';
-import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched } from '../store.js?v=104';
-import { getToken, isLoggedIn } from '../auth.js?v=104';
-import { enhanceSelect } from '../select.js?v=104';
+import * as api from '../api.js?v=105';
+import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched } from '../store.js?v=105';
+import { getToken, isLoggedIn } from '../auth.js?v=105';
+import { enhanceSelect } from '../select.js?v=105';
 
 // View, sort and the airing filter are remembered per browser; the search text is not
 const VIEW_KEY = 'aniroll_list_view';
 const SORT_KEY = 'aniroll_list_sort';
 const AIRING_KEY = 'aniroll_list_airing';
+const FORMAT_KEY = 'aniroll_list_format';
+// Anime formats to filter by; TV counts TV shorts too
+const FORMATS = { TV: ['TV', 'TV_SHORT'], MOVIE: ['MOVIE'], OVA: ['OVA'], ONA: ['ONA'], SPECIAL: ['SPECIAL'] };
+const FORMAT_LABELS = { TV: 'TV', MOVIE: 'Movie', OVA: 'OVA', ONA: 'ONA', SPECIAL: 'Special' };
 
 const totalOf = (e) => e.media.episodes || e.media.chapters || 0;
 const shareOf = (e) => (totalOf(e) ? e.progress / totalOf(e) : 0);
@@ -52,6 +56,7 @@ export async function render({ params, content }) {
     let view = readPref(VIEW_KEY, 'grid', ['list', 'grid']);
     let sort = readPref(SORT_KEY, 'updated', Object.keys(SORTS));
     let airingOnly = readPref(AIRING_KEY, 'off', ['on', 'off']) === 'on';
+    let format = readPref(FORMAT_KEY, 'ALL', ['ALL', ...Object.keys(FORMATS)]);
     let search = '';
 
     content.innerHTML = `<div class="page-enter">
@@ -73,6 +78,8 @@ export async function render({ params, content }) {
                 ${Object.entries(SORTS).map(([key, s]) => `<option value="${key}" ${key === sort ? 'selected' : ''}>${s.label}</option>`).join('')}
             </select>
             <button class="list-chip${airingOnly ? ' active' : ''}" id="list-airing" aria-pressed="${airingOnly}" title="Only shows that are airing right now">Airing</button>
+            <div class="list-formats" id="list-formats" role="group" aria-label="Format">${Object.keys(FORMATS).map(f =>
+                `<button class="list-chip${format === f ? ' active' : ''}" data-format="${f}" aria-pressed="${format === f}">${FORMAT_LABELS[f]}</button>`).join('')}</div>
             <div class="list-view-toggle" role="group" aria-label="View">
                 <button class="list-view-btn${view === 'list' ? ' active' : ''}" data-view="list" aria-pressed="${view === 'list'}" title="List">${ICON_LIST}</button>
                 <button class="list-view-btn${view === 'grid' ? ' active' : ''}" data-view="grid" aria-pressed="${view === 'grid'}" title="Covers">${ICON_GRID}</button>
@@ -89,6 +96,7 @@ export async function render({ params, content }) {
     const listContent = document.getElementById('list-content');
     const toolbar = document.getElementById('list-toolbar');
     const airingChip = document.getElementById('list-airing');
+    const formatChips = document.getElementById('list-formats');
 
     let currentType = 'ANIME';
     let lists = null;
@@ -98,8 +106,9 @@ export async function render({ params, content }) {
         currentType = type;
         const tabsEl = document.getElementById('list-tabs');
         if (!listContent || !tabsEl) return;
-        // Manga have no airing schedule
+        // Manga have no airing schedule, and formats of their own
         airingChip.hidden = type !== 'ANIME';
+        formatChips.hidden = type !== 'ANIME';
 
         listContent.classList.remove('is-grid');
         listContent.innerHTML = '<div class="page-loader"><div class="loader-spinner"></div></div>';
@@ -111,6 +120,11 @@ export async function render({ params, content }) {
             listContent.innerHTML = `<div class="empty-state" style="padding:var(--space-lg)"><div class="empty-state-sub">${esc(err.message)}</div></div>`;
             return;
         }
+
+        // Only the formats this list has; a remembered one it lacks is let go
+        const present = new Set(lists.flatMap(l => l.entries.map(e => e.media.format)));
+        formatChips.querySelectorAll('[data-format]').forEach(b => { b.hidden = !FORMATS[b.dataset.format].some(f => present.has(f)); });
+        if (format !== 'ALL' && formatChips.querySelector(`[data-format="${format}"]`).hidden) setFormat('ALL');
 
         const statusOrder = ['CURRENT', 'REPEATING', 'PLANNING', 'PAUSED', 'COMPLETED', 'DROPPED'];
         lists.sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
@@ -142,6 +156,7 @@ export async function render({ params, content }) {
             });
         }
         if (airingOnly && currentType === 'ANIME') out = out.filter(e => e.media.nextAiringEpisode);
+        if (format !== 'ALL' && currentType === 'ANIME') out = out.filter(e => FORMATS[format].includes(e.media.format));
         return [...out].sort(SORTS[sort].compare);
     }
 
@@ -282,6 +297,22 @@ export async function render({ params, content }) {
     sortSelect?.addEventListener('change', () => {
         sort = sortSelect.value;
         writePref(SORT_KEY, sort);
+        renderEntries();
+    });
+
+    // One format at a time; the chosen one again shows all
+    function setFormat(next) {
+        format = next;
+        writePref(FORMAT_KEY, format);
+        formatChips.querySelectorAll('[data-format]').forEach(b => {
+            b.classList.toggle('active', b.dataset.format === format);
+            b.setAttribute('aria-pressed', String(b.dataset.format === format));
+        });
+    }
+    formatChips?.addEventListener('click', (e) => {
+        const chip = e.target.closest('[data-format]');
+        if (!chip) return;
+        setFormat(format === chip.dataset.format ? 'ALL' : chip.dataset.format);
         renderEntries();
     });
 

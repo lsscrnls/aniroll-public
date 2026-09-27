@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=104';
-import { enhanceSelect } from '../select.js?v=104';
-import { tasteMatch } from '../taste.js?v=104';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=104';
-import { getToken, isLoggedIn } from '../auth.js?v=104';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=104';
-import { showConfirm } from '../a11y.js?v=104';
+import * as api from '../api.js?v=105';
+import { enhanceSelect } from '../select.js?v=105';
+import { tasteMatch } from '../taste.js?v=105';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=105';
+import { getToken, isLoggedIn } from '../auth.js?v=105';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=105';
+import { showConfirm } from '../a11y.js?v=105';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -70,7 +70,7 @@ function renderDetailHTML(media) {
                     ${!isAnime && media.chapters ? `<span class="detail-tag">${media.chapters} Chapters</span>` : ''}
                     ${media.duration ? `<span class="detail-tag">${media.duration} min/ep</span>` : ''}
                     ${media.season ? `<span class="detail-tag">${api.getSeasonName(media.season)} ${media.seasonYear}</span>` : ''}
-                    ${media.studios?.nodes?.[0] ? `<span class="detail-tag">${esc(media.studios.nodes[0].name)}</span>` : ''}
+                    ${mainStudio(media) ? `<span class="detail-tag">${esc(mainStudio(media))}</span>` : ''}
                     ${media.source ? `<span class="detail-tag">Source: ${media.source.replace(/_/g, ' ')}</span>` : ''}
                 </div>
                 <div class="taste-match" id="taste-match" hidden></div>
@@ -98,6 +98,9 @@ function renderDetailHTML(media) {
             <div class="detail-description">${cleanDescription(media.description)}</div>
         </div>` : ''}
 
+        ${studiosHtml(media)}
+        ${relatedHtml(media)}
+
         ${media.genres?.length ? `<div style="margin-bottom:var(--space-xl)">
             <div class="genre-chips">${media.genres.map(g => `<a href="#/search?genre=${encodeURIComponent(g)}" class="genre-chip">${esc(g)}</a>`).join('')}</div>
         </div>` : ''}
@@ -111,20 +114,6 @@ function renderDetailHTML(media) {
                         <div class="char-name">${esc(e.node?.name?.full)}</div>
                         <div class="char-role">${esc(e.role)}</div>
                         ${e.voiceActors?.[0] ? `<div class="char-role">${esc(e.voiceActors[0].name?.full)}</div>` : ''}
-                    </div>
-                </div>`).join('')}</div>
-        </div>` : ''}
-
-        ${media.relations?.edges?.length ? `<div style="margin-bottom:var(--space-xl)">
-            <h3 class="section-title" style="margin-bottom:var(--space-md)">Related</h3>
-            <div class="scroll-row">${media.relations.edges.map(e => `
-                <div style="flex:0 0 150px">
-                    <div class="media-card" data-open="${e.node.id}" role="button" tabindex="0">
-                        <img class="media-card-img" src="${e.node.coverImage?.large || ''}" alt="${esc(titlePref(e.node.title))}" loading="lazy">
-                        <div class="media-card-overlay">
-                            <div class="media-card-sub" style="text-transform:capitalize;margin-bottom:2px">${esc((e.relationType || '').replace(/_/g, ' ').toLowerCase())}</div>
-                            <div class="media-card-title">${esc(titlePref(e.node.title))}</div>
-                        </div>
                     </div>
                 </div>`).join('')}</div>
         </div>` : ''}
@@ -183,6 +172,46 @@ const STATUS_COLORS = {
     PAUSED: 'var(--warning)',
     DROPPED: 'var(--danger)',
 };
+
+const ICON_STUDIO = '<svg data-icon="movie" class="detail-studio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 8l2.5-4.5L9 8M9 3.5 12 8M14 3.5 17 8M19 3.5 21 8"/></svg>';
+const ICON_PRODUCER = '<svg data-icon="apartment" class="detail-studio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16"/><path d="M15 10h4a1 1 0 0 1 1 1v10M3 21h18M8 8h3M8 12h3M8 16h3"/></svg>';
+const ICON_ARROW = '<svg data-icon="arrow_forward" class="detail-studio-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+// The main animation studio's name, for the tags under the title
+const mainStudio = (media) => (media.studios?.edges || []).find(e => e.isMain && e.node?.isAnimationStudio)?.node.name || '';
+
+// Everyone who made the show, as cards that open the studio's page: animation studios first, then producers
+function studiosHtml(media) {
+    const seen = new Set();
+    const edges = (media.studios?.edges || [])
+        .filter(e => e.node && !seen.has(e.node.id) && seen.add(e.node.id))
+        .sort((a, b) => (b.node.isAnimationStudio - a.node.isAnimationStudio) || (b.isMain - a.isMain));
+    if (!edges.length) return '';
+    return `<div class="detail-studios" role="list" aria-label="Studios">${edges.slice(0, 8).map(e => `
+        <a class="box detail-studio" role="listitem" href="#/studio/${e.node.id}">
+            ${e.node.isAnimationStudio ? ICON_STUDIO : ICON_PRODUCER}
+            <span class="detail-studio-text">
+                <span class="detail-studio-name">${esc(e.node.name)}</span>
+                <span class="detail-studio-role">${e.node.isAnimationStudio ? 'Animation studio' : 'Producer'}</span>
+            </span>
+            ${ICON_ARROW}
+        </a>`).join('')}</div>`;
+}
+
+// Sequels, prequels and the rest as a row of covers: what comes before and after at a glance
+function relatedHtml(media) {
+    const edges = (media.relations?.edges || []).filter(e => e.node);
+    if (!edges.length) return '';
+    const kind = (t) => { const s = String(t || '').replace(/_/g, ' ').toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };
+    return `<section class="detail-related" aria-label="Related">
+        <h3 class="detail-related-title">Related</h3>
+        <div class="detail-related-row">${edges.map(e => `
+            <button type="button" class="detail-related-item" data-open="${e.node.id}" title="${esc(titlePref(e.node.title))}">
+                <img src="${esc(e.node.coverImage?.large || '')}" alt="${esc(titlePref(e.node.title))}" loading="lazy">
+                <span class="detail-related-kind">${esc(kind(e.relationType))}</span>
+            </button>`).join('')}</div>
+    </section>`;
+}
 
 function renderListButton(media) {
     if (!isLoggedIn()) {
