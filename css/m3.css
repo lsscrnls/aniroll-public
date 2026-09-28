@@ -775,7 +775,6 @@
 :root[data-design="m3"] .wp-page .wp-host-counter-value small { font-size: 1.4rem; color: var(--md-on-surface-variant); font-weight: 500; }
 :root[data-design="m3"] .wp-page .wp-host-counter .glass-btn-primary { margin-left: 0; height: 56px; padding: 0 28px; font-size: 1rem; }
 :root[data-design="m3"] .wp-page .wp-host-counter .progress-btn { width: 56px; height: 56px; border-radius: var(--radius-lg); }
-:root[data-design="m3"] .wp-page .wp-progress-section .progress-bar { max-width: 480px; }
 /* People: a list with round pictures, like CineRoll's members card */
 :root[data-design="m3"] .wp-page .wp-members-list { flex-direction: column; flex-wrap: nowrap; gap: 10px; }
 :root[data-design="m3"] .wp-page .wp-member { background: none; padding: 0; border-radius: 0; gap: 12px; font-size: 0.95rem; }
