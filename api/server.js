@@ -413,12 +413,17 @@ function hookField(body, name, max = 300) {
 
 const normTitle = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
+// "Mob Psycho 100 II" -> { base: 'mobpsycho100', season: 2 }: AniList names some sequels with a Roman numeral
+// at the end, Jellyfin keeps them as season 2 of one series. II to X in capitals only, so a word never counts
+const ROMAN_SEASONS = { II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10 };
 // "Jujutsu Kaisen 2nd Season" -> { base: 'jujutsukaisen', season: 2 }  (same rule as js/jellyfin.js)
 function splitSeason(title) {
     const t = String(title || '');
     const m = t.match(/(?:\b(\d+)(?:st|nd|rd|th)\s+season\b|\bseason\s+(\d+)\b|\bpart\s+(\d+)\b|\bS(\d+)\b)/i);
-    const season = m ? Number(m[1] || m[2] || m[3] || m[4]) : 1;
-    return { base: normTitle(m ? t.slice(0, m.index) : t), season };
+    if (m) return { base: normTitle(t.slice(0, m.index)), season: Number(m[1] || m[2] || m[3] || m[4]) };
+    const r = t.match(/\s(II|III|IV|V|VI|VII|VIII|IX|X)$/);
+    if (r) return { base: normTitle(t.slice(0, r.index)), season: ROMAN_SEASONS[r[1]] };
+    return { base: normTitle(t), season: 1 };
 }
 
 // "False Memory (2026)" -> { title: 'False Memory', year: 2026 }. AniList adds the year when
