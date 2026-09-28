@@ -3510,6 +3510,13 @@ input, select, textarea { font: inherit; color: inherit; }
 }
 
 /* ===== Watch Party ===== */
+/* The show's banner behind the page: only Material 3 shows it (css/m3.css) */
+.wp-backdrop { display: none; }
+/* The people, the invite and the actions: a side column in Material 3, part of the card otherwise;
+   there the actions stay last, after Roll together */
+.wp-side { display: contents; }
+.wp-card { display: flex; flex-direction: column; }
+.wp-card .wp-actions { order: 1; }
 .wp-card {
     border: 1px solid var(--border);
     border-radius: var(--radius-2xl);

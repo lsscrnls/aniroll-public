@@ -1,9 +1,9 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=112';
-import { openDialog } from './a11y.js?v=112';
-import { prefersReducedMotion } from './animations.js?v=112';
+import { esc } from './store.js?v=113';
+import { openDialog } from './a11y.js?v=113';
+import { prefersReducedMotion } from './animations.js?v=113';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More
@@ -14,7 +14,8 @@ const SEEN_KEY = 'aniroll_seen_changes';
 const CHANGES = [
     {
         // '.2': voice actor pages, spoiler tags on request, the new progress wave
-        id: '2026-09-28.2',
+        // '.3': the Watch Party page in Material 3
+        id: '2026-09-28.3',
         title: 'Starting soon, studios, voice actors and a fairer Roll',
         items: [
             'Home shows what’s <strong>starting soon</strong> from your Planning list, with how long until its first episode.',
@@ -25,6 +26,7 @@ const CHANGES = [
             'Every character shows their <strong>voice actor</strong>; tap one to see all the anime they voice, and who they play there.',
             'Tags that give away the story stay hidden until you tap <strong>Show spoiler tags</strong>.',
             'Material 3: progress runs as a wave up to a round dot, like Android’s media player; after it the line goes on flat.',
+            'Material 3: the <strong>Watch Party</strong> page got a new look — the show’s banner behind it, a big episode counter, the people and the invite on the side.',
         ],
     },
     {
