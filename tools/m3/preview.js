@@ -43,6 +43,10 @@ const design = process.env.DESIGN || 'm3';
             route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
         });
         await c.route(`${base}/api/**`, r => r.fulfill({ status: 404, contentType: 'application/json', body: '{}' }));
+        // A running Watch Party with two friends, for the "party" shot
+        await c.route(`${base}/api/party/**`, r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({
+            hostName: demo.VIEWER.name, mediaId: 154587, mediaTitle: 'Frieren', active: true, hostProgress: 5, hostProgressAt: Date.now(), startedAt: Date.now(), startEp: 3,
+            members: [{ id: 2, name: 'Mika', avatar: '', progress: 5 }, { id: 3, name: 'Jonas', avatar: '', progress: 3 }] }) }));
         await c.route(/kitsu\.io/, r => r.abort());
         const p = await c.newPage();
         p.on('pageerror', e => console.log('pageerror', e.message));
@@ -80,6 +84,8 @@ const design = process.env.DESIGN || 'm3';
     await shot(p, 'full', '#/anime/154587/full', { ms: 6000, full: true });
     await shot(p, 'studio', '#/studio/11', { ms: 6000 });
     await shot(p, 'panel', '#/', { ms: 3000, act: q => q.evaluate(() => window.__openDetailPanel(154587)) });
+    await p.evaluate(n => localStorage.setItem('aniroll_watchparty', JSON.stringify({ hostName: n, mediaId: 154587, hostKey: 'k', mediaTitle: 'Frieren', startEp: 3 })), demo.VIEWER.name);
+    await shot(p, 'party', `#/watchparty?host=${encodeURIComponent(demo.VIEWER.name)}&anime=154587`, { ms: 6000 });
     // A real click on a cover: the container transform runs (View Transitions); shot mid-way and at the end
     if (want('morph')) {
         await p.keyboard.press('Escape');

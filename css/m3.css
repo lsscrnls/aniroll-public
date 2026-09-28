@@ -740,6 +740,64 @@
 
 /* ----- Watch Party ----- */
 :root[data-design="m3"] .wp-card { border-radius: var(--md-shape-xxl); }
+
+/* ----- Watch Party, like CineRoll's: the banner behind a big header with the episode counter, the
+   people and the invite in cards on the side, Roll together as a stage of its own ----- */
+:root[data-design="m3"] .wp-page { position: relative; }
+:root[data-design="m3"] .wp-backdrop {
+    display: block; position: absolute; z-index: -1; top: -96px; left: -48px; right: -48px; height: min(60vh, 520px);
+    overflow: hidden; pointer-events: none;
+    -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 98%); mask-image: linear-gradient(to bottom, #000 30%, transparent 98%);
+}
+:root[data-design="m3"] .wp-backdrop img { width: 100%; height: 100%; object-fit: cover; opacity: .5; }
+:root[data-design="m3"] .wp-backdrop::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--md-surface) 25%, transparent), color-mix(in srgb, var(--md-surface) 55%, transparent)),
+        linear-gradient(to right, color-mix(in srgb, var(--md-surface) 80%, transparent), transparent 65%);
+}
+:root[data-design="m3"] .wp-page-title { display: none; }
+:root[data-design="m3"] .wp-page .wp-card {
+    display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px 32px; align-items: start;
+    border: 0; background: none !important; box-shadow: none; overflow: visible; border-radius: 0; padding-top: 8vh;
+}
+:root[data-design="m3"] .wp-page .wp-card > * { grid-column: 1; border: 0; }
+:root[data-design="m3"] .wp-page .wp-side { display: flex; flex-direction: column; gap: 16px; grid-column: 2; grid-row: 1 / span 20; }
+:root[data-design="m3"] .wp-page .wp-side > * { padding: 20px; border: 0; border-radius: var(--radius-xl); background: var(--md-surface-container); }
+:root[data-design="m3"] .wp-page .wp-member-avatar[src=""] { visibility: hidden; }
+:root[data-design="m3"] .wp-page .wp-header { background: none; padding: 0; gap: 32px; align-items: flex-end; }
+:root[data-design="m3"] .wp-page .wp-cover { width: 180px; height: 260px; border-radius: var(--radius-xl); box-shadow: 0 12px 40px rgba(0, 0, 0, .35); }
+:root[data-design="m3"] .wp-page .wp-title { font-size: clamp(1.8rem, 3.4vw, 2.4rem); font-weight: 500; letter-spacing: -0.01em; line-height: 1.15; }
+:root[data-design="m3"] .wp-page :is(.wp-progress-section, .wp-sync-section) { padding: 0; background: none; }
+:root[data-design="m3"] .wp-page .wp-progress-label { color: var(--md-primary); }
+/* The episode counter, big like CineRoll's "S3 E5" */
+:root[data-design="m3"] .wp-page .wp-host-counter { gap: 12px; flex-wrap: wrap; }
+:root[data-design="m3"] .wp-page .wp-host-counter-value { font-size: clamp(3.5rem, 7vw, 5rem); line-height: 1; font-weight: 600; color: var(--md-primary); min-width: 0; text-align: left; order: -1; flex-basis: 100%; }
+:root[data-design="m3"] .wp-page .wp-host-counter-value small { font-size: 1.4rem; color: var(--md-on-surface-variant); font-weight: 500; }
+:root[data-design="m3"] .wp-page .wp-host-counter .glass-btn-primary { margin-left: 0; height: 56px; padding: 0 28px; font-size: 1rem; }
+:root[data-design="m3"] .wp-page .wp-host-counter .progress-btn { width: 56px; height: 56px; border-radius: var(--radius-lg); }
+:root[data-design="m3"] .wp-page .wp-progress-section .progress-bar { max-width: 480px; }
+/* People: a list with round pictures, like CineRoll's members card */
+:root[data-design="m3"] .wp-page .wp-members-list { flex-direction: column; flex-wrap: nowrap; gap: 10px; }
+:root[data-design="m3"] .wp-page .wp-member { background: none; padding: 0; border-radius: 0; gap: 12px; font-size: 0.95rem; }
+:root[data-design="m3"] .wp-page .wp-member-avatar { width: 40px; height: 40px; }
+:root[data-design="m3"] .wp-page .wp-member-ep { margin-left: auto; }
+:root[data-design="m3"] .wp-page :is(.wp-members-label, .wp-invite-label) { font-weight: 600; color: var(--md-on-surface-variant); margin-bottom: 12px; }
+:root[data-design="m3"] .wp-page .wp-invite-link-box { flex-wrap: wrap; }
+:root[data-design="m3"] .wp-page .wp-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+/* Roll together: a stage like CineRoll's */
+:root[data-design="m3"] .wp-page .wp-roll-section { padding: 24px; border-radius: var(--md-shape-xxl); background: var(--md-surface-container); }
+:root[data-design="m3"] .wp-page .wp-roll-window { border-radius: var(--radius-xl); }
+/* The host card of a guest: the host's episode big */
+:root[data-design="m3"] .wp-page .wp-host-card { background: none; padding: 0; }
+@media (max-width: 1023px) {
+    :root[data-design="m3"] .wp-page .wp-card { grid-template-columns: 1fr; }
+    :root[data-design="m3"] .wp-page .wp-side { grid-column: 1; grid-row: auto; }
+}
+@media (max-width: 600px) {
+    :root[data-design="m3"] .wp-page .wp-header { flex-direction: row; text-align: left; align-items: flex-end; gap: 16px; }
+    :root[data-design="m3"] .wp-page .wp-cover { width: 110px; height: 160px; }
+    :root[data-design="m3"] .wp-backdrop { left: -16px; right: -16px; }
+}
 :root[data-design="m3"] .wp-host-counter-value { font-weight: 500; }
 :root[data-design="m3"] .wp-member { background: var(--md-surface-container); border-radius: var(--radius-lg); }
 :root[data-design="m3"] .wp-status-badge, :root[data-design="m3"] .wp-host-badge { border-radius: var(--radius-sm); background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
