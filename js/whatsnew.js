@@ -1,9 +1,9 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=106';
-import { openDialog } from './a11y.js?v=106';
-import { prefersReducedMotion } from './animations.js?v=106';
+import { esc } from './store.js?v=107';
+import { openDialog } from './a11y.js?v=107';
+import { prefersReducedMotion } from './animations.js?v=107';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More
@@ -12,6 +12,17 @@ const SEEN_KEY = 'aniroll_seen_changes';
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
+    {
+        id: '2026-09-28',
+        title: 'Starting soon, studios, and a fairer Roll',
+        items: [
+            'Home shows what’s <strong>starting soon</strong> from your Planning list, with how long until its first episode.',
+            'My List can be <strong>filtered by format</strong>: TV, movies, OVAs, ONAs or specials, one tap on a chip.',
+            'A show’s <strong>studios</strong> are cards now, and each opens a <strong>studio page</strong> with everything they made.',
+            'Related shows appear as <strong>covers</strong> you can scroll through, not as a list of names.',
+            '<strong>Roll</strong> no longer picks the same show again soon: every show gets its turn before one comes back.',
+        ],
+    },
     {
         // '.2': joining a Watch Party broke after this entry went live; the fix brings it back to everyone.
         // '.3': scores out of 100 everywhere
