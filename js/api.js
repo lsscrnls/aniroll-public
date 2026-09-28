@@ -1,4 +1,4 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=107';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=110';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -417,6 +417,24 @@ export async function getStudio(id, page = 1, token = null) {
     return data.Studio;
 }
 
+// A voice actor's page (#/staff/<id>): who they are and the anime they voice, most popular first
+export async function getStaff(id, page = 1, token = null) {
+    const data = await cachedQuery(`
+        ${MEDIA_FRAGMENT}
+        query ($id: Int, $page: Int) {
+            Staff(id: $id) {
+                id name { full native } image { large } primaryOccupations homeTown
+                dateOfBirth { year month day } dateOfDeath { year month day }
+                characterMedia(page: $page, perPage: 30, sort: [POPULARITY_DESC]) {
+                    pageInfo { hasNextPage total }
+                    edges { characterRole characters { id name { full } } node { ...mediaFields } }
+                }
+            }
+        }
+    `, { id, page }, token, TTL.discovery);
+    return data.Staff;
+}
+
 export async function getMedia(id, token = null) {
     const data = await cachedQuery(`
         ${MEDIA_FRAGMENT}
@@ -711,7 +729,7 @@ export async function saveMediaListEntry(variables, token, { queue = true } = {}
 
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
     if (saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=107').then(m =>
+        import('./jellyfin.js?v=110').then(m =>
             m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
     }
 

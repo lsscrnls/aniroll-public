@@ -35,7 +35,7 @@ New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start read
 - **Jellyfin live tracking**: an episode played past 90% counts as watched, rewatches included.
 - **Calendar**: the week (or month) with air times and where you stand on each show.
 - **Recommendations with a taste match** from your own scores, genres and tags.
-- **Studio pages** with everything a studio made; related shows as covers on every show.
+- **Studio and voice actor pages**: everything a studio made, every role a voice actor plays; related shows as covers, spoiler tags only on request.
 - **My List** with format chips, **Social** (your AniList feed), **scores out of 100** whatever your AniList format, installable as a PWA.
 - **Two designs**: AniRoll's own, or **Material 3 Expressive** in the colours of the show you watched last.
 

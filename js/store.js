@@ -148,7 +148,8 @@ export function showLoader(container) {
 }
 
 // `rec` ({ match, because }) turns the card into a recommendation card
-export function renderMediaCard(media, showStatus = false, rec = null) {
+// `note` replaces the line under the title (a voice actor's page puts the character there)
+export function renderMediaCard(media, showStatus = false, rec = null, note = null) {
     // Recommendation cards show only the taste match — the AniList score next to it was too much
     const score = media.meanScore && !rec ? `<div class="media-card-score" title="AniList average score">${media.meanScore}%</div>` : '';
     const match = rec ? `<div class="media-card-match" data-match="${rec.match}" title="How well this fits your taste (not the AniList score)">${rec.match}% Match</div>` : '';
@@ -167,7 +168,7 @@ export function renderMediaCard(media, showStatus = false, rec = null) {
             ${score}${status}${match}
             <div class="media-card-overlay">
                 <div class="media-card-title">${esc(titlePref(media.title))}</div>
-                ${because || airing || sub}
+                ${note ? `<div class="media-card-sub">${esc(note)}</div>` : because || airing || sub}
             </div>
         </div>
     `;
