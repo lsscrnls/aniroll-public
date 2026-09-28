@@ -1,5 +1,5 @@
-import { toast } from './store.js?v=110';
-import { getToken } from './auth.js?v=110';
+import { toast } from './store.js?v=111';
+import { getToken } from './auth.js?v=111';
 
 // Jellyfin integration: when AniList progress moves forward, mark the matching
 // episodes watched on the user's own Jellyfin server.
@@ -301,13 +301,17 @@ export function setPullEnabled(on) {
     localStorage.setItem(KEYS.pull, on ? 'on' : 'off');
 }
 
+// "Mob Psycho 100 II" -> { base: 'mobpsycho100', season: 2 }: AniList names some sequels with a Roman numeral
+// at the end, Jellyfin keeps them as season 2 of one series. II to X in capitals only, so a word never counts
+const ROMAN_SEASONS = { II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10 };
 // "Jujutsu Kaisen 2nd Season" -> { base: 'jujutsukaisen', season: 2 }
 function splitSeason(title) {
     const t = String(title || '');
     const m = t.match(/(?:\b(\d+)(?:st|nd|rd|th)\s+season\b|\bseason\s+(\d+)\b|\bpart\s+(\d+)\b|\bS(\d+)\b)/i);
-    const season = m ? Number(m[1] || m[2] || m[3] || m[4]) : 1;
-    const base = normTitle(m ? t.slice(0, m.index) : t);
-    return { base, season };
+    if (m) return { base: normTitle(t.slice(0, m.index)), season: Number(m[1] || m[2] || m[3] || m[4]) };
+    const r = t.match(/\s(II|III|IV|V|VI|VII|VIII|IX|X)$/);
+    if (r) return { base: normTitle(t.slice(0, r.index)), season: ROMAN_SEASONS[r[1]] };
+    return { base: normTitle(t), season: 1 };
 }
 
 // One request: the episodes Jellyfin considers played, newest first, grouped per season
@@ -461,7 +465,7 @@ function matchFit(media, group) {
 // Pushes AniList forward where Jellyfin is further along; returns what it changed
 export async function pullFromJellyfin(user, token) {
     if (!getConfig() || !isPullEnabled() || !user?.id || !token) return { updated: 0, changes: [] };
-    const api = await import('./api.js?v=110');
+    const api = await import('./api.js?v=111');
     if (api.isBackgroundPaused()) return { updated: 0, changes: [], skipped: 'maintenance' };
     if (api.isRateLimited()) return { updated: 0, changes: [], skipped: 'rate-limited' };
 
