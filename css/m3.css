@@ -983,7 +983,9 @@
     position: relative;
     height: 10px;
     background: none;
-    overflow: visible;
+    /* clip-path alone still counts the track's overhang as page width (a sideways scrollbar) */
+    overflow: clip;
+    overflow-clip-margin: 4px;
     clip-path: inset(-4px 0);
 }
 :root[data-design="m3"] .progress-bar-fill {
