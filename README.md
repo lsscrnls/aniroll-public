@@ -28,13 +28,15 @@ New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start read
 ## What it does
 
 - **Roll**: a slot-machine reel picks from your Planning list, filtered by length, score and genre,
-  optionally with recommended titles that aren't on your list yet.
+  optionally with recommended titles that aren't on your list yet; every show gets its turn before one comes back.
 - **Watch Party**: the host counts episodes, guests follow along and their AniList moves with them.
-- **Home**: the show you're on with a live countdown to its next episode, then everything else you watch.
+- **Home**: the show you're on with a live countdown to its next episode, then everything else you watch
+  and what from your Planning list starts soon.
 - **Jellyfin live tracking**: an episode played past 90% counts as watched, rewatches included.
 - **Calendar**: the week (or month) with air times and where you stand on each show.
 - **Recommendations with a taste match** from your own scores, genres and tags.
-- **My List**, **Social** (your AniList feed), **scores in your AniList format**, installable as a PWA.
+- **Studio pages** with everything a studio made; related shows as covers on every show.
+- **My List** with format chips, **Social** (your AniList feed), **scores out of 100** whatever your AniList format, installable as a PWA.
 - **Two designs**: AniRoll's own, or **Material 3 Expressive** in the colours of the show you watched last.
 
 | AniRoll | Material 3 Expressive |
@@ -126,7 +128,7 @@ to a module in `js/pages/`, and each page exports one `render({ content, params,
 | Where | What it holds |
 |---|---|
 | `js/api.js` | Everything that talks to AniList: queries, the request budget, the cache, the queue for saves |
-| `js/store.js` | Small shared state (user, settings), escaping, toasts, score formats, events other modules listen to |
+| `js/store.js` | Small shared state (user, settings), escaping, toasts, scores out of 100, events other modules listen to |
 | `js/auth.js` | The AniList login token, kept in `localStorage` |
 | `js/pages/*.js` | One module per page: `home`, `list`, `calendar`, `detail` (the slide-in panel), `social`, `search`, … |
 | `js/upnext.js`, `js/home-cinema.js` | What Home says about your list (next episode, what's waiting, the week) and AniRoll's Home on top of it |

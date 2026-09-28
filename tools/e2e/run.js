@@ -458,7 +458,7 @@ function staticServer() {
     const back = await visitor({ aniroll_theme: 'dark' });
     const both = await back.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent));
     check('returning visitor who confirmed nothing: every change, oldest (the move) first',
-        (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === 5 && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home'), both);
+        (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === 6 && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home') && both[5].startsWith('Starting soon'), both);
     const demoTabs = await back.$$eval('.whatsnew-bar [data-k]', els => els.map(e => e.dataset.k).join(','));
     check('notice: animation ends on the new tab order', demoTabs === 'home,list,roll,discover,social', demoTabs);
     await back.click('.whatsnew [data-close]');
@@ -476,7 +476,7 @@ function staticServer() {
     // Confirmed the move with "Got it" already: only what came after it
     const confirmed = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-22' });
     const only = await confirmed.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, demo: !!document.querySelector('.whatsnew-demo'), sections: document.querySelectorAll('.whatsnew .whatsnew-entry').length }));
-    check('returning visitor who confirmed the move: only what came after, no tab animation', only.title === 'A few things changed' && !only.demo && only.sections === 4, only);
+    check('returning visitor who confirmed the move: only what came after, no tab animation', only.title === 'A few things changed' && !only.demo && only.sections === 5, only);
     await confirmed.close();
 
     const fresh = await visitor({});
@@ -530,17 +530,17 @@ function staticServer() {
     await late.click('.landing-foot .whatsnew-link');
     await late.clock.runFor(500);
     const log = await late.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, entries: document.querySelectorAll('.whatsnew-entry').length }));
-    check('changelog: still there, marked unread, opens with all entries', unread && log.title === "What's new" && log.entries === 5, { unread, ...log });
+    check('changelog: still there, marked unread, opens with all entries', unread && log.title === "What's new" && log.entries === 6, { unread, ...log });
 
-    // Today's entry on its own: its clip sits behind "See it in action"; opening it widens the dialog
+    // An entry with a clip: it sits behind "See it in action"; opening it widens the dialog
     const clipped = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-26' });
-    const teaser = await clipped.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, teaser: !!document.querySelector('.whatsnew-watch') }));
+    const teaser = await clipped.evaluate(() => ({ heads: [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent), teaser: !!document.querySelector('.whatsnew-watch') }));
     await clipped.click('.whatsnew-watch');
     await clipped.waitForTimeout(700);
     const played = await clipped.evaluate(() => ({ wide: document.querySelector('.whatsnew').classList.contains('is-wide'), video: document.querySelector('.whatsnew-video')?.getAttribute('src'),
         width: Math.round(document.querySelector('.whatsnew').getBoundingClientRect().width) }));
     check("what's new: today's clip behind 'See it in action', the dialog widens to play it",
-        teaser.title?.startsWith('A new Home') && teaser.teaser && played.wide && played.video === 'media/design-aniroll.mp4' && played.width > 600, { ...teaser, ...played });
+        teaser.heads.some(h => h.startsWith('A new Home')) && teaser.teaser && played.wide && played.video === 'media/design-aniroll.mp4' && played.width > 600, { ...teaser, ...played });
     await clipped.close();
     await late.close();
 
