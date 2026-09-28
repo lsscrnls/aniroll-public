@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=107';
-import { enhanceSelect } from '../select.js?v=107';
-import { tasteMatch } from '../taste.js?v=107';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=107';
-import { getToken, isLoggedIn } from '../auth.js?v=107';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=107';
-import { showConfirm } from '../a11y.js?v=107';
+import * as api from '../api.js?v=110';
+import { enhanceSelect } from '../select.js?v=110';
+import { tasteMatch } from '../taste.js?v=110';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=110';
+import { getToken, isLoggedIn } from '../auth.js?v=110';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=110';
+import { showConfirm } from '../a11y.js?v=110';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -15,6 +15,7 @@ export async function renderPanel(id, container) {
     document.dispatchEvent(new CustomEvent('aniroll:media-shown', { detail: { media, root: container.closest('.detail-panel') || container, where: 'panel' } }));
     setupListActions(media, token, container);
     setupShare(media, container);
+    setupSpoilerTags(container);
     loadFriendsStatus(media, token, container);
     loadTasteMatch(media, token, container);
 }
@@ -29,6 +30,7 @@ export async function render({ params, content }) {
     document.dispatchEvent(new CustomEvent('aniroll:media-shown', { detail: { media, root: document.documentElement, where: 'page' } }));
     setupListActions(media, token, content);
     setupShare(media, content);
+    setupSpoilerTags(content);
     loadFriendsStatus(media, token, content);
     loadTasteMatch(media, token, content);
 }
@@ -113,8 +115,11 @@ function renderDetailHTML(media) {
                     <div class="char-info">
                         <div class="char-name">${esc(e.node?.name?.full)}</div>
                         <div class="char-role">${esc(e.role)}</div>
-                        ${e.voiceActors?.[0] ? `<div class="char-role">${esc(e.voiceActors[0].name?.full)}</div>` : ''}
                     </div>
+                    ${e.voiceActors?.[0] ? `<a class="char-va" href="#/staff/${e.voiceActors[0].id}" title="More roles of ${esc(e.voiceActors[0].name?.full)}">
+                        <span class="char-info"><span class="char-name">${esc(e.voiceActors[0].name?.full)}</span><span class="char-role">Voice</span></span>
+                        <img class="char-img" src="${e.voiceActors[0].image?.medium || ''}" alt="" loading="lazy">
+                    </a>` : ''}
                 </div>`).join('')}</div>
         </div>` : ''}
 
@@ -129,8 +134,8 @@ function renderDetailHTML(media) {
         ${media.tags?.length ? `<div style="margin-bottom:var(--space-xl)">
             <h3 class="section-title" style="margin-bottom:var(--space-md)">Tags</h3>
             <div class="genre-chips">${media.tags
-                .filter(t => !t.isMediaSpoiler)
-                .map(t => `<span class="genre-chip" style="cursor:default">${esc(t.name)} <small style="opacity:0.6">${t.rank}%</small></span>`).join('')}</div>
+                .map(t => `<span class="genre-chip${t.isMediaSpoiler ? ' spoiler-tag' : ''}" style="cursor:default"${t.isMediaSpoiler ? ' hidden' : ''}>${esc(t.name)} <small style="opacity:0.6">${t.rank}%</small></span>`).join('')}
+                ${spoilerCount(media) ? `<button class="genre-chip spoiler-toggle" aria-expanded="false">Show ${spoilerCount(media)} spoiler tag${spoilerCount(media) === 1 ? '' : 's'}</button>` : ''}</div>
         </div>` : ''}
 
         ${media.stats ? renderDistribution(media.stats, media.type) : ''}
@@ -176,6 +181,20 @@ const STATUS_COLORS = {
 const ICON_STUDIO = '<svg data-icon="movie" class="detail-studio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 8l2.5-4.5L9 8M9 3.5 12 8M14 3.5 17 8M19 3.5 21 8"/></svg>';
 const ICON_PRODUCER = '<svg data-icon="apartment" class="detail-studio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16"/><path d="M15 10h4a1 1 0 0 1 1 1v10M3 21h18M8 8h3M8 12h3M8 16h3"/></svg>';
 const ICON_ARROW = '<svg data-icon="arrow_forward" class="detail-studio-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+// Tags that give away the story stay hidden until someone asks for them
+const spoilerCount = media => (media.tags || []).filter(t => t.isMediaSpoiler).length;
+
+function setupSpoilerTags(root) {
+    const btn = root.querySelector('.spoiler-toggle');
+    btn?.addEventListener('click', () => {
+        const show = btn.getAttribute('aria-expanded') !== 'true';
+        root.querySelectorAll('.spoiler-tag').forEach(t => { t.hidden = !show; });
+        btn.setAttribute('aria-expanded', String(show));
+        const n = root.querySelectorAll('.spoiler-tag').length;
+        btn.textContent = show ? 'Hide spoiler tags' : `Show ${n} spoiler tag${n === 1 ? '' : 's'}`;
+    });
+}
 
 // The main animation studio's name, for the tags under the title
 const mainStudio = (media) => (media.studios?.edges || []).find(e => e.isMain && e.node?.isAnimationStudio)?.node.name || '';

@@ -974,65 +974,50 @@
 }
 :root[data-design="m3"] .home-section:has(#recommendations-row) .media-card { background: var(--md-surface-container-high); }
 
-/* ----- Progress: M3 Expressive wavy indicator, a dot where it ends ----- */
+/* ----- Progress: M3 wavy indicator, like Android's media player ----- */
+/* The wave runs up to where you are, a round dot marks the spot, and only after it the flat track goes
+   on: nothing straight runs behind the wave. The fill starts 6px in and stops 6px early, so the dot
+   stays whole at 0 and at 100%; the track reaches past the bar's end and is cut off there (clip-path,
+   which leaves room above and below for the dot). */
 :root[data-design="m3"] .progress-bar {
     position: relative;
     height: 10px;
     background: none;
     overflow: visible;
-}
-:root[data-design="m3"] .progress-bar::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 3px;
-    height: 4px;
-    border-radius: var(--radius-full);
-    background: var(--md-secondary-container);
+    clip-path: inset(-4px 0);
 }
 :root[data-design="m3"] .progress-bar-fill {
     position: relative;
     height: 10px;
+    margin-left: 6px;
+    max-width: calc(100% - 12px);
     border-radius: 0;
     background: none;
-    /* Where the wave stops: the last crest or trough that leaves room for the whole dot. The wave repeats every 20px from
-       the left, a crest at 5px, a trough at 15px, so one comes every 10px */
-    --wave-end: calc(round(down, 100% - 7.5px, 10px) + 5px);
 }
-/* The wave and the dot are two layers, each with its own mask. The dot layer holds a dot on every
-   crest and in every trough; a 10px window around the end shows just the one where the wave stops,
-   so it sits on top or at the bottom, wherever the wave ends (our choice; M3 puts a dot at the end
-   of the track instead) */
-:root[data-design="m3"] .progress-bar-fill::before,
-:root[data-design="m3"] .progress-bar-fill::after {
+:root[data-design="m3"] .progress-bar-fill::before {
     content: '';
     position: absolute;
     inset: 0;
     background: var(--md-primary);
-}
-:root[data-design="m3"] .progress-bar-fill::before {
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x, linear-gradient(to right, #000 var(--wave-end), transparent 0);
-    -webkit-mask-composite: source-in;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x, linear-gradient(to right, #000 var(--wave-end), transparent 0);
-    mask-composite: intersect;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x;
 }
 :root[data-design="m3"] .progress-bar-fill::after {
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Ccircle cx='5' cy='3' r='2.5'/%3E%3Ccircle cx='15' cy='7' r='2.5'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x,
-        linear-gradient(to right, transparent calc(var(--wave-end) - 5px), #000 0 calc(var(--wave-end) + 5px), transparent 0);
-    -webkit-mask-composite: source-in;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Ccircle cx='5' cy='3' r='2.5'/%3E%3Ccircle cx='15' cy='7' r='2.5'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x,
-        linear-gradient(to right, transparent calc(var(--wave-end) - 5px), #000 0 calc(var(--wave-end) + 5px), transparent 0);
-    mask-composite: intersect;
-}
-/* Browsers without round(): the whole wave, no dot */
-@supports not (width: round(down, 15px, 10px)) {
-    :root[data-design="m3"] .progress-bar-fill::before { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x; }
-    :root[data-design="m3"] .progress-bar-fill::after { content: none; }
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: calc(100% - 6px);
+    width: 100vw;
+    height: 12px;
+    background:
+        radial-gradient(circle at 6px 6px, var(--md-primary) 5.5px, transparent 6px) 0 0 / 12px 12px no-repeat,
+        linear-gradient(var(--md-secondary-container) 0 0) 12px 4.5px / 100% 3px no-repeat;
 }
 /* No endless wave on hover: stopping an endless animation when the pointer leaves stalls a frame */
 /* Continue Watching: the bar sits at the bottom of the card, inset like M3 cards do */
 :root[data-design="m3"] .media-card > .progress-bar { left: 12px !important; right: 12px !important; bottom: 6px !important; top: auto !important; }
+/* My List cards too: away from the rounded corners, so the dot at the end stays whole */
+:root[data-design="m3"] .list-card-progress { margin-inline: 12px; }
 :root[data-design="m3"] #continue-watching .media-card-overlay { padding-bottom: 20px; }
 
 /* ----- Detail: emphasized title, stats in three colour roles ----- */
@@ -1875,4 +1860,11 @@
 :root[data-design="m3"] .detail-related-item img { border-radius: var(--radius-lg); }
 :root[data-design="m3"] .detail-related-item:hover img { border-radius: var(--md-shape-xxl); }
 :root[data-design="m3"] .studio-kicker { color: var(--md-primary); }
+:root[data-design="m3"] .spoiler-tag { background: var(--md-error-container) !important; color: var(--md-on-error-container) !important; }
+:root[data-design="m3"] .spoiler-toggle { background: var(--md-surface-container-highest); color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .char-va:hover { background: var(--md-surface-container-highest); }
+:root[data-design="m3"] .char-va .char-img { transition: clip-path .5s var(--ease); clip-path: circle(50%); }
+:root[data-design="m3"] .char-va:hover .char-img { clip-path: var(--m3-shape-cookie9); }
+/* The voice actor's photo in an M3 Expressive shape */
+:root[data-design="m3"] .staff-photo { border-radius: 0; clip-path: var(--m3-shape-cookie12); background: var(--md-secondary-container); }
 
