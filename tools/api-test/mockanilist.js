@@ -11,6 +11,8 @@ const USERS = {
     'optout-token': { id: 5, name: 'optout' },
     'repeat-token': { id: 6, name: 'repeater' },
     'watching-token': { id: 7, name: 'watcher' },
+    // A VIP of the seat limit (hexlux's real AniList id)
+    'vip-token': { id: 6649000, name: 'hexlux' },
 };
 const MEDIA = {
     101: { id: 101, episodes: 28, format: 'TV', seasonYear: 2023, synonyms: ['Frieren'], title: { romaji: 'Sousou no Frieren', english: "Frieren: Beyond Journey's End", userPreferred: 'Sousou no Frieren' }, coverImage: { large: 'https://s4.anilist.co/frieren.jpg' } },
