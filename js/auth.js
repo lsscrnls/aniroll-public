@@ -47,6 +47,9 @@ export function getLoginUrl(clientId) {
 }
 
 export function logout() {
+    // The seat in the app (js/seat.js) goes to the next in line at once; keepalive outlives the reload
+    const token = getToken();
+    if (token) fetch('/api/seat', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, keepalive: true }).catch(() => {});
     removeToken();
     window.location.hash = '/';
     window.location.reload();
