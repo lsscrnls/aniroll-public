@@ -1,0 +1,13 @@
+Copyright (c) 2026 lsscrnls. All rights reserved.
+
+This repository is published so that its source can be read. No licence is granted beyond that.
+
+You may view the code, fork it on GitHub as GitHub's Terms of Service allow, and learn from it.
+Copying, modifying, distributing, sublicensing, hosting or running this code, in whole or in part,
+requires prior written permission from the copyright holder. To ask, open an issue in this repository.
+
+Third-party parts keep their own licences, with their texts next to them:
+  - the libraries in js/vendor/
+  - the fonts in fonts/ (Inter, Google Sans Flex: SIL Open Font License 1.1)
+  - Material Symbols icons (Apache License 2.0)
+Anime data and images belong to AniList and their respective owners.

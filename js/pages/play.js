@@ -1,13 +1,13 @@
-import * as api from '../api.js?v=116';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=116';
-import { getToken, isLoggedIn } from '../auth.js?v=116';
-import { getConfig, jfAuth, deviceId } from '../jellyfin.js?v=116';
-import { availability } from '../player/availability.js?v=116';
-import { findEpisode } from '../player/library.js?v=116';
-import { deviceProfile } from '../player/profile.js?v=116';
-import { HtmlVideoEngine } from '../player/engine.js?v=116';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=116';
-import { createSubtitles } from '../player/subtitles.js?v=116';
+import * as api from '../api.js?v=117';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=117';
+import { getToken, isLoggedIn } from '../auth.js?v=117';
+import { getConfig, jfAuth, deviceId } from '../jellyfin.js?v=117';
+import { availability } from '../player/availability.js?v=117';
+import { findEpisode, jfGet } from '../player/library.js?v=117';
+import { deviceProfile } from '../player/profile.js?v=117';
+import { HtmlVideoEngine } from '../player/engine.js?v=117';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=117';
+import { createSubtitles } from '../player/subtitles.js?v=117';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -15,6 +15,8 @@ import { createSubtitles } from '../player/subtitles.js?v=116';
 const TICKS = 10_000_000;
 const WATCHED_AT = 0.9;
 const REPORT_EVERY = 10_000;
+// Halfway through, Jellyfin starts unpacking the next episode's subtitles
+const WARM_AT = 0.5;
 // The public address sits behind a home upload of about 30 Mbit/s: leave room, let Jellyfin shrink the rest
 const PUBLIC_BITRATE = 25_000_000;
 const LOCAL_BITRATE = 120_000_000;
@@ -137,9 +139,27 @@ export async function render({ params, content }) {
 
         const runtime = () => (ep.runTimeTicks ? ep.runTimeTicks / TICKS : 0) || engine.duration;
 
+        // The next episode, if Jellyfin has it: the Up next card, and its subtitles unpacked ahead
+        const nextNumber = episode + 1;
+        const nextEp = media.format === 'MOVIE' || (media.episodes && episode >= media.episodes)
+            ? Promise.resolve(null)
+            : findEpisode(avail.base, media, nextNumber).catch(() => null);
+        nextEp.then(n => {
+            if (closed || !n) return;
+            controls.setNext({
+                title: `Episode ${nextNumber}${n.name && !/^episode \d+$/i.test(n.name) ? ` · ${n.name}` : ''}`,
+                // Replaces this episode in the history: Back still leads to where Play was pressed
+                go: () => location.replace(`#/play/${mediaId}/${nextNumber}`),
+            });
+        });
+
         engine.on('error', (err) => status(err.message, { error: true }));
         video.addEventListener('timeupdate', () => {
             const total = runtime();
+            if (!session.warmed && total && engine.time / total >= WARM_AT) {
+                session.warmed = true;
+                nextEp.then(n => { if (n && !closed) warmSubtitles(avail.base, cfg, n.itemId); });
+            }
             if (!session.done && total && engine.time / total >= WATCHED_AT) {
                 session.done = true;
                 if (isLoggedIn()) saveEpisode(media, episode, token);
@@ -158,6 +178,22 @@ export async function render({ params, content }) {
         if (!closed) status(err.message || 'Playback failed', { error: true });
     }
     return cleanup;
+}
+
+// Jellyfin unpacks every subtitle of a file on the first request for one of them, reading the whole
+// file (4 s for a small episode, 40 s for a Blu-ray remux). One short request starts it; Jellyfin
+// finishes even when the request is dropped (measured), so nothing big is downloaded here.
+async function warmSubtitles(base, cfg, itemId) {
+    try {
+        const item = await jfGet(base, `/Users/${encodeURIComponent(cfg.userId)}/Items/${encodeURIComponent(itemId)}`, cfg.apiKey);
+        const source = item?.MediaSources?.[0];
+        const s = (source?.MediaStreams || []).find(x => x.Type === 'Subtitle' && !x.IsExternal);
+        if (!s) return;
+        const codec = String(s.Codec).toLowerCase();
+        const ext = codec.includes('pgs') ? 'pgssub' : codec === 'ass' || codec === 'ssa' ? 'ass' : 'vtt';
+        await fetch(`${base}/Videos/${encodeURIComponent(itemId)}/${encodeURIComponent(source.Id)}/Subtitles/${s.Index}/0/Stream.${ext}?ApiKey=${encodeURIComponent(cfg.apiKey)}`,
+            { signal: AbortSignal.timeout(3000) });
+    } catch { /* only a head start */ }
 }
 
 // Intro, recap, credits: Jellyfin's media segments (Jellyfin 10.10+, filled by the Intro Skipper plugin).
