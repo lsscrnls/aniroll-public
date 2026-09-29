@@ -806,6 +806,205 @@ async function verifyViewer(req) {
     return { status: 'unreachable' };
 }
 
+// ===== Seats: at most seatSettings.max people in the app at once (100 unless changed) =====
+// Logged-in AniRoll counts one seat per AniList account (tabs and devices share it); the landing page and
+// everything logged out stay open. A seat is held by a heartbeat (the app sends one every 30 s while
+// visible) and lapses SEAT_TTL_MS after the last. When the house is full, newcomers wait in line, first
+// come first served, and move in as seats lapse. VIPs always get in, on top of the others.
+// Memory only: after a restart every open app claims its seat again with its next heartbeat.
+const SEAT_TTL_MS = 90 * 1000;
+// The limit and the VIPs can be changed in the admin page; they are kept in data/admin-settings.json.
+// VIPs by AniList user id, not name (a name can be given up and taken by someone else)
+const ADMIN_ID = 6649000; // hexlux: always a VIP, so the owner can never lock themself out
+const DEFAULT_VIPS = [
+    { id: ADMIN_ID, name: 'hexlux' },
+    { id: 771659, name: 'Kikitob' },
+    { id: 7100446, name: 'bignutty' },
+];
+const SETTINGS_FILE = path.join(DATA_DIR, 'admin-settings.json');
+const seatSettings = (() => {
+    const saved = readJson(SETTINGS_FILE);
+    const vips = Array.isArray(saved.vips) ? saved.vips.filter(v => Number.isInteger(v.id)) : DEFAULT_VIPS;
+    if (!vips.some(v => v.id === ADMIN_ID)) vips.unshift(DEFAULT_VIPS[0]);
+    return { max: Number(process.env.MAX_SEATS) || Number(saved.max) || 100, vips };
+})();
+const isVip = (id) => seatSettings.vips.some(v => v.id === Number(id));
+function saveSeatSettings() {
+    writeJson(SETTINGS_FILE, { max: seatSettings.max, vips: seatSettings.vips });
+}
+const seats = new Map(); // key -> last heartbeat
+const seatNames = new Map(); // key -> AniList name (for the admin view), when known
+const seatQueue = new Map(); // key -> { since, seen }, in arrival order
+// Who a token belongs to, kept longer than the viewer cache: while AniList refuses to verify, a VIP
+// stays a VIP and an account keeps its own seat instead of a second one under its token
+const seatOwners = new Map(); // token hash -> { key, vip, at }
+const SEAT_OWNER_TTL_MS = 24 * 60 * 60 * 1000;
+
+function sweepSeats(now) {
+    for (const [key, at] of seats) if (now - at > SEAT_TTL_MS) seats.delete(key);
+    for (const key of seatNames.keys()) if (!seats.has(key) && !seatQueue.has(key)) seatNames.delete(key);
+    for (const [key, q] of seatQueue) if (now - q.seen > SEAT_TTL_MS) seatQueue.delete(key);
+}
+
+// -> { seat: true, vip } | { seat: false, position, waiting }
+function claimSeat(key, vip, now = Date.now()) {
+    sweepSeats(now);
+    if (vip || seats.has(key)) {
+        seats.set(key, now);
+        seatQueue.delete(key);
+        return { seat: true, vip };
+    }
+    const q = seatQueue.get(key) || { since: now };
+    q.seen = now;
+    seatQueue.set(key, q);
+    // Only the others count against the limit; VIPs come on top
+    let taken = 0;
+    for (const k of seats.keys()) if (!k.startsWith('vip:')) taken++;
+    const position = [...seatQueue.keys()].indexOf(key) + 1;
+    if (position <= seatSettings.max - taken) {
+        seats.set(key, now);
+        seatQueue.delete(key);
+        return { seat: true, vip: false };
+    }
+    return { seat: false, position: position - Math.max(0, seatSettings.max - taken), waiting: seatQueue.size };
+}
+
+async function seatOwner(req) {
+    const auth = await verifyViewer(req);
+    const token = String(req.headers['authorization'] || '').slice(7).trim();
+    const hash = tokenHash(token);
+    if (auth.status === 'ok') {
+        const vip = isVip(auth.viewer.id);
+        const owner = { key: `${vip ? 'vip' : 'u'}:${auth.viewer.id}`, vip, at: Date.now() };
+        seatNames.set(owner.key, str(auth.viewer.name, 40));
+        if (seatOwners.size > 5000) seatOwners.clear();
+        seatOwners.set(hash, owner);
+        return owner;
+    }
+    if (auth.status === 'missing' || auth.status === 'invalid') return null;
+    // AniList could not be asked: the account known for this token, else the token itself
+    const known = seatOwners.get(hash);
+    if (known && Date.now() - known.at < SEAT_OWNER_TTL_MS) return known;
+    return { key: `t:${hash}`, vip: false };
+}
+
+// ===== Admin: how busy AniRoll is, for its owner only =====
+// A sample a minute of the last 24 hours (seats, VIPs, queue, requests, Jellyfin playback), kept in
+// data/admin-stats.json so a restart does not wipe the day; plus a snapshot of right now.
+const ADMIN_KEY = `vip:${ADMIN_ID}`; // checked on the server; the page only hides the link
+const STATS_FILE = path.join(DATA_DIR, 'admin-stats.json');
+const STATS_KEEP = 24 * 60;
+const startedAt = Date.now();
+let requestsThisMinute = 0;
+const statsHistory = (() => {
+    const saved = readJson(STATS_FILE);
+    return Array.isArray(saved.samples) ? saved.samples.slice(-STATS_KEEP) : [];
+})();
+
+function watchingNow(now = Date.now()) {
+    let n = 0;
+    for (const sessions of nowPlaying.values()) for (const s of sessions.values()) if (now - s.updatedAt < 2 * 60 * 1000) n++;
+    return n;
+}
+
+function seatCounts(now = Date.now()) {
+    sweepSeats(now);
+    let vip = 0;
+    for (const k of seats.keys()) if (k.startsWith('vip:')) vip++;
+    return { seats: seats.size - vip, vip, queue: seatQueue.size };
+}
+
+setInterval(function() {
+    const now = Date.now();
+    const sample = { t: now, ...seatCounts(now), req: requestsThisMinute, watching: watchingNow(now) };
+    requestsThisMinute = 0;
+    statsHistory.push(sample);
+    if (statsHistory.length > STATS_KEEP) statsHistory.splice(0, statsHistory.length - STATS_KEEP);
+    try { writeJson(STATS_FILE, { samples: statsHistory }, { pretty: false }); } catch (e) { console.error('stats write failed:', e.message); }
+}, 60000);
+
+function countEntries(file) {
+    try { return Object.keys(readJson(file)).length; } catch { return 0; }
+}
+
+function recentClientErrors(now = Date.now()) {
+    let lines = [];
+    try { lines = fs.readFileSync(ERROR_LOG, 'utf8').trim().split('\n'); } catch { return { count: 0, latest: [] }; }
+    const day = lines.map(l => { try { return JSON.parse(l); } catch { return null; } })
+        .filter(e => e && now - Date.parse(e.at) < 24 * 60 * 60 * 1000);
+    return { count: day.length, latest: day.slice(-5).reverse().map(e => ({ at: e.at, message: e.message, route: e.route, version: e.version })) };
+}
+
+function adminStats() {
+    const now = Date.now();
+    const counts = seatCounts(now);
+    const people = (map, extra) => [...map.entries()].map(([key, v]) => ({
+        key,
+        name: seatNames.get(key) || (key.startsWith('t:') ? 'unverified' : key.split(':')[1]),
+        vip: key.startsWith('vip:'),
+        ...extra(v),
+    }));
+    let parties = 0;
+    try { parties = Object.values(readJson(path.join(DATA_DIR, 'parties.json'))).filter(p => p && p.active).length; } catch { /* none */ }
+    return {
+        now,
+        max: seatSettings.max,
+        vips: seatSettings.vips,
+        maintenance: readMaintenance(),
+        ...counts,
+        watching: watchingNow(now),
+        online: people(seats, at => ({ seen: at })).sort((a, b) => b.vip - a.vip || a.name.localeCompare(b.name)),
+        waiting: people(seatQueue, q => ({ since: q.since })),
+        samples: statsHistory,
+        accounts: { backgroundSync: countEntries(TOKEN_FILE), jellyfin: countEntries(JF_FILE), webhooks: countEntries(HOOK_FILE) },
+        parties,
+        anilist: { verifyPausedFor: Math.max(0, verifyPausedUntil - now) },
+        errors: recentClientErrors(now),
+        server: { uptime: now - startedAt, rss: process.memoryUsage().rss, node: process.version },
+    };
+}
+
+// What the owner can change from the admin page. Every change is logged to the server console.
+function adminAction(body) {
+    const action = str(body.action, 20);
+    if (action === 'limit') {
+        const max = Math.round(Number(body.max));
+        if (!(max >= 1 && max <= 10000)) return { status: 400, error: 'The limit must be between 1 and 10000' };
+        seatSettings.max = max;
+        saveSeatSettings();
+    } else if (action === 'addVip') {
+        const id = Number(body.id);
+        if (!Number.isInteger(id) || id < 1) return { status: 400, error: 'No such AniList user' };
+        if (!isVip(id)) seatSettings.vips.push({ id, name: str(body.name, 40) || String(id) });
+        saveSeatSettings();
+    } else if (action === 'removeVip') {
+        const id = Number(body.id);
+        if (id === ADMIN_ID) return { status: 400, error: 'The owner stays a VIP' };
+        seatSettings.vips = seatSettings.vips.filter(v => v.id !== id);
+        saveSeatSettings();
+    } else if (action === 'letIn') {
+        // Straight to a seat, past the line and the limit
+        const key = str(body.key, 80);
+        if (!seatQueue.has(key)) return { status: 404, error: 'Not waiting any more' };
+        seatQueue.delete(key);
+        seats.set(key, Date.now());
+    } else if (action === 'free') {
+        // The seat goes to the first in line; the person joins the line with their next heartbeat
+        const key = str(body.key, 80);
+        if (key.startsWith('vip:')) return { status: 400, error: 'VIPs always have a seat' };
+        seats.delete(key);
+    } else if (action === 'maintenance') {
+        if (body.on) writeJson(MAINT_FILE, { maintenance: true, since: new Date().toISOString(), note: str(body.note, 200) });
+        else { try { fs.unlinkSync(MAINT_FILE); } catch { /* already off */ } }
+    } else if (action === 'clearErrors') {
+        for (const f of [ERROR_LOG, ERROR_LOG + '.1']) { try { fs.unlinkSync(f); } catch { /* none */ } }
+    } else {
+        return { status: 400, error: 'Unknown action' };
+    }
+    console.log(`admin: ${action}`, JSON.stringify({ ...body, action: undefined }));
+    return { status: 200 };
+}
+
 // The answer for a request whose account could not be confirmed (auth.status !== 'ok')
 function refuseAuth(res, auth) {
     if (auth.status === 'limited') return json(res, 429, { error: 'Too many sign-in checks, try again in a minute' });
@@ -984,6 +1183,7 @@ async function handle(req, res) {
     }
 
     const pathname = req.url.split('?')[0];
+    requestsThisMinute++;
 
     if (pathname === '/api/log' && req.method === 'POST') {
         const body = await readBody(req);
@@ -1034,6 +1234,35 @@ async function handle(req, res) {
     }
 
     // Public read-only state — clients ask every minute whether to stay quiet
+    // A seat in the app: claimed and kept with each heartbeat, given back on logout
+    if (pathname === '/api/seat' && (req.method === 'POST' || req.method === 'DELETE')) {
+        if (overLimit('seat-ip', clientIp(req), 60, 60000)) return json(res, 429, { error: 'Too many requests' });
+        const owner = await seatOwner(req);
+        if (!owner) return json(res, 401, { error: 'Not signed in' });
+        if (req.method === 'DELETE') {
+            seats.delete(owner.key);
+            seatQueue.delete(owner.key);
+            return json(res, 200, { ok: true });
+        }
+        return json(res, 200, { ...claimSeat(owner.key, owner.vip), max: seatSettings.max });
+    }
+
+    if (pathname === '/api/admin/stats' && req.method === 'GET') {
+        if (overLimit('admin-ip', clientIp(req), 30, 60000)) return json(res, 429, { error: 'Too many requests' });
+        const owner = await seatOwner(req);
+        if (!owner) return json(res, 401, { error: 'Not signed in' });
+        if (owner.key !== ADMIN_KEY) return json(res, 403, { error: 'Not for you' });
+        return json(res, 200, adminStats());
+    }
+    if (pathname === '/api/admin/action' && req.method === 'POST') {
+        if (overLimit('admin-ip', clientIp(req), 30, 60000)) return json(res, 429, { error: 'Too many requests' });
+        const owner = await seatOwner(req);
+        if (!owner) return json(res, 401, { error: 'Not signed in' });
+        if (owner.key !== ADMIN_KEY) return json(res, 403, { error: 'Not for you' });
+        const done = adminAction(await readBody(req));
+        return done.status === 200 ? json(res, 200, adminStats()) : json(res, done.status, { error: done.error });
+    }
+
     if (pathname === '/api/maintenance' && req.method === 'GET') {
         const m = readMaintenance();
         return json(res, 200, m

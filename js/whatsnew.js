@@ -1,9 +1,9 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=118';
-import { openDialog } from './a11y.js?v=118';
-import { prefersReducedMotion } from './animations.js?v=118';
+import { esc } from './store.js?v=119';
+import { openDialog } from './a11y.js?v=119';
+import { prefersReducedMotion } from './animations.js?v=119';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More

@@ -1,8 +1,8 @@
 // A voice actor's page (#/staff/<id>): photo, a few facts and every anime they voice, most popular
 // first, each with the character they play. Reached from the characters on a detail page.
-import * as api from '../api.js?v=118';
-import { renderMediaCard, esc, emptyIcon } from '../store.js?v=118';
-import { getToken } from '../auth.js?v=118';
+import * as api from '../api.js?v=119';
+import { renderMediaCard, esc, emptyIcon } from '../store.js?v=119';
+import { getToken } from '../auth.js?v=119';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const fuzzyDate = d => d?.year ? [d.day, d.month ? MONTHS[d.month - 1] : null, d.year].filter(Boolean).join(' ') : null;
