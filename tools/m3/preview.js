@@ -73,6 +73,16 @@ const design = process.env.DESIGN || 'm3';
     const p = await open(false);
     await shot(p, 'home', null, { ms: 3000 });
     await shot(p, 'home-full', null, { ms: 300, full: true });
+    // The Jellyfin card on Home, fed the way the webhook state arrives (needs EXTRA='{"aniroll_jf_hook":"x"}')
+    await shot(p, 'now-playing', null, { ms: 300, act: async q => {
+        await q.evaluate(() => {
+            const min = 600000000;
+            window.dispatchEvent(new CustomEvent('aniroll:jf-now', { detail: { trackAt: 0.9, sessions: [{
+                type: 'Episode', series: 'Jigokuraku', name: 'The Samurai and the Woman', season: 1, episode: 5,
+                position: 16 * min, runtime: 23 * min, device: 'living room' }] } }));
+            document.getElementById('jf-now-section')?.scrollIntoView({ block: 'center' });
+        });
+    } });
     await shot(p, 'list', '#/list');
     await shot(p, 'roll', '#/roll', { ms: 6000, act: async q => { await q.click('#roll-btn'); await wait(300); await settle(q); } });
     await shot(p, 'search', '#/search', { ms: 6000 });

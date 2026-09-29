@@ -671,8 +671,19 @@
 :root[data-design="m3"] .fr-card { border-radius: var(--radius-lg); background: var(--md-surface-container-low); }
 :root[data-design="m3"] .jf-now-card { max-width: none; }
 :root[data-design="m3"] .jf-now-cover { border-radius: var(--radius-md); }
-:root[data-design="m3"] .jf-now-bar { height: 4px; background: var(--md-secondary-container); }
-:root[data-design="m3"] .jf-now-bar span { background: var(--md-primary); }
+/* The playback bar is the same wave as every other progress bar (see Progress below); the tick at the
+   tracking threshold sits on the track, the wave reaching it means the episode counts */
+:root[data-design="m3"] .jf-now-bar {
+    height: 10px;
+    margin: 8px 0 4px;
+    border-radius: 0;
+    background: none;
+    overflow: clip;
+    overflow-clip-margin: 4px;
+    clip-path: inset(-4px 0);
+}
+:root[data-design="m3"] .jf-now-bar span { left: 6px; width: calc((100% - 12px) * var(--pn, 0)); border-radius: 0; background: none; }
+:root[data-design="m3"] .jf-now-bar i { top: 1px; width: 2px; height: 8px; margin-left: -1px; background: var(--md-on-surface-variant); z-index: 1; }
 
 /* ----- Calendar ----- */
 :root[data-design="m3"] .calendar-week { gap: 8px; }
@@ -1053,7 +1064,7 @@
     border-radius: 0;
     background: none;
 }
-:root[data-design="m3"] .progress-bar-fill::before {
+:root[data-design="m3"] :is(.progress-bar-fill, .jf-now-bar span)::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -1061,7 +1072,7 @@
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 5 Q5 1 10 5 T20 5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 20px 10px repeat-x;
 }
-:root[data-design="m3"] .progress-bar-fill::after {
+:root[data-design="m3"] :is(.progress-bar-fill, .jf-now-bar span)::after {
     content: '';
     position: absolute;
     top: -1px;
