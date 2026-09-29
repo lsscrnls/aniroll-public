@@ -59,7 +59,7 @@ export function controlsHtml() {
             <div class="pl-next" role="group" aria-label="Up next" hidden>
                 <div class="pl-next-text"><span class="pl-next-kicker">Up next</span><span class="pl-next-title"></span></div>
                 <button class="pl-next-play" data-act="playNext">${icon('skipNext')}<span class="pl-next-label">Play now</span></button>
-                <button class="pl-btn pl-next-cancel" data-act="cancelNext" aria-label="Stay on this episode" title="Stay on this episode">${icon('close')}</button>
+                <button class="pl-next-stay" data-act="cancelNext">Watch credits</button>
             </div>
             <div class="pl-subs-note" role="status" hidden><span class="pl-subs-note-dot" aria-hidden="true"></span>Loading subtitles…</div>
             <div class="pl-row">
@@ -274,9 +274,9 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             nextBox.hidden = !show;
             root.classList.toggle('has-next', show);
             clearInterval(nextTimer);
-            // Counts only while the video plays: pausing on the credits holds it
+            // Counts only while the video plays (or has ended): pausing on the credits holds it
             if (show) nextTimer = setInterval(() => {
-                if (video.paused) return;
+                if (video.paused && !video.ended) return;
                 nextLeft -= 0.25;
                 paintNextCount();
                 if (nextLeft <= 0) playNext();
@@ -294,7 +294,13 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         paintNext();
         paintSegment();
     }
-    on(video, 'ended', () => { if (next && nextState !== 'cancelled') playNext(); });
+    // The end: straight on, unless the credits were watched — then the card asks once more, with its countdown
+    on(video, 'ended', () => {
+        if (!next) return;
+        if (nextState !== 'cancelled') return playNext();
+        nextState = 'off';
+        paintNext();
+    });
 
     // ----- Seeking on the wave -----
     const timeAt = (clientX) => {
