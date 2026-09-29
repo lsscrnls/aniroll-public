@@ -1,4 +1,4 @@
-import { esc } from './store.js?v=114';
+import { esc } from './store.js?v=115';
 
 // What Jellyfin is playing right now (from the webhook state in js/jellyfin.js):
 // the chip in the navbar and the card on Home.
@@ -77,7 +77,7 @@ export function renderNowCard(section, state) {
             <div class="jf-now-kicker"><span class="jf-now-dot"></span>${esc(kicker)}</div>
             <div class="jf-now-title">${esc(sessionTitle(s))}</div>
             <div class="jf-now-sub">${esc(sessionEpisode(s) + epName)}</div>
-            <div class="jf-now-bar" style="--p:${pct}%" title="${pct}%"><span></span><i style="left:${Math.round(trackAt * 100)}%"></i></div>
+            <div class="jf-now-bar" style="--p:${pct}%;--pn:${pct / 100}" title="${pct}%"><span></span><i style="left:${Math.round(trackAt * 100)}%"></i></div>
             <div class="jf-now-meta">${esc(meta)}</div>
         </div>
     </div>`;
