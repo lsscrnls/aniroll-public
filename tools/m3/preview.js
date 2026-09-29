@@ -3,10 +3,11 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const demo = require('../showcase/demo');
+const { mockJellyfin, JF_STORAGE } = require('../e2e/jellyfin-mock');
 
 const ROOT = path.join(__dirname, '..', '..');
 const OUT = path.join(__dirname, 'out');
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp4': 'video/mp4', '.woff2': 'font/woff2' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.mp4': 'video/mp4', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const [theme = 'dark', ...only] = process.argv.slice(2);
 const want = n => !only.length || only.includes(n);
@@ -110,7 +111,32 @@ const design = process.env.DESIGN || 'm3';
         await p.screenshot({ path: path.join(OUT, `${theme}-morph-end.png`) });
         console.log('morph', await p.evaluate(() => ({ vt: !!document.startViewTransition, open: document.getElementById('detail-panel-overlay').classList.contains('open'), scoped: document.querySelector('.detail-panel').className })));
     }
+
+    // The player (Jellyfin mocked): paused mid-episode, playing with the subtitle menu, on a phone
+    async function player(q, name, mobile) {
+        if (!want(name) && !want(name + '-menu')) return;
+        await mockJellyfin(q, { anyTitle: true });
+        await q.evaluate(jf => { for (const [k, v] of Object.entries(jf)) localStorage.setItem(k, v); sessionStorage.clear(); }, JF_STORAGE);
+        await q.evaluate(() => { localStorage.removeItem('aniroll_req_times'); location.hash = '#/play/154587/2'; });
+        await wait(5000);
+        await q.evaluate(() => { const v = document.getElementById('player-video'); v.pause(); v.currentTime = 8.4; });
+        await wait(800);
+        await q.mouse.move(mobile ? 200 : 700, mobile ? 700 : 820);
+        await wait(600);
+        if (want(name)) { await q.screenshot({ path: path.join(OUT, `${theme}-${name}.png`) }); console.log('shot', name); }
+        if (want(name + '-menu')) {
+            await q.evaluate(() => document.getElementById('player-video').play());
+            await q.click('[data-act="subs"]');
+            await wait(900);
+            await q.screenshot({ path: path.join(OUT, `${theme}-${name}-menu.png`) });
+            console.log('shot', name + '-menu');
+        }
+        await q.evaluate(() => { location.hash = '#/'; });
+        await wait(800);
+    }
+    await player(p, 'player', false);
     const m = await open(true);
+    await player(m, 'm-player', true);
     await shot(m, 'm-home', null, { ms: 3000 });
     await shot(m, 'm-roll', '#/roll', { ms: 6000, act: async q => { await q.click('#roll-btn'); await wait(300); await settle(q); } });
     await shot(m, 'm-list', '#/list', { ms: 5000 });

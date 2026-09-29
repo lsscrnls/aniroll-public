@@ -7,10 +7,11 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 const { respond, VIEWER } = require('./mock');
+const { mockJellyfin, JF_URL, JF_STORAGE } = require('./jellyfin-mock');
 
 const ROOT = path.join(__dirname, '..', '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
-    '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
+    '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json' };
 
 let failed = 0;
 function check(name, ok, detail) {
@@ -421,6 +422,206 @@ function staticServer() {
     check('studio page: its name and its anime, under Discover', /^#\/studio\/\d+$/.test(studio.hash) && !!studio.title && studio.cards > 0 && studio.discover, studio);
     await nx.close();
 
+    // Jellyfin player. A page logged in to AniList and to Jellyfin (a friend's sign-in, not an API key)
+    async function playerPage(jellyfinUp, signedIn = true) {
+        const p = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+        const pageErrors = [];
+        p.on('pageerror', e => pageErrors.push(e.message));
+        p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) pageErrors.push(m.text()); });
+        const saves = [];
+        await p.route('https://graphql.anilist.co/**', route => {
+            const body = route.request().postDataJSON();
+            if (/^\s*mutation/.test(body.query) && /SaveMediaListEntry/.test(body.query)) saves.push(body.variables);
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(body)) });
+        });
+        await p.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false,"configured":false}' }));
+        await p.route(/cdn|googleapis|gstatic/, route => route.abort());
+        // The stack switched off: every request to Jellyfin fails the way a dead host does
+        const calls = jellyfinUp ? await mockJellyfin(p) : [];
+        if (!jellyfinUp) await p.route(`${JF_URL}/**`, route => route.abort('connectionrefused'));
+        await p.addInitScript(({ id, name, jf }) => {
+            localStorage.setItem('aniroll_token', 'e2e-token');
+            localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+            localStorage.setItem('aniroll_user_ts', String(Date.now()));
+            localStorage.setItem('aniroll_seen_changes', '9999');
+            for (const [k, v] of Object.entries(jf)) localStorage.setItem(k, v);
+        }, { ...VIEWER, jf: signedIn ? JF_STORAGE : {} });
+        return { p, pageErrors, saves, calls };
+    }
+
+    // Friends connect with a Quick Connect code: no password field, the code shown, connected once confirmed
+    {
+        const { p, pageErrors, calls } = await playerPage(true, false);
+        await p.goto(base + '/#/settings?tab=jellyfin');
+        await p.waitForSelector('#jf-connect', { timeout: 8000 });
+        const form = await p.evaluate(() => ({ password: !!document.querySelector('#jf-settings input[type=password]'), button: document.getElementById('jf-connect').textContent }));
+        await p.fill('#jf-url', 'https://jellyfin.e2e.test');
+        await p.click('#jf-connect');
+        await p.waitForSelector('.jf-qc-code', { timeout: 5000 }).catch(() => {});
+        const code = await p.evaluate(() => document.querySelector('.jf-qc-code')?.textContent);
+        await p.waitForFunction(() => /Connected/.test(document.getElementById('jf-settings-state')?.textContent || ''), null, { timeout: 12000 }).catch(() => {});
+        const done = await p.evaluate(() => ({ state: document.getElementById('jf-settings-state')?.textContent, kind: localStorage.aniroll_jf_kind,
+            token: localStorage.aniroll_jf_apikey, local: !!document.getElementById('jf-local') }));
+        check('jellyfin: Quick Connect code instead of a password, connected once confirmed',
+            !form.password && /Quick Connect/.test(form.button) && code === '482913' && /Connected/.test(done.state || '') && done.kind === 'user'
+            && done.token === 'qc-token' && done.local && calls.some(c => c.type === 'qcAuth' && c.body?.Secret === 'qc-secret') && !pageErrors.length,
+            { form, code, done, pageErrors });
+        await p.close();
+    }
+
+    // Stack off (required): the app starts as always, no Play button, no error, no waiting
+    {
+        const { p, pageErrors } = await playerPage(false);
+        const t0 = Date.now();
+        await p.goto(base + '/#/anime/101/full');
+        await p.waitForSelector('.detail-title', { timeout: 10000 });
+        const shownAfter = Date.now() - t0;
+        await p.waitForTimeout(4000); // longer than the reachability timeout
+        const off = await p.evaluate(() => ({
+            play: !!document.querySelector('.detail-play'),
+            slotHidden: document.getElementById('detail-play')?.hidden,
+            title: document.querySelector('.detail-title')?.textContent,
+        }));
+        check('player, Jellyfin off: detail page as always, no Play button, no errors',
+            !off.play && off.slotHidden === true && !!off.title && shownAfter < 4000 && !pageErrors.length, { ...off, shownAfter, pageErrors });
+        await p.evaluate(() => { location.hash = '#/play/101/2'; });
+        await p.waitForTimeout(2500);
+        const msg = await p.evaluate(() => document.getElementById('player-status')?.textContent.trim());
+        check('player, Jellyfin off: #/play says the server cannot be reached', /cannot be reached/.test(msg || ''), msg);
+        await p.close();
+    }
+
+    // Stack on: Play button, direct play from the stream URL, reports to Jellyfin, AniList exactly once at 90%
+    {
+        const { p, pageErrors, saves, calls } = await playerPage(true);
+        await p.goto(base + '/#/anime/101/full');
+        await p.waitForSelector('.detail-play', { timeout: 8000 }).catch(() => {});
+        const button = await p.evaluate(() => {
+            const a = document.querySelector('.detail-play');
+            return a ? { href: a.getAttribute('href'), text: a.textContent.trim() } : null;
+        });
+        check('player: Play button for the next episode when Jellyfin has it', /^#\/play\/\d+\/2$/.test(button?.href || '') && /Play episode 2/.test(button.text), button);
+
+        const playHash = button?.href || '#/play/101/2';
+        await p.click('.detail-play').catch(() => p.evaluate(h => { location.hash = h; }, playHash));
+        await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2; }, null, { timeout: 10000 }).catch(() => {});
+        await p.waitForTimeout(1500);
+        const playing = await p.evaluate(() => {
+            const v = document.getElementById('player-video');
+            return { src: v?.currentSrc || '', ready: v?.readyState, tracks: v ? [...v.textTracks].map(t => `${t.label}:${t.mode}`) : [],
+                status: document.getElementById('player-status')?.hidden, method: document.getElementById('player-method')?.textContent,
+                open: document.body.classList.contains('player-open') };
+        });
+        const info = calls.find(c => c.type === 'PlaybackInfo');
+        const profile = info?.body?.DeviceProfile;
+        check('player: PlaybackInfo with this browser\'s profile (VP9 direct, no 10-bit H.264, bitrate cap on the public address)',
+            info?.item === 'ep2' && profile?.DirectPlayProfiles?.some(d => /webm/.test(d.Container) && /vp9/.test(d.VideoCodec))
+            && JSON.stringify(profile.CodecProfiles).includes('VideoBitDepth') && profile.MaxStreamingBitrate === 25000000, profile);
+        check('player: direct play from the static stream, subtitles shown, full screen',
+            /\/Videos\/ep2\/stream\?static=true/.test(playing.src) && playing.ready >= 2 && playing.tracks.join() === 'English:showing'
+            && playing.status === true && playing.method === 'Direct play' && playing.open, playing);
+        const start = calls.find(c => c.type === 'Playing');
+        check('player: Jellyfin gets the start report with this device', start?.body?.ItemId === 'ep2' && start.body.PlaySessionId === 'ps-ep2'
+            && /Client="AniRoll".*DeviceId="[^"]+".*Token="e2e-jf-token"/.test(start.auth), start);
+
+        const savesBefore = saves.length;
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.5; v.play(); });
+        await p.waitForTimeout(2500);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 2; });
+        await p.waitForTimeout(500);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 19; });
+        await p.waitForTimeout(1500);
+        const written = saves.slice(savesBefore);
+        check('player: AniList gets episode 2 exactly once, past 90%', written.length === 1 && written[0].progress === 2, written);
+
+        // Skip intro from Jellyfin's media segments: shown inside the intro, jumps to its end
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 3; return v.play(); }).catch(() => {});
+        await p.waitForTimeout(700);
+        const skip = await p.evaluate(() => { const b = document.querySelector('.pl-skip-segment'); return { shown: b && !b.hidden, text: b?.textContent }; });
+        await p.click('.pl-skip-segment').catch(() => {});
+        await p.waitForTimeout(400);
+        const skipped = await p.evaluate(() => ({ t: document.getElementById('player-video').currentTime, hidden: document.querySelector('.pl-skip-segment').hidden }));
+        check('player: Skip intro from the media segments, jumps past it', skip.shown && skip.text === 'Skip intro' && skipped.t >= 6.9 && skipped.hidden, { skip, skipped });
+
+        // Own M3 controls: no native ones, Space pauses, the wave follows, ← jumps back 10 s, C switches subtitles off
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 12; return v.play(); }).catch(() => {});
+        await p.waitForTimeout(400);
+        await p.mouse.move(640, 400);
+        await p.keyboard.press('Space');
+        await p.waitForTimeout(300);
+        const ui = await p.evaluate(() => {
+            const v = document.getElementById('player-video');
+            return { native: v.controls, paused: v.paused, cls: document.getElementById('player').classList.contains('is-paused'),
+                label: document.querySelector('.pl-play').getAttribute('aria-label'), now: Number(document.querySelector('.pl-seek').getAttribute('aria-valuenow')),
+                pos: getComputedStyle(document.getElementById('player')).getPropertyValue('--pl-pos') };
+        });
+        await p.keyboard.press('ArrowLeft');
+        await p.keyboard.press('c');
+        await p.waitForTimeout(300);
+        const after = await p.evaluate(() => ({ t: document.getElementById('player-video').currentTime, subs: [...document.getElementById('player-video').textTracks].map(t => t.mode).join() }));
+        check('player: own controls — Space pauses, the wave follows, ← back 10 s, C toggles subtitles',
+            !ui.native && ui.paused && ui.cls && ui.label === 'Play' && ui.now >= 11 && parseFloat(ui.pos) > 50 && after.t < 4 && after.subs === 'disabled', { ui, after });
+
+        await p.evaluate(() => { location.hash = '#/anime/101/full'; });
+        await p.waitForTimeout(1200);
+        const stopped = calls.find(c => c.type === 'Playing/Stopped');
+        check('player: leaving reports where it stopped and frees the page', stopped?.body?.ItemId === 'ep2' && stopped.body.PositionTicks > 0
+            && !(await p.evaluate(() => document.body.classList.contains('player-open'))), stopped);
+
+        // Styled ASS: drawn by JASSUB on its canvas with the MKV's fonts, listed in the menu
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));
+        await p.waitForTimeout(4000);
+        const ass = await p.evaluate(() => {
+            const c = document.querySelector('.pl-subs-canvas');
+            return { canvas: !!c, shown: c && !c.hidden, w: c?.width || 0, textTracks: [...document.getElementById('player-video').textTracks].map(t => t.mode).join() };
+        });
+        await p.mouse.move(640, 500);
+        await p.click('[data-act="subs"]').catch(() => {});
+        await p.waitForTimeout(300);
+        const menuItems = await p.$$eval('.pl-menu-item', els => els.map(e => e.textContent.trim()));
+        await p.keyboard.press('Escape');
+        check('player: styled ASS through JASSUB with the embedded font, text tracks stay off',
+            ass.canvas && ass.shown && ass.w > 0 && ass.textTracks === 'disabled' && calls.some(c => c.type === 'ass') && calls.some(c => c.type === 'font' && /Token=/.test(c.auth))
+            && menuItems.join('|') === 'Off|English|English (Signs & Songs)', { ...ass, menuItems });
+
+        // Blu-ray subtitles (PGS): libpgs draws the picture on its own canvas, at the place the disc puts it
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/4'));
+        await p.waitForTimeout(3500);
+        const pgs = await p.evaluate(() => {
+            const v = document.getElementById('player-video');
+            const c = [...document.querySelectorAll('.pl-subs-canvas')].find(x => !x.hidden);
+            if (!c) return { canvas: false };
+            // Sample the middle of the bar (x 960, y 990 on the 1920x1080 picture) from a copy of the canvas
+            const copy = document.createElement('canvas');
+            copy.width = c.width;
+            copy.height = c.height;
+            const g = copy.getContext('2d');
+            g.drawImage(c, 0, 0);
+            const at = (x, y) => [...g.getImageData(Math.round(x * c.width / 1920), Math.round(y * c.height / 1080), 1, 1).data];
+            return { canvas: true, w: c.width, h: c.height, bar: at(960, 990), above: at(960, 500), time: v.currentTime,
+                noteGone: document.querySelector('.pl-subs-note')?.hidden === true,
+                textTracks: [...v.textTracks].map(t => t.mode).join() };
+        });
+        await p.mouse.move(640, 500);
+        await p.click('[data-act="subs"]').catch(() => {});
+        await p.waitForTimeout(300);
+        const pgsMenu = await p.$$eval('.pl-menu-item', els => els.map(e => e.textContent.trim()));
+        await p.keyboard.press('Escape');
+        check('player: Blu-ray subtitles (PGS) drawn by libpgs where the disc places them, the loading note gone',
+            pgs.canvas && pgs.noteGone && pgs.bar?.[3] > 200 && pgs.bar[0] > 200 && pgs.above?.[3] === 0 && pgs.textTracks === 'disabled'
+            && calls.some(c => c.type === 'pgs') && pgsMenu.join('|') === 'Off|English|English [PGS]', { ...pgs, pgsMenu });
+
+        // The server cannot convert (graphics card full): a clear message, no endless spinner, the conversion ended
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/5'));
+        await p.waitForTimeout(3500);
+        const failed = await p.evaluate(() => ({ text: document.getElementById('player-status')?.textContent.trim(), error: document.getElementById('player-status')?.classList.contains('error') }));
+        const segTries = calls.filter(c => c.type === 'segment').length;
+        check('player: a failed conversion says so at once (no endless retrying), with Try again',
+            failed.error && /could not convert/.test(failed.text || '') && /Try again/.test(failed.text || '') && segTries <= 2, { ...failed, segTries });
+        check('player: no errors', !pageErrors.length, pageErrors);
+        await p.close();
+    }
+
     // "Reduce motion": no smooth scrolling (Lenis marks <html>), no cards flying in, no count-up
     const calm = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
     await calm.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
@@ -458,7 +659,7 @@ function staticServer() {
     const back = await visitor({ aniroll_theme: 'dark' });
     const both = await back.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent));
     check('returning visitor who confirmed nothing: every change, oldest (the move) first',
-        (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === 6 && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home') && both[5].startsWith('Starting soon'), both);
+        (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === 7 && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home') && both[5].startsWith('Starting soon') && both[6].startsWith('Watch from your Jellyfin'), both);
     const demoTabs = await back.$$eval('.whatsnew-bar [data-k]', els => els.map(e => e.dataset.k).join(','));
     check('notice: animation ends on the new tab order', demoTabs === 'home,list,roll,discover,social', demoTabs);
     await back.click('.whatsnew [data-close]');
@@ -476,7 +677,7 @@ function staticServer() {
     // Confirmed the move with "Got it" already: only what came after it
     const confirmed = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-22' });
     const only = await confirmed.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, demo: !!document.querySelector('.whatsnew-demo'), sections: document.querySelectorAll('.whatsnew .whatsnew-entry').length }));
-    check('returning visitor who confirmed the move: only what came after, no tab animation', only.title === 'A few things changed' && !only.demo && only.sections === 5, only);
+    check('returning visitor who confirmed the move: only what came after, no tab animation', only.title === 'A few things changed' && !only.demo && only.sections === 6, only);
     await confirmed.close();
 
     const fresh = await visitor({});
@@ -530,7 +731,7 @@ function staticServer() {
     await late.click('.landing-foot .whatsnew-link');
     await late.clock.runFor(500);
     const log = await late.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, entries: document.querySelectorAll('.whatsnew-entry').length }));
-    check('changelog: still there, marked unread, opens with all entries', unread && log.title === "What's new" && log.entries === 6, { unread, ...log });
+    check('changelog: still there, marked unread, opens with all entries', unread && log.title === "What's new" && log.entries === 7, { unread, ...log });
 
     // An entry with a clip: it sits behind "See it in action"; opening it widens the dialog
     const clipped = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-26' });

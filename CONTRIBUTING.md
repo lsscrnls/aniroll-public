@@ -29,6 +29,8 @@ Reading needs nothing installed. A path that builds up step by step:
 6. **`api/server.js`**, section by section (`// =====` marks each one), with **`js/jellyfin.js`** next to
    it: the Jellyfin matcher exists in both, with the same rules.
 7. For the look: **`js/design.js`**, **`js/m3.js`** and **`css/m3.css`**.
+8. The player: **`js/pages/play.js`**, then **`js/player/profile.js`** (what the browser can play) and
+   **`js/player/subtitles.js`**. `tools/e2e/jellyfin-mock.js` shows the Jellyfin answers it expects.
 
 Most files open with a comment saying what they are for. Comments further down explain *why*
 something is done a certain way, especially where the obvious way failed.
@@ -52,6 +54,8 @@ If you propose code, it helps when it reads like the rest:
   `api.progressVars()` and `api.saveMediaListEntry()`.
 - Motion checks `prefersReducedMotion()` (`js/animations.js`). No emojis in the UI; dropdowns use
   `js/select.js` rather than the browser's own.
+- Third-party code lives in `js/vendor/`, unchanged, with its version in the name and its licence next to it.
+  No CDN and no package manager at runtime.
 - Comments say why, not what.
 - `tools/e2e/` drives every page against a mocked AniList, and `tools/api-test/` checks the matcher, the
   relay and the data files. A change that touches either area comes with a check.

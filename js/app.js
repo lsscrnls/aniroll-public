@@ -1,14 +1,14 @@
-import { route, startRouter, navigate } from './router.js?v=115';
-import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl } from './auth.js?v=115';
-import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, setAccentColor, getAccentColors, esc, titlePref } from './store.js?v=115';
-import * as api from './api.js?v=115';
-import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js?v=115';
-import { openDialog, initActivation, showConfirm } from './a11y.js?v=115';
-import { noteVisitor, maybeShowMoveNotice, openChangelog, hasUnread } from './whatsnew.js?v=115';
-import { applyDesign, getDesign, getVariant, setDesign, switchDesign, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from './design.js?v=115';
+import { route, startRouter, navigate } from './router.js?v=116';
+import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl } from './auth.js?v=116';
+import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, setAccentColor, getAccentColors, esc, titlePref } from './store.js?v=116';
+import * as api from './api.js?v=116';
+import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js?v=116';
+import { openDialog, initActivation, showConfirm } from './a11y.js?v=116';
+import { noteVisitor, maybeShowMoveNotice, openChangelog, hasUnread } from './whatsnew.js?v=116';
+import { applyDesign, getDesign, getVariant, setDesign, switchDesign, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from './design.js?v=116';
 
 const CLIENT_ID = '50643';
-const APP_VERSION = '115';
+const APP_VERSION = '116';
 
 // Report uncaught errors to our backend (api/server.js → data/client-errors.log).
 // Each distinct message once per page load, at most 10 — a loop must not flood the log.
@@ -69,18 +69,18 @@ async function init() {
 
     // Guests of a Watch Party keep syncing with the host on every page, not only on /watchparty
     if (isLoggedIn() && localStorage.getItem('aniroll_joined_party')) {
-        import('./pages/watchparty.js?v=115').then(m => m.initGuestSync());
+        import('./pages/watchparty.js?v=116').then(m => m.initGuestSync());
     }
     // Hosts get their running party back on a second device, and a pill leading back to it
     if (isLoggedIn()) {
-        import('./pages/watchparty.js?v=115').then(async m => {
+        import('./pages/watchparty.js?v=116').then(async m => {
             if (!localStorage.getItem('aniroll_watchparty')) await m.restoreHostParty();
             m.renderPartyPill();
         });
     }
     // The Jellyfin connection belongs to the AniList account, so pull it in on this device
     if (isLoggedIn()) {
-        import('./jellyfin.js?v=115').then(async m => {
+        import('./jellyfin.js?v=116').then(async m => {
             await m.loadAccountConfig();
             setupJellyfinLive();
         });
@@ -165,7 +165,7 @@ function watchMaintenanceMode() {
 function setupJellyfinPull() {
     const pull = async () => {
         if (api.shouldHoldBackground()) return;
-        const { getConfig, isPullEnabled, pullFromJellyfin } = await import('./jellyfin.js?v=115');
+        const { getConfig, isPullEnabled, pullFromJellyfin } = await import('./jellyfin.js?v=116');
         if (!getConfig() || !isPullEnabled()) return;
         const user = getState().user;
         if (!user) return;
@@ -185,10 +185,10 @@ function setupJellyfinPull() {
 // Jellyfin webhook -> AniRoll backend: the chip in the navbar, toasts for tracked episodes,
 // and episodes the backend could not write (no access, AniList blocking it) applied from here
 async function setupJellyfinLive() {
-    const jf = await import('./jellyfin.js?v=115');
+    const jf = await import('./jellyfin.js?v=116');
     // Set up on another device: fetch the link once, only for people who use Jellyfin at all
     if (!jf.getHookSecret() && jf.getConfig()) await jf.loadHook().catch(() => null);
-    const np = await import('./nowplaying.js?v=115');
+    const np = await import('./nowplaying.js?v=116');
     window.addEventListener(jf.NOW_EVENT, (e) => np.renderNowChip(document.getElementById('jf-now-chip'), e.detail));
     jf.startNowPlaying({
         onTracked: (item) => {
@@ -279,7 +279,7 @@ async function loadViewer() {
 
 function setupRoutes() {
     route('/', async (ctx) => {
-        const { render, loadLandingTrending } = await import('./pages/home.js?v=115');
+        const { render, loadLandingTrending } = await import('./pages/home.js?v=116');
         const cleanup = await render(ctx);
         if (!isLoggedIn()) loadLandingTrending();
         refreshAnimations();
@@ -287,19 +287,19 @@ function setupRoutes() {
     });
 
     route('/studio/:id', async (ctx) => {
-        const { render } = await import('./pages/studio.js?v=115');
+        const { render } = await import('./pages/studio.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/staff/:id', async (ctx) => {
-        const { render } = await import('./pages/staff.js?v=115');
+        const { render } = await import('./pages/staff.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/search', async (ctx) => {
-        const { render } = await import('./pages/search.js?v=115');
+        const { render } = await import('./pages/search.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
@@ -309,9 +309,15 @@ function setupRoutes() {
     });
 
     route('/anime/:id/full', async (ctx) => {
-        const { render } = await import('./pages/detail.js?v=115');
+        const { render } = await import('./pages/detail.js?v=116');
         await render({ params: { id: ctx.params.id }, content: ctx.content });
         refreshAnimations();
+    });
+
+    // The player loads only when something is played
+    route('/play/:id/:episode', async (ctx) => {
+        const { render } = await import('./pages/play.js?v=116');
+        return render(ctx);
     });
 
     route('/manga/:id', async (ctx) => {
@@ -319,74 +325,74 @@ function setupRoutes() {
     });
 
     route('/manga/:id/full', async (ctx) => {
-        const { render } = await import('./pages/detail.js?v=115');
+        const { render } = await import('./pages/detail.js?v=116');
         await render({ params: { id: ctx.params.id }, content: ctx.content });
         refreshAnimations();
     });
 
     route('/list', async (ctx) => {
-        const { render } = await import('./pages/list.js?v=115');
+        const { render } = await import('./pages/list.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/list/:username', async (ctx) => {
-        const { render } = await import('./pages/list.js?v=115');
+        const { render } = await import('./pages/list.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/social', async (ctx) => {
-        const { render } = await import('./pages/social.js?v=115');
+        const { render } = await import('./pages/social.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/profile', async (ctx) => {
-        const { render } = await import('./pages/profile.js?v=115');
+        const { render } = await import('./pages/profile.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/user/:username', async (ctx) => {
-        const { render } = await import('./pages/profile.js?v=115');
+        const { render } = await import('./pages/profile.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/season', async (ctx) => {
-        const { render } = await import('./pages/season.js?v=115');
+        const { render } = await import('./pages/season.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/season/:year/:season', async (ctx) => {
-        const { render } = await import('./pages/season.js?v=115');
+        const { render } = await import('./pages/season.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/roll', async (ctx) => {
-        const { render } = await import('./pages/roll.js?v=115');
+        const { render } = await import('./pages/roll.js?v=116');
         const cleanup = await render(ctx);
         refreshAnimations();
         return cleanup;
     });
 
     route('/calendar', async (ctx) => {
-        const { render } = await import('./pages/calendar.js?v=115');
+        const { render } = await import('./pages/calendar.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/notifications', async (ctx) => {
-        const { render } = await import('./pages/notifications.js?v=115');
+        const { render } = await import('./pages/notifications.js?v=116');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/watchparty', async (ctx) => {
-        const { render } = await import('./pages/watchparty.js?v=115');
+        const { render } = await import('./pages/watchparty.js?v=116');
         const cleanup = await render(ctx);
         refreshAnimations();
         return cleanup;
@@ -655,7 +661,7 @@ async function renderSettings({ content, query }) {
         </div>
 
         <div class="settings-panel" id="settings-jellyfin" role="tabpanel" aria-labelledby="settings-tab-jellyfin" ${tab === 'jellyfin' ? '' : 'hidden'}>
-            ${card('Jellyfin', 'Marks episodes watched on your own Jellyfin server whenever your AniList progress moves forward', '<div id="jf-settings"></div><div id="jf-live"></div>')}
+            ${card('Jellyfin', 'Plays episodes from your own Jellyfin server and keeps it in step with AniList', '<div id="jf-settings"></div><div id="jf-live"></div>')}
         </div>
     </div>`;
 
@@ -774,7 +780,7 @@ async function renderSettings({ content, query }) {
     document.getElementById('mal-xml-upload')?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        import('./pages/mal-import.js?v=115').then(m => m.startXMLImport(file));
+        import('./pages/mal-import.js?v=116').then(m => m.startXMLImport(file));
     });
 
     renderJellyfinSettings();
@@ -790,7 +796,7 @@ async function renderPartySyncSettings() {
         box.innerHTML = '<p class="dot-label">Log in to change this.</p>';
         return;
     }
-    const bg = await import('./background.js?v=115');
+    const bg = await import('./background.js?v=116');
     const mode = bg.getPartySyncMode();
     box.innerHTML = `
         <label class="settings-choice"><input type="radio" name="party-sync" value="open" ${mode === 'open' ? 'checked' : ''}>
@@ -864,7 +870,7 @@ async function renderJellyfinLive() {
         return;
     }
     const [jf, bg, np] = await Promise.all([
-        import('./jellyfin.js?v=115'), import('./background.js?v=115'), import('./nowplaying.js?v=115'),
+        import('./jellyfin.js?v=116'), import('./background.js?v=116'), import('./nowplaying.js?v=116'),
     ]);
     const head = `<h4 class="jf-live-title">Live tracking</h4>
         <p class="dot-label">See what you are watching right in AniRoll, and finished episodes and movies land on your AniList within seconds, even when AniRoll is closed. Uses the Webhook plugin of your Jellyfin server.</p>`;
@@ -1004,43 +1010,94 @@ async function renderJellyfinLive() {
 async function renderJellyfinSettings() {
     const box = document.getElementById('jf-settings');
     if (!box) return;
-    const jf = await import('./jellyfin.js?v=115');
+    const jf = await import('./jellyfin.js?v=116');
     await jf.loadAccountConfig();
     const cfg = jf.getConfig();
 
     if (!cfg) {
+        // Most people have a Jellyfin account, not an API key: Quick Connect is the usual way
+        const mode = box.dataset.mode === 'key' ? 'key' : 'code';
         box.innerHTML = `
             <div class="jf-form">
-                <input type="text" class="glass-input" id="jf-url" placeholder="Server URL, e.g. https://jellyfin.example.com">
-                <input type="password" class="glass-input" id="jf-apikey" placeholder="API key (Jellyfin: Dashboard, API Keys)">
-                <input type="text" class="glass-input" id="jf-user" placeholder="Jellyfin username">
-                <button class="glass-btn glass-btn-primary" id="jf-connect">Connect</button>
+                <input type="text" class="glass-input" id="jf-url" placeholder="Server URL, e.g. https://jellyfin.example.com" autocomplete="url">
+                ${mode === 'key' ? `
+                <input type="password" class="glass-input" id="jf-apikey" placeholder="API key (Jellyfin: Dashboard, API Keys)" autocomplete="off">
+                <input type="text" class="glass-input" id="jf-user" placeholder="Jellyfin username" autocomplete="username">` : ''}
+                <button class="glass-btn glass-btn-primary" id="jf-connect">${mode === 'key' ? 'Connect' : 'Get a Quick Connect code'}</button>
+                <div class="jf-qc" id="jf-qc" hidden></div>
+                <button type="button" class="jf-mode" id="jf-mode">${mode === 'key' ? 'Connect with a Quick Connect code instead' : 'Server admin? Use an API key instead'}</button>
             </div>
-            <p class="dot-label jf-hint">Needs a Jellyfin this browser can reach. A plain http server on your home network cannot be used from the https page.</p>`;
+            <p class="dot-label jf-hint">${mode === 'key'
+                ? 'Needs a Jellyfin this browser can reach. A plain http server on your home network cannot be used from the https page.'
+                : 'You confirm the code in a Jellyfin app you are signed in to. AniRoll never sees your password.'}</p>`;
 
-        box.querySelector('#jf-connect').addEventListener('click', async () => {
-            const btn = box.querySelector('#jf-connect');
+        let polling = null;
+        const stopPolling = () => { clearTimeout(polling); polling = null; };
+        box.querySelector('#jf-mode').addEventListener('click', () => {
+            stopPolling();
+            box.dataset.mode = mode === 'key' ? 'code' : 'key';
+            renderJellyfinSettings();
+        });
+        const connected = (info) => {
+            toast(`Connected to ${info.serverName}`, 'success');
+            if (info.scope === 'device') toast('Stored in this browser only — could not save it for your account', 'error');
+            renderJellyfinSettings();
+            refreshJellyfinStatus(true);
+        };
+        const btn = box.querySelector('#jf-connect');
+
+        btn.addEventListener('click', async () => {
+            stopPolling();
             btn.disabled = true;
-            btn.textContent = 'Connecting...';
+            btn.textContent = mode === 'key' ? 'Connecting...' : 'Asking Jellyfin...';
             try {
-                const info = await jf.connect(
-                    box.querySelector('#jf-url').value,
-                    box.querySelector('#jf-apikey').value,
-                    box.querySelector('#jf-user').value);
-                toast(`Connected to ${info.serverName}`, 'success');
-                if (info.scope === 'device') toast('Stored in this browser only — could not save it for your account', 'error');
-                renderJellyfinSettings();
-                refreshJellyfinStatus(true);
+                if (mode === 'key') {
+                    connected(await jf.connect(box.querySelector('#jf-url').value, box.querySelector('#jf-apikey').value, box.querySelector('#jf-user').value));
+                    return;
+                }
+                const qc = await jf.startQuickConnect(box.querySelector('#jf-url').value);
+                const panel = box.querySelector('#jf-qc');
+                panel.hidden = false;
+                panel.innerHTML = `
+                    <div class="jf-qc-code" aria-label="Quick Connect code">${esc(qc.code)}</div>
+                    <p class="jf-qc-how">In a Jellyfin app where you are signed in: your profile, <strong>Quick Connect</strong>, enter this code.</p>
+                    <p class="jf-qc-wait" role="status"><span class="jf-dot jf-dot-checking"></span> Waiting for Jellyfin...</p>`;
+                btn.disabled = false;
+                btn.textContent = 'New code';
+                const started = Date.now();
+                const poll = async () => {
+                    if (!box.isConnected || !panel.isConnected) return stopPolling();
+                    try {
+                        if (await jf.quickConnectApproved(qc.url, qc.secret)) {
+                            stopPolling();
+                            connected(await jf.finishQuickConnect(qc.url, qc.secret));
+                            return;
+                        }
+                    } catch (err) {
+                        stopPolling();
+                        panel.querySelector('.jf-qc-wait').textContent = err.message;
+                        return;
+                    }
+                    // Jellyfin keeps a code for a few minutes; stop asking before that
+                    if (Date.now() - started > 5 * 60 * 1000) {
+                        panel.querySelector('.jf-qc-wait').textContent = 'The code expired — get a new one';
+                        return stopPolling();
+                    }
+                    polling = setTimeout(poll, 2500);
+                };
+                polling = setTimeout(poll, 2500);
             } catch (err) {
                 toast(err.message, 'error');
                 btn.disabled = false;
-                btn.textContent = 'Connect';
+                btn.textContent = mode === 'key' ? 'Connect' : 'Get a Quick Connect code';
             }
         });
         return;
     }
 
     const scope = jf.getScope();
+    const player = await import('./player/availability.js?v=116');
+    const localUrl = player.getLocalUrl();
     box.innerHTML = `
         <div class="jf-row"><span class="jf-dot jf-dot-checking" id="jf-settings-dot"></span><span id="jf-settings-state">Checking...</span></div>
         <div class="jf-meta">${esc(cfg.serverName)} · ${esc(cfg.url)}${cfg.userName ? ` · ${esc(cfg.userName)}` : ''}</div>
@@ -1048,6 +1105,14 @@ async function renderJellyfinSettings() {
             ? 'Saved for your AniList account, so it works on all your devices'
             : 'Saved in this browser only — the copy for your account could not be written'}</div>
         <label class="roll-check jf-pull-toggle"><input type="checkbox" id="jf-pull" ${jf.isPullEnabled() ? 'checked' : ''}> Also take watched episodes from Jellyfin into AniList</label>
+        <div class="jf-local">
+            <label class="jf-local-label" for="jf-local">Local address on this device (optional)</label>
+            <div class="jf-local-row">
+                <input type="text" class="glass-input" id="jf-local" placeholder="e.g. http://localhost:8096" value="${esc(localUrl)}" autocomplete="off">
+                <button class="glass-btn glass-btn-secondary glass-btn-sm" id="jf-local-save">Save</button>
+            </div>
+            <p class="dot-label jf-hint">The player tries it first — at home it skips the detour through the internet and plays big files at full quality.</p>
+        </div>
         <div class="jf-actions">
             <button class="glass-btn glass-btn-secondary glass-btn-sm" id="jf-pull-now">Sync from Jellyfin</button>
             <button class="glass-btn glass-btn-secondary glass-btn-sm" id="jf-recheck">Test again</button>
@@ -1065,6 +1130,17 @@ async function renderJellyfinSettings() {
             : `Not connected · ${status.error}`;
     };
     paint(await jf.getStatus(true));
+
+    box.querySelector('#jf-local-save').addEventListener('click', async (ev) => {
+        const btn = ev.target;
+        const url = player.setLocalUrl(box.querySelector('#jf-local').value);
+        box.querySelector('#jf-local').value = url;
+        if (!url) return toast('Local address removed', 'success');
+        btn.disabled = true;
+        const avail = await player.availability(true);
+        btn.disabled = false;
+        toast(avail?.local ? 'Local address works — the player uses it on this device' : 'Saved, but it does not answer right now — the player uses the public address', avail?.local ? 'success' : 'error');
+    });
 
     box.querySelector('#jf-recheck').addEventListener('click', async (ev) => {
         ev.target.disabled = true;
@@ -1106,7 +1182,9 @@ async function renderJellyfinSettings() {
     box.querySelector('#jf-disconnect').addEventListener('click', async () => {
         const ok = await showConfirm({
             title: 'Disconnect Jellyfin',
-            message: 'AniRoll stops marking episodes watched, and the API key is removed from this browser.',
+            message: cfg.kind === 'user'
+                ? 'AniRoll stops marking episodes watched and signs out of Jellyfin.'
+                : 'AniRoll stops marking episodes watched, and the API key is removed from this browser.',
             confirmText: 'Disconnect',
             danger: true
         });
@@ -1139,7 +1217,7 @@ async function refreshJellyfinStatus(force = false) {
     refreshPendingStatus();
     const item = document.getElementById('jf-status-item');
     if (!item) return;
-    const { getConfig, getStatus } = await import('./jellyfin.js?v=115');
+    const { getConfig, getStatus } = await import('./jellyfin.js?v=116');
     if (!getConfig()) {
         item.hidden = true;
         return;
@@ -1207,7 +1285,7 @@ async function openDetailPanel(id) {
     body.scrollTop = 0;
     body.innerHTML = '<div class="page-loader" style="padding:var(--space-3xl)"><div class="loader-spinner"></div></div>';
 
-    const { renderPanel } = await import('./pages/detail.js?v=115');
+    const { renderPanel } = await import('./pages/detail.js?v=116');
     await renderPanel(id, body);
     overlay.dataset.mediaType = body.querySelector('.detail-fullscreen-btn')?.dataset.type || 'anime';
 }
