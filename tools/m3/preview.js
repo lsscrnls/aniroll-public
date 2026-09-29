@@ -153,6 +153,40 @@ const design = process.env.DESIGN || 'm3';
         await q.evaluate(() => { location.hash = '#/'; });
         await wait(800);
     }
+    // Admin: a made-up day (people online, a queue at the evening peak), the demo account as the owner
+    async function admin(q, name) {
+        if (!want(name)) return;
+        const now = Date.now();
+        const samples = [];
+        for (let i = 24 * 60; i > 0; i--) {
+            const t = now - i * 60000;
+            const h = new Date(t).getHours() + new Date(t).getMinutes() / 60;
+            const wave = Math.max(0, Math.sin(((h - 8) / 16) * Math.PI));
+            const seats = Math.min(100, Math.round(8 + 104 * wave ** 1.6 + 6 * Math.sin(i / 7)));
+            samples.push({ t, seats, vip: h > 19 ? 2 : 1, queue: seats >= 100 ? Math.round(3 + 4 * Math.sin(i / 11) ** 2) : 0,
+                req: Math.round(40 + seats * 9 + 30 * Math.sin(i / 5)), watching: Math.max(0, Math.round(seats / 12 + Math.sin(i / 9))) });
+        }
+        const stats = { now, max: 100, seats: 97, vip: 2, queue: 3, watching: 7, parties: 2, samples,
+            vips: [{ id: 6649000, name: demo.VIEWER.name }, { id: 2, name: 'mizuki_wl' }, { id: 3, name: 'ren.kx' }], maintenance: null,
+            online: [{ key: 'vip:6649000', name: demo.VIEWER.name, vip: true, seen: now - 4000 }, { key: 'vip:2', name: 'mizuki_wl', vip: true, seen: now - 21000 },
+                { key: 'u:11', name: 'akari_s', vip: false, seen: now - 9000 }, { key: 'u:12', name: 'tobu_', vip: false, seen: now - 48000 }, { key: 'u:13', name: 'nanase77', vip: false, seen: now - 12000 }],
+            waiting: [{ key: 'u:21', name: 'kuro.neko', since: now - 5 * 60000 }, { key: 'u:22', name: 'haru_m', since: now - 3 * 60000 }, { key: 'u:23', name: 'sora', since: now - 60000 }],
+            accounts: { backgroundSync: 41, jellyfin: 6, webhooks: 3 }, anilist: { verifyPausedFor: 0 },
+            errors: { count: 2, latest: [{ at: new Date(now - 3600e3).toISOString(), message: "TypeError: Cannot read properties of null (reading 'hidden')", route: '#/calendar', version: '118' },
+                { at: new Date(now - 7 * 3600e3).toISOString(), message: 'Load failed', route: '#/roll', version: '117' }] },
+            server: { uptime: 3 * 86400e3 + 5 * 3600e3, rss: 92 * 1024 * 1024, node: 'v24.21.0' } };
+        await q.route(`${base}/api/admin/stats`, r => r.fulfill({ contentType: 'application/json', body: JSON.stringify(stats) }));
+        await q.evaluate(() => { const u = JSON.parse(localStorage.getItem('aniroll_user')); u.id = 6649000; localStorage.setItem('aniroll_user', JSON.stringify(u)); location.hash = '#/admin'; location.reload(); });
+        await wait(5000);
+        await q.click('[data-range="24h"]').catch(() => {});
+        await wait(600);
+        const box = await q.$('#adm-chart-seats svg');
+        if (box) { const b = await box.boundingBox(); await q.mouse.move(b.x + b.width * 0.78, b.y + b.height / 2); }
+        await wait(400);
+        await q.screenshot({ path: path.join(OUT, `${theme}-${name}.png`), fullPage: true });
+        console.log('shot', name);
+    }
+    await admin(p, 'admin');
     await player(p, 'player', false);
     const m = await open(true);
     await player(m, 'm-player', true);

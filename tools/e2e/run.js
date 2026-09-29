@@ -677,6 +677,90 @@ function staticServer() {
         await p.close();
     }
 
+    // A full house: logged in, the app waits on the waiting page with the place in line, nothing of the app
+    // underneath, and lets the person in by itself once the server has a seat; logout gives the seat back
+    {
+        const sq = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+        sq.on('pageerror', e => errors.push(`seats: ${e.message}`));
+        const seatCalls = [];
+        await sq.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
+        await sq.route(`${base}/api/**`, route => {
+            const p = new URL(route.request().url()).pathname;
+            if (p === '/api/admin/stats') {
+                const now = Date.now();
+                return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ now, max: 100, seats: 1, vip: 1, queue: 1, watching: 0, parties: 0,
+                    samples: Array.from({ length: 90 }, (_, i) => ({ t: now - (90 - i) * 60000, seats: i % 7, vip: 1, queue: 0, req: 20 + i, watching: 0 })),
+                    vips: [{ id: 6649000, name: 'tester' }], maintenance: null, online: [{ key: 'vip:6649000', name: 'tester', vip: true, seen: now }],
+                    waiting: [{ key: 'u:5', name: 'someone', since: now }], accounts: { backgroundSync: 1, jellyfin: 1, webhooks: 0 },
+                    anilist: { verifyPausedFor: 0 }, errors: { count: 0, latest: [] }, server: { uptime: 60000, rss: 1e8, node: 'v24' } }) });
+            }
+            if (p !== '/api/seat') return route.fulfill({ contentType: 'application/json', body: '{"maintenance":false}' });
+            seatCalls.push({ method: route.request().method(), auth: route.request().headers().authorization || '' });
+            const posts = seatCalls.filter(c => c.method === 'POST').length;
+            const body = posts <= 2 ? { seat: false, position: posts === 1 ? 3 : 1, waiting: 3, max: 100 } : { seat: true, vip: false, max: 100 };
+            return route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+        });
+        await sq.route(/cdn|googleapis|gstatic/, route => route.abort());
+        await sq.addInitScript(({ id, name }) => {
+            localStorage.setItem('aniroll_token', 'e2e-token');
+            localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+            localStorage.setItem('aniroll_user_ts', String(Date.now()));
+            localStorage.setItem('aniroll_seen_changes', '9999');
+        }, VIEWER);
+        await sq.clock.install();
+        await sq.goto(base + '/#/');
+        await sq.waitForTimeout(1500);
+        const full = await sq.evaluate(() => ({ page: !!document.getElementById('seat-wait'), line: document.querySelector('.seat-wait-line')?.textContent.trim(),
+            app: !!document.querySelector('.home-section, #continue-watching') }));
+        await sq.clock.runFor(16000);
+        await sq.waitForTimeout(300);
+        const next = await sq.evaluate(() => document.querySelector('.seat-wait-line')?.textContent.trim());
+        await sq.clock.runFor(16000);
+        await sq.waitForTimeout(2500);
+        const inside = await sq.evaluate(() => ({ page: !!document.getElementById('seat-wait'), app: !!document.querySelector('.home-section, #continue-watching') }));
+        check('seats: a full house shows the waiting page and the place in line, then lets in by itself',
+            full.page && /number 3 in line/.test(full.line || '') && !full.app && /next in line/.test(next || '') && !inside.page && inside.app
+            && seatCalls.every(c => c.auth === 'Bearer e2e-token'), { full, next, inside, calls: seatCalls.length });
+        // The mock account is the owner's id: the link shows, the page draws the numbers
+        const adminView = await sq.evaluate(async () => {
+            const link = document.getElementById('admin-link')?.hidden === false;
+            location.hash = '#/admin';
+            await new Promise(r => setTimeout(r, 50));
+            return link;
+        });
+        await sq.clock.runFor(2000);
+        await sq.waitForTimeout(1200);
+        const adminPage = await sq.evaluate(() => ({ tiles: document.querySelectorAll('.adm-tile').length, charts: document.querySelectorAll('.adm-chart svg').length,
+            online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
+        check('admin: the owner sees tiles, four charts, who is online and who waits',
+            adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
+        await sq.evaluate(() => import('/js/auth.js?v=119').then(m => m.logout()));
+        await sq.waitForTimeout(800);
+        check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
+        await sq.close();
+    }
+
+    // Anyone else: no Admin link, and #/admin shows no numbers (the server would refuse them too)
+    {
+        const na = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+        na.on('pageerror', e => errors.push(`admin, not owner: ${e.message}`));
+        await na.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
+        await na.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false}' }));
+        await na.route(/cdn|googleapis|gstatic/, route => route.abort());
+        await na.addInitScript(() => {
+            localStorage.setItem('aniroll_token', 'e2e-token');
+            localStorage.setItem('aniroll_user', JSON.stringify({ id: 1, name: 'someone', avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+            localStorage.setItem('aniroll_user_ts', String(Date.now()));
+            localStorage.setItem('aniroll_seen_changes', '9999');
+        });
+        await na.goto(base + '/#/admin');
+        await na.waitForTimeout(2500);
+        const other = await na.evaluate(() => ({ link: document.getElementById('admin-link')?.hidden, text: document.querySelector('.adm-page')?.textContent || '',
+            tiles: document.querySelectorAll('.adm-tile').length }));
+        check('admin: no link and no numbers for anyone but the owner', other.link === true && /only for AniRoll/.test(other.text) && !other.tiles, other);
+        await na.close();
+    }
+
     // "Reduce motion": no smooth scrolling (Lenis marks <html>), no cards flying in, no count-up
     const calm = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
     await calm.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));

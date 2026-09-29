@@ -27,7 +27,7 @@ cp "$root/api/server.js" "$root/api/party.js" "$work/"
 node "$here/mockanilist.js" > "$work/mock.log" 2>&1 &
 pids+=($!)
 (cd "$work" && exec env ANILIST_URL=http://127.0.0.1:3099 JF_SECRET=local-test-secret-0123456789abcdef \
-    ANILIST_BUDGET_PER_MIN=200 VERIFY_PAUSE_MS=1000 node server.js > "$work/server.log" 2>&1) &
+    ANILIST_BUDGET_PER_MIN=200 VERIFY_PAUSE_MS=1000 MAX_SEATS=2 node server.js > "$work/server.log" 2>&1) &
 pids+=($!)
 
 for _ in $(seq 50); do

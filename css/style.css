@@ -5529,3 +5529,95 @@ body.player-open .cursor { display: none !important; }
 :root[data-design="m3"] .ep-row.is-next { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
 :root[data-design="m3"] .ep-next { color: var(--md-primary); }
 :root[data-design="m3"] .ep-thumb { border-radius: 12px; }
+
+/* ===== Waiting page when AniRoll is full (js/seat.js) ===== */
+.seat-wait {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: var(--bg);
+}
+html.seat-waiting body { overflow: hidden; }
+.seat-wait-card { max-width: 440px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--space-md); }
+.seat-wait-spinner { width: 48px; height: 48px; border: 4px solid var(--border); border-top-color: var(--user-accent); border-radius: 50%; animation: spin 1.1s linear infinite; }
+.seat-wait-title { font-size: 1.6rem; font-weight: 750; letter-spacing: -0.02em; margin: var(--space-sm) 0 0; }
+.seat-wait-text { color: var(--text-secondary); line-height: 1.6; margin: 0; }
+.seat-wait-line { display: block; margin-top: var(--space-sm); color: var(--text); font-size: 1.05rem; }
+.seat-wait-note { font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 var(--space-sm); }
+@media (prefers-reduced-motion: reduce) { .seat-wait-spinner { animation-duration: 3s; } }
+:root[data-design="m3"] .seat-wait { background: var(--md-surface); }
+:root[data-design="m3"] .seat-wait-spinner { border-color: var(--md-secondary-container); border-top-color: var(--md-primary); }
+
+/* ===== Admin (js/pages/admin.js): tiles, charts in the scheme's own colours, tables, controls ===== */
+.adm-page { --adm-line: var(--user-accent); --adm-area: color-mix(in srgb, var(--user-accent) 16%, transparent); padding-bottom: var(--space-3xl, 64px); }
+.adm-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; margin-bottom: var(--space-lg); }
+.adm-head .page-title { margin: 0; }
+.adm-note { color: var(--text-secondary); font-size: 0.9rem; margin: 4px 0 0; }
+.adm-ranges { display: flex; gap: 6px; }
+.adm-ranges [aria-pressed="true"] { background: var(--user-accent); color: var(--bg); border-color: transparent; }
+.adm-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-md); margin-bottom: var(--space-lg); }
+.adm-tile { padding: var(--space-lg); border-radius: var(--radius-xl); background: var(--bg-secondary); display: flex; flex-direction: column; gap: 4px; }
+.adm-tile-value { font-size: 2rem; font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.adm-tile-value small { font-size: 1rem; font-weight: 600; color: var(--text-secondary); }
+.adm-tile-label { font-weight: 600; }
+.adm-tile-note { font-size: 0.8rem; color: var(--text-secondary); }
+.adm-gauge { height: 6px; border-radius: 3px; background: var(--border-subtle); overflow: hidden; margin-top: 4px; }
+.adm-gauge span { display: block; height: 100%; border-radius: 3px; background: var(--user-accent); }
+.adm-card { padding: var(--space-lg); border-radius: var(--radius-xl); background: var(--bg-secondary); margin-bottom: var(--space-lg); min-width: 0; }
+.adm-card-title { font-size: 1.05rem; font-weight: 700; margin: 0 0 4px; }
+.adm-card-sub { font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 var(--space-md); }
+.adm-grid2, .adm-grid3 { display: grid; gap: var(--space-lg); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.adm-grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.adm-grid2 > .adm-card, .adm-grid3 > .adm-card { margin-bottom: 0; }
+.adm-grid2, .adm-grid3 { margin-bottom: var(--space-lg); }
+@media (max-width: 900px) { .adm-grid2, .adm-grid3 { grid-template-columns: minmax(0, 1fr); } }
+.adm-chart { position: relative; width: 100%; }
+.adm-chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.adm-grid { stroke: var(--border-subtle); stroke-width: 1; }
+.adm-axis { fill: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.adm-line { fill: none; stroke: var(--adm-line); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.adm-area { fill: var(--adm-area); }
+.adm-limit { stroke: var(--text-secondary); stroke-width: 1.5; stroke-dasharray: 6 5; }
+.adm-limit-label { fill: var(--text-secondary); font-size: 11px; font-weight: 600; }
+.adm-cross-line { stroke: var(--text-secondary); stroke-width: 1; }
+.adm-cross-dot { fill: var(--adm-line); stroke: var(--bg-secondary); stroke-width: 2; }
+.adm-cross[hidden] { display: none; }
+.adm-tip { position: absolute; pointer-events: none; min-width: 90px; padding: 6px 10px; border-radius: 10px; background: var(--text); color: var(--bg); font-size: 0.8rem; display: flex; flex-direction: column; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+.adm-tip[hidden] { display: none; }
+.adm-tip span { opacity: .75; }
+.adm-table-view { margin-top: var(--space-md); font-size: 0.85rem; }
+.adm-table-view summary { color: var(--text-secondary); }
+.adm-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.adm-table th { text-align: left; font-weight: 600; color: var(--text-secondary); padding: 6px 8px; }
+.adm-table td { padding: 8px; border-top: 1px solid var(--border-subtle); vertical-align: middle; }
+.adm-table tr:first-child td { border-top: 0; }
+.adm-table a { color: inherit; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
+.adm-muted { color: var(--text-secondary); white-space: nowrap; }
+.adm-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm-act { text-align: right; width: 1%; white-space: nowrap; }
+.adm-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; background: var(--user-accent-dim, var(--border-subtle)); color: var(--user-accent); vertical-align: 1px; }
+.adm-big { font-size: 2rem; font-weight: 750; margin: 0 0 var(--space-sm); font-variant-numeric: tabular-nums; }
+.adm-err { font-family: ui-monospace, monospace; font-size: 0.8rem; word-break: break-word; }
+.adm-status { font-weight: 600; }
+.adm-status::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: currentColor; vertical-align: 1px; }
+.adm-status.is-ok { color: var(--success, #2e7d32); }
+.adm-status.is-warn { color: var(--warning, #b26a00); }
+.adm-form { display: flex; align-items: flex-end; gap: var(--space-sm); flex-wrap: wrap; margin-top: var(--space-sm); }
+.adm-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--text-secondary); }
+.adm-field[hidden] { display: none; }
+.adm-field-grow { flex: 1; min-width: 180px; }
+.adm-field input { width: 100%; min-width: 100px; }
+#adm-clear-errors { margin-top: var(--space-md); }
+#adm-clear-errors[hidden] { display: none; }
+:root[data-design="m3"] .adm-tile, :root[data-design="m3"] .adm-card { border-radius: var(--md-shape-xl, 28px); background: var(--md-surface-container); }
+:root[data-design="m3"] .adm-tile:first-child { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+:root[data-design="m3"] .adm-tile:first-child :is(.adm-tile-note, .adm-tile-value small) { color: inherit; opacity: .8; }
+:root[data-design="m3"] .adm-tile:first-child .adm-gauge { background: color-mix(in srgb, var(--md-on-primary-container) 18%, transparent); }
+:root[data-design="m3"] .adm-tile:first-child .adm-gauge span { background: var(--md-on-primary-container); }
+:root[data-design="m3"] .adm-page { --adm-line: var(--md-primary); --adm-area: color-mix(in srgb, var(--md-primary) 18%, transparent); }
+:root[data-design="m3"] .adm-chip { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+:root[data-design="m3"] .adm-tip { background: var(--md-inverse-surface); color: var(--md-inverse-on-surface); }
+:root[data-design="m3"] .adm-ranges [aria-pressed="true"] { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
