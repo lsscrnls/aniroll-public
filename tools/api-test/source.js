@@ -13,7 +13,7 @@ function loadFunctions(file, names, context = {}) {
     const parts = names.map(name => {
         const oneLine = src.match(new RegExp(`^(?:export )?function ${name}\\(.*\\{.*\\}$`, 'm'));
         const fn = oneLine || src.match(new RegExp(`^(?:export )?function ${name}\\([^]*?^}`, 'm'));
-        const constant = src.match(new RegExp(`^const ${name} = .*;$`, 'm'));
+        const constant = src.match(new RegExp(`^(?:export )?const ${name} = .*;$`, 'm'));
         const found = (fn || constant || [])[0];
         if (!found) throw new Error(`${name} not found in ${file} — renamed? update the test`);
         return found.replace(/^export /, '');

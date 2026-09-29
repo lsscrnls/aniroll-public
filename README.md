@@ -32,6 +32,8 @@ New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start read
 - **Watch Party**: the host counts episodes, guests follow along and their AniList moves with them.
 - **Home**: the show you're on with a live countdown to its next episode, then everything else you watch
   and what from your Planning list starts soon.
+- **Play from Jellyfin**: episodes from your own Jellyfin server play right in AniRoll, subtitles as the release styled them,
+  with skip intro; sign-in by Quick Connect, no password typed into AniRoll.
 - **Jellyfin live tracking**: an episode played past 90% counts as watched, rewatches included.
 - **Calendar**: the week (or month) with air times and where you stand on each show.
 - **Recommendations with a taste match** from your own scores, genres and tags.
@@ -89,6 +91,18 @@ A wrong guess would change someone's list on the wrong show, so matching is stri
 title has to agree, the episode has to fit, shows that share a name are told apart first, and if in
 doubt nothing is written. A correction by hand wins over a later playback.
 
+### A player that leaves the files alone
+
+`js/pages/play.js` and `js/player/` play episodes from the user's Jellyfin server. The browser says what
+it can decode (`js/player/profile.js` asks it, codec by codec, instead of trusting a list), and Jellyfin
+plays the file as it is, repackages it, or converts only what doesn't fit, usually just the audio.
+Streams go through [hls.js](https://github.com/video-dev/hls.js) even where the browser plays HLS itself,
+because only hls.js reports a failing conversion as what it is. Subtitles are drawn as the release made
+them: ASS with the fonts embedded in the file through libass in WebAssembly
+([JASSUB](https://github.com/ThaUnknown/jassub)), Blu-ray picture subtitles through
+[libpgs](https://github.com/Arcus92/libpgs-js), timed to each video frame. Without a server, or with it
+switched off, AniRoll shows no Play button rather than an error.
+
 ### A small server that holds secrets
 
 `api/server.js` is plain Node without a framework. It serves the Jellyfin relay and webhook, background
@@ -102,7 +116,8 @@ private addresses at connect time, so DNS tricks can't point it at localhost.
 Plain ES modules, loaded by the browser as they are. Every import carries `?v=N`, raised on each
 release, so a browser never mixes old and new modules. With no bundler and no inline script, the
 Content Security Policy can say `script-src 'self'`: only AniRoll's own files run, even if a bug ever
-let markup through the escaping.
+let markup through the escaping. The one addition is `'wasm-unsafe-eval'`, so the subtitle renderer's
+WebAssembly may compile; it still has to come from AniRoll's own files.
 
 ### Two designs, one app
 
@@ -134,6 +149,8 @@ to a module in `js/pages/`, and each page exports one `render({ content, params,
 | `js/upnext.js`, `js/home-cinema.js` | What Home says about your list (next episode, what's waiting, the week) and AniRoll's Home on top of it |
 | `js/design.js`, `js/m3.js`, `css/m3.css` | The design switch, Material 3's generated palette and its extra pieces |
 | `js/jellyfin.js`, `js/nowplaying.js` | Jellyfin: matching what you played to an AniList entry, the *Now watching* chip |
+| `js/pages/play.js`, `js/player/` | The player: finding the episode, what the browser can play, the stream, its controls, subtitles |
+| `js/vendor/` | Third-party libraries, unchanged and with their version in the name, each with its licence |
 | `js/a11y.js`, `js/select.js` | Dialogs, keyboard activation, styled selects |
 | `js/whatsnew.js` | The changelog and the pop-up for returning visitors |
 | `api/server.js` | The Node backend |
@@ -170,9 +187,17 @@ contain these pieces either. To see them in action, [try AniRoll](https://anirol
 
 - `tools/e2e/`: every page in Chromium (Playwright) against a mocked AniList: navigation, dialogs and
   keyboard, both designs, the changelog, and a check that two accounts in one browser never share
-  cached answers or queued saves
+  cached answers or queued saves; the player against a mocked Jellyfin (direct play, a failing
+  conversion, Quick Connect, styled and Blu-ray subtitles)
 - `tools/api-test/`: the Jellyfin matcher in the server and the browser gives the same answer for the
   same cases, the relay refuses private addresses, posts are escaped, data files survive a crash mid-write
 
 AniRoll is built with Vanilla JS, [GSAP](https://gsap.com), [Lenis](https://lenis.darkroom.engineering),
 the self-hosted [Inter](https://rsms.me/inter/) font and Material Symbols. All anime data comes from AniList.
+
+The player uses [hls.js](https://github.com/video-dev/hls.js) (Apache-2.0),
+[libpgs](https://github.com/Arcus92/libpgs-js) (MIT) and [JASSUB](https://github.com/ThaUnknown/jassub) (MIT).
+JASSUB's WebAssembly contains libass, FreeType, HarfBuzz, FriBidi and other libraries under their own
+licences, some of them LGPL-2.1-or-later; they ship as separate, replaceable files in
+`js/vendor/jassub-2.5.16/`, rebuilt from the published package by `tools/vendor/jassub.sh`. Every
+library's licence text lies next to it in `js/vendor/`.

@@ -1,5 +1,5 @@
-import { toast } from './store.js?v=115';
-import { getToken } from './auth.js?v=115';
+import { toast } from './store.js?v=116';
+import { getToken } from './auth.js?v=116';
 
 // Jellyfin integration: when AniList progress moves forward, mark the matching
 // episodes watched on the user's own Jellyfin server.
@@ -19,7 +19,11 @@ const KEYS = {
     serverName: 'aniroll_jf_servername',
     scope: 'aniroll_jf_scope',
     pull: 'aniroll_jf_pull',
+    // 'key' = an API key (admins), 'user' = the token of a Jellyfin sign-in (anyone with an account)
+    kind: 'aniroll_jf_kind',
 };
+// Per browser, not per account: Jellyfin shows it as the playing device
+const DEVICE_KEY = 'aniroll_jf_device';
 const PROXY = '/api/jellyfin/proxy';
 const CONFIG_URL = '/api/jellyfin/config';
 const STATUS_TTL = 60000;
@@ -33,6 +37,7 @@ export function getConfig() {
         url, apiKey, userId,
         userName: localStorage.getItem(KEYS.userName) || '',
         serverName: localStorage.getItem(KEYS.serverName) || 'Jellyfin',
+        kind: localStorage.getItem(KEYS.kind) === 'user' ? 'user' : 'key',
     };
 }
 
@@ -47,6 +52,7 @@ function writeLocal(cfg, scope) {
     localStorage.setItem(KEYS.userId, cfg.userId);
     localStorage.setItem(KEYS.userName, cfg.userName || '');
     localStorage.setItem(KEYS.serverName, cfg.serverName || 'Jellyfin');
+    localStorage.setItem(KEYS.kind, cfg.kind === 'user' ? 'user' : 'key');
     localStorage.setItem(KEYS.scope, scope);
     statusCache = null;
 }
@@ -62,12 +68,23 @@ export function normalizeUrl(raw) {
     return url;
 }
 
+export function deviceId() {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+}
+
 // Jellyfin 12 only accepts the MediaBrowser scheme; X-Emby-Token stays for 10.x servers
-// behind proxies that strip Authorization.
-function jfAuth(apiKey) {
+// behind proxies that strip Authorization. Client and device name the session in Jellyfin's dashboard.
+export function jfAuth(token) {
+    const q = (v) => String(v).replace(/"/g, '');
+    const device = /Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Phone' : 'Browser';
     return {
-        Authorization: `MediaBrowser Token="${apiKey}"`,
-        'X-Emby-Token': apiKey,
+        Authorization: `MediaBrowser Client="AniRoll", Device="${q(device)}", DeviceId="${q(deviceId())}", Version="1"${token ? `, Token="${q(token)}"` : ''}`,
+        ...(token ? { 'X-Emby-Token': token } : {}),
     };
 }
 
@@ -123,6 +140,11 @@ export async function saveToAccount() {
 }
 
 export async function clearConfig() {
+    const cfg = getConfig();
+    // A sign-in token is ours to end; an API key belongs to the server admin and stays
+    if (cfg?.kind === 'user') {
+        fetch(`${cfg.url}/Sessions/Logout`, { method: 'POST', headers: jfAuth(cfg.apiKey), signal: AbortSignal.timeout(5000) }).catch(() => {});
+    }
     if (getToken()) {
         try {
             await fetch(CONFIG_URL, { method: 'DELETE', headers: authHeaders(), signal: AbortSignal.timeout(8000) });
@@ -185,10 +207,68 @@ export async function connect(rawUrl, apiKey, username) {
         userId: user.Id,
         userName: user.Name || '',
         serverName: info.data.ServerName || 'Jellyfin',
+        kind: 'key',
     };
     const onAccount = await saveAccountConfig(full);
     writeLocal(full, onAccount ? 'account' : 'device');
     return { ...full, version: info.data.Version, scope: onAccount ? 'account' : 'device' };
+}
+
+// Quick Connect: for everyone without an API key (friends on the same server). AniRoll asks
+// Jellyfin for a code, the person enters it in a Jellyfin app they are already signed in to,
+// and Jellyfin hands AniRoll a session of its own — no password ever passes through AniRoll.
+// Straight from the browser, never through our relay.
+async function qcFetch(url, path, init = {}) {
+    try {
+        return await fetch(url + path, {
+            ...init,
+            headers: { ...jfAuth(null), Accept: 'application/json', ...(init.body ? { 'Content-Type': 'application/json' } : {}) },
+            signal: AbortSignal.timeout(10000),
+        });
+    } catch {
+        throw new Error('This browser cannot reach the server. Check the address (https, no typo)');
+    }
+}
+
+// -> { url, code, secret }
+export async function startQuickConnect(rawUrl) {
+    const url = normalizeUrl(rawUrl);
+    if (!url) throw new Error('Enter the server URL');
+    const res = await qcFetch(url, '/QuickConnect/Initiate', { method: 'POST' });
+    if (res.status === 401 || res.status === 403) throw new Error('Quick Connect is switched off on this server (Jellyfin: Dashboard, General)');
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.Code || !data.Secret) throw new Error(`No usable answer from the server (HTTP ${res.status})`);
+    return { url, code: data.Code, secret: data.Secret };
+}
+
+// true once the code was entered in Jellyfin; throws when the code expired
+export async function quickConnectApproved(url, secret) {
+    const res = await qcFetch(url, `/QuickConnect/Connect?secret=${encodeURIComponent(secret)}`);
+    if (res.status === 404) throw new Error('The code expired — get a new one');
+    const data = await res.json().catch(() => null);
+    return !!data?.Authenticated;
+}
+
+export async function finishQuickConnect(url, secret) {
+    const res = await qcFetch(url, '/Users/AuthenticateWithQuickConnect', { method: 'POST', body: JSON.stringify({ Secret: secret }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.AccessToken || !data.User?.Id) throw new Error(`Jellyfin did not complete the sign-in (HTTP ${res.status})`);
+
+    const full = {
+        url,
+        apiKey: data.AccessToken,
+        userId: data.User.Id,
+        userName: data.User.Name || '',
+        serverName: data.User.ServerName || 'Jellyfin',
+        kind: 'user',
+    };
+    try {
+        const info = await fetch(`${url}/System/Info/Public`, { signal: AbortSignal.timeout(5000) }).then(r => r.json());
+        full.serverName = info.ServerName || full.serverName;
+    } catch { /* the name is cosmetic */ }
+    const onAccount = await saveAccountConfig(full);
+    writeLocal(full, onAccount ? 'account' : 'device');
+    return { ...full, scope: onAccount ? 'account' : 'device' };
 }
 
 let statusCache = null;
@@ -200,7 +280,12 @@ export async function getStatus(force = false) {
 
     let value;
     try {
-        const info = await request(cfg, '/System/Info');
+        // A sign-in token is an ordinary user: the full system info may be admin-only
+        const info = await request(cfg, cfg.kind === 'user' ? '/System/Info/Public' : '/System/Info');
+        if (cfg.kind === 'user' && info.status === 200) {
+            const me = await request(cfg, '/Users/Me');
+            if (me.status !== 200) info.status = me.status;
+        }
         if (info.status === 200 && info.data) {
             value = {
                 state: 'connected',
@@ -220,23 +305,28 @@ export async function getStatus(force = false) {
 
 export function invalidateStatus() { statusCache = null; }
 
-const normTitle = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+export const normTitle = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 // "False Memory (2026)" -> { title: 'False Memory', year: 2026 }. AniList adds the year when two
 // entries share a name; the Jellyfin folder may or may not carry it.  (same rule as api/server.js)
-function splitYear(title) {
+export function splitYear(title) {
     const m = String(title || '').match(/^(.*\S)\s*\((\d{4})\)$/);
     return m ? { title: m[1], year: Number(m[2]) } : { title: String(title || ''), year: null };
 }
 
-const nearYear = (a, b) => !a || !b || Math.abs(a - b) <= 1;
+export const nearYear = (a, b) => !a || !b || Math.abs(a - b) <= 1;
+
+export function hasAniListId(item, anilistId) {
+    return Object.entries(item?.ProviderIds || {}).some(([k, v]) => k.toLowerCase() === 'anilist' && String(v) === String(anilistId));
+}
 
 // Jellyfin libraries rarely carry AniList ids, so fall back to a title search. Jellyfin finds
 // nothing for "False Memory (2026)", so the year is searched apart and has to fit the series.
 async function findSeries(cfg, anilistId, titles, year) {
     for (const providerId of [`anilist.${anilistId}`, `AniList.${anilistId}`]) {
-        const r = await request(cfg, `/Users/${encodeURIComponent(cfg.userId)}/Items?AnyProviderIdEquals=${encodeURIComponent(providerId)}&IncludeItemTypes=Series&Recursive=true`);
-        const hit = r.data?.Items?.[0];
+        const r = await request(cfg, `/Users/${encodeURIComponent(cfg.userId)}/Items?AnyProviderIdEquals=${encodeURIComponent(providerId)}&IncludeItemTypes=Series&Recursive=true&Limit=5&fields=ProviderIds`);
+        // Jellyfin 12 answers an unknown provider filter with the whole library: check the id
+        const hit = (r.data?.Items || []).find(i => hasAniListId(i, anilistId));
         if (hit) return hit;
     }
     for (const raw of (titles || []).filter(Boolean)) {
@@ -305,7 +395,7 @@ export function setPullEnabled(on) {
 // at the end, Jellyfin keeps them as season 2 of one series. II to X in capitals only, so a word never counts
 const ROMAN_SEASONS = { II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10 };
 // "Jujutsu Kaisen 2nd Season" -> { base: 'jujutsukaisen', season: 2 }
-function splitSeason(title) {
+export function splitSeason(title) {
     const t = String(title || '');
     const m = t.match(/(?:\b(\d+)(?:st|nd|rd|th)\s+season\b|\bseason\s+(\d+)\b|\bpart\s+(\d+)\b|\bS(\d+)\b)/i);
     if (m) return { base: normTitle(t.slice(0, m.index)), season: Number(m[1] || m[2] || m[3] || m[4]) };
@@ -465,7 +555,7 @@ function matchFit(media, group) {
 // Pushes AniList forward where Jellyfin is further along; returns what it changed
 export async function pullFromJellyfin(user, token) {
     if (!getConfig() || !isPullEnabled() || !user?.id || !token) return { updated: 0, changes: [] };
-    const api = await import('./api.js?v=115');
+    const api = await import('./api.js?v=116');
     if (api.isBackgroundPaused()) return { updated: 0, changes: [], skipped: 'maintenance' };
     if (api.isRateLimited()) return { updated: 0, changes: [], skipped: 'rate-limited' };
 

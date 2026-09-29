@@ -46,7 +46,7 @@ css_version=$(grep -oE "style\.css\?v=[0-9]+" index.html | sed 's/.*=//')
 echo "JS v$js_versions, CSS v$css_version"
 
 tmp_check="$(mktemp -d)"
-for f in js/*.js js/pages/*.js; do
+for f in js/*.js js/pages/*.js js/player/*.js; do
     cp "$f" "$tmp_check/check.mjs"
     node --check "$tmp_check/check.mjs" || fail "syntax error in $f"
 done
@@ -84,7 +84,7 @@ rm -f "$stage/check.mjs"
 if [ "$E2E" -eq 1 ]; then
     echo "browser checks on the obfuscated build..."
     docker run --rm -v "$stage:/work:ro" -v "$PWD/tools/e2e:/e2e:ro" mcr.microsoft.com/playwright:v1.63.0-noble sh -c \
-        "cp -r /e2e /tmp/e2e && cd /tmp/e2e && npm ci --silent >/dev/null 2>&1 && sed -i \"s#path.join(__dirname, '..', '..')#'/work'#\" run.js && node run.js" \
+        "cp -r /e2e /tmp/e2e && cd /tmp/e2e && npm ci --silent >/dev/null 2>&1 && sed -i \"s#path.join(__dirname, '..', '..')#'/work'#\" run.js jellyfin-mock.js && node run.js" \
         > "$stage.e2e.log" 2>&1 || { grep -v '^PASS' "$stage.e2e.log" >&2; rm -f "$stage.e2e.log"; fail "browser checks failed on the obfuscated build, nothing uploaded"; }
     echo "$(grep -c '^PASS' "$stage.e2e.log") browser checks passed"
     rm -f "$stage.e2e.log"
