@@ -525,12 +525,18 @@ function staticServer() {
             && /Client="AniRoll".*DeviceId="[^"]+".*Token="e2e-jf-token"/.test(start.auth), start);
 
         const savesBefore = saves.length;
+        // Stays on episode 2 at its end: Up next is cancelled each time it comes up
+        const stay = () => p.evaluate(() => document.querySelector('[data-act="cancelNext"]')?.click());
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.5; v.play(); });
-        await p.waitForTimeout(2500);
+        await p.waitForTimeout(400);
+        await stay();
+        await p.waitForTimeout(2100);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 2; });
         await p.waitForTimeout(500);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 19; });
-        await p.waitForTimeout(1500);
+        await p.waitForTimeout(400);
+        await stay();
+        await p.waitForTimeout(1100);
         const written = saves.slice(savesBefore);
         check('player: AniList gets episode 2 exactly once, past 90%', written.length === 1 && written[0].progress === 2, written);
 
@@ -567,6 +573,29 @@ function staticServer() {
         const stopped = calls.find(c => c.type === 'Playing/Stopped');
         check('player: leaving reports where it stopped and frees the page', stopped?.body?.ItemId === 'ep2' && stopped.body.PositionTicks > 0
             && !(await p.evaluate(() => document.body.classList.contains('player-open'))), stopped);
+
+        // Up next: from the last seconds a card counts down; Cancel keeps the episode, going back and
+        // forward brings it again, Play now opens the next one. Halfway, the next subtitles are unpacked ahead
+        await p.evaluate(h => { location.hash = h; }, playHash);
+        await p.waitForTimeout(2500);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.6; v.play(); });
+        await p.waitForTimeout(800);
+        const upNext = await p.evaluate(() => ({ shown: !document.querySelector('.pl-next').hidden,
+            title: document.querySelector('.pl-next-title').textContent, label: document.querySelector('.pl-next-label').textContent }));
+        await p.click('[data-act="cancelNext"]');
+        const cancelled = await p.evaluate(() => document.querySelector('.pl-next').hidden);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 5; });
+        await p.waitForTimeout(400);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.6; v.play(); });
+        await p.waitForTimeout(800);
+        const again = await p.evaluate(() => !document.querySelector('.pl-next').hidden);
+        await p.click('[data-act="playNext"]');
+        await p.waitForTimeout(2500);
+        const moved = await p.evaluate(() => location.hash);
+        check('player: Up next counts down from the end, Cancel holds it, Play now opens the next episode, its subtitles warmed',
+            upNext.shown && upNext.title === 'Episode 3' && /^Play now · \d+$/.test(upNext.label) && cancelled && again
+            && /\/3$/.test(moved) && calls.some(c => c.type === 'PlaybackInfo' && c.item === 'ep3') && calls.some(c => c.type === 'vtt' && c.item === 'ep3'),
+            { upNext, cancelled, again, moved });
 
         // Styled ASS: drawn by JASSUB on its canvas with the MKV's fonts, listed in the menu
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));

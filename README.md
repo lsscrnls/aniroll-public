@@ -11,7 +11,8 @@ Live at **[aniroll.hxlx.de](https://aniroll.hxlx.de)**. Log in with AniList; you
 ## Read this first
 
 This repository is a **showcase, not a kit**. It shows how AniRoll is built. It is not meant to be
-cloned and run as your own copy.
+cloned and run as your own copy: the code is **all rights reserved** ([LICENSE](LICENSE)). Reading it and
+learning from it is welcome; copying, redistributing or hosting it needs my written permission.
 
 **Everything AniRoll stands on is here**: talking to a rate-limited API with no backend of its own
 in between, caching that keeps working offline, keeping two accounts in one browser apart, writing to
