@@ -8,12 +8,14 @@ const path = require('path');
 const JF_URL = 'https://jellyfin.e2e.test';
 const JF_USER = 'jf-user-1';
 const CLIP = fs.readFileSync(path.join(__dirname, 'media', 'clip.webm'));
-// Any font does for the embedded-font path: JASSUB's own default face
 // A white bar from 0.5 s to 15 s, drawn as a Blu-ray (PGS) subtitle; made by media/make-sup.py
 const SUP = fs.readFileSync(path.join(__dirname, 'media', 'sub.sup'));
 // The repository (deploy.sh points this at the obfuscated copy)
 const ROOT = path.join(__dirname, '..', '..');
+// Any font does for the embedded-font path: JASSUB's own default face
 const FONT = fs.readFileSync(path.join(ROOT, 'js', 'vendor', 'jassub-2.5.16', 'default.woff2'));
+// Any picture does for the episode thumbnails
+const THUMB = fs.readFileSync(path.join(ROOT, 'og-image-v3.jpg'));
 const ASS_SCRIPT = `[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Liberation Sans,36,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,20,20,20,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:19.00,Default,,0,0,0,,{\\an8\\pos(320,60)}A styled sign\n`;
 const RUNTIME = 20 * 10_000_000;
 const CORS = {
@@ -24,7 +26,9 @@ const CORS = {
 
 function episode(n) {
     return { Id: `ep${n}`, Name: `Episode ${n}`, SeriesName: 'Show 1', IndexNumber: n, ParentIndexNumber: 1,
-        RunTimeTicks: RUNTIME, UserData: { Played: false, PlaybackPositionTicks: 0 } };
+        RunTimeTicks: RUNTIME, ImageTags: { Primary: `t${n}` },
+        // Episode 1 watched, episode 3 half-way
+        UserData: { Played: n === 1, PlaybackPositionTicks: n === 3 ? RUNTIME / 2 : 0 } };
 }
 
 function mediaSource(id) {
@@ -83,6 +87,9 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
             return json({ Items: term === 'show 1' || anyTitle ? [{ Id: 'series1', Name: anyTitle ? url.searchParams.get('searchTerm') : 'Show 1', ProductionYear: anyTitle ? null : 2026 }] : [] });
         }
         if (p === '/Shows/series1/Episodes') return json({ Items: Array.from({ length: 12 }, (_, i) => episode(i + 1)) });
+        if (/^\/Items\/ep\d+\/Images\/Primary$/.test(p)) {
+            return route.fulfill({ status: 200, headers: CORS, contentType: 'image/jpeg', body: THUMB });
+        }
         const item = p.match(new RegExp(`^/Users/${JF_USER}/Items/(ep\\d+)$`));
         if (item) return json({ ...episode(Number(item[1].slice(2))), MediaSources: [mediaSource(item[1])] });
         const info = p.match(/^\/Items\/(ep\d+)\/PlaybackInfo$/);

@@ -5277,6 +5277,18 @@ body.player-open .cursor { display: none !important; }
     transition: width .25s linear;
 }
 .pl-next-play .pl-icon { width: 22px; height: 22px; fill: currentColor; }
+.pl-next-stay {
+    height: 48px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 16px;
+    font: inherit;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+    transition: background-color .2s, border-radius .35s var(--pl-bounce);
+}
+.pl-next-stay:hover { background: rgba(255,255,255,0.16); border-radius: 24px; }
 .pl-next-play:hover { border-radius: 24px; }
 .pl-next-play:active { transform: scale(.95); }
 .player.has-next .pl-skip-segment[data-type="Outro"] { display: none; }
@@ -5471,3 +5483,49 @@ body.player-open .cursor { display: none !important; }
 .jf-qc-code { font-size: 2rem; font-weight: 700; letter-spacing: 0.25em; font-variant-numeric: tabular-nums; }
 .jf-qc-how { margin-top: 6px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; }
 .jf-qc-wait { display: flex; align-items: center; gap: var(--space-sm); margin-top: var(--space-sm); font-size: 0.85rem; }
+
+/* ===== Episodes (js/player/episodes.js): every episode Jellyfin has, to start any of them ===== */
+.ep-dialog { max-width: 640px; width: 94%; display: flex; flex-direction: column; overflow: hidden; padding: var(--space-xl); }
+.ep-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); }
+.ep-heading { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ep-seasons { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-sm); margin: var(--space-md) 0; }
+.ep-seasons:empty { display: none; }
+.ep-seasons .is-after { margin-left: auto; }
+.ep-list { overflow-y: auto; margin: var(--space-sm) calc(-1 * var(--space-sm)) 0; padding: 0 var(--space-sm); min-height: 120px; }
+.ep-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-sm);
+    border-radius: var(--radius-lg);
+    transition: background-color .2s var(--ease);
+}
+.ep-row:hover, .ep-row:focus-visible { background: var(--bg-secondary); outline: none; }
+.ep-row.is-next { background: color-mix(in srgb, var(--user-accent) 12%, transparent); }
+.ep-thumb {
+    position: relative;
+    flex: none;
+    width: 144px;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--bg-secondary);
+}
+.ep-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ep-row.is-watched .ep-thumb img { opacity: .55; }
+.ep-progress { position: absolute; left: 6px; right: 6px; bottom: 6px; margin: 0; }
+.ep-progress, .ep-progress .progress-bar-fill { display: block; }
+.ep-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ep-title { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ep-number { color: var(--text-secondary); font-variant-numeric: tabular-nums; margin-right: 8px; }
+.ep-meta { font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; }
+.ep-next { font-weight: 700; color: var(--user-accent); }
+.ep-empty { display: grid; place-items: center; padding: var(--space-2xl) 0; color: var(--text-secondary); text-align: center; }
+@media (max-width: 600px) {
+    .ep-dialog { padding: var(--space-lg); max-height: 88vh; }
+    .ep-thumb { width: 112px; }
+}
+:root[data-design="m3"] .ep-row { border-radius: 16px; }
+:root[data-design="m3"] .ep-row.is-next { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+:root[data-design="m3"] .ep-next { color: var(--md-primary); }
+:root[data-design="m3"] .ep-thumb { border-radius: 12px; }
