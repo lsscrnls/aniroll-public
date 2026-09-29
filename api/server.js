@@ -1149,6 +1149,8 @@ async function handle(req, res) {
                 userId,
                 userName: str(body.userName, 100),
                 serverName: str(body.serverName, 100),
+                // 'user' = a Jellyfin sign-in token, 'key' = an API key
+                kind: body.kind === 'user' ? 'user' : 'key',
                 updatedAt: Date.now(),
             };
             saveJellyfin(all);

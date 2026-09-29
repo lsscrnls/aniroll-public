@@ -1,4 +1,4 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=115';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=116';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -729,7 +729,7 @@ export async function saveMediaListEntry(variables, token, { queue = true } = {}
 
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
     if (saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=115').then(m =>
+        import('./jellyfin.js?v=116').then(m =>
             m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
     }
 
@@ -792,7 +792,7 @@ export async function getUserMediaProgress(user, mediaId, token = null) {
     try {
         const data = await query(`
             query ($userId: Int, $userName: String, $mediaId: Int) {
-                MediaList(userId: $userId, userName: $userName, mediaId: $mediaId) { id status progress repeat }
+                MediaList(userId: $userId, userName: $userName, mediaId: $mediaId) { id status progress repeat startedAt { year } completedAt { year } }
             }
         `, vars, token);
         return data.MediaList;

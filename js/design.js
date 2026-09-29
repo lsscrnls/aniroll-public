@@ -100,7 +100,7 @@ export async function applyDesign(loggedIn) {
     }
     // Page additions only M3 has (hero, search bar, rail FAB ...)
     if (enhancer) enhancer.then(m => m.refresh());
-    enhancer ??= import('./m3.js?v=115').then(m => { m.setup(); return m; });
+    enhancer ??= import('./m3.js?v=116').then(m => { m.setup(); return m; });
 
     // Stylesheet first; keep the page hidden until it's there, so AniRoll's look never flashes
     let sheet = null;
