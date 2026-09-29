@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=116';
-import { enhanceSelect } from '../select.js?v=116';
-import { tasteMatch } from '../taste.js?v=116';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=116';
-import { getToken, isLoggedIn } from '../auth.js?v=116';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=116';
-import { showConfirm } from '../a11y.js?v=116';
+import * as api from '../api.js?v=117';
+import { enhanceSelect } from '../select.js?v=117';
+import { tasteMatch } from '../taste.js?v=117';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=117';
+import { getToken, isLoggedIn } from '../auth.js?v=117';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=117';
+import { showConfirm } from '../a11y.js?v=117';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -51,13 +51,13 @@ async function loadPlayButton(media, root) {
     const slot = root.querySelector('#detail-play');
     if (!slot || media.type !== 'ANIME') return;
     try {
-        const { getConfig } = await import('../jellyfin.js?v=116');
+        const { getConfig } = await import('../jellyfin.js?v=117');
         if (!getConfig()) return;
-        const { availability } = await import('../player/availability.js?v=116');
+        const { availability } = await import('../player/availability.js?v=117');
         const avail = await availability();
         if (!avail) return;
         const episode = nextEpisode(media);
-        const { findEpisode } = await import('../player/library.js?v=116');
+        const { findEpisode } = await import('../player/library.js?v=117');
         const found = await findEpisode(avail.base, media, episode);
         if (!found || !slot.isConnected) return;
         const resume = found.positionTicks > 0 && !found.played;
