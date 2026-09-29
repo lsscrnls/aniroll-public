@@ -114,7 +114,7 @@ const design = process.env.DESIGN || 'm3';
 
     // The player (Jellyfin mocked): paused mid-episode, playing with the subtitle menu, on a phone
     async function player(q, name, mobile) {
-        if (!want(name) && !want(name + '-menu')) return;
+        if (!want(name) && !want(name + '-menu') && !want(name + '-next')) return;
         await mockJellyfin(q, { anyTitle: true });
         await q.evaluate(jf => { for (const [k, v] of Object.entries(jf)) localStorage.setItem(k, v); sessionStorage.clear(); }, JF_STORAGE);
         await q.evaluate(() => { localStorage.removeItem('aniroll_req_times'); location.hash = '#/play/154587/2'; });
@@ -130,6 +130,16 @@ const design = process.env.DESIGN || 'm3';
             await wait(900);
             await q.screenshot({ path: path.join(OUT, `${theme}-${name}-menu.png`) });
             console.log('shot', name + '-menu');
+        }
+        if (want(name + '-next')) {
+            await q.keyboard.press('Escape');
+            await q.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.3; v.play(); });
+            await wait(1600);
+            await q.evaluate(() => document.getElementById('player-video').pause());
+            await q.mouse.move(mobile ? 200 : 700, mobile ? 700 : 820);
+            await wait(500);
+            await q.screenshot({ path: path.join(OUT, `${theme}-${name}-next.png`) });
+            console.log('shot', name + '-next');
         }
         await q.evaluate(() => { location.hash = '#/'; });
         await wait(800);

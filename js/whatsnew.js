@@ -1,9 +1,9 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=116';
-import { openDialog } from './a11y.js?v=116';
-import { prefersReducedMotion } from './animations.js?v=116';
+import { esc } from './store.js?v=117';
+import { openDialog } from './a11y.js?v=117';
+import { prefersReducedMotion } from './animations.js?v=117';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More
@@ -13,13 +13,15 @@ const SEEN_KEY = 'aniroll_seen_changes';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-09-30',
+        // '.2': Up next with a countdown
+        id: '2026-09-30.2',
         title: 'Watch from your Jellyfin, right in AniRoll',
         items: [
             'Shows in your Jellyfin library get a <strong>Play</strong> button: episodes play in AniRoll, and finishing one ticks it off on AniList.',
             'It picks up where you stopped, and Jellyfin only converts what your browser can’t play.',
             '<strong>Subtitles</strong> look the way the release made them: styled signs and karaoke with the file’s own fonts, and Blu-ray subtitles too.',
             '<strong>Skip intro</strong>, recaps and credits with one press, when your server knows where they are.',
+            'When the credits roll, <strong>Up next</strong> counts down to the next episode; its subtitles are already waiting.',
             'Signing in to Jellyfin works with <strong>Quick Connect</strong>: confirm a code in Jellyfin, no password typed into AniRoll.',
         ],
     },

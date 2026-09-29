@@ -17,6 +17,8 @@ const ICON = {
     fullscreen: 'M180-180h103q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H150q-12.75 0-21.37-8.63Q120-137.25 120-150v-133q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v103Zm600 0v-103q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v133q0 12.75-8.62 21.37Q822.75-120 810-120H677q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h103ZM180-780v103q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-133q0-12.75 8.63-21.38Q137.25-840 150-840h133q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H180Zm600 0H677q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h133q12.75 0 21.38 8.62Q840-822.75 840-810v133q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-103Z',
     exitFullscreen: 'M253-253H150q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h133q12.75 0 21.38 8.62Q313-295.75 313-283v133q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-103Zm454 0v103q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-133q0-12.75 8.63-21.38Q664.25-313 677-313h133q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H707ZM253-707v-103q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v133q0 12.75-8.62 21.37Q295.75-647 283-647H150q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h103Zm454 0h103q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H677q-12.75 0-21.37-8.63Q647-664.25 647-677v-133q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v103Z',
     back: 'm274-450 227 227q9 9 9 21t-9 21q-9 9-21 9t-21-9L181-459q-5-5-7-10t-2-11q0-6 2-11t7-10l278-278q9-9 21-9t21 9q9 9 9 21t-9 21L274-510h496q13 0 21.5 8.5T800-480q0 13-8.5 21.5T770-450H274Z',
+    skipNext: 'M660-280v-400q0-17 11.5-28.5T700-720q17 0 28.5 11.5T740-680v400q0 17-11.5 28.5T700-240q-17 0-28.5-11.5T660-280Zm-440-35v-330q0-18 12-29t28-11q5 0 11 1t11 5l248 166q9 6 13.5 14.5T548-480q0 10-4.5 18.5T530-447L282-281q-5 4-11 5t-11 1q-16 0-28-11t-12-29Z',
+    close: 'M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z',
     check: 'm378-332 363-363q9-9 21.5-9t21.5 9q9 9 9 21.5t-9 21.5L399-267q-9 9-21 9t-21-9L175-449q-9-9-8.5-21.5T176-492q9-9 21.5-9t21.5 9l159 160Z',
 };
 
@@ -25,6 +27,8 @@ export const icon = (name) => `<svg class="pl-icon" viewBox="0 -960 960 960" ari
 const IDLE_MS = 3000;
 const STEP = 10;
 const VOLUME_KEY = 'aniroll_player_volume';
+// Up next: seconds of playing time before the next episode starts by itself
+const COUNTDOWN = 10;
 
 export function fmtTime(s) {
     if (!Number.isFinite(s) || s < 0) s = 0;
@@ -52,6 +56,11 @@ export function controlsHtml() {
                 <div class="pl-seek-hover" aria-hidden="true"></div>
             </div>
             <button class="pl-skip-segment" data-act="skipSegment" hidden></button>
+            <div class="pl-next" role="group" aria-label="Up next" hidden>
+                <div class="pl-next-text"><span class="pl-next-kicker">Up next</span><span class="pl-next-title"></span></div>
+                <button class="pl-next-play" data-act="playNext">${icon('skipNext')}<span class="pl-next-label">Play now</span></button>
+                <button class="pl-btn pl-next-cancel" data-act="cancelNext" aria-label="Stay on this episode" title="Stay on this episode">${icon('close')}</button>
+            </div>
             <div class="pl-subs-note" role="status" hidden><span class="pl-subs-note-dot" aria-hidden="true"></span>Loading subtitles…</div>
             <div class="pl-row">
                 <span class="pl-time"><span class="pl-now">0:00</span> <span class="pl-total">/ 0:00</span></span>
@@ -146,7 +155,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     const jump = (s) => { video.currentTime = Math.max(0, Math.min(duration() || Infinity, video.currentTime + s)); paintTime(); wake(); };
     const toggleFullscreen = () => {
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-        else root.requestFullscreen?.().catch(() => {});
+        // The whole document, not the player: the next episode is a new page and keeps full screen
+        else document.documentElement.requestFullscreen?.().catch(() => {});
     };
     const togglePip = () => {
         if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
@@ -193,6 +203,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             else if (act === 'pip') togglePip();
             else if (act === 'fullscreen') toggleFullscreen();
             else if (act === 'skipSegment') skipSegment();
+            else if (act === 'playNext') playNext();
+            else if (act === 'cancelNext') cancelNext();
             return;
         }
         const item = ev.target.closest('.pl-menu-item');
@@ -218,7 +230,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     function paintSegment() {
         const t = video.currentTime;
         // Shown from the segment's start until a second before it ends
-        const seg = segments.find(g => t >= g.start && t < g.end - 1);
+        const seg = segments.find(g => t >= g.start && t < g.end - 1 && !(g.type === 'Outro' && nextState === 'shown'));
         skipTarget = seg ? seg.end : null;
         skipBtn.hidden = !seg;
         if (seg && skipBtn.dataset.type !== seg.type) {
@@ -232,6 +244,57 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         video.currentTime = Math.min(skipTarget, (duration() || skipTarget) - 0.5);
         paintSegment();
     }
+
+    // ----- Up next: from the credits (or the last 30 s) a card counts down to the next episode -----
+    let next = null;
+    let nextState = 'off'; // 'off' | 'shown' | 'cancelled'
+    let nextLeft = COUNTDOWN;
+    let nextTimer = 0;
+    const nextBox = $('.pl-next');
+    // Credits that end near the end of the file; a preview after them may follow
+    const nextFrom = () => {
+        const d = duration();
+        if (!d) return Infinity;
+        const outro = segments.find(g => g.type === 'Outro' && g.end >= d - 120);
+        return outro ? outro.start : d - Math.min(30, d * 0.1);
+    };
+    function paintNextCount() {
+        const left = Math.max(0, Math.ceil(nextLeft));
+        $('.pl-next-label').textContent = `Play now · ${left}`;
+        nextBox.style.setProperty('--pl-next-done', `${(1 - Math.max(0, nextLeft) / COUNTDOWN) * 100}%`);
+    }
+    function paintNext() {
+        if (!next) return;
+        const before = video.currentTime < nextFrom() - 1;
+        // Going back before the credits starts over, a cancel included
+        if (before) nextState = 'off';
+        else if (nextState === 'off') { nextState = 'shown'; nextLeft = COUNTDOWN; paintNextCount(); }
+        const show = nextState === 'shown';
+        if (nextBox.hidden === show) {
+            nextBox.hidden = !show;
+            root.classList.toggle('has-next', show);
+            clearInterval(nextTimer);
+            // Counts only while the video plays: pausing on the credits holds it
+            if (show) nextTimer = setInterval(() => {
+                if (video.paused) return;
+                nextLeft -= 0.25;
+                paintNextCount();
+                if (nextLeft <= 0) playNext();
+            }, 250);
+        }
+    }
+    function playNext() {
+        if (!next || nextState === 'gone') return;
+        nextState = 'gone';
+        clearInterval(nextTimer);
+        next.go();
+    }
+    function cancelNext() {
+        nextState = 'cancelled';
+        paintNext();
+        paintSegment();
+    }
+    on(video, 'ended', () => { if (next && nextState !== 'cancelled') playNext(); });
 
     // ----- Seeking on the wave -----
     const timeAt = (clientX) => {
@@ -313,7 +376,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
 
     on(root, 'pointermove', wake);
     on(root, 'focusin', wake);
-    on(video, 'timeupdate', () => { if (!dragging) paintTime(); if (segments.length) paintSegment(); });
+    on(video, 'timeupdate', () => { if (!dragging) paintTime(); paintNext(); if (segments.length) paintSegment(); });
     on(video, 'progress', () => paintTime());
     on(video, 'durationchange', () => paintTime());
     on(video, 'play', paintPlay);
@@ -325,7 +388,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     on(document, 'fullscreenchange', paintFullscreen);
 
     if (!document.pictureInPictureEnabled || video.disablePictureInPicture) $('[data-act="pip"]').hidden = true;
-    if (!root.requestFullscreen) $('[data-act="fullscreen"]').hidden = true;
+    if (!document.documentElement.requestFullscreen) $('[data-act="fullscreen"]').hidden = true;
 
     paintTime();
     paintPlay();
@@ -344,6 +407,12 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         setSubtitlesLoading(on) {
             $('.pl-subs-note').hidden = !on;
         },
+        // The next episode, once it is known to be there: { title, go() }
+        setNext(info) {
+            next = info;
+            $('.pl-next-title').textContent = info.title;
+            paintNext();
+        },
         // [{ type: 'Intro' | 'Recap' | 'Outro' | ..., start, end }] in seconds
         setSegments(list) {
             segments = (list || []).filter(g => g.end - g.start >= 3);
@@ -352,7 +421,9 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
                 destroy() {
             clearTimeout(idleTimer);
             offs.forEach(off => off());
-            if (document.fullscreenElement === root) document.exitFullscreen().catch(() => {});
+            clearInterval(nextTimer);
+            // Leaving for another episode keeps full screen; leaving the player ends it
+            if (document.fullscreenElement && !location.hash.startsWith('#/play/')) document.exitFullscreen().catch(() => {});
         },
     };
 }

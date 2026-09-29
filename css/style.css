@@ -5230,6 +5230,61 @@ body.player-open .cursor { display: none !important; }
     transition: transform .35s var(--pl-bounce), border-radius .35s var(--pl-bounce);
 }
 .pl-skip-segment:hover { border-radius: 28px; }
+/* Up next: from the credits on, in Skip credits' place; the play button fills as the countdown runs */
+.pl-next {
+    position: absolute;
+    right: max(24px, env(safe-area-inset-right));
+    bottom: calc(100% + 16px);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 12px 12px 20px;
+    border-radius: 28px;
+    background: var(--pl-surface);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    animation: plSkipIn .45s var(--pl-bounce);
+}
+.pl-next[hidden] { display: none; }
+.pl-next-text { display: flex; flex-direction: column; min-width: 0; max-width: 260px; }
+.pl-next-kicker { font-size: 0.75rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,0.65); }
+.pl-next-title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-next-play {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 48px;
+    padding: 0 20px 0 14px;
+    border: 0;
+    border-radius: 16px;
+    font: inherit;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--pl-on-primary);
+    background: var(--pl-primary);
+    isolation: isolate;
+    transition: border-radius .35s var(--pl-bounce), transform .35s var(--pl-bounce);
+}
+/* What is left of the countdown: a shade over the right part, shrinking */
+.pl-next-play::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: calc(100% - var(--pl-next-done, 0%));
+    background: rgba(0,0,0,0.22);
+    z-index: -1;
+    transition: width .25s linear;
+}
+.pl-next-play .pl-icon { width: 22px; height: 22px; fill: currentColor; }
+.pl-next-play:hover { border-radius: 24px; }
+.pl-next-play:active { transform: scale(.95); }
+.player.has-next .pl-skip-segment[data-type="Outro"] { display: none; }
+.player.is-idle .pl-bottom:has(.pl-next:not([hidden])) { opacity: 1; transform: none; }
+.player.is-idle .pl-bottom:has(.pl-next:not([hidden])) > :not(.pl-next, .pl-skip-segment, .pl-subs-note) { opacity: 0; }
+.player.is-idle .pl-next { pointer-events: auto; }
+.player.is-idle .pl-next :is(button) { cursor: pointer !important; }
+
 /* Loading subtitles: a quiet chip on the left, opposite Skip intro; also stays while the controls hide */
 .pl-subs-note {
     position: absolute;
@@ -5391,7 +5446,8 @@ body.player-open .cursor { display: none !important; }
 }
 @media (prefers-reduced-motion: reduce) {
     .pl-seek-wave { animation: none; }
-    .pl-menu, .pl-skip-segment, .pl-subs-note { animation: none; }
+    .pl-menu, .pl-skip-segment, .pl-subs-note, .pl-next { animation: none; }
+    .pl-next-play::before { transition: none; }
     .pl-subs-note-dot { animation-duration: 2.5s; }
 }
 

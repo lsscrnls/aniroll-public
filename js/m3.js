@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=116';
-import { upNext, glance, DAYS, greeting } from './upnext.js?v=116';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=116';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=117';
+import { upNext, glance, DAYS, greeting } from './upnext.js?v=117';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=117';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -530,9 +530,11 @@ function setupCursor() {
     const onDown = () => el.classList.add('is-down');
     const onUp = () => el.classList.remove('is-down');
     const onLeave = () => { el.classList.remove('is-on'); shown = false; };
-    // Full screen shows only the full-screen element (the player): the cursor moves in with it
+    // Full screen shows only the full-screen element: the cursor moves in with it (the player puts the
+    // whole document in full screen, where the body is fine)
     const onFullscreen = () => {
-        const host = document.fullscreenElement || document.body;
+        const fs = document.fullscreenElement;
+        const host = fs && fs !== document.documentElement ? fs : document.body;
         if (el.parentNode !== host) host.appendChild(el);
     };
 

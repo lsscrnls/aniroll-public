@@ -83,6 +83,8 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
             return json({ Items: term === 'show 1' || anyTitle ? [{ Id: 'series1', Name: anyTitle ? url.searchParams.get('searchTerm') : 'Show 1', ProductionYear: anyTitle ? null : 2026 }] : [] });
         }
         if (p === '/Shows/series1/Episodes') return json({ Items: Array.from({ length: 12 }, (_, i) => episode(i + 1)) });
+        const item = p.match(new RegExp(`^/Users/${JF_USER}/Items/(ep\\d+)$`));
+        if (item) return json({ ...episode(Number(item[1].slice(2))), MediaSources: [mediaSource(item[1])] });
         const info = p.match(/^\/Items\/(ep\d+)\/PlaybackInfo$/);
         if (info) {
             calls.push({ type: 'PlaybackInfo', item: info[1], body: req.postDataJSON() });
@@ -111,6 +113,7 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
             return route.fulfill({ status: 200, headers: CORS, contentType: 'font/woff2', body: FONT });
         }
         if (/\/Subtitles\/\d+\/0\/Stream\.vtt$/.test(p)) {
+            calls.push({ type: 'vtt', item: p.split('/')[2] });
             return route.fulfill({ status: 200, headers: CORS, contentType: 'text/vtt', body: 'WEBVTT\n\n00:00:00.000 --> 00:00:19.000\nHello from Jellyfin\n' });
         }
         // The playlists come back fine, the first segment fails with 500 — as when ffmpeg finds no GPU memory
