@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=115';
-import { upNext, glance, DAYS, greeting } from './upnext.js?v=115';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=115';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=116';
+import { upNext, glance, DAYS, greeting } from './upnext.js?v=116';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=116';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -487,7 +487,7 @@ function renderCountdown(el) {
 const CURSOR_STATES = [
     ['text', 'input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), textarea, [contenteditable="true"]'],
     ['show', '.media-card, .list-card, .search-result-item, .calendar-week-item, .schedule-item, .fr-card, .m3-hero-deck, [data-open]'],
-    ['press', 'a[href], button, [role="button"], [role="link"], [role="tab"], label, select, summary, [data-go], .glass-menu-trigger, .accent-swatch, input[type="checkbox"], input[type="radio"], input[type="color"]'],
+    ['press', '.pl-seek, a[href], button, [role="button"], [role="link"], [role="tab"], label, select, summary, [data-go], .glass-menu-trigger, .accent-swatch, input[type="checkbox"], input[type="radio"], input[type="color"]'],
 ];
 
 function setupCursor() {
@@ -530,12 +530,18 @@ function setupCursor() {
     const onDown = () => el.classList.add('is-down');
     const onUp = () => el.classList.remove('is-down');
     const onLeave = () => { el.classList.remove('is-on'); shown = false; };
+    // Full screen shows only the full-screen element (the player): the cursor moves in with it
+    const onFullscreen = () => {
+        const host = document.fullscreenElement || document.body;
+        if (el.parentNode !== host) host.appendChild(el);
+    };
 
     window.addEventListener('pointermove', onMove, { passive: true });
     document.addEventListener('pointerover', onOver, { passive: true });
     window.addEventListener('pointerdown', onDown, { passive: true });
     window.addEventListener('pointerup', onUp, { passive: true });
     root.addEventListener('mouseleave', onLeave);
+    document.addEventListener('fullscreenchange', onFullscreen);
     return () => {
         cancelAnimationFrame(raf);
         window.removeEventListener('pointermove', onMove);
@@ -543,6 +549,7 @@ function setupCursor() {
         window.removeEventListener('pointerdown', onDown);
         window.removeEventListener('pointerup', onUp);
         root.removeEventListener('mouseleave', onLeave);
+        document.removeEventListener('fullscreenchange', onFullscreen);
         root.classList.remove('m3-cursor-on');
         el.remove();
     };

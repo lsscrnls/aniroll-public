@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=115';
-import { enhanceSelect } from '../select.js?v=115';
-import { tasteMatch } from '../taste.js?v=115';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=115';
-import { getToken, isLoggedIn } from '../auth.js?v=115';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=115';
-import { showConfirm } from '../a11y.js?v=115';
+import * as api from '../api.js?v=116';
+import { enhanceSelect } from '../select.js?v=116';
+import { tasteMatch } from '../taste.js?v=116';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=116';
+import { getToken, isLoggedIn } from '../auth.js?v=116';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=116';
+import { showConfirm } from '../a11y.js?v=116';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -16,6 +16,7 @@ export async function renderPanel(id, container) {
     setupListActions(media, token, container);
     setupShare(media, container);
     setupSpoilerTags(container);
+    loadPlayButton(media, container);
     loadFriendsStatus(media, token, container);
     loadTasteMatch(media, token, container);
 }
@@ -31,8 +32,41 @@ export async function render({ params, content }) {
     setupListActions(media, token, content);
     setupShare(media, content);
     setupSpoilerTags(content);
+    loadPlayButton(media, content);
     loadFriendsStatus(media, token, content);
     loadTasteMatch(media, token, content);
+}
+
+// The episode to play next: after the last one watched, from the start once finished
+function nextEpisode(media) {
+    const entry = media.mediaListEntry;
+    if (media.format === 'MOVIE' || !entry || entry.status === 'COMPLETED') return 1;
+    const next = (entry.progress || 0) + 1;
+    return media.episodes ? Math.min(next, media.episodes) : next;
+}
+
+// "Play episode N" from the user's own Jellyfin — only when the server answers and has that
+// episode. Nothing waits for it and nothing shows when Jellyfin is off.
+async function loadPlayButton(media, root) {
+    const slot = root.querySelector('#detail-play');
+    if (!slot || media.type !== 'ANIME') return;
+    try {
+        const { getConfig } = await import('../jellyfin.js?v=116');
+        if (!getConfig()) return;
+        const { availability } = await import('../player/availability.js?v=116');
+        const avail = await availability();
+        if (!avail) return;
+        const episode = nextEpisode(media);
+        const { findEpisode } = await import('../player/library.js?v=116');
+        const found = await findEpisode(avail.base, media, episode);
+        if (!found || !slot.isConnected) return;
+        const resume = found.positionTicks > 0 && !found.played;
+        const label = media.format === 'MOVIE' ? (resume ? 'Resume' : 'Play') : `${resume ? 'Resume' : 'Play'} episode ${episode}`;
+        slot.innerHTML = `<a class="glass-btn glass-btn-primary detail-play" href="#/play/${media.id}/${episode}">${ICON_PLAY}${esc(label)}</a>`;
+        slot.hidden = false;
+    } catch (err) {
+        console.warn('Jellyfin player unavailable:', err.message);
+    }
 }
 
 function fixBannerFit(container) {
@@ -77,6 +111,7 @@ function renderDetailHTML(media) {
                 </div>
                 <div class="taste-match" id="taste-match" hidden></div>
                 <div class="detail-actions">
+                    <span class="detail-play-slot" id="detail-play" hidden></span>
                     <span class="detail-actions-inner" id="detail-actions">${renderListButton(media)}</span>
                     <button class="glass-btn glass-btn-secondary" id="detail-share" title="Copy a link that previews this title">
                         <svg data-icon="share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Share
@@ -178,6 +213,7 @@ const STATUS_COLORS = {
     DROPPED: 'var(--danger)',
 };
 
+const ICON_PLAY = '<svg data-icon="play_arrow" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:18px;height:18px;vertical-align:-4px;margin-right:6px"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
 const ICON_STUDIO = '<svg data-icon="movie" class="detail-studio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 8l2.5-4.5L9 8M9 3.5 12 8M14 3.5 17 8M19 3.5 21 8"/></svg>';
 const ICON_PRODUCER = '<svg data-icon="apartment" class="detail-studio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16"/><path d="M15 10h4a1 1 0 0 1 1 1v10M3 21h18M8 8h3M8 12h3M8 16h3"/></svg>';
 const ICON_ARROW = '<svg data-icon="arrow_forward" class="detail-studio-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
@@ -335,6 +371,7 @@ function setupListActions(media, token, root = document) {
             actionsEl.innerHTML = renderListButton(media);
             setupListActions(media, token, root);
         }
+        loadPlayButton(media, root);
     }
 
     q('#add-to-list')?.addEventListener('click', async () => {
