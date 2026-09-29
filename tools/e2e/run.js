@@ -502,6 +502,28 @@ function staticServer() {
         });
         check('player: Play button for the next episode when Jellyfin has it', /^#\/play\/\d+\/2$/.test(button?.href || '') && /Play episode 2/.test(button.text), button);
 
+        // Episodes: every episode Jellyfin has, the next one marked, watched and started ones told apart;
+        // the sequel's chip switches the list over (the mock Jellyfin has none of its episodes)
+        await p.click('.detail-episodes').catch(() => {});
+        await p.waitForSelector('.ep-row', { timeout: 5000 }).catch(() => {});
+        const eps = await p.evaluate(() => {
+            const rows = [...document.querySelectorAll('.ep-row')];
+            return { rows: rows.length, next: document.querySelector('.ep-row.is-next')?.getAttribute('href'),
+                watched: rows[0]?.classList.contains('is-watched'), started: !!rows[2]?.querySelector('.ep-progress'),
+                thumb: rows[0]?.querySelector('img')?.getAttribute('src') || '', play: rows[3]?.getAttribute('href'),
+                chip: document.querySelector('.ep-seasons [data-season]')?.dataset.season || null };
+        });
+        await p.click('.ep-seasons [data-season]').catch(() => {});
+        await p.waitForTimeout(1500);
+        const switched = await p.evaluate(() => ({ first: document.querySelector('.ep-row')?.getAttribute('href') || null,
+            empty: /None of its episodes/.test(document.querySelector('.ep-list')?.textContent || '') }));
+        await p.keyboard.press('Escape');
+        await p.waitForTimeout(300);
+        const epsClosed = await p.evaluate(() => !document.querySelector('.ep-dialog'));
+        check('player: Episodes lists every episode, marks the next, watched and started; seasons switch; Escape closes',
+            eps.rows === 12 && /^#\/play\/\d+\/2$/.test(eps.next || '') && eps.watched && eps.started && /\/Items\/ep1\/Images\/Primary/.test(eps.thumb)
+            && /^#\/play\/\d+\/4$/.test(eps.play || '') && eps.chip && (switched.empty || (!!switched.first && switched.first.split('/')[2] !== (eps.next || '').split('/')[2])) && epsClosed, { ...eps, ...switched, epsClosed });
+
         const playHash = button?.href || '#/play/101/2';
         await p.click('.detail-play').catch(() => p.evaluate(h => { location.hash = h; }, playHash));
         await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2; }, null, { timeout: 10000 }).catch(() => {});
@@ -584,6 +606,9 @@ function staticServer() {
             title: document.querySelector('.pl-next-title').textContent, label: document.querySelector('.pl-next-label').textContent }));
         await p.click('[data-act="cancelNext"]');
         const cancelled = await p.evaluate(() => document.querySelector('.pl-next').hidden);
+        // Watched the credits to the end: the card asks once more instead of leaving at once
+        await p.waitForTimeout(1800);
+        const atEnd = await p.evaluate(() => ({ ended: document.getElementById('player-video').ended, shown: !document.querySelector('.pl-next').hidden, hash: location.hash }));
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 5; });
         await p.waitForTimeout(400);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.6; v.play(); });
@@ -592,10 +617,11 @@ function staticServer() {
         await p.click('[data-act="playNext"]');
         await p.waitForTimeout(2500);
         const moved = await p.evaluate(() => location.hash);
-        check('player: Up next counts down from the end, Cancel holds it, Play now opens the next episode, its subtitles warmed',
-            upNext.shown && upNext.title === 'Episode 3' && /^Play now · \d+$/.test(upNext.label) && cancelled && again
+        check('player: Up next counts down from the end, Watch credits hides it until the very end, Play now opens the next episode, its subtitles warmed',
+            upNext.shown && upNext.title === 'Episode 3' && /^Play now · \d+$/.test(upNext.label) && cancelled
+            && atEnd.ended && atEnd.shown && /\/2$/.test(atEnd.hash) && again
             && /\/3$/.test(moved) && calls.some(c => c.type === 'PlaybackInfo' && c.item === 'ep3') && calls.some(c => c.type === 'vtt' && c.item === 'ep3'),
-            { upNext, cancelled, again, moved });
+            { upNext, cancelled, atEnd, again, moved });
 
         // Styled ASS: drawn by JASSUB on its canvas with the MKV's fonts, listed in the menu
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));

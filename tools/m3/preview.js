@@ -114,9 +114,18 @@ const design = process.env.DESIGN || 'm3';
 
     // The player (Jellyfin mocked): paused mid-episode, playing with the subtitle menu, on a phone
     async function player(q, name, mobile) {
-        if (!want(name) && !want(name + '-menu') && !want(name + '-next')) return;
+        if (!want(name) && !want(name + '-menu') && !want(name + '-next') && !want(name + '-episodes')) return;
         await mockJellyfin(q, { anyTitle: true });
         await q.evaluate(jf => { for (const [k, v] of Object.entries(jf)) localStorage.setItem(k, v); sessionStorage.clear(); }, JF_STORAGE);
+        if (want(name + '-episodes')) {
+            await q.evaluate(() => { localStorage.removeItem('aniroll_req_times'); location.hash = '#/anime/154587/full'; });
+            await q.waitForSelector('.detail-episodes', { timeout: 10000 }).catch(() => {});
+            await q.click('.detail-episodes').catch(() => {});
+            await wait(2500);
+            await q.screenshot({ path: path.join(OUT, `${theme}-${name}-episodes.png`) });
+            console.log('shot', name + '-episodes');
+            await q.keyboard.press('Escape');
+        }
         await q.evaluate(() => { localStorage.removeItem('aniroll_req_times'); location.hash = '#/play/154587/2'; });
         await wait(5000);
         await q.evaluate(() => { const v = document.getElementById('player-video'); v.pause(); v.currentTime = 8.4; });

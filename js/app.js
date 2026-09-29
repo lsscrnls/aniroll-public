@@ -1,14 +1,14 @@
-import { route, startRouter, navigate } from './router.js?v=117';
-import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl } from './auth.js?v=117';
-import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, setAccentColor, getAccentColors, esc, titlePref } from './store.js?v=117';
-import * as api from './api.js?v=117';
-import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js?v=117';
-import { openDialog, initActivation, showConfirm } from './a11y.js?v=117';
-import { noteVisitor, maybeShowMoveNotice, openChangelog, hasUnread } from './whatsnew.js?v=117';
-import { applyDesign, getDesign, getVariant, setDesign, switchDesign, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from './design.js?v=117';
+import { route, startRouter, navigate } from './router.js?v=118';
+import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl } from './auth.js?v=118';
+import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, setAccentColor, getAccentColors, esc, titlePref } from './store.js?v=118';
+import * as api from './api.js?v=118';
+import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js?v=118';
+import { openDialog, initActivation, showConfirm } from './a11y.js?v=118';
+import { noteVisitor, maybeShowMoveNotice, openChangelog, hasUnread } from './whatsnew.js?v=118';
+import { applyDesign, getDesign, getVariant, setDesign, switchDesign, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from './design.js?v=118';
 
 const CLIENT_ID = '50643';
-const APP_VERSION = '117';
+const APP_VERSION = '118';
 
 // Report uncaught errors to our backend (api/server.js → data/client-errors.log).
 // Each distinct message once per page load, at most 10 — a loop must not flood the log.
@@ -69,18 +69,18 @@ async function init() {
 
     // Guests of a Watch Party keep syncing with the host on every page, not only on /watchparty
     if (isLoggedIn() && localStorage.getItem('aniroll_joined_party')) {
-        import('./pages/watchparty.js?v=117').then(m => m.initGuestSync());
+        import('./pages/watchparty.js?v=118').then(m => m.initGuestSync());
     }
     // Hosts get their running party back on a second device, and a pill leading back to it
     if (isLoggedIn()) {
-        import('./pages/watchparty.js?v=117').then(async m => {
+        import('./pages/watchparty.js?v=118').then(async m => {
             if (!localStorage.getItem('aniroll_watchparty')) await m.restoreHostParty();
             m.renderPartyPill();
         });
     }
     // The Jellyfin connection belongs to the AniList account, so pull it in on this device
     if (isLoggedIn()) {
-        import('./jellyfin.js?v=117').then(async m => {
+        import('./jellyfin.js?v=118').then(async m => {
             await m.loadAccountConfig();
             setupJellyfinLive();
         });
@@ -165,7 +165,7 @@ function watchMaintenanceMode() {
 function setupJellyfinPull() {
     const pull = async () => {
         if (api.shouldHoldBackground()) return;
-        const { getConfig, isPullEnabled, pullFromJellyfin } = await import('./jellyfin.js?v=117');
+        const { getConfig, isPullEnabled, pullFromJellyfin } = await import('./jellyfin.js?v=118');
         if (!getConfig() || !isPullEnabled()) return;
         const user = getState().user;
         if (!user) return;
@@ -185,10 +185,10 @@ function setupJellyfinPull() {
 // Jellyfin webhook -> AniRoll backend: the chip in the navbar, toasts for tracked episodes,
 // and episodes the backend could not write (no access, AniList blocking it) applied from here
 async function setupJellyfinLive() {
-    const jf = await import('./jellyfin.js?v=117');
+    const jf = await import('./jellyfin.js?v=118');
     // Set up on another device: fetch the link once, only for people who use Jellyfin at all
     if (!jf.getHookSecret() && jf.getConfig()) await jf.loadHook().catch(() => null);
-    const np = await import('./nowplaying.js?v=117');
+    const np = await import('./nowplaying.js?v=118');
     window.addEventListener(jf.NOW_EVENT, (e) => np.renderNowChip(document.getElementById('jf-now-chip'), e.detail));
     jf.startNowPlaying({
         onTracked: (item) => {
@@ -279,7 +279,7 @@ async function loadViewer() {
 
 function setupRoutes() {
     route('/', async (ctx) => {
-        const { render, loadLandingTrending } = await import('./pages/home.js?v=117');
+        const { render, loadLandingTrending } = await import('./pages/home.js?v=118');
         const cleanup = await render(ctx);
         if (!isLoggedIn()) loadLandingTrending();
         refreshAnimations();
@@ -287,19 +287,19 @@ function setupRoutes() {
     });
 
     route('/studio/:id', async (ctx) => {
-        const { render } = await import('./pages/studio.js?v=117');
+        const { render } = await import('./pages/studio.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/staff/:id', async (ctx) => {
-        const { render } = await import('./pages/staff.js?v=117');
+        const { render } = await import('./pages/staff.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/search', async (ctx) => {
-        const { render } = await import('./pages/search.js?v=117');
+        const { render } = await import('./pages/search.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
@@ -309,14 +309,14 @@ function setupRoutes() {
     });
 
     route('/anime/:id/full', async (ctx) => {
-        const { render } = await import('./pages/detail.js?v=117');
+        const { render } = await import('./pages/detail.js?v=118');
         await render({ params: { id: ctx.params.id }, content: ctx.content });
         refreshAnimations();
     });
 
     // The player loads only when something is played
     route('/play/:id/:episode', async (ctx) => {
-        const { render } = await import('./pages/play.js?v=117');
+        const { render } = await import('./pages/play.js?v=118');
         return render(ctx);
     });
 
@@ -325,74 +325,74 @@ function setupRoutes() {
     });
 
     route('/manga/:id/full', async (ctx) => {
-        const { render } = await import('./pages/detail.js?v=117');
+        const { render } = await import('./pages/detail.js?v=118');
         await render({ params: { id: ctx.params.id }, content: ctx.content });
         refreshAnimations();
     });
 
     route('/list', async (ctx) => {
-        const { render } = await import('./pages/list.js?v=117');
+        const { render } = await import('./pages/list.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/list/:username', async (ctx) => {
-        const { render } = await import('./pages/list.js?v=117');
+        const { render } = await import('./pages/list.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/social', async (ctx) => {
-        const { render } = await import('./pages/social.js?v=117');
+        const { render } = await import('./pages/social.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/profile', async (ctx) => {
-        const { render } = await import('./pages/profile.js?v=117');
+        const { render } = await import('./pages/profile.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/user/:username', async (ctx) => {
-        const { render } = await import('./pages/profile.js?v=117');
+        const { render } = await import('./pages/profile.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/season', async (ctx) => {
-        const { render } = await import('./pages/season.js?v=117');
+        const { render } = await import('./pages/season.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/season/:year/:season', async (ctx) => {
-        const { render } = await import('./pages/season.js?v=117');
+        const { render } = await import('./pages/season.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/roll', async (ctx) => {
-        const { render } = await import('./pages/roll.js?v=117');
+        const { render } = await import('./pages/roll.js?v=118');
         const cleanup = await render(ctx);
         refreshAnimations();
         return cleanup;
     });
 
     route('/calendar', async (ctx) => {
-        const { render } = await import('./pages/calendar.js?v=117');
+        const { render } = await import('./pages/calendar.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/notifications', async (ctx) => {
-        const { render } = await import('./pages/notifications.js?v=117');
+        const { render } = await import('./pages/notifications.js?v=118');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/watchparty', async (ctx) => {
-        const { render } = await import('./pages/watchparty.js?v=117');
+        const { render } = await import('./pages/watchparty.js?v=118');
         const cleanup = await render(ctx);
         refreshAnimations();
         return cleanup;
@@ -780,7 +780,7 @@ async function renderSettings({ content, query }) {
     document.getElementById('mal-xml-upload')?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        import('./pages/mal-import.js?v=117').then(m => m.startXMLImport(file));
+        import('./pages/mal-import.js?v=118').then(m => m.startXMLImport(file));
     });
 
     renderJellyfinSettings();
@@ -796,7 +796,7 @@ async function renderPartySyncSettings() {
         box.innerHTML = '<p class="dot-label">Log in to change this.</p>';
         return;
     }
-    const bg = await import('./background.js?v=117');
+    const bg = await import('./background.js?v=118');
     const mode = bg.getPartySyncMode();
     box.innerHTML = `
         <label class="settings-choice"><input type="radio" name="party-sync" value="open" ${mode === 'open' ? 'checked' : ''}>
@@ -870,7 +870,7 @@ async function renderJellyfinLive() {
         return;
     }
     const [jf, bg, np] = await Promise.all([
-        import('./jellyfin.js?v=117'), import('./background.js?v=117'), import('./nowplaying.js?v=117'),
+        import('./jellyfin.js?v=118'), import('./background.js?v=118'), import('./nowplaying.js?v=118'),
     ]);
     const head = `<h4 class="jf-live-title">Live tracking</h4>
         <p class="dot-label">See what you are watching right in AniRoll, and finished episodes and movies land on your AniList within seconds, even when AniRoll is closed. Uses the Webhook plugin of your Jellyfin server.</p>`;
@@ -1010,7 +1010,7 @@ async function renderJellyfinLive() {
 async function renderJellyfinSettings() {
     const box = document.getElementById('jf-settings');
     if (!box) return;
-    const jf = await import('./jellyfin.js?v=117');
+    const jf = await import('./jellyfin.js?v=118');
     await jf.loadAccountConfig();
     const cfg = jf.getConfig();
 
@@ -1096,7 +1096,7 @@ async function renderJellyfinSettings() {
     }
 
     const scope = jf.getScope();
-    const player = await import('./player/availability.js?v=117');
+    const player = await import('./player/availability.js?v=118');
     const localUrl = player.getLocalUrl();
     box.innerHTML = `
         <div class="jf-row"><span class="jf-dot jf-dot-checking" id="jf-settings-dot"></span><span id="jf-settings-state">Checking...</span></div>
@@ -1217,7 +1217,7 @@ async function refreshJellyfinStatus(force = false) {
     refreshPendingStatus();
     const item = document.getElementById('jf-status-item');
     if (!item) return;
-    const { getConfig, getStatus } = await import('./jellyfin.js?v=117');
+    const { getConfig, getStatus } = await import('./jellyfin.js?v=118');
     if (!getConfig()) {
         item.hidden = true;
         return;
@@ -1285,7 +1285,7 @@ async function openDetailPanel(id) {
     body.scrollTop = 0;
     body.innerHTML = '<div class="page-loader" style="padding:var(--space-3xl)"><div class="loader-spinner"></div></div>';
 
-    const { renderPanel } = await import('./pages/detail.js?v=117');
+    const { renderPanel } = await import('./pages/detail.js?v=118');
     await renderPanel(id, body);
     overlay.dataset.mediaType = body.querySelector('.detail-fullscreen-btn')?.dataset.type || 'anime';
 }

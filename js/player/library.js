@@ -1,4 +1,4 @@
-import { getConfig, jfAuth, normTitle, splitYear, splitSeason, nearYear, hasAniListId } from '../jellyfin.js?v=117';
+import { getConfig, jfAuth, normTitle, splitYear, splitSeason, nearYear, hasAniListId } from '../jellyfin.js?v=118';
 
 // AniList show + episode -> the Jellyfin item to play. The same title rules as the Jellyfin sync
 // (js/jellyfin.js, api/server.js) in the other direction: Jellyfin keeps one series with seasons,
@@ -92,12 +92,8 @@ async function findShow(base, cfg, media) {
     return null;
 }
 
-// The Jellyfin item for episode `episode` of an AniList show, or null.
-// { itemId, name, seriesName, season, episode, runTimeTicks, positionTicks, played }
-export async function findEpisode(base, media, episode) {
-    const cfg = getConfig();
-    if (!cfg || !media?.id) return null;
-
+// The Jellyfin show (or movie) behind an AniList entry, looked up once per session
+async function showFor(base, cfg, media) {
     const cache = readCache(cfg);
     let show = cache.map[media.id];
     if (show === undefined) {
@@ -105,6 +101,37 @@ export async function findEpisode(base, media, episode) {
         cache.map[media.id] = show; // null too: no need to search again this session
         writeCache(cache);
     }
+    return show;
+}
+
+// Every episode of the AniList entry's season in Jellyfin, in order, with a thumbnail; [] when none.
+// [{ itemId, name, episode, episodeEnd, runTimeTicks, positionTicks, played, image }]
+export async function listEpisodes(base, media) {
+    const cfg = getConfig();
+    if (!cfg || !media?.id) return [];
+    const show = await showFor(base, cfg, media);
+    if (!show || show.kind !== 'series') return [];
+    const data = await jfGet(base, `/Shows/${encodeURIComponent(show.id)}/Episodes?userId=${encodeURIComponent(cfg.userId)}`
+        + `&season=${show.season}&fields=UserData`, cfg.apiKey);
+    return (data?.Items || [])
+        .filter(e => e.ParentIndexNumber === show.season && e.IndexNumber != null)
+        // A later part of a season can share Jellyfin's season; AniList knows how many are this entry's
+        .filter(e => !media.episodes || e.IndexNumber <= media.episodes)
+        .sort((a, b) => a.IndexNumber - b.IndexNumber)
+        .map(e => ({
+            ...toEpisode(e),
+            episodeEnd: e.IndexNumberEnd ?? null,
+            image: e.ImageTags?.Primary ? `${base}/Items/${encodeURIComponent(e.Id)}/Images/Primary?fillWidth=400&quality=80&tag=${encodeURIComponent(e.ImageTags.Primary)}` : null,
+        }));
+}
+
+// The Jellyfin item for episode `episode` of an AniList show, or null.
+// { itemId, name, seriesName, season, episode, runTimeTicks, positionTicks, played }
+export async function findEpisode(base, media, episode) {
+    const cfg = getConfig();
+    if (!cfg || !media?.id) return null;
+
+    const show = await showFor(base, cfg, media);
     if (!show) return null;
 
     if (show.kind === 'movie') {
