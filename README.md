@@ -205,3 +205,15 @@ JASSUB's WebAssembly contains libass, FreeType, HarfBuzz, FriBidi and other libr
 licences, some of them LGPL-2.1-or-later; they ship as separate, replaceable files in
 `js/vendor/jassub-2.5.16/`, rebuilt from the published package by `tools/vendor/jassub.sh`. Every
 library's licence text lies next to it in `js/vendor/`.
+
+## License
+
+AniRoll's code is **all rights reserved**, see [LICENSE](LICENSE): you're welcome to read it and learn from it,
+but copying, redistributing or hosting it needs my written permission.
+
+The design follows [Material 3 Expressive](https://m3.material.io/), Google's design system. AniRoll is not
+affiliated with or endorsed by Google. Its colour schemes are generated with
+[Material Color Utilities](https://github.com/material-foundation/material-color-utilities) (Apache-2.0), icons
+are [Material Symbols](https://fonts.google.com/icons) (Apache-2.0), the type is Google Sans Flex and Inter
+(SIL Open Font License 1.1), and the shapes are redrawn after the M3 shape library by `tools/m3/shapes.py`.
+Third-party code keeps its own licence; the texts lie next to it in `js/vendor/` and `fonts/`.
