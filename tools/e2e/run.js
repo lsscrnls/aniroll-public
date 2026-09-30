@@ -666,6 +666,39 @@ function staticServer() {
             pgs.canvas && pgs.noteGone && pgs.bar?.[3] > 200 && pgs.bar[0] > 200 && pgs.above?.[3] === 0 && pgs.textTracks === 'disabled'
             && calls.some(c => c.type === 'pgs') && pgsMenu.join('|') === 'Off|English|English [PGS]', { ...pgs, pgsMenu });
 
+        // Audio tracks: a second section in the menu; picking the dub asks Jellyfin again with that track and
+        // goes on from the same spot; the next episode of the show starts with the dub
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/6'));
+        await p.waitForTimeout(3000);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 6; });
+        await p.waitForTimeout(500);
+        await p.mouse.move(640, 500);
+        await p.click('[data-act="subs"]').catch(() => {});
+        await p.waitForTimeout(300);
+        const audioMenu = await p.evaluate(() => ({
+            titles: [...document.querySelectorAll('.pl-menu-title')].map(e => e.textContent),
+            audio: [...document.querySelectorAll('[data-audio]')].map(e => `${e.textContent.trim()}:${e.getAttribute('aria-checked')}`),
+        }));
+        await p.click('[data-audio="5"]').catch(() => {});
+        await p.waitForTimeout(2500);
+        const dubbed = await p.evaluate(() => ({ time: document.getElementById('player-video').currentTime,
+            pref: JSON.parse(localStorage.getItem('aniroll_audio_pref') || '{}') }));
+        const asked = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep6').map(c => c.audio);
+        await p.mouse.move(600, 500);
+        await p.click('[data-act="subs"]').catch(() => {});
+        await p.waitForTimeout(300);
+        const checkedAfter = await p.evaluate(() => document.querySelector('[data-audio][aria-checked="true"]')?.dataset.audio);
+        await p.keyboard.press('Escape');
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/7'));
+        await p.waitForTimeout(3000);
+        const nextAsked = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep7').map(c => c.audio);
+        const reportedAudio = calls.filter(c => c.type === 'Playing' && c.body?.ItemId === 'ep7').map(c => c.body.AudioStreamIndex);
+        check('player: audio tracks in the menu, switching asks Jellyfin for that track from the same spot, the show remembers the dub',
+            audioMenu.titles.join() === 'Audio,Subtitles' && audioMenu.audio.join('|') === 'Japanese - Opus - Stereo:true|English - Opus - Stereo:false'
+            && asked.join() === ',5' && dubbed.time > 4 && checkedAfter === '5'
+            && Object.values(dubbed.pref).some(v => v.lang === 'eng') && reportedAudio.includes(5) && !reportedAudio.includes(1),
+            { audioMenu, asked, dubbed, checkedAfter, nextAsked, reportedAudio });
+
         // The server cannot convert (graphics card full): a clear message, no endless spinner, the conversion ended
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/5'));
         await p.waitForTimeout(3500);
@@ -734,7 +767,7 @@ function staticServer() {
             online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
         check('admin: the owner sees tiles, four charts, who is online and who waits',
             adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
-        await sq.evaluate(() => import('/js/auth.js?v=119').then(m => m.logout()));
+        await sq.evaluate(() => import('/js/auth.js?v=120').then(m => m.logout()));
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();

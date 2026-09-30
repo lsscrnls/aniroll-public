@@ -70,7 +70,7 @@ export function controlsHtml() {
                     <input class="pl-volume-slider" type="range" min="0" max="1" step="0.05" aria-label="Volume">
                 </div>
                 <div class="pl-menu-wrap">
-                    <button class="pl-btn" data-act="subs" aria-label="Subtitles" aria-haspopup="menu" aria-expanded="false" title="Subtitles (C)">${icon('subtitles')}</button>
+                    <button class="pl-btn" data-act="subs" aria-label="Audio and subtitles" aria-haspopup="menu" aria-expanded="false" title="Audio & subtitles (C: subtitles on/off)">${icon('subtitles')}</button>
                     <div class="pl-menu" role="menu" hidden></div>
                 </div>
                 <button class="pl-btn" data-act="pip" aria-label="Picture in picture" title="Picture in picture">${icon('pip')}</button>
@@ -95,6 +95,10 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     let lastSubs = null;
     // The subtitle manager (js/player/subtitles.js), set once the file is known
     let subs = { list: () => [], current: () => null, select: () => {} };
+    // The audio tracks (js/pages/play.js switches them with the server), set once the file is known
+    let audio = { list: () => [], current: () => null, select: () => {} };
+    // Worth a menu: some subtitles, or more than one audio track
+    const paintMenuButton = () => { $('.pl-menu-wrap').hidden = !subs.list().length && audio.list().length < 2; };
 
     const duration = () => (Number.isFinite(video.duration) && video.duration) || runtime() || 0;
     $('.pl-seek-mark').style.left = `${watchedAt * 100}%`;
@@ -174,11 +178,20 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     const openMenu = () => {
         const list = subs.list();
         const current = subs.current();
-        const item = (label, id, selected) => `<button class="pl-menu-item" role="menuitemradio" aria-checked="${selected}" data-track="${id}">
+        const item = (label, attr, id, selected) => `<button class="pl-menu-item" role="menuitemradio" aria-checked="${selected}" ${attr}="${id}">
             <span class="pl-menu-check">${selected ? icon('check') : ''}</span>${label}</button>`;
-        menu.innerHTML = `<div class="pl-menu-title">Subtitles</div>`
-            + item('Off', 'off', current == null)
-            + list.map(t => item(escapeHtml(t.label), t.id, t.id === current)).join('');
+        const tracks = audio.list();
+        const nowAudio = audio.current();
+        menu.innerHTML = (tracks.length > 1
+            ? `<div class="pl-menu-title">Audio</div>`
+                + tracks.map(t => item(escapeHtml(t.label), 'data-audio', t.id, t.id === nowAudio)).join('')
+                + (list.length ? '<div class="pl-menu-divider" role="separator"></div>' : '')
+            : '')
+            + (list.length
+                ? `<div class="pl-menu-title">Subtitles</div>`
+                    + item('Off', 'data-track', 'off', current == null)
+                    + list.map(t => item(escapeHtml(t.label), 'data-track', t.id, t.id === current)).join('')
+                : '');
         menu.hidden = false;
         subsBtn.setAttribute('aria-expanded', 'true');
         wake();
@@ -209,7 +222,12 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         }
         const item = ev.target.closest('.pl-menu-item');
         if (item) {
-            setSubs(item.dataset.track === 'off' ? null : Number(item.dataset.track));
+            if (item.dataset.audio != null) {
+                const id = Number(item.dataset.audio);
+                if (id !== audio.current()) audio.select(id);
+            } else {
+                setSubs(item.dataset.track === 'off' ? null : Number(item.dataset.track));
+            }
             closeMenu();
             return;
         }
@@ -404,10 +422,15 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     return {
         setSubtitles(manager) {
             subs = manager;
-            $('.pl-menu-wrap').hidden = !manager.list().length;
+            paintMenuButton();
             const current = manager.current();
             if (current != null) lastSubs = current;
             subsBtn.classList.toggle('is-on', current != null);
+        },
+        // { list() -> [{ id, label }], current() -> id, select(id) }
+        setAudio(manager) {
+            audio = manager;
+            paintMenuButton();
         },
         // While Jellyfin extracts the file's subtitles (the first time only: 4–40 s, it reads the whole file)
         setSubtitlesLoading(on) {
