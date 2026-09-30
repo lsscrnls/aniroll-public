@@ -1,13 +1,13 @@
-import * as api from '../api.js?v=121';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=121';
-import { getToken, isLoggedIn } from '../auth.js?v=121';
-import { getConfig, jfAuth, deviceId } from '../jellyfin.js?v=121';
-import { availability } from '../player/availability.js?v=121';
-import { findEpisode, jfGet } from '../player/library.js?v=121';
-import { deviceProfile } from '../player/profile.js?v=121';
-import { HtmlVideoEngine } from '../player/engine.js?v=121';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=121';
-import { createSubtitles } from '../player/subtitles.js?v=121';
+import * as api from '../api.js?v=122';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=122';
+import { getToken, isLoggedIn } from '../auth.js?v=122';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=122';
+import { availability } from '../player/availability.js?v=122';
+import { findEpisode, jfGet } from '../player/library.js?v=122';
+import { deviceProfile } from '../player/profile.js?v=122';
+import { HtmlVideoEngine } from '../player/engine.js?v=122';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=122';
+import { createSubtitles } from '../player/subtitles.js?v=122';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -50,6 +50,7 @@ export async function render({ params, content }) {
     let closed = false;
     let controls = null;
     let subtitles = null;
+    let offTracked = () => {};
 
     const status = (text, { error = false } = {}) => {
         const box = $('player-status');
@@ -84,6 +85,7 @@ export async function render({ params, content }) {
         clearInterval(reportTimer);
         controls?.destroy();
         subtitles?.destroy();
+        offTracked();
         window.removeEventListener('pagehide', onPageHide);
         document.body.classList.remove('player-open');
         stopSession(session, engine.time);
@@ -97,7 +99,8 @@ export async function render({ params, content }) {
         if (!cfg) throw new Error('Connect Jellyfin in Settings to play episodes here');
         if (!(mediaId > 0) || !(episode > 0)) throw new Error('No such episode');
 
-        const [avail, media] = await Promise.all([availability(true), api.getMedia(mediaId, token)]);
+        // The show as the last episode left it (Up next, the episode list): no second look-up on AniList
+        const [avail, media] = await Promise.all([availability(true), carriedMedia(mediaId) || api.getMedia(mediaId, token)]);
         if (closed) return cleanup;
         $('player-show').textContent = titlePref(media.title);
         if (!avail) throw new Error('Your Jellyfin server cannot be reached right now');
@@ -227,7 +230,7 @@ export async function render({ params, content }) {
             controls.setNext({
                 title: `Episode ${nextNumber}${n.name && !/^episode \d+$/i.test(n.name) ? ` · ${n.name}` : ''}`,
                 // Replaces this episode in the history: Back still leads to where Play was pressed
-                go: () => location.replace(`#/play/${mediaId}/${nextNumber}`),
+                go: () => { upNextArrival = `${mediaId}/${nextNumber}`; location.replace(`#/play/${mediaId}/${nextNumber}`); },
             });
         });
 
@@ -240,9 +243,19 @@ export async function render({ params, content }) {
             }
             if (!session.done && total && engine.time / total >= WATCHED_AT) {
                 session.done = true;
-                if (isLoggedIn()) saveEpisode(media, episode, token);
+                if (isLoggedIn()) saveEpisode(media, mediaId, episode, token);
             }
         });
+        // Jellyfin's webhook got there first (our server wrote it): nothing left to write from here
+        const onTracked = (e) => {
+            const item = e.detail;
+            if (item?.status !== 'saved' || item.mediaId !== mediaId || !(item.progress >= episode)) return;
+            session.done = true;
+            media.mediaListEntry = { ...(media.mediaListEntry || {}), progress: item.progress, ...(item.entryStatus ? { status: item.entryStatus } : {}) };
+            carry(mediaId, media);
+        };
+        window.addEventListener(TRACKED_EVENT, onTracked);
+        offTracked = () => window.removeEventListener(TRACKED_EVENT, onTracked);
         const report = () => reportProgress(session, engine);
         video.addEventListener('pause', report);
         video.addEventListener('play', report);
@@ -251,6 +264,14 @@ export async function render({ params, content }) {
         loadSegments(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setSegments(list); });
         await reportStart(session, engine);
         reportTimer = setInterval(report, REPORT_EVERY);
+        // Stopped part-way before: continue there or start over. Not when Up next brought us here
+        const cameByUpNext = upNextArrival === `${mediaId}/${episode}`;
+        upNextArrival = null;
+        if (startTime > 0 && !cameByUpNext) {
+            const choice = await controls.askResume(startTime);
+            if (closed) return cleanup;
+            if (choice === 'restart') engine.seek(0);
+        }
         engine.play().catch(() => { /* autoplay refused: the controls are there */ });
     } catch (err) {
         if (!closed) status(err.message || 'Playback failed', { error: true });
@@ -553,12 +574,24 @@ function stopSession(session, time) {
 // ===== AniList =====
 // Once per episode page, forward only. The Jellyfin webhook may report the same episode from the
 // server side — whoever comes second finds the progress already there and writes nothing.
-async function saveEpisode(media, episode, token) {
+// The show travels on to the next episode's page (Up next, the episode list), with the list entry
+// as this page left it: one AniList request per episode, the one that saves it
+const CARRY_MS = 3 * 60 * 60 * 1000;
+// The episode Up next is opening: it starts right away, no Continue / Start over question
+let upNextArrival = null;
+let carried = null; // { id (as in the address), media, at }
+function carry(id, media) { carried = { id, media, at: Date.now() }; }
+function carriedMedia(id) {
+    return carried && carried.id === id && Date.now() - carried.at < CARRY_MS ? carried.media : null;
+}
+
+async function saveEpisode(media, mediaId, episode, token) {
     const user = getState().user;
     if (!user?.id || !token) return;
     const total = media.episodes || null;
     try {
-        const entry = await api.getUserMediaProgress(user.id, media.id, token);
+        // The entry came with the show at the start: no second read before writing
+        const entry = media.mediaListEntry || null;
         let vars;
         if (!entry) {
             vars = { mediaId: media.id, progress: episode, status: total && episode >= total ? 'COMPLETED' : 'CURRENT', startedAt: api.fuzzyToday() };
@@ -572,7 +605,10 @@ async function saveEpisode(media, episode, token) {
         } else {
             vars = api.progressVars(entry, episode, total);
         }
-        const saved = await api.saveMediaListEntry(vars, token);
+        // Jellyfin played it, so it knows: no mirroring back (that cost a title lookup on AniList)
+        const saved = await api.saveMediaListEntry(vars, token, { mirror: false });
+        media.mediaListEntry = { ...(entry || {}), ...saved };
+        carry(mediaId, media);
         emitListChange({ mediaId: media.id, status: saved.status, progress: saved.progress });
         emitWatched(media);
         toast(saved.status === 'COMPLETED' ? `${titlePref(media.title)} completed` : `Episode ${saved.progress} saved to AniList`, 'success');

@@ -1244,7 +1244,10 @@ async function handle(req, res) {
             seatQueue.delete(owner.key);
             return json(res, 200, { ok: true });
         }
-        return json(res, 200, { ...claimSeat(owner.key, owner.vip), max: seatSettings.max });
+        // The maintenance state rides along, so a logged-in app needs no second request a minute
+        const m = readMaintenance();
+        return json(res, 200, { ...claimSeat(owner.key, owner.vip), max: seatSettings.max,
+            maintenance: !!m, ...(m ? { note: str(m.note, 200) } : {}) });
     }
 
     if (pathname === '/api/admin/stats' && req.method === 'GET') {

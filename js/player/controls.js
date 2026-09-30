@@ -479,6 +479,41 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             if (current != null) lastSubs = current;
             subsBtn.classList.toggle('is-on', current != null);
         },
+        // Continue where it stopped or start over: resolves 'continue' | 'restart'. Enter continues
+        askResume(seconds) {
+            return new Promise(resolve => {
+                const box = document.createElement('div');
+                box.className = 'pl-resume';
+                box.setAttribute('role', 'dialog');
+                box.setAttribute('aria-label', 'Continue watching');
+                box.innerHTML = `<div class="pl-resume-card">
+                    <div class="pl-resume-title">You stopped at ${fmtTime(seconds)}</div>
+                    <div class="pl-resume-actions">
+                        <button class="pl-resume-btn is-primary" data-resume="continue">${icon('play')}Continue at ${fmtTime(seconds)}</button>
+                        <button class="pl-resume-btn" data-resume="restart">${icon('back10')}Start over</button>
+                    </div>
+                </div>`;
+                const done = (choice) => {
+                    offKey();
+                    box.remove();
+                    root.classList.remove('has-resume');
+                    wake();
+                    resolve(choice);
+                };
+                box.addEventListener('click', (ev) => {
+                    const b = ev.target.closest('[data-resume]');
+                    ev.stopPropagation();
+                    if (b) done(b.dataset.resume);
+                });
+                const onKey = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); done('continue'); } };
+                document.addEventListener('keydown', onKey, true);
+                const offKey = () => document.removeEventListener('keydown', onKey, true);
+                offs.push(offKey);
+                root.appendChild(box);
+                root.classList.add('has-resume');
+                box.querySelector('[data-resume="continue"]').focus();
+            });
+        },
         // { list() -> [{ id: 'auto' | 'max' | bps, label }], current(), select(id) }
         setQuality(manager) {
             quality = manager;
