@@ -10,7 +10,9 @@ const demo = require('./demo');
 const ROOT = path.join(__dirname, '..', '..');
 const OUT = process.env.OUT || path.join(__dirname, 'out');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png',
-    '.jpg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
+    '.jpg': 'image/jpeg', '.webp': 'image/webp', '.mp4': 'video/mp4', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json',
+    // libass (JASSUB) compiles only from the right type, as nginx serves it live
+    '.wasm': 'application/wasm', '.mjs': 'text/javascript' };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const only = process.argv.slice(2);
 const want = n => !only.length || only.includes(n);
@@ -364,6 +366,107 @@ function staticServer() {
         const l = await (await context({ loggedIn: false })).newPage();
         await l.goto(base + '/#/'); await still(l, 'landing', 4000);
         await l.context().close();
+    }
+
+    // The player, from a real Jellyfin (run.sh: JF, SHOW_ID, EPISODE, SEEK): the detail page's Episodes list,
+    // Play, the stream with its subtitles, the controls and the Audio & subtitles menu. Google Chrome: Playwright's
+    // Chromium has no H.264. Material 3, the design the player is built in
+    if (want('player')) {
+        const jf = JSON.parse(fs.readFileSync(process.env.JF, 'utf8'));
+        const showId = Number(process.env.SHOW_ID);
+        const episode = Number(process.env.EPISODE) || 1;
+        if (!showId) throw new Error('player clip: SHOW_ID missing');
+        const chrome = await chromium.launch({ channel: 'chrome', args: process.env.GPU
+            ? ['--enable-gpu', '--ignore-gpu-blocklist', '--use-gl=angle', '--use-angle=gl-egl', '--autoplay-policy=no-user-gesture-required']
+            : ['--autoplay-policy=no-user-gesture-required'] });
+        const ctx = await chrome.newContext({ viewport: { width: 1440, height: 810 }, colorScheme: 'dark' });
+        await ctx.addInitScript(([user, jf]) => {
+            if (sessionStorage.getItem('init')) return;
+            sessionStorage.setItem('init', '1');
+            const set = { aniroll_theme: 'dark', aniroll_design: 'm3', aniroll_seen_changes: '9999', aniroll_token: 'demo',
+                aniroll_user: JSON.stringify(user), aniroll_user_ts: String(Date.now()),
+                aniroll_jf_url: jf.url, aniroll_jf_apikey: jf.token, aniroll_jf_userid: jf.userId, aniroll_jf_username: jf.userName,
+                aniroll_jf_servername: jf.server, aniroll_jf_kind: 'user', aniroll_jf_scope: 'device' };
+            for (const [k, v] of Object.entries(set)) localStorage.setItem(k, v);
+        }, [{ ...demo.VIEWER, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }, { url: 'http://localhost:8096', ...jf }]);
+        await ctx.route('https://graphql.anilist.co/**', async route => {
+            let body;
+            try { body = await demo.respond(route.request().postDataJSON()); } catch (e) { body = { errors: [{ message: e.message }] }; }
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+        });
+        await ctx.route(`${base}/api/**`, r => r.fulfill({ status: 404, contentType: 'application/json', body: '{}' }));
+        const pp = await ctx.newPage();
+        pp.on('pageerror', e => console.log('pageerror', e.message));
+        pp.on('console', m => { if (['warning', 'error'].includes(m.type())) console.log('console', m.type(), m.text().slice(0, 200)); });
+        await pp.goto(base + '/#/');
+        await wait(4000);
+        // The show's page first, loaded before the recording starts
+        await pp.evaluate(id => { localStorage.removeItem('aniroll_req_times'); location.hash = `#/anime/${id}/full`; }, showId);
+        await pp.waitForSelector('.detail-episodes', { timeout: 20000 });
+        await wait(1500);
+        await settle(pp, false);
+        mouse = { x: 900, y: 300 };
+        await clip(pp, 'player', async () => {
+            await wait(900);
+            await glide(pp, '.detail-episodes', { click: true });
+            await pp.waitForSelector('.ep-row', { timeout: 15000 });
+            await wait(900);
+            // Pick the episode from the list, as a person would (scrolled into the list's view first)
+            await pp.evaluate(n => document.querySelector(`.ep-row[href$="/${n}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), episode);
+            await wait(700);
+            await glide(pp, `.ep-row[href$="/${episode}"]`, { steps: 40 });
+            await wait(500);
+            await glide(pp, `.ep-row[href$="/${episode}"]`, { click: true, steps: 2 });
+            await pp.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 3 && !v.paused; }, null, { timeout: 45000 })
+                .catch(async (err) => {
+                    await pp.screenshot({ path: path.join(OUT, 'debug.png') });
+                    console.log('player state:', JSON.stringify(await pp.evaluate(() => { const v = document.getElementById('player-video');
+                        return { hash: location.hash, status: document.getElementById('player-status')?.textContent.trim(), method: document.getElementById('player-method')?.textContent,
+                            ready: v?.readyState, paused: v?.paused, src: (v?.currentSrc || '').slice(0, 60), error: v?.error?.message }; })));
+                    throw err;
+                });
+            if (process.env.SEEK) {
+                await pp.evaluate(t => { document.getElementById('player-video').currentTime = Number(t); }, process.env.SEEK);
+                await pp.waitForFunction(() => document.getElementById('player-video').readyState >= 3, null, { timeout: 30000 });
+            }
+            await wait(2000);
+            // In the intro: the Audio & subtitles menu, the dialogue track picked (not the signs-only one)
+            await glide(pp, '[data-act="subs"]', { click: true });
+            await wait(1400);
+            const dialogue = await pp.evaluate(() => {
+                const items = [...document.querySelectorAll('.pl-menu-item[data-track]:not([data-track="off"])')];
+                const pick = items.find(i => !/forced|signs/i.test(i.textContent) && /eng/i.test(i.textContent));
+                if (!pick || pick.getAttribute('aria-checked') === 'true') return false;
+                pick.id = 'showcase-dialogue';
+                return true;
+            });
+            if (dialogue) {
+                await glide(pp, '#showcase-dialogue', { steps: 25 });
+                await wait(400);
+                await glide(pp, '#showcase-dialogue', { click: true, steps: 2 });
+            } else {
+                await pp.keyboard.press('Escape');
+            }
+            await wait(900);
+            // Skip intro, pressed like a person would: the episode goes on where people start talking
+            if (await pp.locator('.pl-skip-segment:not([hidden])').count()) {
+                await glide(pp, '.pl-skip-segment', { steps: 35 });
+                await wait(500);
+                await glide(pp, '.pl-skip-segment', { click: true, steps: 2 });
+                await pp.waitForFunction(() => document.getElementById('player-video').readyState >= 3, null, { timeout: 30000 }).catch(() => {});
+            }
+            await glide(pp, '.player-video', { steps: 25 });
+            await wait(6500);
+            // The wave: where you are, what's buffered, the 90 % mark
+            await glide(pp, '.pl-seek', { steps: 30 });
+            await wait(2000);
+            await glide(pp, '.player-video', { steps: 25 });
+            await wait(2500);
+            console.log('subtitles:', JSON.stringify(await pp.evaluate(() => ({
+                canvases: [...document.querySelectorAll('.pl-subs-canvas')].map(c => `${c.tagName}:${c.width}x${c.height}:${c.hidden ? 'hidden' : 'shown'}`),
+                checked: [...document.querySelectorAll('.pl-menu-item[aria-checked="true"]')].map(e => e.textContent.trim()) }))));
+        });
+        await chrome.close();
     }
 
     await browser.close();
