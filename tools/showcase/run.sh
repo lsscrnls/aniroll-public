@@ -13,9 +13,19 @@ mkdir -p "$OUT"
 # then record at full frame rate instead of stalling in software rendering
 GPU=()
 if docker info 2>/dev/null | grep -q nvidia; then GPU=(--gpus all -e NVIDIA_DRIVER_CAPABILITIES=all -e GPU=1); fi
-docker run --rm "${GPU[@]}" -v "$ROOT":/work -e OUT=/work/$OUT -e NODE_PATH=/tmp/e2e/node_modules \
+# The player clip plays from a real Jellyfin: JF=<file> holds { url, token, userId, userName, server } (never
+# committed), the container shares the host's network to reach it, and Google Chrome replaces Playwright's
+# Chromium, which cannot decode H.264 (what Jellyfin converts to)
+PLAYER=()
+CHROME=""
+if [[ " $* " == *" player "* ]]; then
+    [ -n "${JF:-}" ] && [ -f "$JF" ] || { echo "player clip: set JF=<file with the Jellyfin login>" >&2; exit 1; }
+    PLAYER=(--network host -v "$JF":/jf.json:ro -e JF=/jf.json -e SHOW_ID="${SHOW_ID:-}" -e EPISODE="${EPISODE:-1}" -e SEEK="${SEEK:-}")
+    CHROME="npx playwright install --with-deps chrome >/dev/null 2>&1 && "
+fi
+docker run --rm "${GPU[@]}" "${PLAYER[@]}" -v "$ROOT":/work -e OUT=/work/$OUT -e NODE_PATH=/tmp/e2e/node_modules \
     mcr.microsoft.com/playwright:v1.63.0-noble sh -c \
-    "cp -r /work/tools/e2e /tmp/e2e && cd /tmp/e2e && npm ci --silent >/dev/null 2>&1 && node /work/tools/showcase/record.js $*; chown -R $(id -u):$(id -g) /work/$OUT"
+    "cp -r /work/tools/e2e /tmp/e2e && cd /tmp/e2e && npm ci --silent >/dev/null 2>&1 && ${CHROME}node /work/tools/showcase/record.js $*; chown -R $(id -u):$(id -g) /work/$OUT"
 
 mkdir -p media docs/screenshots
 for dir in "$OUT"/clips/*/; do

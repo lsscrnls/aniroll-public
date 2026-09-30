@@ -53,6 +53,10 @@ New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start read
 | **Taste match** | **Home** |
 | ![Recommendations with their match, one opened in the detail panel](docs/screenshots/clip-match.webp) | ![Home: the show you're on, a countdown to its next episode, then Continue Watching](docs/screenshots/home.webp) |
 
+**Play from Jellyfin**: an episode picked from the list, Skip intro, subtitles drawn the way the release styled them
+
+![The player: Episodes on a show's page, an episode started, the Audio & subtitles menu, Skip intro, then the episode with its styled subtitles](docs/screenshots/clip-player.webp)
+
 <p align="center">
   <img src="docs/screenshots/mobile-roll.webp" width="260" alt="Roll on a phone">
   &nbsp;&nbsp;
