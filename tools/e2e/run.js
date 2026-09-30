@@ -901,6 +901,21 @@ function staticServer() {
     // Material 3 only: shaped tiles with trending covers, the colour section with its clip, no design switch
     const m3landing = await fresh.evaluate(() => ({ design: document.documentElement.dataset.design, tiles: document.querySelectorAll('.lp-tile').length,
         colour: document.querySelector('.lp-colour video')?.getAttribute('src'), tryDesign: !!document.querySelector('[data-try-design], .landing-designs') }));
+    // The colour shapes: the page in that palette for a look, nothing stored, back with "From the show"
+    const palette = await fresh.evaluate(async () => {
+        const primary = () => getComputedStyle(document.documentElement).getPropertyValue('--md-primary').trim();
+        const before = primary();
+        document.querySelector('[data-preview-seed="#006a6a"]').click();
+        await new Promise(r => setTimeout(r, 1200));
+        const picked = primary();
+        const pressed = document.querySelector('[data-preview-seed="#006a6a"]').getAttribute('aria-pressed');
+        const stored = localStorage.getItem('aniroll_m3_seed');
+        document.querySelector('[data-preview-seed=""]').click();
+        await new Promise(r => setTimeout(r, 1200));
+        return { before, picked, pressed, stored, after: primary() };
+    });
+    check('landing: a colour shape turns the page into its palette, keeps nothing, and goes back',
+        palette.picked !== palette.before && palette.pressed === 'true' && palette.stored === null && palette.after === palette.before, palette);
     check('landing: Material 3 only, shaped cover tiles, the colours section, no design switch',
         m3landing.design === 'm3' && m3landing.tiles === 6 && m3landing.colour === 'media/m3.mp4' && !m3landing.tryDesign, m3landing);
     await fresh.close();
@@ -936,6 +951,10 @@ function staticServer() {
         teaser.heads.some(h => h.startsWith('A new Home')) && teaser.teaser && played.wide && played.video === 'media/design-aniroll.mp4' && played.width > 600, { ...teaser, ...played });
     await clipped.close();
     await late.close();
+
+    // Checks kept out of the published source, when present
+    const extra = path.join(__dirname, 'private.js');
+    if (fs.existsSync(extra)) await require(extra)({ browser, base, check, respond, VIEWER, errors });
 
     check('no errors on any page', !errors.length, errors.join('\n      '));
     await browser.close();

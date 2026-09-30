@@ -206,6 +206,16 @@ const design = process.env.DESIGN || 'm3';
         await wait(1500);
         await q.screenshot({ path: path.join(OUT, `${theme}-${name}.png`), fullPage: true });
         console.log('shot', name);
+        // A palette picked from the colour shapes: the hero and the section in it
+        await q.evaluate(() => document.querySelector('[data-preview-seed="#b33b15"]')?.scrollIntoView({ block: 'center' }));
+        await wait(800);
+        await q.click('[data-preview-seed="#b33b15"]').catch(() => {});
+        await wait(1800);
+        await q.screenshot({ path: path.join(OUT, `${theme}-${name}-picked.png`) });
+        await q.evaluate(() => window.scrollTo(0, 0));
+        await wait(800);
+        await q.screenshot({ path: path.join(OUT, `${theme}-${name}-picked-top.png`) });
+        console.log('shot', name + '-picked');
     }
     await landing(p, 'landing');
     await player(p, 'player', false);

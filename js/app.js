@@ -91,6 +91,7 @@ async function init() {
     }
     if (isLoggedIn()) setupPendingSaveRetry();
     if (isLoggedIn()) setupJellyfinPull();
+    if (isLoggedIn()) import('./drift.js?v=121').then(m => m.startDrift()).catch(() => { /* not essential */ });
     watchMaintenanceMode();
 }
 
@@ -305,6 +306,11 @@ function setupRoutes() {
     // The owner's view of how busy AniRoll is (the server checks who asks)
     route('/admin', async (ctx) => {
         const { render } = await import('./pages/admin.js?v=121');
+        return render(ctx);
+    });
+
+    route('/shelf', async (ctx) => {
+        const { render } = await import('./pages/shelf.js?v=121');
         return render(ctx);
     });
 
