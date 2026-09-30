@@ -5,3 +5,5 @@ js/reel.js
 js/pages/watchparty.js
 js/taste.js
 api/party.js
+js/drift.js
+js/pages/shelf.js

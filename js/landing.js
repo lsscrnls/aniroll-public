@@ -1,4 +1,5 @@
 import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=121';
+import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=121';
 
 // The landing page, in Material 3 Expressive (the only design logged out): the headline arrives word by word,
 // covers of what's trending pop into shaped tiles, the big clip tilts upright while it scrolls in, and the
@@ -12,16 +13,19 @@ export const TOUR = [
     { key: 'player', title: 'Play from your Jellyfin', text: 'Your own server, right here: subtitles as the release styled them, Skip intro, and your list moves on by itself.' },
 ];
 
-// Shaped tiles for the hero; the covers come from what's trending (fillCollage)
-const TILES = ['flower', 'cookie9', 'arch', 'clover4', 'cookie12', 'sunny'];
+// Shaped tiles for the hero, as Material 3 does it: pictures in calm shapes that suit a portrait poster
+// (arch, squircle, a soft 12-scallop), the playful shapes only as colour; covers from what's trending
+const TILES = [
+    { shape: 'arch', img: true }, { shape: 'squircle', img: true }, { shape: 'cookie12', img: true },
+    { shape: 'flower' }, { shape: 'sunny' }, { shape: 'clover4' },
+];
 export function renderCollage() {
     return `<div class="lp-collage" aria-hidden="true">
-        ${TILES.map((shape, i) => `<span class="lp-tile lp-tile-${i + 1} lp-shape-${shape}"></span>`).join('')}
+        ${TILES.map((t, i) => `<span class="lp-tile lp-tile-${i + 1} lp-shape-${t.shape}${t.img ? ' lp-tile-img' : ''}"></span>`).join('')}
     </div>`;
 }
 export function fillCollage(root, media) {
-    // The last, small tile stays a plain accent in the scheme's colour
-    const tiles = [...root.querySelectorAll('.lp-tile')].slice(0, -1);
+    const tiles = [...root.querySelectorAll('.lp-tile-img')];
     media.filter(m => m.coverImage?.extraLarge || m.coverImage?.large).slice(0, tiles.length).forEach((m, i) => {
         const url = m.coverImage.extraLarge || m.coverImage.large;
         const img = new Image();
@@ -30,13 +34,18 @@ export function fillCollage(root, media) {
     });
 }
 
-// Material 3 takes its colours from the show you watched last: the clip shows it, the swatches hint at it
+// Material 3 takes its colours from the show you watched last: the clip shows it, and each shape below it
+// turns the whole page into its palette for a look (nothing is kept)
+const SWATCH_SHAPES = ['cookie9', 'flower', 'clover4', 'cookie12', 'sunny', 'arch', 'burst', 'squircle'];
 export function renderColour() {
     return `<section class="lp-colour">
         <div class="lp-colour-text">
             <h2 class="landing-tour-title">In the colours of what you watch</h2>
             <p class="landing-tour-sub">Finish an episode and AniRoll takes on its colours: the cover becomes your wallpaper, every surface follows. Or pick a palette of your own.</p>
-            <div class="lp-swatches" aria-hidden="true">${['#8e4957', '#b33b15', '#8b5000', '#4c662b', '#006a6a', '#415f91', '#8a4c9e'].map((c, i) => `<span style="--c:${c};--shape:var(--m3-shape-${['cookie9', 'flower', 'clover4', 'cookie12', 'sunny', 'arch', 'burst'][i]})"></span>`).join('')}</div>
+            <div class="lp-swatches" role="group" aria-label="Try a palette">
+                <button type="button" class="lp-swatch-reset" data-preview-seed="" aria-pressed="true">From the show</button>
+                ${SEEDS.filter(x => x.hex !== SHOW_SEED).map((x, i) => `<button type="button" class="lp-swatch lp-shape-${SWATCH_SHAPES[i % SWATCH_SHAPES.length]}" style="--c:${x.hex}" data-preview-seed="${x.hex}" aria-pressed="false" aria-label="${x.name}" title="${x.name}"></button>`).join('')}
+            </div>
         </div>
         <div class="lp-colour-frame">
             <video class="landing-video" src="media/m3.mp4" poster="media/m3.jpg" muted loop playsinline preload="none" aria-label="AniRoll taking on the colours of a show"></video>
@@ -156,6 +165,18 @@ export function initLanding(root) {
     }
 
     items.forEach((el, i) => el.addEventListener('click', () => select(i)));
+
+    // The palette shapes: the page takes on the picked colours, spreading from the shape
+    const swatches = [...root.querySelectorAll('[data-preview-seed]')];
+    let previewing = false;
+    swatches.forEach(btn => btn.addEventListener('click', (e) => {
+        const hex = btn.dataset.previewSeed || null;
+        swatches.forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+        const r = btn.getBoundingClientRect();
+        previewing = !!hex;
+        reveal(() => previewSeed(hex), { x: e.clientX || r.left + r.width / 2, y: e.clientY || r.top + r.height / 2 });
+    }));
+    cleanups.push(() => { if (previewing) previewSeed(null); });
 
     // "See what's inside": down to the tour (a hash link would go to the router)
     root.querySelector('[data-scroll-to]')?.addEventListener('click', (e) => {

@@ -78,12 +78,17 @@ let enhancer = null;
 
 // Switches with a flourish: the new design spreads as a circle from where it was chosen (View Transitions,
 // where supported; elsewhere it just switches). Waits for the stylesheet, so the circle never shows a half-styled page.
-export async function switchDesign(design, loggedIn, from) {
+export function switchDesign(design, loggedIn, from) {
+    return reveal(() => setDesign(design, loggedIn), from);
+}
+
+// Any change of the whole look, spreading as a circle from `from` ({ x, y }) where View Transitions exist
+export async function reveal(change, from) {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!document.startViewTransition || reduce || !from) return setDesign(design, loggedIn);
+    if (!document.startViewTransition || reduce || !from) return change();
     const root = document.documentElement;
     root.classList.add('design-swap');
-    const vt = document.startViewTransition(() => setDesign(design, loggedIn));
+    const vt = document.startViewTransition(change);
     vt.ready.then(() => {
         const r = Math.hypot(Math.max(from.x, innerWidth - from.x), Math.max(from.y, innerHeight - from.y));
         root.animate({ clipPath: [`circle(0px at ${from.x}px ${from.y}px)`, `circle(${r}px at ${from.x}px ${from.y}px)`] },
@@ -91,6 +96,28 @@ export async function switchDesign(design, loggedIn, from) {
     }).catch(() => {});
     try { await vt.finished; } catch { /* skipped */ }
     root.classList.remove('design-swap');
+}
+
+// The landing page's colour shapes: the page in another palette for a look, nothing kept. The show's own
+// colours (a class on <html>) step aside meanwhile; null goes back to what the page had
+let previewStash = null; // the show's colour classes, taken off <html> while a preview shows
+export async function previewSeed(hex) {
+    const root = document.documentElement;
+    if (!hex) {
+        if (previewStash) root.classList.add(...previewStash);
+        previewStash = null;
+        let cached = null;
+        try { cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch { /* none */ }
+        if (cached?.css) writeScheme(cached.css);
+        else await applyDesign(false);
+        return;
+    }
+    const css = await buildSchemeCss(hex, getVariant());
+    if (!previewStash) {
+        previewStash = [...root.classList].filter(c => c === 'm3-scope' || c.startsWith('m3-c-'));
+        root.classList.remove(...previewStash);
+    }
+    writeScheme(css);
 }
 
 // Logged out: always Material 3 (the landing page exists only in it). index.html starts in M3 with its
