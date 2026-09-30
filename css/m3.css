@@ -1989,14 +1989,16 @@
     background: var(--md-primary-container) center / cover no-repeat;
     transition: transform .6s var(--m3-bouncy), background-color .3s var(--md-standard);
 }
-:root[data-design="m3"] .lp-tile:not(.has-cover):nth-child(even) { background-color: var(--md-tertiary-container); }
-:root[data-design="m3"] .lp-tile:hover { transform: rotate(var(--turn-hover, 12deg)) scale(1.04); }
-:root[data-design="m3"] .lp-tile-1 { left: 4%; top: 6%; width: 50%; aspect-ratio: 1; transform: rotate(-8deg); }
-:root[data-design="m3"] .lp-tile-2 { right: 2%; top: 0; width: 40%; aspect-ratio: 1; transform: rotate(10deg); }
-:root[data-design="m3"] .lp-tile-3 { right: 6%; top: 42%; width: 34%; aspect-ratio: 1; }
-:root[data-design="m3"] .lp-tile-4 { left: 0; bottom: 6%; width: 30%; aspect-ratio: 1; transform: rotate(14deg); }
-:root[data-design="m3"] .lp-tile-5 { left: 32%; bottom: 0; width: 36%; aspect-ratio: 1; transform: rotate(-6deg); }
-:root[data-design="m3"] .lp-tile-6 { left: 44%; top: 34%; width: 20%; aspect-ratio: 1; background-color: var(--md-primary); }
+:root[data-design="m3"] .lp-tile-img { background-color: var(--md-surface-container-high); background-position: center 22%; }
+:root[data-design="m3"] .lp-tile:hover { transform: rotate(var(--turn-hover, 6deg)) scale(1.03); }
+/* Three posters, portrait like the covers; the colour shapes sit between them */
+:root[data-design="m3"] .lp-tile-1 { left: 4%; top: 2%; width: 46%; aspect-ratio: 3 / 4; transform: rotate(-4deg); }
+:root[data-design="m3"] .lp-tile-2 { right: 2%; top: 12%; width: 40%; aspect-ratio: 3 / 4; transform: rotate(5deg); }
+:root[data-design="m3"] .lp-tile-3 { left: 30%; bottom: 0; width: 38%; aspect-ratio: 1; transform: rotate(-3deg); }
+:root[data-design="m3"] .lp-tile-4 { left: 2%; bottom: 8%; width: 24%; aspect-ratio: 1; background-color: var(--md-primary-container); transform: rotate(12deg); }
+:root[data-design="m3"] .lp-tile-5 { right: 8%; bottom: 4%; width: 20%; aspect-ratio: 1; background-color: var(--md-tertiary-container); }
+:root[data-design="m3"] .lp-tile-6 { left: 46%; top: 0; width: 12%; aspect-ratio: 1; background-color: var(--md-primary); transform: rotate(20deg); }
+:root[data-design="m3"] .lp-shape-squircle { clip-path: var(--m3-shape-squircle); }
 :root[data-design="m3"] .lp-shape-flower { clip-path: var(--m3-shape-flower); }
 :root[data-design="m3"] .lp-shape-cookie9 { clip-path: var(--m3-shape-cookie9); }
 :root[data-design="m3"] .lp-shape-arch { clip-path: var(--m3-shape-arch); }
@@ -2033,15 +2035,34 @@
     margin-top: calc(var(--space-3xl) * 1.5);
 }
 :root[data-design="m3"] .lp-colour-frame { aspect-ratio: 16 / 9; }
-:root[data-design="m3"] .lp-swatches { display: flex; flex-wrap: wrap; gap: 10px; margin-top: var(--space-lg); }
-:root[data-design="m3"] .lp-swatches span {
-    width: 44px;
-    height: 44px;
+:root[data-design="m3"] .lp-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: var(--space-lg); }
+:root[data-design="m3"] .lp-swatch {
+    width: 48px;
+    height: 48px;
+    border: 0;
+    padding: 0;
     background: var(--c);
-    clip-path: var(--shape);
+    cursor: pointer;
     transition: transform .5s var(--m3-bouncy);
 }
-:root[data-design="m3"] .lp-swatches span:hover { transform: rotate(30deg) scale(1.15); }
+:root[data-design="m3"] .lp-swatch:hover { transform: rotate(30deg) scale(1.12); }
+/* The one in use: bigger and turned, the way a picked palette looks in Settings */
+:root[data-design="m3"] .lp-swatch[aria-pressed="true"] { transform: rotate(45deg) scale(1.28); }
+:root[data-design="m3"] .lp-swatch:focus-visible { outline: 3px solid var(--md-primary); outline-offset: 4px; }
+:root[data-design="m3"] .lp-swatch-reset {
+    height: 40px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 20px;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--md-surface-container-high);
+    color: var(--md-on-surface);
+    transition: background-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .lp-swatch-reset[aria-pressed="true"] { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
 
 /* And there's more: tonal cards, the icon in a cookie */
 :root[data-design="m3"] .lp .landing-more-title { font-weight: 800; letter-spacing: -0.03em; }
@@ -2054,5 +2075,5 @@
     :root[data-design="m3"] .lp-colour { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
-    :root[data-design="m3"] :is(.lp-tile, .lp-btn, .lp-swatches span) { transition: none; }
+    :root[data-design="m3"] :is(.lp-tile, .lp-btn, .lp-swatch) { transition: none; }
 }
