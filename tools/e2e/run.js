@@ -597,6 +597,20 @@ function staticServer() {
         check('player: leaving reports where it stopped and frees the page', stopped?.body?.ItemId === 'ep2' && stopped.body.PositionTicks > 0
             && !(await p.evaluate(() => document.body.classList.contains('player-open'))), stopped);
 
+        // Stopped half-way before (episode 3 in the mock): Continue or Start over, playing only once chosen
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));
+        await p.waitForSelector('.pl-resume', { timeout: 8000 }).catch(() => {});
+        const resume = await p.evaluate(() => ({ shown: !!document.querySelector('.pl-resume'),
+            label: document.querySelector('[data-resume="continue"]')?.textContent.trim(), paused: document.getElementById('player-video')?.paused,
+            focused: document.activeElement?.dataset.resume }));
+        await p.click('[data-resume="restart"]').catch(() => {});
+        await p.waitForTimeout(1200);
+        const restarted = await p.evaluate(() => ({ gone: !document.querySelector('.pl-resume'), t: document.getElementById('player-video').currentTime,
+            playing: !document.getElementById('player-video').paused }));
+        check('player: a started episode asks Continue at 0:10 or Start over; Start over plays from the beginning',
+            resume.shown && resume.label === 'Continue at 0:10' && resume.paused && resume.focused === 'continue'
+            && restarted.gone && restarted.t < 3 && restarted.playing, { resume, restarted });
+
         // Up next: from the last seconds a card counts down; Cancel keeps the episode, going back and
         // forward brings it again, Play now opens the next one. Halfway, the next subtitles are unpacked ahead
         await p.evaluate(h => { location.hash = h; }, playHash);
@@ -618,11 +632,12 @@ function staticServer() {
         await p.click('[data-act="playNext"]');
         await p.waitForTimeout(2500);
         const moved = await p.evaluate(() => location.hash);
+        const askedOnUpNext = await p.evaluate(() => !!document.querySelector('.pl-resume'));
         check('player: Up next counts down from the end, Watch credits hides it until the very end, Play now opens the next episode, its subtitles warmed',
             upNext.shown && upNext.title === 'Episode 3' && /^Play now · \d+$/.test(upNext.label) && cancelled
             && atEnd.ended && atEnd.shown && /\/2$/.test(atEnd.hash) && again
-            && /\/3$/.test(moved) && calls.some(c => c.type === 'PlaybackInfo' && c.item === 'ep3') && calls.some(c => c.type === 'vtt' && c.item === 'ep3'),
-            { upNext, cancelled, atEnd, again, moved });
+            && /\/3$/.test(moved) && calls.some(c => c.type === 'PlaybackInfo' && c.item === 'ep3') && calls.some(c => c.type === 'vtt' && c.item === 'ep3')
+            && !askedOnUpNext, { upNext, cancelled, atEnd, again, moved, askedOnUpNext });
 
         // Styled ASS: drawn by JASSUB on its canvas with the MKV's fonts, listed in the menu
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));
@@ -793,7 +808,7 @@ function staticServer() {
             online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
         check('admin: the owner sees tiles, four charts, who is online and who waits',
             adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
-        await sq.evaluate(() => import('/js/auth.js?v=121').then(m => m.logout()));
+        await sq.evaluate(() => import('/js/auth.js?v=122').then(m => m.logout()));
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();
