@@ -1,16 +1,20 @@
-// Two designs: AniRoll's own and Material 3 Expressive (Settings → Appearance, or the switch on the landing page).
+// Material 3 Expressive is AniRoll's design, for everyone and on the landing page. AniRoll's first design stays
+// as "legacy", a switch in Settings → Appearance for logged-in people who want it back.
 // M3 = css/m3.css (components, shapes, type, motion), js/m3.js (page additions) and a colour scheme generated from
 // its own seed colour (not AniRoll's accent)
 // with Google's Material Color Utilities (2025 spec, the one M3 Expressive uses). The scheme is written as a
 // <style> with a light and a dark block, so System/Light/Dark keep working without recomputing; it is cached
 // in localStorage so a reload paints M3 colours before the colour library has even loaded.
 
-const DESIGN_KEY = 'aniroll_design';        // 'aniroll' | 'm3'
+// 'aniroll' only when chosen as legacy. A new key: choices from the time AniRoll's design was the default
+// (and M3 the one to try) do not carry over, so everyone starts in Material 3 once
+const DESIGN_KEY = 'aniroll_design_v2';     // 'aniroll' (legacy) | absent = 'm3'
+const OLD_DESIGN_KEY = 'aniroll_design';
 const VARIANT_KEY = 'aniroll_m3_variant';   // 'tonal' | 'vibrant' | 'expressive'
 const SEED_KEY = 'aniroll_m3_seed';         // M3 has its own palette, unrelated to AniRoll's accent colour
 const CACHE_KEY = 'aniroll_m3_scheme3';     // { key, css } — new name when the generated CSS changes
 const SHOW_KEY = 'aniroll_m3_show';         // { color, cover } of the show you're on: the app's "wallpaper" 
-const CSS_HREF = 'css/m3.css?v=28';
+const CSS_HREF = 'css/m3.css?v=29';
 
 // 'show' themes the whole app from the show you're watching, like a desktop themed from its wallpaper
 // (js/m3.js applies it); the others are seeds in the spirit of Google's own M3 palettes
@@ -35,7 +39,7 @@ export const VARIANTS = [
 ];
 
 export function getDesign() {
-    try { return localStorage.getItem(DESIGN_KEY) === 'm3' ? 'm3' : 'aniroll'; } catch { return 'aniroll'; }
+    try { return localStorage.getItem(DESIGN_KEY) === 'aniroll' ? 'aniroll' : 'm3'; } catch { return 'm3'; }
 }
 export function getVariant() {
     try { return VARIANTS.some(v => v.key === localStorage.getItem(VARIANT_KEY)) ? localStorage.getItem(VARIANT_KEY) : 'tonal'; } catch { return 'tonal'; }
@@ -59,7 +63,10 @@ export function setSeed(hex, loggedIn) {
 }
 
 export function setDesign(design, loggedIn) {
-    try { localStorage.setItem(DESIGN_KEY, design); } catch { /* storage blocked */ }
+    try {
+        if (design === 'aniroll') localStorage.setItem(DESIGN_KEY, 'aniroll');
+        else localStorage.removeItem(DESIGN_KEY);
+    } catch { /* storage blocked */ }
     return applyDesign(loggedIn);
 }
 export function setVariant(variant, loggedIn) {
@@ -86,10 +93,12 @@ export async function switchDesign(design, loggedIn, from) {
     root.classList.remove('design-swap');
 }
 
-// Logged out too: the landing page lets visitors try Material 3 before they log in
+// Logged out: always Material 3 (the landing page exists only in it). index.html starts in M3 with its
+// stylesheet, so nobody sees the other design flash first; legacy takes both away here.
 export async function applyDesign(loggedIn) {
     const root = document.documentElement;
-    const on = getDesign() === 'm3';
+    try { localStorage.removeItem(OLD_DESIGN_KEY); } catch { /* nothing kept */ }
+    const on = !loggedIn || getDesign() === 'm3';
     if (!on) {
         root.removeAttribute('data-design');
         document.getElementById('m3-css')?.remove();
@@ -100,7 +109,7 @@ export async function applyDesign(loggedIn) {
     }
     // Page additions only M3 has (hero, search bar, rail FAB ...)
     if (enhancer) enhancer.then(m => m.refresh());
-    enhancer ??= import('./m3.js?v=120').then(m => { m.setup(); return m; });
+    enhancer ??= import('./m3.js?v=121').then(m => { m.setup(); return m; });
 
     // Stylesheet first; keep the page hidden until it's there, so AniRoll's look never flashes
     let sheet = null;
@@ -175,12 +184,16 @@ async function buildSchemeCss(seedHex, variant) {
 // becomes a scheme for one part of the page — or, on the <html>, for the whole app. SchemeContent keeps the
 // colours close to the cover. Returns the class to put on that element; its CSS is written once per colour.
 const contentClasses = new Map();
+// A show's colours follow the colour style too: Tonal stays close to the cover (Content), Vibrant and
+// Expressive push it further, as they do for a picked palette
 export async function contentScheme(hex) {
     if (!/^#[0-9a-f]{6}$/i.test(hex || '')) return null;
-    const cls = `m3-c-${hex.slice(1).toLowerCase()}`;
+    const variant = getVariant();
+    const cls = `m3-c-${hex.slice(1).toLowerCase()}-${variant}`;
     if (!contentClasses.has(cls)) {
         contentClasses.set(cls, loadMcu().then(mcu => {
-            const { light, dark } = blocks(mcu, hex, mcu.SchemeContent);
+            const Scheme = { vibrant: mcu.SchemeVibrant, expressive: mcu.SchemeExpressive }[variant] || mcu.SchemeContent;
+            const { light, dark } = blocks(mcu, hex, Scheme);
             const on = (theme, sel) => `:root[data-design="m3"]${theme}.${sel}, :root[data-design="m3"]${theme} .${sel}`;
             let style = document.getElementById('m3-content');
             if (!style) {

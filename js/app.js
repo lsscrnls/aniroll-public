@@ -1,15 +1,15 @@
-import { route, startRouter, navigate } from './router.js?v=120';
-import { takeSeat } from './seat.js?v=120';
-import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl } from './auth.js?v=120';
-import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, setAccentColor, getAccentColors, esc, titlePref } from './store.js?v=120';
-import * as api from './api.js?v=120';
-import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js?v=120';
-import { openDialog, initActivation, showConfirm } from './a11y.js?v=120';
-import { noteVisitor, maybeShowMoveNotice, openChangelog, hasUnread } from './whatsnew.js?v=120';
-import { applyDesign, getDesign, getVariant, setDesign, switchDesign, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from './design.js?v=120';
+import { route, startRouter, navigate } from './router.js?v=121';
+import { takeSeat } from './seat.js?v=121';
+import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl } from './auth.js?v=121';
+import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, setAccentColor, getAccentColors, esc, titlePref } from './store.js?v=121';
+import * as api from './api.js?v=121';
+import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js?v=121';
+import { openDialog, initActivation, showConfirm } from './a11y.js?v=121';
+import { noteVisitor, maybeShowMoveNotice, openChangelog, hasUnread } from './whatsnew.js?v=121';
+import { applyDesign, getDesign, getVariant, setDesign, switchDesign, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from './design.js?v=121';
 
 const CLIENT_ID = '50643';
-const APP_VERSION = '120';
+const APP_VERSION = '121';
 
 // Report uncaught errors to our backend (api/server.js → data/client-errors.log).
 // Each distinct message once per page load, at most 10 — a loop must not flood the log.
@@ -73,18 +73,18 @@ async function init() {
 
     // Guests of a Watch Party keep syncing with the host on every page, not only on /watchparty
     if (isLoggedIn() && localStorage.getItem('aniroll_joined_party')) {
-        import('./pages/watchparty.js?v=120').then(m => m.initGuestSync());
+        import('./pages/watchparty.js?v=121').then(m => m.initGuestSync());
     }
     // Hosts get their running party back on a second device, and a pill leading back to it
     if (isLoggedIn()) {
-        import('./pages/watchparty.js?v=120').then(async m => {
+        import('./pages/watchparty.js?v=121').then(async m => {
             if (!localStorage.getItem('aniroll_watchparty')) await m.restoreHostParty();
             m.renderPartyPill();
         });
     }
     // The Jellyfin connection belongs to the AniList account, so pull it in on this device
     if (isLoggedIn()) {
-        import('./jellyfin.js?v=120').then(async m => {
+        import('./jellyfin.js?v=121').then(async m => {
             await m.loadAccountConfig();
             setupJellyfinLive();
         });
@@ -169,7 +169,7 @@ function watchMaintenanceMode() {
 function setupJellyfinPull() {
     const pull = async () => {
         if (api.shouldHoldBackground()) return;
-        const { getConfig, isPullEnabled, pullFromJellyfin } = await import('./jellyfin.js?v=120');
+        const { getConfig, isPullEnabled, pullFromJellyfin } = await import('./jellyfin.js?v=121');
         if (!getConfig() || !isPullEnabled()) return;
         const user = getState().user;
         if (!user) return;
@@ -189,10 +189,10 @@ function setupJellyfinPull() {
 // Jellyfin webhook -> AniRoll backend: the chip in the navbar, toasts for tracked episodes,
 // and episodes the backend could not write (no access, AniList blocking it) applied from here
 async function setupJellyfinLive() {
-    const jf = await import('./jellyfin.js?v=120');
+    const jf = await import('./jellyfin.js?v=121');
     // Set up on another device: fetch the link once, only for people who use Jellyfin at all
     if (!jf.getHookSecret() && jf.getConfig()) await jf.loadHook().catch(() => null);
-    const np = await import('./nowplaying.js?v=120');
+    const np = await import('./nowplaying.js?v=121');
     window.addEventListener(jf.NOW_EVENT, (e) => np.renderNowChip(document.getElementById('jf-now-chip'), e.detail));
     jf.startNowPlaying({
         onTracked: (item) => {
@@ -283,7 +283,7 @@ async function loadViewer() {
 
 function setupRoutes() {
     route('/', async (ctx) => {
-        const { render, loadLandingTrending } = await import('./pages/home.js?v=120');
+        const { render, loadLandingTrending } = await import('./pages/home.js?v=121');
         const cleanup = await render(ctx);
         if (!isLoggedIn()) loadLandingTrending();
         refreshAnimations();
@@ -291,25 +291,25 @@ function setupRoutes() {
     });
 
     route('/studio/:id', async (ctx) => {
-        const { render } = await import('./pages/studio.js?v=120');
+        const { render } = await import('./pages/studio.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/staff/:id', async (ctx) => {
-        const { render } = await import('./pages/staff.js?v=120');
+        const { render } = await import('./pages/staff.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     // The owner's view of how busy AniRoll is (the server checks who asks)
     route('/admin', async (ctx) => {
-        const { render } = await import('./pages/admin.js?v=120');
+        const { render } = await import('./pages/admin.js?v=121');
         return render(ctx);
     });
 
     route('/search', async (ctx) => {
-        const { render } = await import('./pages/search.js?v=120');
+        const { render } = await import('./pages/search.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
@@ -319,14 +319,14 @@ function setupRoutes() {
     });
 
     route('/anime/:id/full', async (ctx) => {
-        const { render } = await import('./pages/detail.js?v=120');
+        const { render } = await import('./pages/detail.js?v=121');
         await render({ params: { id: ctx.params.id }, content: ctx.content });
         refreshAnimations();
     });
 
     // The player loads only when something is played
     route('/play/:id/:episode', async (ctx) => {
-        const { render } = await import('./pages/play.js?v=120');
+        const { render } = await import('./pages/play.js?v=121');
         return render(ctx);
     });
 
@@ -335,74 +335,74 @@ function setupRoutes() {
     });
 
     route('/manga/:id/full', async (ctx) => {
-        const { render } = await import('./pages/detail.js?v=120');
+        const { render } = await import('./pages/detail.js?v=121');
         await render({ params: { id: ctx.params.id }, content: ctx.content });
         refreshAnimations();
     });
 
     route('/list', async (ctx) => {
-        const { render } = await import('./pages/list.js?v=120');
+        const { render } = await import('./pages/list.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/list/:username', async (ctx) => {
-        const { render } = await import('./pages/list.js?v=120');
+        const { render } = await import('./pages/list.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/social', async (ctx) => {
-        const { render } = await import('./pages/social.js?v=120');
+        const { render } = await import('./pages/social.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/profile', async (ctx) => {
-        const { render } = await import('./pages/profile.js?v=120');
+        const { render } = await import('./pages/profile.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/user/:username', async (ctx) => {
-        const { render } = await import('./pages/profile.js?v=120');
+        const { render } = await import('./pages/profile.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/season', async (ctx) => {
-        const { render } = await import('./pages/season.js?v=120');
+        const { render } = await import('./pages/season.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/season/:year/:season', async (ctx) => {
-        const { render } = await import('./pages/season.js?v=120');
+        const { render } = await import('./pages/season.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/roll', async (ctx) => {
-        const { render } = await import('./pages/roll.js?v=120');
+        const { render } = await import('./pages/roll.js?v=121');
         const cleanup = await render(ctx);
         refreshAnimations();
         return cleanup;
     });
 
     route('/calendar', async (ctx) => {
-        const { render } = await import('./pages/calendar.js?v=120');
+        const { render } = await import('./pages/calendar.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/notifications', async (ctx) => {
-        const { render } = await import('./pages/notifications.js?v=120');
+        const { render } = await import('./pages/notifications.js?v=121');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/watchparty', async (ctx) => {
-        const { render } = await import('./pages/watchparty.js?v=120');
+        const { render } = await import('./pages/watchparty.js?v=121');
         const cleanup = await render(ctx);
         refreshAnimations();
         return cleanup;
@@ -623,33 +623,25 @@ async function renderSettings({ content, query }) {
         </div>
 
         <div class="settings-panel" id="settings-appearance" role="tabpanel" aria-labelledby="settings-tab-appearance" ${tab === 'appearance' ? '' : 'hidden'}>
-            ${loggedIn ? card('Design', 'How AniRoll looks and moves', `
-                <div class="design-options" role="radiogroup" aria-label="Design">
-                    <button class="design-option${design === 'aniroll' ? ' active' : ''}" role="radio" aria-checked="${design === 'aniroll'}" data-design="aniroll">
-                        <span class="design-preview design-preview-aniroll" aria-hidden="true"><i></i><i></i><i></i></span>
-                        <span class="design-option-name">AniRoll</span>
-                        <span class="design-option-text">Monochrome, cinematic, your accent colour as a highlight</span>
-                    </button>
-                    <button class="design-option${design === 'm3' ? ' active' : ''}" role="radio" aria-checked="${design === 'm3'}" data-design="m3">
-                        <span class="design-preview design-preview-m3" aria-hidden="true"><i></i><i></i><i></i></span>
-                        <span class="design-option-name">Material 3 Expressive</span>
-                        <span class="design-option-text">Google's design language as its own app: bold palettes, the Material shape library, big type, springy motion</span>
-                    </button>
-                </div>
-                <div class="settings-sub-block" id="m3-variant" ${design === 'm3' ? '' : 'hidden'}>
+            ${card('Colours', 'Material 3 Expressive, in the colours you pick', `
+                <div class="settings-sub-block" id="m3-variant">
                     <div class="settings-sub-label">Palette</div>
                     <p class="settings-hint">“From your show” takes its colours from the show you watched last. Or pick your own.</p>
                     <div class="m3-seeds" role="radiogroup" aria-label="Palette">${SEEDS.map(x => `<button class="m3-seed${x.hex === SHOW_SEED ? ' m3-seed-show' : ''}${x.hex === getSeed() ? ' active' : ''}" role="radio" aria-checked="${x.hex === getSeed()}" data-seed="${x.hex}" style="${x.hex === SHOW_SEED ? `--cover:url('${esc(getShowTheme()?.cover || '')}')` : `--seed:${x.hex}`}" title="${x.name}" aria-label="${x.name}"></button>`).join('')}</div>
                     ${hexField('m3-hex', getSeed() === SHOW_SEED ? '' : getSeed())}
                     <div class="settings-sub-label" style="margin-top:var(--space-md)">Colour style</div>
                     <div class="settings-choices">${VARIANTS.map(v => choice('variant', v.key, variant, v.label)).join('')}</div>
-                </div>`) : ''}
+                </div>`, ` id="m3-card"${loggedIn && design === 'aniroll' ? ' hidden' : ''}`)}
             ${card('Theme', '', `<div class="settings-choices">${choice('theme', 'system', theme, 'System')}${choice('theme', 'light', theme, 'Light')}${choice('theme', 'dark', theme, 'Dark')}</div>`)}
             ${card('Accent Color', 'Personalise your interface', `
                 <div class="accent-picker">
                     ${accentColors.map(c => `<button class="accent-swatch ${c.hex === accentColor ? 'active' : ''}" data-color="${c.hex}" style="background:${c.hex}" title="${c.name}" aria-label="${c.name}"></button>`).join('')}
                 </div>
-                ${hexField('accent-hex', accentColor)}`, ` id="accent-card"${design === 'm3' && loggedIn ? ' hidden' : ''}`)}
+                ${hexField('accent-hex', accentColor)}`, ` id="accent-card"${design === 'm3' || !loggedIn ? ' hidden' : ''}`)}
+            ${loggedIn ? card('Legacy design', 'AniRoll’s first look: monochrome and cinematic, with one accent colour', `
+                <label class="settings-choice"><input type="checkbox" id="legacy-design" ${design === 'aniroll' ? 'checked' : ''}>
+                    <span>Use the legacy design</span></label>
+                <p class="settings-hint">It stays available, but new pages and features are made for Material 3 first.</p>`) : ''}
             ${card('Title Language', 'Choose how anime and manga titles are displayed', `
                 <div class="settings-choices">${choice('titlelang', 'romaji', titleLang, 'Romaji')}${choice('titlelang', 'english', titleLang, 'English')}${choice('titlelang', 'native', titleLang, 'Native')}</div>`)}
         </div>
@@ -701,19 +693,13 @@ async function renderSettings({ content, query }) {
         });
     });
 
-    content.querySelectorAll('.design-option').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const d = btn.dataset.design;
-            content.querySelectorAll('.design-option').forEach(b => {
-                b.classList.toggle('active', b === btn);
-                b.setAttribute('aria-checked', String(b === btn));
-            });
-            content.querySelector('#m3-variant').hidden = d !== 'm3';
-            content.querySelector('#accent-card').hidden = d === 'm3';
-            const r = btn.getBoundingClientRect();
-            await switchDesign(d, isLoggedIn(), { x: r.left + r.width / 2, y: r.top + r.height / 2 });
-            toast(d === 'm3' ? 'Material 3 Expressive on' : 'AniRoll design on', 'success');
-        });
+    content.querySelector('#legacy-design')?.addEventListener('change', async (ev) => {
+        const d = ev.target.checked ? 'aniroll' : 'm3';
+        content.querySelector('#m3-card').hidden = d !== 'm3';
+        content.querySelector('#accent-card').hidden = d === 'm3';
+        const r = ev.target.getBoundingClientRect();
+        await switchDesign(d, isLoggedIn(), { x: r.left + r.width / 2, y: r.top + r.height / 2 });
+        toast(d === 'm3' ? 'Material 3 Expressive on' : 'Legacy design on', 'success');
     });
 
     const markSeed = (hex) => content.querySelectorAll('.m3-seed').forEach(b => {
@@ -793,7 +779,7 @@ async function renderSettings({ content, query }) {
     document.getElementById('mal-xml-upload')?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        import('./pages/mal-import.js?v=120').then(m => m.startXMLImport(file));
+        import('./pages/mal-import.js?v=121').then(m => m.startXMLImport(file));
     });
 
     renderJellyfinSettings();
@@ -809,7 +795,7 @@ async function renderPartySyncSettings() {
         box.innerHTML = '<p class="dot-label">Log in to change this.</p>';
         return;
     }
-    const bg = await import('./background.js?v=120');
+    const bg = await import('./background.js?v=121');
     const mode = bg.getPartySyncMode();
     box.innerHTML = `
         <label class="settings-choice"><input type="radio" name="party-sync" value="open" ${mode === 'open' ? 'checked' : ''}>
@@ -883,7 +869,7 @@ async function renderJellyfinLive() {
         return;
     }
     const [jf, bg, np] = await Promise.all([
-        import('./jellyfin.js?v=120'), import('./background.js?v=120'), import('./nowplaying.js?v=120'),
+        import('./jellyfin.js?v=121'), import('./background.js?v=121'), import('./nowplaying.js?v=121'),
     ]);
     const head = `<h4 class="jf-live-title">Live tracking</h4>
         <p class="dot-label">See what you are watching right in AniRoll, and finished episodes and movies land on your AniList within seconds, even when AniRoll is closed. Uses the Webhook plugin of your Jellyfin server.</p>`;
@@ -1023,7 +1009,7 @@ async function renderJellyfinLive() {
 async function renderJellyfinSettings() {
     const box = document.getElementById('jf-settings');
     if (!box) return;
-    const jf = await import('./jellyfin.js?v=120');
+    const jf = await import('./jellyfin.js?v=121');
     await jf.loadAccountConfig();
     const cfg = jf.getConfig();
 
@@ -1109,7 +1095,7 @@ async function renderJellyfinSettings() {
     }
 
     const scope = jf.getScope();
-    const player = await import('./player/availability.js?v=120');
+    const player = await import('./player/availability.js?v=121');
     const localUrl = player.getLocalUrl();
     box.innerHTML = `
         <div class="jf-row"><span class="jf-dot jf-dot-checking" id="jf-settings-dot"></span><span id="jf-settings-state">Checking...</span></div>
@@ -1230,7 +1216,7 @@ async function refreshJellyfinStatus(force = false) {
     refreshPendingStatus();
     const item = document.getElementById('jf-status-item');
     if (!item) return;
-    const { getConfig, getStatus } = await import('./jellyfin.js?v=120');
+    const { getConfig, getStatus } = await import('./jellyfin.js?v=121');
     if (!getConfig()) {
         item.hidden = true;
         return;
@@ -1298,7 +1284,7 @@ async function openDetailPanel(id) {
     body.scrollTop = 0;
     body.innerHTML = '<div class="page-loader" style="padding:var(--space-3xl)"><div class="loader-spinner"></div></div>';
 
-    const { renderPanel } = await import('./pages/detail.js?v=120');
+    const { renderPanel } = await import('./pages/detail.js?v=121');
     await renderPanel(id, body);
     overlay.dataset.mediaType = body.querySelector('.detail-fullscreen-btn')?.dataset.type || 'anime';
 }

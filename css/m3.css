@@ -831,16 +831,6 @@
 
 /* ----- Settings ----- */
 :root[data-design="m3"] .settings-card-title { font-size: 1.125rem; font-weight: 600; }
-:root[data-design="m3"] .design-option {
-    border: 0;
-    background: var(--md-surface-container);
-    border-radius: var(--radius-xl);
-    transition: background-color .2s var(--md-standard), border-radius .45s var(--ease);
-}
-:root[data-design="m3"] .design-option:hover { background: var(--md-surface-container-high); }
-:root[data-design="m3"] .design-option.active { background: var(--md-secondary-container); color: var(--md-on-secondary-container); border-radius: var(--md-shape-xxl); }
-:root[data-design="m3"] .design-option.active .design-option-text { color: inherit; opacity: .8; }
-:root[data-design="m3"] .design-preview { border-radius: var(--radius-lg); }
 :root[data-design="m3"] .settings-choice { align-items: center; min-height: 48px; }
 
 /* ----- Scrollbars and page transitions ----- */
@@ -1264,7 +1254,7 @@
 
 /* ----- Press and hover: things squish under the finger and spring back ----- */
 :root[data-design="m3"] :is(.glass-btn, .list-tab, .tab-btn, .friends-tab, .page-switch > a, .genre-chip, .progress-btn,
-    .cw-inc, .nav-icon-btn, .m3-rail-fab, .wp-fab, .compare-fab, .season-nav-btn, .detail-panel-action-btn, .design-option, .m3-seed) {
+    .cw-inc, .nav-icon-btn, .m3-rail-fab, .wp-fab, .compare-fab, .season-nav-btn, .detail-panel-action-btn, .m3-seed) {
     transition: background-color .2s var(--md-standard), color .2s var(--md-standard), box-shadow .3s var(--md-standard),
         border-radius .5s var(--m3-bouncy), transform .5s var(--m3-bouncy), padding .5s var(--m3-bouncy), clip-path .5s var(--m3-bouncy);
 }
@@ -1938,3 +1928,131 @@
 /* The voice actor's photo in an M3 Expressive shape */
 :root[data-design="m3"] .staff-photo { border-radius: 0; clip-path: var(--m3-shape-cookie12); background: var(--md-secondary-container); }
 
+
+/* =====================================================================================================
+   Landing (js/landing.js, js/pages/home.js renderLanding): Material 3 is the only design logged out.
+   A hero with trending covers in shaped tiles, clips in tonal surfaces instead of black monitor frames.
+   ===================================================================================================== */
+:root[data-design="m3"] .lp-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(24px, 4vw, 64px);
+    text-align: left;
+    min-height: min(78vh, 760px);
+    padding: var(--space-2xl) 0;
+}
+:root[data-design="m3"] .lp-hero-text { display: flex; flex-direction: column; align-items: flex-start; }
+:root[data-design="m3"] .lp-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 14px;
+    margin-bottom: var(--space-lg);
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: var(--md-secondary-container);
+    color: var(--md-on-secondary-container);
+}
+:root[data-design="m3"] .lp .landing-title {
+    font-size: clamp(3rem, 6.4vw, 5.6rem);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 0.98;
+    margin-bottom: var(--space-lg);
+}
+:root[data-design="m3"] .lp .landing-sub { margin: 0 0 var(--space-xl); max-width: 520px; font-size: 1.12rem; color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .lp-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+:root[data-design="m3"] .lp-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 56px;
+    padding: 0 28px;
+    border: 0;
+    border-radius: 28px;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-radius .45s var(--m3-bouncy), transform .45s var(--m3-bouncy), background-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .lp-btn:hover { border-radius: 16px; }
+:root[data-design="m3"] .lp-btn:active { transform: scale(.96); }
+:root[data-design="m3"] .lp-btn-filled { background: var(--md-primary); color: var(--md-on-primary); }
+:root[data-design="m3"] .lp-btn-tonal { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+
+/* The collage: six shaped tiles, turned a little, trending covers inside once they have loaded */
+:root[data-design="m3"] .lp-collage { position: relative; aspect-ratio: 1; width: 100%; max-width: 560px; justify-self: end; }
+:root[data-design="m3"] .lp-tile {
+    position: absolute;
+    background: var(--md-primary-container) center / cover no-repeat;
+    transition: transform .6s var(--m3-bouncy), background-color .3s var(--md-standard);
+}
+:root[data-design="m3"] .lp-tile:not(.has-cover):nth-child(even) { background-color: var(--md-tertiary-container); }
+:root[data-design="m3"] .lp-tile:hover { transform: rotate(var(--turn-hover, 12deg)) scale(1.04); }
+:root[data-design="m3"] .lp-tile-1 { left: 4%; top: 6%; width: 50%; aspect-ratio: 1; transform: rotate(-8deg); }
+:root[data-design="m3"] .lp-tile-2 { right: 2%; top: 0; width: 40%; aspect-ratio: 1; transform: rotate(10deg); }
+:root[data-design="m3"] .lp-tile-3 { right: 6%; top: 42%; width: 34%; aspect-ratio: 1; }
+:root[data-design="m3"] .lp-tile-4 { left: 0; bottom: 6%; width: 30%; aspect-ratio: 1; transform: rotate(14deg); }
+:root[data-design="m3"] .lp-tile-5 { left: 32%; bottom: 0; width: 36%; aspect-ratio: 1; transform: rotate(-6deg); }
+:root[data-design="m3"] .lp-tile-6 { left: 44%; top: 34%; width: 20%; aspect-ratio: 1; background-color: var(--md-primary); }
+:root[data-design="m3"] .lp-shape-flower { clip-path: var(--m3-shape-flower); }
+:root[data-design="m3"] .lp-shape-cookie9 { clip-path: var(--m3-shape-cookie9); }
+:root[data-design="m3"] .lp-shape-arch { clip-path: var(--m3-shape-arch); }
+:root[data-design="m3"] .lp-shape-clover4 { clip-path: var(--m3-shape-clover4); }
+:root[data-design="m3"] .lp-shape-cookie12 { clip-path: var(--m3-shape-cookie12); }
+:root[data-design="m3"] .lp-shape-sunny { clip-path: var(--m3-shape-sunny); }
+
+/* Stage, tour and colour clips: tonal surfaces, big shapes, no black monitor frame */
+:root[data-design="m3"] .lp .landing-stage { margin-top: 0; }
+:root[data-design="m3"] .lp .landing-stage-glow { display: none; }
+:root[data-design="m3"] .lp :is(.landing-stage-frame, .landing-tour-frame, .lp-colour-frame) {
+    border: 0;
+    border-radius: var(--md-shape-xxl);
+    background: var(--md-surface-container-high);
+    padding: 12px;
+    box-shadow: none;
+}
+:root[data-design="m3"] .lp :is(.landing-stage-frame, .lp-colour-frame) .landing-video { border-radius: 36px; }
+:root[data-design="m3"] .lp .landing-tour-frame video { inset: 12px; width: calc(100% - 24px); height: calc(100% - 24px); border-radius: 36px; }
+:root[data-design="m3"] .lp .landing-tour-title { font-weight: 800; letter-spacing: -0.03em; }
+:root[data-design="m3"] .lp .landing-tour-item { border-radius: 28px; transition: background-color .25s var(--md-standard), border-radius .45s var(--m3-bouncy); }
+:root[data-design="m3"] .lp .landing-tour-item:hover:not(.active) { background: var(--md-surface-container); }
+:root[data-design="m3"] .lp .landing-tour-item.active { background: var(--md-primary-container); color: var(--md-on-primary-container); border-radius: 36px; }
+:root[data-design="m3"] .lp .landing-tour-item.active :is(.landing-tour-item-title, .landing-tour-item-text) { color: var(--md-on-primary-container); }
+:root[data-design="m3"] .lp .landing-tour-bar { height: 4px; background: color-mix(in srgb, var(--md-on-primary-container) 18%, transparent); }
+:root[data-design="m3"] .lp .landing-tour-bar span { background: var(--md-on-primary-container); }
+
+/* In the colours of what you watch: text with a row of shaped swatches, the M3 clip beside it */
+:root[data-design="m3"] .lp-colour {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: clamp(24px, 4vw, 64px);
+    align-items: center;
+    margin-top: calc(var(--space-3xl) * 1.5);
+}
+:root[data-design="m3"] .lp-colour-frame { aspect-ratio: 16 / 9; }
+:root[data-design="m3"] .lp-swatches { display: flex; flex-wrap: wrap; gap: 10px; margin-top: var(--space-lg); }
+:root[data-design="m3"] .lp-swatches span {
+    width: 44px;
+    height: 44px;
+    background: var(--c);
+    clip-path: var(--shape);
+    transition: transform .5s var(--m3-bouncy);
+}
+:root[data-design="m3"] .lp-swatches span:hover { transform: rotate(30deg) scale(1.15); }
+
+/* And there's more: tonal cards, the icon in a cookie */
+:root[data-design="m3"] .lp .landing-more-title { font-weight: 800; letter-spacing: -0.03em; }
+:root[data-design="m3"] .lp .landing-feature { border: 0; border-radius: 36px; background: var(--md-surface-container); }
+:root[data-design="m3"] .lp .landing-feature-icon { background: var(--md-primary-container); color: var(--md-on-primary-container); clip-path: var(--m3-shape-cookie9); border-radius: 0; }
+
+@media (max-width: 899px) {
+    :root[data-design="m3"] .lp-hero { grid-template-columns: 1fr; min-height: auto; padding-top: var(--space-xl); }
+    :root[data-design="m3"] .lp-collage { max-width: 420px; justify-self: center; order: -1; width: 86%; }
+    :root[data-design="m3"] .lp-colour { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] :is(.lp-tile, .lp-btn, .lp-swatches span) { transition: none; }
+}

@@ -1,5 +1,5 @@
-import { getToken, isLoggedIn } from './auth.js?v=120';
-import { esc } from './store.js?v=120';
+import { getToken, isLoggedIn } from './auth.js?v=121';
+import { esc } from './store.js?v=121';
 
 // A seat in AniRoll: at most 100 people use the app at once (api/server.js, "Seats"). Only a logged-in
 // app takes one; the landing page stays open to everyone. The seat is kept with a heartbeat while the
@@ -50,7 +50,7 @@ function waitPage(answer) {
             <button class="glass-btn glass-btn-secondary" type="button" data-seat-logout>Log out</button>
         </div>`;
         box.querySelector('[data-seat-logout]').addEventListener('click', async () => {
-            const { logout } = await import('./auth.js?v=120');
+            const { logout } = await import('./auth.js?v=121');
             logout();
         });
         document.body.appendChild(box);

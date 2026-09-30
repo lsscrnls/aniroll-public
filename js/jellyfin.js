@@ -1,5 +1,5 @@
-import { toast } from './store.js?v=120';
-import { getToken } from './auth.js?v=120';
+import { toast } from './store.js?v=121';
+import { getToken } from './auth.js?v=121';
 
 // Jellyfin integration: when AniList progress moves forward, mark the matching
 // episodes watched on the user's own Jellyfin server.
@@ -153,6 +153,14 @@ export async function clearConfig() {
     clearLocal();
 }
 
+// localhost, 127.x, 10.x, 172.16–31.x, 192.168.x, *.local and plain host names: only reachable at home
+function isPrivateUrl(url) {
+    let host = '';
+    try { host = new URL(url).hostname.toLowerCase(); } catch { return false; }
+    return host === 'localhost' || host.endsWith('.local') || host.endsWith('.localhost') || !host.includes('.')
+        || /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host) || host === '[::1]';
+}
+
 async function viaProxy(cfg, path, method) {
     const res = await fetch(PROXY, {
         method: 'POST',
@@ -161,7 +169,14 @@ async function viaProxy(cfg, path, method) {
         signal: AbortSignal.timeout(15000),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || `Relay failed (${res.status})`);
+    if (!res.ok) {
+        // A home address the browser could not reach itself: the relay may not go there (on purpose),
+        // and it belongs in a different field anyway
+        if (res.status === 400 && isPrivateUrl(cfg.url)) {
+            throw new Error('This browser cannot reach that home address directly, and AniRoll only relays public addresses. Connect with the address your server has on the internet, then enter the home one under "Local address on this device".');
+        }
+        throw new Error(body.error || `Relay failed (${res.status})`);
+    }
     return { status: body.status, data: body.data };
 }
 
@@ -555,7 +570,7 @@ function matchFit(media, group) {
 // Pushes AniList forward where Jellyfin is further along; returns what it changed
 export async function pullFromJellyfin(user, token) {
     if (!getConfig() || !isPullEnabled() || !user?.id || !token) return { updated: 0, changes: [] };
-    const api = await import('./api.js?v=120');
+    const api = await import('./api.js?v=121');
     if (api.isBackgroundPaused()) return { updated: 0, changes: [], skipped: 'maintenance' };
     if (api.isRateLimited()) return { updated: 0, changes: [], skipped: 'rate-limited' };
 

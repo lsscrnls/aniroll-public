@@ -1,11 +1,11 @@
-import * as api from '../api.js?v=120';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=120';
-import { openDialog } from '../a11y.js?v=120';
-import { isLoggedIn, getToken } from '../auth.js?v=120';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=120';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=120';
-import { renderHeadline, renderStage, renderTour, renderDesigns, initLanding } from '../landing.js?v=120';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=120';
+import * as api from '../api.js?v=121';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=121';
+import { openDialog } from '../a11y.js?v=121';
+import { isLoggedIn, getToken } from '../auth.js?v=121';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=121';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=121';
+import { renderHeadline, renderStage, renderTour, renderColour, renderCollage, fillCollage, initLanding } from '../landing.js?v=121';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=121';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
@@ -83,7 +83,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=120'), import('../jellyfin.js?v=120')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=121'), import('../jellyfin.js?v=121')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
@@ -668,17 +668,22 @@ function initPopularToggle() {
 }
 
 function renderLanding() {
-    return `<div class="page-enter">
-        <div class="landing-hero">
-            <h1 class="landing-title">${renderHeadline(['Watch Together.', 'Track Together.'])}</h1>
-            <p class="landing-sub">Host a Watch Party, sync progress with friends in real time, and never watch alone again.</p>
-            <button class="glass-btn glass-btn-primary" style="font-size:1rem;padding:14px 36px" data-login>
-                Get Started with AniList
-            </button>
-        </div>
+    return `<div class="page-enter lp">
+        <section class="landing-hero lp-hero">
+            <div class="lp-hero-text">
+                <span class="lp-eyebrow">For your AniList</span>
+                <h1 class="landing-title">${renderHeadline(['Roll it.', 'Track it.', 'Watch together.'])}</h1>
+                <p class="landing-sub">Let AniRoll pick tonight’s show from your Planning list, follow every airing, watch with friends and play from your own Jellyfin. Your AniList keeps up by itself.</p>
+                <div class="lp-actions">
+                    <button class="lp-btn lp-btn-filled" data-login>Get started with AniList</button>
+                    <button class="lp-btn lp-btn-tonal" type="button" data-scroll-to="lp-tour">See what’s inside</button>
+                </div>
+            </div>
+            ${renderCollage()}
+        </section>
         ${renderStage()}
         ${renderTour()}
-        ${renderDesigns()}
+        ${renderColour()}
         <h2 class="landing-more-title">And there's more</h2>
         <div class="landing-features stagger-in">
             <div class="landing-feature landing-feature-highlight landing-feature-clickable" role="button" tabindex="0" data-feature="watchparty">
@@ -898,6 +903,8 @@ function showFeatureDetail(detail) {
 
 export function loadLandingTrending() {
     api.getTrending('ANIME', 1, 15).then(media => {
+        const hero = document.querySelector('.lp-hero');
+        if (hero) fillCollage(hero, media);
         const el = document.getElementById('landing-trending');
         if (el) el.innerHTML = media.map(m => `<div style="flex:0 0 150px">${renderMediaCard(m)}</div>`).join('');
     }).catch(() => {});
