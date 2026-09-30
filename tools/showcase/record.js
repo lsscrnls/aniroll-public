@@ -38,13 +38,15 @@ function staticServer() {
     console.log('rendering on', process.env.GPU ? 'the GPU' : 'the CPU (software)');
     fs.mkdirSync(path.join(OUT, 'stills'), { recursive: true });
 
-    async function context({ loggedIn = true, mobile = false, size = { width: 1440, height: 900 }, design = 'aniroll' } = {}) {
+    async function context({ loggedIn = true, mobile = false, size = { width: 1440, height: 900 }, design = 'm3' } = {}) {
         const ctx = await browser.newContext(mobile
             ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, colorScheme: 'dark' }
             : { viewport: size, colorScheme: 'dark' });
         await ctx.addInitScript(([user, li, design]) => {
             localStorage.setItem('aniroll_theme', 'dark');
-            localStorage.setItem('aniroll_design', design);
+            // Material 3 unless a clip wants the legacy design
+            if (design === 'aniroll') localStorage.setItem('aniroll_design_v2', 'aniroll');
+            else localStorage.removeItem('aniroll_design_v2');
 
             // Clips must never show a cover arriving late: every image loads right away, not when scrolled to
             new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => {
@@ -129,7 +131,8 @@ function staticServer() {
     // Moves the (custom) cursor to an element in a smooth line, like a person would
     let mouse = { x: 700, y: 500 };
     async function glide(page, selector, { steps = 30, click = false } = {}) {
-        const box = await page.locator(selector).first().boundingBox({ timeout: 8000 }).catch(() => null);
+        // The first visible match: some pages keep a hidden copy (a skeleton, the other layout) in the DOM
+        const box = await page.locator(`${selector} >> visible=true`).first().boundingBox({ timeout: 8000 }).catch(() => null);
         if (!box) {
             await page.screenshot({ path: path.join(OUT, 'debug.png') });
             throw new Error('not found: ' + selector + ' (screenshot: out/debug.png)');
@@ -383,7 +386,7 @@ function staticServer() {
         await ctx.addInitScript(([user, jf]) => {
             if (sessionStorage.getItem('init')) return;
             sessionStorage.setItem('init', '1');
-            const set = { aniroll_theme: 'dark', aniroll_design: 'm3', aniroll_seen_changes: '9999', aniroll_token: 'demo',
+            const set = { aniroll_theme: 'dark', aniroll_seen_changes: '9999', aniroll_token: 'demo',
                 aniroll_user: JSON.stringify(user), aniroll_user_ts: String(Date.now()),
                 aniroll_jf_url: jf.url, aniroll_jf_apikey: jf.token, aniroll_jf_userid: jf.userId, aniroll_jf_username: jf.userName,
                 aniroll_jf_servername: jf.server, aniroll_jf_kind: 'user', aniroll_jf_scope: 'device' };
