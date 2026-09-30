@@ -5362,6 +5362,7 @@ body.player-open .cursor { display: none !important; }
 }
 .pl-menu[hidden] { display: none; }
 @keyframes plMenuIn { from { opacity: 0; transform: scale(.9) translateY(8px); } }
+.pl-menu-divider { height: 1px; margin: 8px 16px; background: rgba(255,255,255,0.12); }
 .pl-menu-title { padding: 8px 16px 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255,255,255,0.6); }
 .pl-menu-item {
     display: flex;

@@ -41,7 +41,9 @@ function mediaSource(id) {
         Id: id, Container: 'webm', SupportsDirectPlay: true, SupportsDirectStream: true, RunTimeTicks: RUNTIME,
         MediaStreams: [
             { Type: 'Video', Index: 0, Codec: 'vp9' },
-            { Type: 'Audio', Index: 1, Codec: 'opus', Language: 'jpn' },
+            { Type: 'Audio', Index: 1, Codec: 'opus', Language: 'jpn', DisplayTitle: 'Japanese - Opus - Stereo', Title: 'Japanese' },
+            // Episodes 6 and 7: dual audio, Japanese first, an English dub second
+            ...(id === 'ep6' || id === 'ep7' ? [{ Type: 'Audio', Index: 5, Codec: 'opus', Language: 'eng', DisplayTitle: 'English - Opus - Stereo', Title: 'English' }] : []),
             { Type: 'Subtitle', Index: 2, Codec: 'subrip', Language: 'eng', DisplayTitle: 'English', IsTextSubtitleStream: true, IsDefault: id !== 'ep3' },
             // Episode 3: styled ASS with an embedded font, as in most fansub and BD releases
             ...(id === 'ep3' ? [{ Type: 'Subtitle', Index: 3, Codec: 'ass', Language: 'eng', DisplayTitle: 'English (Signs & Songs)', IsTextSubtitleStream: true, IsDefault: true }] : []),
@@ -49,6 +51,7 @@ function mediaSource(id) {
             ...(id === 'ep4' ? [{ Type: 'Subtitle', Index: 3, Codec: 'PGSSUB', Language: 'eng', DisplayTitle: 'English [PGS]', IsTextSubtitleStream: false, IsDefault: true }] : []),
         ],
         MediaAttachments: id === 'ep3' ? [{ Index: 4, FileName: 'LiberationSans.woff2', MimeType: 'font/woff2' }] : [],
+        DefaultAudioStreamIndex: 1,
         DefaultSubtitleStreamIndex: id === 'ep3' || id === 'ep4' ? 3 : 2,
     };
 }
@@ -57,6 +60,7 @@ function mediaSource(id) {
 // anyTitle: every search finds the series (screenshots with real show names)
 async function mockJellyfin(page, { anyTitle = false } = {}) {
     const calls = [];
+    let lastAudio = null; // the track Jellyfin "remembers" from the reports
     await page.route(`${JF_URL}/**`, async route => {
         const req = route.request();
         const url = new URL(req.url());
@@ -94,8 +98,13 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
         if (item) return json({ ...episode(Number(item[1].slice(2))), MediaSources: [mediaSource(item[1])] });
         const info = p.match(/^\/Items\/(ep\d+)\/PlaybackInfo$/);
         if (info) {
-            calls.push({ type: 'PlaybackInfo', item: info[1], body: req.postDataJSON() });
-            return json({ MediaSources: [mediaSource(info[1])], PlaySessionId: `ps-${info[1]}` });
+            // Like Jellyfin 12: the audio track counts only from the query; without it, the one last reported
+            const asked = url.searchParams.get('AudioStreamIndex');
+            calls.push({ type: 'PlaybackInfo', item: info[1], body: req.postDataJSON(), audio: asked == null ? null : Number(asked) });
+            const source = mediaSource(info[1]);
+            const audio = asked != null ? Number(asked) : lastAudio;
+            if (audio != null && source.MediaStreams.some(s => s.Type === 'Audio' && s.Index === audio)) source.DefaultAudioStreamIndex = audio;
+            return json({ MediaSources: [source], PlaySessionId: `ps-${info[1]}` });
         }
         if (/^\/Videos\/ep\d+\/stream$/.test(p)) {
             calls.push({ type: 'stream', item: p.split('/')[2], query: Object.fromEntries(url.searchParams) });
@@ -143,6 +152,7 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
         }
         if (p.startsWith('/Sessions/Playing')) {
             calls.push({ type: p.replace('/Sessions/', ''), body: req.postDataJSON(), auth: req.headers().authorization || '' });
+            if (req.postDataJSON()?.AudioStreamIndex != null) lastAudio = req.postDataJSON().AudioStreamIndex;
             return route.fulfill({ status: 204, headers: CORS });
         }
         if (p === '/Videos/ActiveEncodings' && req.method() === 'DELETE') {
