@@ -1,5 +1,5 @@
-import { toast } from './store.js?v=122';
-import { getToken } from './auth.js?v=122';
+import { toast } from './store.js?v=123';
+import { getToken } from './auth.js?v=123';
 
 // Jellyfin integration: when AniList progress moves forward, mark the matching
 // episodes watched on the user's own Jellyfin server.
@@ -572,7 +572,7 @@ function matchFit(media, group) {
 // Pushes AniList forward where Jellyfin is further along; returns what it changed
 export async function pullFromJellyfin(user, token) {
     if (!getConfig() || !isPullEnabled() || !user?.id || !token) return { updated: 0, changes: [] };
-    const api = await import('./api.js?v=122');
+    const api = await import('./api.js?v=123');
     if (api.isBackgroundPaused()) return { updated: 0, changes: [], skipped: 'maintenance' };
     if (api.isRateLimited()) return { updated: 0, changes: [], skipped: 'rate-limited' };
 
