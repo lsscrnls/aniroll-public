@@ -1,5 +1,5 @@
-import { toast } from './store.js?v=121';
-import { getToken } from './auth.js?v=121';
+import { toast } from './store.js?v=122';
+import { getToken } from './auth.js?v=122';
 
 // Jellyfin integration: when AniList progress moves forward, mark the matching
 // episodes watched on the user's own Jellyfin server.
@@ -553,8 +553,10 @@ async function pollNow() {
         }
         window.dispatchEvent(new CustomEvent(NOW_EVENT, { detail: data }));
     } catch { /* backend unreachable: try again on the next tick */ }
-    // Our backend only, no AniList: every 10s on screen, once a minute in the background
-    nowTimer = setTimeout(pollNow, document.visibilityState === 'visible' ? 10000 : 60000);
+    // Our backend only, no AniList: every 10s on screen, once a minute in the background and in the
+    // player (it knows what plays; tracked episodes still announce themselves)
+    const busy = document.visibilityState !== 'visible' || location.hash.startsWith('#/play/');
+    nowTimer = setTimeout(pollNow, busy ? 60000 : 10000);
 }
 
 // The episode has to fit, then the year decides  (same weights as matchFit in api/server.js)
@@ -570,7 +572,7 @@ function matchFit(media, group) {
 // Pushes AniList forward where Jellyfin is further along; returns what it changed
 export async function pullFromJellyfin(user, token) {
     if (!getConfig() || !isPullEnabled() || !user?.id || !token) return { updated: 0, changes: [] };
-    const api = await import('./api.js?v=121');
+    const api = await import('./api.js?v=122');
     if (api.isBackgroundPaused()) return { updated: 0, changes: [], skipped: 'maintenance' };
     if (api.isRateLimited()) return { updated: 0, changes: [], skipped: 'rate-limited' };
 

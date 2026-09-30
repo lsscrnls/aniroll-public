@@ -1,4 +1,4 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=121';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=122';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -700,7 +700,8 @@ export async function getMediaList(userId, type = 'ANIME', token = null) {
 }
 
 // Scores: always pass `scoreRaw` (0-100). `score` would be read in the user's own AniList format.
-export async function saveMediaListEntry(variables, token, { queue = true } = {}) {
+// mirror: false when the change came from Jellyfin itself (the player), which knows already
+export async function saveMediaListEntry(variables, token, { queue = true, mirror = true } = {}) {
     const data = await queryOrQueue(variables, token, queue, `
         mutation (
             $mediaId: Int, $id: Int, $status: MediaListStatus, $scoreRaw: Int,
@@ -728,8 +729,8 @@ export async function saveMediaListEntry(variables, token, { queue = true } = {}
     const saved = data.SaveMediaListEntry;
 
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
-    if (saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=121').then(m =>
+    if (mirror && saved?.mediaId && saved.progress) {
+        import('./jellyfin.js?v=122').then(m =>
             m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
     }
 
