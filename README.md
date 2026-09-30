@@ -16,7 +16,7 @@ learning from it is welcome; copying, redistributing or hosting it needs my writ
 
 **Everything AniRoll stands on is here**: talking to a rate-limited API with no backend of its own
 in between, caching that keeps working offline, keeping two accounts in one browser apart, writing to
-someone's list only when that is safe, a small server that holds secrets, two complete designs, and
+someone's list only when that is safe, a small server that holds secrets, a Material 3 Expressive design of its own, and
 no bundler anywhere.
 
 **Three pieces are cut on purpose**: Roll, the Watch Party and the taste match. They are what makes
@@ -40,12 +40,10 @@ New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start read
 - **Recommendations with a taste match** from your own scores, genres and tags.
 - **Studio and voice actor pages**: everything a studio made, every role a voice actor plays; related shows as covers, spoiler tags only on request.
 - **My List** with format chips, **Social** (your AniList feed), **scores out of 100** whatever your AniList format, installable as a PWA.
-- **Two designs**: AniRoll's own, or **Material 3 Expressive** in the colours of the show you watched last.
+- **Material 3 Expressive**, in the colours of the show you watched last: its cover becomes the wallpaper,
+  every surface follows. AniRoll's first design stays available as a legacy option in Settings.
 
-| AniRoll | Material 3 Expressive |
-|---|---|
-| ![AniRoll's design: Home with the show you're on and its countdown, then an accent colour by swatch and hex code](docs/screenshots/clip-design-aniroll.webp) | ![Material 3 Expressive: Home themed from the show you're on, widgets, +1 and Roll](docs/screenshots/clip-m3.webp) |
-| Monochrome and cinematic, one accent colour of your choice. | Themed from your last show: its cover becomes the wallpaper, every surface follows. |
+![Material 3 Expressive: Home themed from the show you're on, widgets, +1 on a card, then Roll](docs/screenshots/clip-m3.webp)
 
 | My List | Calendar |
 |---|---|
@@ -124,11 +122,12 @@ Content Security Policy can say `script-src 'self'`: only AniRoll's own files ru
 let markup through the escaping. The one addition is `'wasm-unsafe-eval'`, so the subtitle renderer's
 WebAssembly may compile; it still has to come from AniRoll's own files.
 
-### Two designs, one app
+### One design, generated from what you watch
 
-`js/design.js` switches between AniRoll's own look and Material 3 Expressive. Material 3's whole
-light and dark scheme comes from one seed colour, the cover colour of the show you watched last,
-through Google's Material Color Utilities. Its wallpaper is that cover, blurred once on a tiny canvas
+AniRoll is built in Material 3 Expressive (`css/m3.css`, `js/m3.js`). Its whole light and dark scheme
+comes from one seed colour, the cover colour of the show you watched last, through Google's Material
+Color Utilities, in the colour style you pick. `index.html` starts in it, so no other look flashes first;
+`js/design.js` keeps AniRoll's first design as a legacy option. Its wallpaper is that cover, blurred once on a tiny canvas
 instead of with an expensive CSS blur. `js/m3.js` adds what CSS alone can't: the hero, the widgets
 and a cursor that takes the shape of what it points at.
 
@@ -152,14 +151,14 @@ to a module in `js/pages/`, and each page exports one `render({ content, params,
 | `js/auth.js` | The AniList login token, kept in `localStorage` |
 | `js/pages/*.js` | One module per page: `home`, `list`, `calendar`, `detail` (the slide-in panel), `social`, `search`, … |
 | `js/upnext.js`, `js/home-cinema.js` | What Home says about your list (next episode, what's waiting, the week) and AniRoll's Home on top of it |
-| `js/design.js`, `js/m3.js`, `css/m3.css` | The design switch, Material 3's generated palette and its extra pieces |
+| `js/design.js`, `js/m3.js`, `css/m3.css` | Material 3's generated palette, its shapes and extra pieces; the legacy switch |
 | `js/jellyfin.js`, `js/nowplaying.js` | Jellyfin: matching what you played to an AniList entry, the *Now watching* chip |
 | `js/pages/play.js`, `js/player/` | The player: finding the episode, what the browser can play, the stream, its controls, subtitles |
 | `js/vendor/` | Third-party libraries, unchanged and with their version in the name, each with its licence |
 | `js/a11y.js`, `js/select.js` | Dialogs, keyboard activation, styled selects |
 | `js/whatsnew.js` | The changelog and the pop-up for returning visitors |
 | `api/server.js` | The Node backend |
-| `css/style.css` | AniRoll's own design; `css/m3.css` is only loaded in Material 3 |
+| `css/style.css`, `css/m3.css` | The base styles (also the legacy design) and Material 3 on top of them |
 
 ### One action, followed through the code
 
@@ -191,7 +190,7 @@ contain these pieces either. To see them in action, [try AniRoll](https://anirol
 ## How it is checked
 
 - `tools/e2e/`: every page in Chromium (Playwright) against a mocked AniList: navigation, dialogs and
-  keyboard, both designs, the changelog, and a check that two accounts in one browser never share
+  keyboard, Material 3 and the legacy design, the changelog, and a check that two accounts in one browser never share
   cached answers or queued saves; the player against a mocked Jellyfin (direct play, a failing
   conversion, Quick Connect, styled and Blu-ray subtitles)
 - `tools/api-test/`: the Jellyfin matcher in the server and the browser gives the same answer for the

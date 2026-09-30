@@ -1,4 +1,4 @@
-import { jfAuth } from '../jellyfin.js?v=120';
+import { jfAuth } from '../jellyfin.js?v=121';
 
 // Every subtitle of a file behind one list, whatever draws it:
 //   ASS/SSA  -> JASSUB (libass in WebAssembly) with the fonts embedded in the MKV — typesetting, signs,
@@ -170,6 +170,8 @@ export function createSubtitles({ video, base, cfg, itemId, source, onChange = (
     return {
         list: () => tracks.map(t => ({ id: t.id, label: t.label })),
         current: () => active?.id ?? null,
+        // What draws the track, for the stats
+        kind: (id) => ({ ass: 'libass', pgs: 'libpgs', text: 'WebVTT' })[tracks.find(t => t.id === id)?.kind] || '',
         select,
         destroy() {
             closed = true;

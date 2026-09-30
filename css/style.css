@@ -4046,37 +4046,9 @@ input, select, textarea { font: inherit; color: inherit; }
 .settings-sub-block[hidden] { display: none; }
 .settings-sub-label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm); }
 
-/* Design picker: two cards with a tiny drawing of each look */
-.design-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-md); }
-.design-option {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    padding: var(--space-md);
-    text-align: left;
-    border: 2px solid var(--border);
-    border-radius: var(--radius-xl);
-    transition: border-color var(--duration-fast) ease;
-}
-.design-option:hover { border-color: var(--text-secondary); }
-.design-option.active { border-color: var(--user-accent); }
-.design-option-name { font-weight: 700; margin-top: var(--space-sm); }
-.design-option-text { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; }
 /* The score field on an entry: 0–100 with its scale written next to it */
 .score-field { display: inline-flex; align-items: baseline; gap: 4px; }
 .score-scale { font-size: 0.85rem; color: var(--text-secondary); }
-.design-preview { display: flex; align-items: center; gap: 8px; width: 100%; height: 72px; padding: 0 16px; border-radius: 14px; }
-.design-preview i { display: block; }
-.design-preview-aniroll { background: #0a0a0a; }
-.design-preview-aniroll i:nth-child(1) { width: 34px; height: 48px; border-radius: 8px; background: #262626; }
-.design-preview-aniroll i:nth-child(2) { width: 70px; height: 22px; border-radius: 999px; background: #fff; }
-.design-preview-aniroll i:nth-child(3) { width: 10px; height: 10px; border-radius: 50%; background: var(--user-accent); }
-.design-preview-m3 { background: #f7f2fa; }
-.design-preview-m3 i:nth-child(1) { width: 44px; height: 44px; border-radius: 14px; background: #eaddff; }
-.design-preview-m3 i:nth-child(2) { width: 76px; height: 32px; border-radius: 999px; background: #6750a4; }
-.design-preview-m3 i:nth-child(3) { width: 28px; height: 28px; border-radius: 50%; background: #7d5260; }
-
 /* M3 design: nothing shows until its stylesheet is in (js/design.js), so AniRoll's look never flashes */
 html.m3-loading body { visibility: hidden; }
 
@@ -5297,6 +5269,36 @@ body.player-open .cursor { display: none !important; }
 .player.is-idle .pl-next { pointer-events: auto; }
 .player.is-idle .pl-next :is(button) { cursor: pointer !important; }
 
+/* Stats for nerds (I): top left under the title, stays while the controls hide; never catches the pointer
+   except on its close button */
+.pl-stats {
+    position: absolute;
+    top: 76px;
+    left: max(16px, env(safe-area-inset-left));
+    z-index: 4;
+    width: min(360px, calc(100% - 32px));
+    max-height: calc(100% - 200px);
+    overflow-y: auto;
+    padding: 10px 14px 12px;
+    border-radius: 16px;
+    background: rgba(12,12,16,0.78);
+    backdrop-filter: blur(12px);
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    pointer-events: none;
+}
+.pl-stats[hidden] { display: none; }
+.pl-stats-head { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 0.8rem; margin-bottom: 4px; }
+.pl-stats-close { pointer-events: auto; width: 32px; height: 32px; margin-right: -8px; }
+.pl-stats-close .pl-icon { width: 18px; height: 18px; }
+.pl-stats-sec + .pl-stats-sec { margin-top: 8px; }
+.pl-stats-title { font-size: 0.68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--pl-primary); margin-bottom: 2px; }
+.pl-stats-row { display: grid; grid-template-columns: 92px 1fr; gap: 8px; }
+.pl-stats-row span:first-child { color: rgba(255,255,255,0.6); }
+.pl-stats-row span:last-child { font-variant-numeric: tabular-nums; word-break: break-word; }
+.player.is-idle .pl-stats { opacity: .85; }
+
 /* Loading subtitles: a quiet chip on the left, opposite Skip intro; also stays while the controls hide */
 .pl-subs-note {
     position: absolute;
@@ -5345,7 +5347,7 @@ body.player-open .cursor { display: none !important; }
 .pl-volume-slider::-moz-range-thumb { width: 4px; height: 20px; border: 0; border-radius: 2px; background: var(--pl-primary); }
 
 /* Subtitle menu: an M3 menu, opening upwards */
-.pl-menu-wrap { position: relative; }
+.pl-menu-wrap { position: relative; display: flex; align-items: center; gap: 4px; }
 .pl-menu {
     position: absolute;
     right: 0;

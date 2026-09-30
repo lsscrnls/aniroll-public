@@ -34,7 +34,12 @@ export function startLenis() {
 
 export function lenisScrollTo(target, opts) {
     if (lenis) lenis.scrollTo(target, opts);
-    else window.scrollTo({ top: typeof target === 'number' ? target : 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    else {
+        // Without Lenis (reduce motion): a number, or an element and the offset above it
+        const top = typeof target === 'number' ? target
+            : target?.getBoundingClientRect ? target.getBoundingClientRect().top + window.scrollY + (opts?.offset || 0) : 0;
+        window.scrollTo({ top, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    }
 }
 
 export function refreshAnimations() {

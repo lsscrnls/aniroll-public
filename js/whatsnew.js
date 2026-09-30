@@ -1,9 +1,9 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=120';
-import { openDialog } from './a11y.js?v=120';
-import { prefersReducedMotion } from './animations.js?v=120';
+import { esc } from './store.js?v=121';
+import { openDialog } from './a11y.js?v=121';
+import { prefersReducedMotion } from './animations.js?v=121';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More
@@ -16,15 +16,19 @@ const CHANGES = [
         // '.2': Up next with a countdown
         // '.3': the episode list, Watch credits
         // '.4': choosing the audio track
-        id: '2026-09-30.4',
-        title: 'Watch from your Jellyfin, right in AniRoll',
+        // '.5': Material 3 Expressive for everyone, quality and stats in the player
+        id: '2026-09-30.5',
+        title: 'Material 3 for everyone, and your Jellyfin right in AniRoll',
         items: [
+            '<strong>Material 3 Expressive</strong> is AniRoll’s design now, in the colours of the show you watched last. The first design stays under Settings as <strong>Legacy design</strong>.',
+            'The colour style (Tonal, Vibrant, Expressive) now also shapes the colours taken from your show.',
             'Shows in your Jellyfin library get a <strong>Play</strong> button: episodes play in AniRoll, and finishing one ticks it off on AniList.',
             'It picks up where you stopped, and Jellyfin only converts what your browser can’t play.',
             '<strong>Subtitles</strong> look the way the release made them: styled signs and karaoke with the file’s own fonts, and Blu-ray subtitles too.',
             '<strong>Skip intro</strong>, recaps and credits with one press, when your server knows where they are.',
             'When the credits roll, <strong>Up next</strong> counts down to the next episode; its subtitles are already waiting. Rather see the credits? <strong>Watch credits</strong>, and it asks again at the very end.',
             'Dual audio? Pick the <strong>audio track</strong> next to the subtitles; AniRoll keeps it for the rest of the show.',
+            'The gear sets the <strong>quality</strong>: Auto measures your connection, Maximum plays the original, or pick a bitrate. <strong>Stats for nerds</strong> (I) shows what plays and how.',
             '<strong>Episodes</strong> next to Play lists every episode your Jellyfin has, with the seasons before and after: start any of them, for a rewatch or one you skipped.',
             'Signing in to Jellyfin works with <strong>Quick Connect</strong>: confirm a code in Jellyfin, no password typed into AniRoll.',
         ],

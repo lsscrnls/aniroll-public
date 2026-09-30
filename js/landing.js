@@ -1,15 +1,48 @@
-import { prefersReducedMotion } from './animations.js?v=120';
-import { getDesign, switchDesign } from './design.js?v=120';
+import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=121';
 
-// Landing page motion: the headline arrives word by word, the big clip tilts upright while it scrolls in,
-// and the feature tour plays one clip after another. Clips (media/*.mp4) are recorded with tools/showcase.
+// The landing page, in Material 3 Expressive (the only design logged out): the headline arrives word by word,
+// covers of what's trending pop into shaped tiles, the big clip tilts upright while it scrolls in, and the
+// feature tour plays one clip after another. Clips (media/*.mp4) are recorded with tools/showcase.
 // "Reduce motion": everything is shown at once, clips don't autoplay (posters + controls instead).
 
 export const TOUR = [
     { key: 'list', title: 'Your list, one tap away', text: 'Covers first, +1 right on the card, search, sort and an “Airing” filter.' },
     { key: 'calendar', title: 'The week at a glance', text: 'Air times, finales and where you stand on every show — or everything that airs.' },
     { key: 'match', title: 'A match that knows your taste', text: 'Built only from your own scores, genres and tags, with the show it’s based on.' },
+    { key: 'player', title: 'Play from your Jellyfin', text: 'Your own server, right here: subtitles as the release styled them, Skip intro, and your list moves on by itself.' },
 ];
+
+// Shaped tiles for the hero; the covers come from what's trending (fillCollage)
+const TILES = ['flower', 'cookie9', 'arch', 'clover4', 'cookie12', 'sunny'];
+export function renderCollage() {
+    return `<div class="lp-collage" aria-hidden="true">
+        ${TILES.map((shape, i) => `<span class="lp-tile lp-tile-${i + 1} lp-shape-${shape}"></span>`).join('')}
+    </div>`;
+}
+export function fillCollage(root, media) {
+    // The last, small tile stays a plain accent in the scheme's colour
+    const tiles = [...root.querySelectorAll('.lp-tile')].slice(0, -1);
+    media.filter(m => m.coverImage?.extraLarge || m.coverImage?.large).slice(0, tiles.length).forEach((m, i) => {
+        const url = m.coverImage.extraLarge || m.coverImage.large;
+        const img = new Image();
+        img.onload = () => { tiles[i].style.backgroundImage = `url("${url.replace(/"/g, '')}")`; tiles[i].classList.add('has-cover'); };
+        img.src = url;
+    });
+}
+
+// Material 3 takes its colours from the show you watched last: the clip shows it, the swatches hint at it
+export function renderColour() {
+    return `<section class="lp-colour">
+        <div class="lp-colour-text">
+            <h2 class="landing-tour-title">In the colours of what you watch</h2>
+            <p class="landing-tour-sub">Finish an episode and AniRoll takes on its colours: the cover becomes your wallpaper, every surface follows. Or pick a palette of your own.</p>
+            <div class="lp-swatches" aria-hidden="true">${['#8e4957', '#b33b15', '#8b5000', '#4c662b', '#006a6a', '#415f91', '#8a4c9e'].map((c, i) => `<span style="--c:${c};--shape:var(--m3-shape-${['cookie9', 'flower', 'clover4', 'cookie12', 'sunny', 'arch', 'burst'][i]})"></span>`).join('')}</div>
+        </div>
+        <div class="lp-colour-frame">
+            <video class="landing-video" src="media/m3.mp4" poster="media/m3.jpg" muted loop playsinline preload="none" aria-label="AniRoll taking on the colours of a show"></video>
+        </div>
+    </section>`;
+}
 
 export function renderHeadline(lines, accentLast = true) {
     const words = lines.map(l => l.split(' '));
@@ -28,7 +61,7 @@ export function renderStage() {
 }
 
 export function renderTour() {
-    return `<section class="landing-tour">
+    return `<section class="landing-tour" id="lp-tour">
         <div class="landing-tour-head">
             <h2 class="landing-tour-title">Everything around your list</h2>
             <p class="landing-tour-sub">AniRoll sits on top of your AniList account. Nothing to import, nothing to keep in sync.</p>
@@ -48,31 +81,6 @@ export function renderTour() {
     </section>`;
 }
 
-// The two designs side by side, each with its own clip
-export const DESIGNS = [
-    { key: 'aniroll', name: 'AniRoll', text: 'Monochrome and cinematic, with one accent colour: pick a swatch or type any hex code.' },
-    { key: 'm3', name: 'Material 3 Expressive', text: 'Google’s newest design language, dressed in the colours of the show you watched last. Springy, bright, alive.' },
-];
-
-export function renderDesigns() {
-    return `<section class="landing-designs">
-        <div class="landing-tour-head">
-            <h2 class="landing-tour-title">Two looks. Your colours.</h2>
-            <p class="landing-tour-sub">Try both right here. Later you switch in Settings, with your own colours in both.</p>
-        </div>
-        <div class="landing-designs-grid">
-            ${DESIGNS.map(d => `<figure class="landing-design landing-design-${d.key}">
-                <div class="landing-design-frame">
-                    <video class="landing-video" src="media/design-${d.key}.mp4" poster="media/design-${d.key}.jpg" muted loop playsinline preload="none" aria-label="${d.name} design in action"></video>
-                </div>
-                <figcaption><strong>${d.name}</strong><span>${d.text}</span>
-                    <button type="button" class="glass-btn ${getDesign() === d.key ? 'glass-btn-primary' : 'glass-btn-secondary'} landing-design-try" data-try-design="${d.key}" aria-pressed="${getDesign() === d.key}">${getDesign() === d.key ? 'In use' : 'Try this look'}</button>
-                </figcaption>
-            </figure>`).join('')}
-        </div>
-    </section>`;
-}
-
 // Returns a cleanup for the router
 export function initLanding(root) {
     const reduce = prefersReducedMotion();
@@ -84,7 +92,10 @@ export function initLanding(root) {
         const words = root.querySelectorAll('.landing-title .lw > span');
         const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
             .from(words, { yPercent: 60, opacity: 0, filter: 'blur(14px)', duration: 0.9, stagger: 0.09, clearProps: 'all' })
-            .from(root.querySelectorAll('.landing-sub, .landing-hero .glass-btn'), { y: 18, opacity: 0, duration: 0.7, stagger: 0.08, clearProps: 'all' }, '-=0.45')
+            .from(root.querySelectorAll('.lp-eyebrow, .landing-sub, .lp-actions > *'), { y: 18, opacity: 0, duration: 0.7, stagger: 0.08, clearProps: 'all' }, '-=0.45')
+            // The shaped tiles pop in one after another, a little turned, and spring into place
+            // (only its own properties are cleared: the cover is an inline background image)
+            .from(root.querySelectorAll('.lp-tile'), { scale: 0.4, rotate: -25, opacity: 0, duration: 0.9, stagger: 0.07, ease: 'back.out(1.8)', clearProps: 'transform,opacity' }, '-=0.9')
             .from(root.querySelector('.landing-stage'), { y: 60, opacity: 0, duration: 1, clearProps: 'opacity' }, '-=0.5');
         cleanups.push(() => tl.kill());
 
@@ -113,7 +124,7 @@ export function initLanding(root) {
     let current = 0;
     let raf = 0;
 
-    const designVideos = [...root.querySelectorAll('.landing-designs video')];
+    const designVideos = [...root.querySelectorAll('.lp-colour video')];
     function syncPlayback() {
         if (reduce) return;
         designVideos.forEach(v => {
@@ -146,19 +157,13 @@ export function initLanding(root) {
 
     items.forEach((el, i) => el.addEventListener('click', () => select(i)));
 
-    // Try a design before logging in: the page changes right here, the choice is kept for later
-    root.querySelectorAll('[data-try-design]').forEach(btn => btn.addEventListener('click', async (e) => {
-        const design = btn.dataset.tryDesign;
-        const r = btn.getBoundingClientRect();
-        const from = { x: e.clientX || r.left + r.width / 2, y: e.clientY || r.top + r.height / 2 };
-        await switchDesign(design, false, from);
-        root.querySelectorAll('[data-try-design]').forEach(b => {
-            const on = b.dataset.tryDesign === design;
-            b.className = `glass-btn ${on ? 'glass-btn-primary' : 'glass-btn-secondary'} landing-design-try`;
-            b.setAttribute('aria-pressed', String(on));
-            b.textContent = on ? 'In use' : 'Try this look';
-        });
-    }));
+    // "See what's inside": down to the tour (a hash link would go to the router)
+    root.querySelector('[data-scroll-to]')?.addEventListener('click', (e) => {
+        const target = document.getElementById(e.currentTarget.dataset.scrollTo);
+        if (!target) return;
+        lenisScrollTo(target, { offset: -80 });
+    });
+
     // Arrow keys move between the tabs
     root.querySelector('.landing-tour-list')?.addEventListener('keydown', (e) => {
         const d = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0;
@@ -195,9 +200,9 @@ export function initLanding(root) {
     if (tourFrame) io.observe(tourFrame);
     designVideos.forEach(v => io.observe(v));
     if (hasGsap && window.ScrollTrigger && !reduce) {
-        const designs = gsap.from(root.querySelectorAll('.landing-designs .landing-tour-head > *, .landing-design'), {
+        const designs = gsap.from(root.querySelectorAll('.lp-colour-text > *, .lp-colour-frame'), {
             y: 48, opacity: 0, filter: 'blur(8px)', duration: 0.9, stagger: 0.1, ease: 'power3.out', clearProps: 'all',
-            scrollTrigger: { trigger: root.querySelector('.landing-designs'), start: 'top 80%', once: true },
+            scrollTrigger: { trigger: root.querySelector('.lp-colour'), start: 'top 80%', once: true },
         });
         cleanups.push(() => { designs.scrollTrigger?.kill(); designs.kill(); });
     }

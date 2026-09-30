@@ -18,6 +18,7 @@ const ICON = {
     exitFullscreen: 'M253-253H150q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h133q12.75 0 21.38 8.62Q313-295.75 313-283v133q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-103Zm454 0v103q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-133q0-12.75 8.63-21.38Q664.25-313 677-313h133q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H707ZM253-707v-103q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v133q0 12.75-8.62 21.37Q295.75-647 283-647H150q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h103Zm454 0h103q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H677q-12.75 0-21.37-8.63Q647-664.25 647-677v-133q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v103Z',
     back: 'm274-450 227 227q9 9 9 21t-9 21q-9 9-21 9t-21-9L181-459q-5-5-7-10t-2-11q0-6 2-11t7-10l278-278q9-9 21-9t21 9q9 9 9 21t-9 21L274-510h496q13 0 21.5 8.5T800-480q0 13-8.5 21.5T770-450H274Z',
     skipNext: 'M660-280v-400q0-17 11.5-28.5T700-720q17 0 28.5 11.5T740-680v400q0 17-11.5 28.5T700-240q-17 0-28.5-11.5T660-280Zm-440-35v-330q0-18 12-29t28-11q5 0 11 1t11 5l248 166q9 6 13.5 14.5T548-480q0 10-4.5 18.5T530-447L282-281q-5 4-11 5t-11 1q-16 0-28-11t-12-29Z',
+    settings: 'M433-80q-27 0-46.5-18T363-142l-9-66q-13-5-24.5-12T307-235l-62 26q-25 11-50 2t-39-32l-47-82q-14-23-8-49t27-43l53-40q-1-7-1-13.5v-27q0-6.5 1-13.5l-53-40q-21-17-27-43t8-49l47-82q14-23 39-32t50 2l62 26q11-8 23-15t24-12l9-66q4-26 23.5-44t46.5-18h94q27 0 46.5 18t23.5 44l9 66q13 5 24.5 12t22.5 15l62-26q25-11 50-2t39 32l47 82q14 23 8 49t-27 43l-53 40q1 7 1 13.5v27q0 6.5-2 13.5l53 40q21 17 27 43t-8 49l-48 82q-14 23-39 32t-50-2l-60-26q-11 8-23 15t-24 12l-9 66q-4 26-23.5 44T527-80h-94Zm49-260q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Z',
     close: 'M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z',
     check: 'm378-332 363-363q9-9 21.5-9t21.5 9q9 9 9 21.5t-9 21.5L399-267q-9 9-21 9t-21-9L175-449q-9-9-8.5-21.5T176-492q9-9 21.5-9t21.5 9l159 160Z',
 };
@@ -41,6 +42,10 @@ export function fmtTime(s) {
 export function controlsHtml() {
     return `
         <div class="pl-scrim" aria-hidden="true"></div>
+        <div class="pl-stats" role="region" aria-label="Stats for nerds" hidden>
+            <div class="pl-stats-head"><span>Stats for nerds</span><button class="pl-btn pl-stats-close" data-act="stats" aria-label="Close the stats" title="Close (I)">${icon('close')}</button></div>
+            <div class="pl-stats-body"></div>
+        </div>
         <div class="pl-center">
             <button class="pl-btn pl-btn-tonal pl-skip" data-act="back10" aria-label="Back 10 seconds" title="Back 10 s (←)">${icon('back10')}</button>
             <button class="pl-btn pl-play" data-act="play" aria-label="Play" title="Play (Space)">${icon('play')}</button>
@@ -71,6 +76,7 @@ export function controlsHtml() {
                 </div>
                 <div class="pl-menu-wrap">
                     <button class="pl-btn" data-act="subs" aria-label="Audio and subtitles" aria-haspopup="menu" aria-expanded="false" title="Audio & subtitles (C: subtitles on/off)">${icon('subtitles')}</button>
+                    <button class="pl-btn" data-act="settings" aria-label="Quality and stats" aria-haspopup="menu" aria-expanded="false" title="Quality & stats for nerds (I)">${icon('settings')}</button>
                     <div class="pl-menu" role="menu" hidden></div>
                 </div>
                 <button class="pl-btn" data-act="pip" aria-label="Picture in picture" title="Picture in picture">${icon('pip')}</button>
@@ -86,6 +92,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     const playBtn = $('.pl-play');
     const menu = $('.pl-menu');
     const subsBtn = $('[data-act="subs"]');
+    const settingsBtn = $('[data-act="settings"]');
+    let menuKind = null; // 'subs' | 'settings' while the menu is open
     const muteBtn = $('[data-act="mute"]');
     const volume = $('.pl-volume-slider');
     const offs = [];
@@ -97,8 +105,12 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     let subs = { list: () => [], current: () => null, select: () => {} };
     // The audio tracks (js/pages/play.js switches them with the server), set once the file is known
     let audio = { list: () => [], current: () => null, select: () => {} };
-    // Worth a menu: some subtitles, or more than one audio track
-    const paintMenuButton = () => { $('.pl-menu-wrap').hidden = !subs.list().length && audio.list().length < 2; };
+    // The quality steps (js/pages/play.js asks the server again) and the stats rows
+    let quality = { list: () => [], current: () => null, select: () => {} };
+    let stats = () => [];
+    let statsTimer = 0;
+    // Worth a button: some subtitles, or more than one audio track
+    const paintMenuButton = () => { subsBtn.hidden = !subs.list().length && audio.list().length < 2; };
 
     const duration = () => (Number.isFinite(video.duration) && video.duration) || runtime() || 0;
     $('.pl-seek-mark').style.left = `${watchedAt * 100}%`;
@@ -175,6 +187,20 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     const toggleSubs = () => {
         setSubs(subs.current() != null ? null : (lastSubs ?? subs.list()[0]?.id ?? null));
     };
+    const menuItem = (label, attr, id, selected, role = 'menuitemradio') => `<button class="pl-menu-item" role="${role}" aria-checked="${selected}" ${attr}="${id}">
+            <span class="pl-menu-check">${selected ? icon('check') : ''}</span>${label}</button>`;
+    const openSettings = () => {
+        const nowQ = quality.current();
+        menu.innerHTML = `<div class="pl-menu-title">Quality</div>`
+            + quality.list().map(q => menuItem(escapeHtml(q.label), 'data-quality', q.id, q.id === nowQ)).join('')
+            + '<div class="pl-menu-divider" role="separator"></div>'
+            + menuItem('Stats for nerds', 'data-stats', '1', !statsBox.hidden, 'menuitemcheckbox');
+        menuKind = 'settings';
+        menu.hidden = false;
+        settingsBtn.setAttribute('aria-expanded', 'true');
+        wake();
+        (menu.querySelector('[data-quality][aria-checked="true"]') || menu.querySelector('.pl-menu-item'))?.focus();
+    };
     const openMenu = () => {
         const list = subs.list();
         const current = subs.current();
@@ -192,6 +218,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
                     + item('Off', 'data-track', 'off', current == null)
                     + list.map(t => item(escapeHtml(t.label), 'data-track', t.id, t.id === current)).join('')
                 : '');
+        menuKind = 'subs';
         menu.hidden = false;
         subsBtn.setAttribute('aria-expanded', 'true');
         wake();
@@ -199,8 +226,25 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     };
     const closeMenu = () => {
         menu.hidden = true;
+        menuKind = null;
         subsBtn.setAttribute('aria-expanded', 'false');
+        settingsBtn.setAttribute('aria-expanded', 'false');
         wake();
+    };
+
+    // ----- Stats for nerds: a panel at the top left, redrawn every second while it shows -----
+    const statsBox = $('.pl-stats');
+    const paintStats = () => {
+        let sections = [];
+        try { sections = stats() || []; } catch { /* a moment without numbers */ }
+        $('.pl-stats-body').innerHTML = sections.map(sec => `<div class="pl-stats-sec"><div class="pl-stats-title">${escapeHtml(sec.title)}</div>`
+            + sec.rows.map(([k, v]) => `<div class="pl-stats-row"><span>${escapeHtml(k)}</span><span>${escapeHtml(String(v))}</span></div>`).join('') + '</div>').join('');
+    };
+    const toggleStats = (show = statsBox.hidden) => {
+        statsBox.hidden = !show;
+        root.classList.toggle('has-stats', show);
+        clearInterval(statsTimer);
+        if (show) { paintStats(); statsTimer = setInterval(paintStats, 1000); }
     };
 
     on(root, 'click', (ev) => {
@@ -212,7 +256,9 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             else if (act === 'back10') jump(-STEP);
             else if (act === 'fwd10') jump(STEP);
             else if (act === 'mute') { video.muted = !video.muted; if (!video.muted && video.volume === 0) video.volume = 0.5; }
-            else if (act === 'subs') (menu.hidden ? openMenu() : closeMenu());
+            else if (act === 'subs') (menuKind === 'subs' ? closeMenu() : openMenu());
+            else if (act === 'settings') (menuKind === 'settings' ? closeMenu() : openSettings());
+            else if (act === 'stats') toggleStats();
             else if (act === 'pip') togglePip();
             else if (act === 'fullscreen') toggleFullscreen();
             else if (act === 'skipSegment') skipSegment();
@@ -225,6 +271,11 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             if (item.dataset.audio != null) {
                 const id = Number(item.dataset.audio);
                 if (id !== audio.current()) audio.select(id);
+            } else if (item.dataset.quality != null) {
+                const q = /^\d+(\.\d+)?$/.test(item.dataset.quality) ? Number(item.dataset.quality) : item.dataset.quality;
+                if (q !== quality.current()) quality.select(q);
+            } else if (item.dataset.stats != null) {
+                toggleStats();
             } else {
                 setSubs(item.dataset.track === 'off' ? null : Number(item.dataset.track));
             }
@@ -367,7 +418,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
         if (ev.target.closest?.('input, textarea, select, [contenteditable]') && ev.target !== volume) return;
         if (!menu.hidden) {
-            if (ev.key === 'Escape') { ev.preventDefault(); closeMenu(); subsBtn.focus(); }
+            if (ev.key === 'Escape') { ev.preventDefault(); const back = menuKind === 'settings' ? settingsBtn : subsBtn; closeMenu(); back.focus(); }
             if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
                 ev.preventDefault();
                 const items = [...menu.querySelectorAll('.pl-menu-item')];
@@ -391,6 +442,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             m: () => { video.muted = !video.muted; },
             c: toggleSubs,
             s: skipSegment,
+            i: () => toggleStats(),
         }[key];
         if (handled && handled() !== false) {
             ev.preventDefault();
@@ -427,6 +479,14 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             if (current != null) lastSubs = current;
             subsBtn.classList.toggle('is-on', current != null);
         },
+        // { list() -> [{ id: 'auto' | 'max' | bps, label }], current(), select(id) }
+        setQuality(manager) {
+            quality = manager;
+        },
+        // () -> [{ title, rows: [[label, value]] }]
+        setStats(provider) {
+            stats = provider;
+        },
         // { list() -> [{ id, label }], current() -> id, select(id) }
         setAudio(manager) {
             audio = manager;
@@ -451,6 +511,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             clearTimeout(idleTimer);
             offs.forEach(off => off());
             clearInterval(nextTimer);
+            clearInterval(statsTimer);
             // Leaving for another episode keeps full screen; leaving the player ends it
             if (document.fullscreenElement && !location.hash.startsWith('#/play/')) document.exitFullscreen().catch(() => {});
         },

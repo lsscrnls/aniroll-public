@@ -91,6 +91,11 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
             return json({ Items: term === 'show 1' || anyTitle ? [{ Id: 'series1', Name: anyTitle ? url.searchParams.get('searchTerm') : 'Show 1', ProductionYear: anyTitle ? null : 2026 }] : [] });
         }
         if (p === '/Shows/series1/Episodes') return json({ Items: Array.from({ length: 12 }, (_, i) => episode(i + 1)) });
+        // Auto quality measures the way to the server: 2 MB, answered at once (a fast line)
+        if (p === '/Playback/BitrateTest') {
+            calls.push({ type: 'bitrateTest', size: Number(url.searchParams.get('Size')) });
+            return route.fulfill({ status: 200, headers: CORS, contentType: 'application/octet-stream', body: Buffer.alloc(Math.min(Number(url.searchParams.get('Size')) || 0, 3_000_000)) });
+        }
         if (/^\/Items\/ep\d+\/Images\/Primary$/.test(p)) {
             return route.fulfill({ status: 200, headers: CORS, contentType: 'image/jpeg', body: THUMB });
         }
@@ -100,7 +105,8 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
         if (info) {
             // Like Jellyfin 12: the audio track counts only from the query; without it, the one last reported
             const asked = url.searchParams.get('AudioStreamIndex');
-            calls.push({ type: 'PlaybackInfo', item: info[1], body: req.postDataJSON(), audio: asked == null ? null : Number(asked) });
+            calls.push({ type: 'PlaybackInfo', item: info[1], body: req.postDataJSON(), audio: asked == null ? null : Number(asked),
+                bitrate: Number(url.searchParams.get('MaxStreamingBitrate')) || null });
             const source = mediaSource(info[1]);
             const audio = asked != null ? Number(asked) : lastAudio;
             if (audio != null && source.MediaStreams.some(s => s.Type === 'Audio' && s.Index === audio)) source.DefaultAudioStreamIndex = audio;
