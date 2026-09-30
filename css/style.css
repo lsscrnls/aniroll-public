@@ -5138,7 +5138,7 @@ body.player-open .cursor { display: none !important; }
     background: var(--pl-primary);
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 12'%3E%3Cpath d='M0 6 Q6 1 12 6 T24 6' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 24px 12px repeat-x;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 12'%3E%3Cpath d='M0 6 Q6 1 12 6 T24 6' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 24px 12px repeat-x;
-    animation: plWave 1.2s linear infinite;
+    animation: plWave 1.8s linear infinite;
 }
 /* Paused, the wave lies flat — as on Android */
 .player.is-paused .pl-seek-wave, .player.is-seeking .pl-seek-wave {

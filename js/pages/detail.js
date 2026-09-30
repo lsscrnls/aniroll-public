@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=122';
-import { enhanceSelect } from '../select.js?v=122';
-import { tasteMatch } from '../taste.js?v=122';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=122';
-import { getToken, isLoggedIn } from '../auth.js?v=122';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=122';
-import { showConfirm } from '../a11y.js?v=122';
+import * as api from '../api.js?v=123';
+import { enhanceSelect } from '../select.js?v=123';
+import { tasteMatch } from '../taste.js?v=123';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=123';
+import { getToken, isLoggedIn } from '../auth.js?v=123';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=123';
+import { showConfirm } from '../a11y.js?v=123';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -51,13 +51,13 @@ async function loadPlayButton(media, root) {
     const slot = root.querySelector('#detail-play');
     if (!slot || media.type !== 'ANIME') return;
     try {
-        const { getConfig } = await import('../jellyfin.js?v=122');
+        const { getConfig } = await import('../jellyfin.js?v=123');
         if (!getConfig()) return;
-        const { availability } = await import('../player/availability.js?v=122');
+        const { availability } = await import('../player/availability.js?v=123');
         const avail = await availability();
         if (!avail) return;
         const episode = nextEpisode(media);
-        const { findEpisode } = await import('../player/library.js?v=122');
+        const { findEpisode } = await import('../player/library.js?v=123');
         const found = await findEpisode(avail.base, media, episode);
         if (!found || !slot.isConnected) return;
         const resume = found.positionTicks > 0 && !found.played;
@@ -66,7 +66,7 @@ async function loadPlayButton(media, root) {
             // Any other episode (a rewatch, one skipped) and the seasons around it
             + (media.format === 'MOVIE' ? '' : `<button class="glass-btn glass-btn-secondary detail-episodes" type="button">${ICON_EPISODES}Episodes</button>`);
         slot.querySelector('.detail-episodes')?.addEventListener('click', async () => {
-            const { openEpisodes } = await import('../player/episodes.js?v=122');
+            const { openEpisodes } = await import('../player/episodes.js?v=123');
             openEpisodes(media, avail.base);
         });
         slot.hidden = false;
@@ -175,7 +175,7 @@ function renderDetailHTML(media) {
         ${media.tags?.length ? `<div style="margin-bottom:var(--space-xl)">
             <h3 class="section-title" style="margin-bottom:var(--space-md)">Tags</h3>
             <div class="genre-chips">${media.tags
-                .map(t => `<span class="genre-chip${t.isMediaSpoiler ? ' spoiler-tag' : ''}" style="cursor:default"${t.isMediaSpoiler ? ' hidden' : ''}>${esc(t.name)} <small style="opacity:0.6">${t.rank}%</small></span>`).join('')}
+                .map(t => `<a href="#/search?type=${media.type}&tag=${encodeURIComponent(t.name)}" class="genre-chip${t.isMediaSpoiler ? ' spoiler-tag' : ''}" title="Browse by this tag"${t.isMediaSpoiler ? ' hidden' : ''}>${esc(t.name)} <small style="opacity:0.6">${t.rank}%</small></a>`).join('')}
                 ${spoilerCount(media) ? `<button class="genre-chip spoiler-toggle" aria-expanded="false">Show ${spoilerCount(media)} spoiler tag${spoilerCount(media) === 1 ? '' : 's'}</button>` : ''}</div>
         </div>` : ''}
 

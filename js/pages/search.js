@@ -1,13 +1,15 @@
-import * as api from '../api.js?v=122';
-import { enhanceSelect } from '../select.js?v=122';
-import { renderMediaCard, getState, esc, emptyIcon, renderPageSwitch } from '../store.js?v=122';
-import { getToken } from '../auth.js?v=122';
+import * as api from '../api.js?v=123';
+import { enhanceSelect } from '../select.js?v=123';
+import { renderMediaCard, getState, esc, emptyIcon, renderPageSwitch } from '../store.js?v=123';
+import { getToken } from '../auth.js?v=123';
 
 export async function render({ content, query: params }) {
     const token = getToken();
     const type = params.type || 'ANIME';
     const sort = params.sort || 'TRENDING_DESC';
     const genre = params.genre || '';
+    // A tag from a show's page: browse everything carrying it, until the chip is switched off
+    let tag = params.tag || '';
     const search = params.q || '';
 
     let genres = getState().genreCache;
@@ -36,6 +38,9 @@ export async function render({ content, query: params }) {
                 ${genres.filter(g => g !== 'Hentai').map(g => `<option value="${esc(g)}" ${genre === g ? 'selected' : ''}>${esc(g)}</option>`).join('')}
             </select>
         </div>
+        ${tag ? `<div class="genre-chips" style="margin-bottom:var(--space-lg)">
+            <button class="genre-chip active" id="browse-tag" title="Remove tag filter">Tag: ${esc(tag)}</button>
+        </div>` : ''}
         <div id="browse-grid" class="media-grid media-grid-lg"></div>
         <div id="browse-more" style="text-align:center;margin-top:var(--space-xl)" hidden>
             <button class="glass-btn glass-btn-secondary" id="load-more-btn">Load More</button>
@@ -67,6 +72,7 @@ export async function render({ content, query: params }) {
 
         const genreVal = document.getElementById('browse-genre')?.value;
         if (genreVal) vars.genre_in = [genreVal];
+        if (tag) vars.tag_in = [tag];
 
         try {
             const result = await api.browseMedia(vars, token);
@@ -111,5 +117,10 @@ export async function render({ content, query: params }) {
     enhanceSelect(document.getElementById('browse-genre'));
     document.getElementById('browse-sort')?.addEventListener('change', () => loadResults(1));
     document.getElementById('browse-genre')?.addEventListener('change', () => loadResults(1));
+    document.getElementById('browse-tag')?.addEventListener('click', e => {
+        tag = '';
+        e.currentTarget.parentElement.remove();
+        loadResults(1);
+    });
     document.getElementById('load-more-btn')?.addEventListener('click', () => loadResults(currentPage + 1, true));
 }
