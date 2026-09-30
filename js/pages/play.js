@@ -1,13 +1,13 @@
-import * as api from '../api.js?v=119';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=119';
-import { getToken, isLoggedIn } from '../auth.js?v=119';
-import { getConfig, jfAuth, deviceId } from '../jellyfin.js?v=119';
-import { availability } from '../player/availability.js?v=119';
-import { findEpisode, jfGet } from '../player/library.js?v=119';
-import { deviceProfile } from '../player/profile.js?v=119';
-import { HtmlVideoEngine } from '../player/engine.js?v=119';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=119';
-import { createSubtitles } from '../player/subtitles.js?v=119';
+import * as api from '../api.js?v=120';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=120';
+import { getToken, isLoggedIn } from '../auth.js?v=120';
+import { getConfig, jfAuth, deviceId } from '../jellyfin.js?v=120';
+import { availability } from '../player/availability.js?v=120';
+import { findEpisode, jfGet } from '../player/library.js?v=120';
+import { deviceProfile } from '../player/profile.js?v=120';
+import { HtmlVideoEngine } from '../player/engine.js?v=120';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=120';
+import { createSubtitles } from '../player/subtitles.js?v=120';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -115,14 +115,29 @@ export async function render({ params, content }) {
             ? ep.positionTicks / TICKS : 0;
 
         status('Asking Jellyfin how to play it...');
-        const info = await playbackInfo(avail, cfg, ep.itemId, startTime);
+        let info = await playbackInfo(avail, cfg, ep.itemId, startTime);
         if (closed) return cleanup;
-        const source = info.MediaSources?.[0];
+        let source = info.MediaSources?.[0];
         if (!source) throw new Error(info.ErrorCode ? `Jellyfin cannot play this (${info.ErrorCode})` : 'Jellyfin found no playable file');
+
+        // The audio language picked for this show before (dual audio: the dub or the original), when this
+        // file has it; otherwise Jellyfin's pick from the user's language settings
+        const audioTracks = audioList(source);
+        const wanted = preferredAudio(mediaId, audioTracks);
+        session.audioIndex = source.DefaultAudioStreamIndex ?? audioTracks[0]?.id ?? null;
+        if (wanted != null && wanted !== session.audioIndex) {
+            const again = await playbackInfo(avail, cfg, ep.itemId, startTime, wanted).catch(() => null);
+            if (closed) return cleanup;
+            if (again?.MediaSources?.[0]) {
+                info = again;
+                source = again.MediaSources[0];
+                session.audioIndex = wanted;
+            }
+        }
         session.mediaSourceId = source.Id;
         session.playSessionId = info.PlaySessionId;
 
-        const plan = playPlan(avail.base, cfg, ep.itemId, source);
+        const plan = playPlan(avail.base, cfg, ep.itemId, source, session.audioIndex);
         session.hls = plan.hls;
         session.method = plan.method;
         $('player-method').textContent = plan.label;
@@ -131,6 +146,44 @@ export async function render({ params, content }) {
         subtitles = createSubtitles({ video, base: avail.base, cfg, itemId: ep.itemId, source,
             onLoading: (on) => controls?.setSubtitlesLoading(on) });
         controls.setSubtitles(subtitles);
+
+        // Another audio track: the browser cannot switch inside a file, so Jellyfin serves the file again
+        // with that track (usually only repackaged), from where it is now
+        let switching = false;
+        const switchAudio = async (id) => {
+            if (switching || closed || id === session.audioIndex) return;
+            switching = true;
+            const at = engine.time;
+            const wasPaused = engine.paused;
+            rememberAudio(mediaId, audioTracks.find(t => t.id === id));
+            try {
+                engine.pause();
+                status('Switching the audio...');
+                stopSession(session, at);
+                const next = await playbackInfo(avail, cfg, ep.itemId, at, id);
+                if (closed) return;
+                const src = next.MediaSources?.[0];
+                if (!src) throw new Error('Jellyfin cannot play this audio track');
+                const p = playPlan(avail.base, cfg, ep.itemId, src, id);
+                Object.assign(session, { mediaSourceId: src.Id, playSessionId: next.PlaySessionId, audioIndex: id,
+                    hls: p.hls, method: p.method, started: false, stopped: false });
+                $('player-method').textContent = p.label;
+                await engine.load({ url: p.url, hls: p.hls, startTime: at });
+                if (closed) return;
+                status('');
+                await reportStart(session, engine);
+                if (!wasPaused) engine.play().catch(() => { /* the controls are there */ });
+            } catch (err) {
+                if (!closed) status(err.message, { error: true });
+            } finally {
+                switching = false;
+            }
+        };
+        controls.setAudio({
+            list: () => audioTracks.map(t => ({ id: t.id, label: t.label })),
+            current: () => session.audioIndex,
+            select: switchAudio,
+        });
 
         status(plan.hls ? 'Starting the stream...' : 'Loading...');
         await engine.load({ url: plan.url, hls: plan.hls, startTime });
@@ -217,8 +270,47 @@ async function loadSegments(base, cfg, itemId) {
     }
 }
 
-async function playbackInfo(avail, cfg, itemId, startTime) {
-    const res = await fetch(`${avail.base}/Items/${encodeURIComponent(itemId)}/PlaybackInfo?userId=${encodeURIComponent(cfg.userId)}`, {
+// ===== Audio tracks =====
+// { 'm<anilistId>': { lang, title } } — a letter first, so the keys keep their order (newest last)
+const AUDIO_PREF_KEY = 'aniroll_audio_pref';
+
+function audioList(source) {
+    return (source.MediaStreams || []).filter(s => s.Type === 'Audio').map(s => ({
+        id: s.Index,
+        label: s.DisplayTitle || s.Title || s.Language || `Track ${s.Index}`,
+        lang: s.Language || '',
+        title: s.Title || '',
+    }));
+}
+
+// The track matching what was chosen for this show: same language and name, else same language
+function preferredAudio(mediaId, tracks) {
+    let pref = null;
+    try { pref = JSON.parse(localStorage.getItem(AUDIO_PREF_KEY) || '{}')[`m${mediaId}`] || null; } catch { /* none */ }
+    if (!pref || tracks.length < 2) return null;
+    const same = tracks.filter(t => t.lang === pref.lang);
+    return (same.find(t => t.title === pref.title) || same[0])?.id ?? null;
+}
+
+function rememberAudio(mediaId, track) {
+    if (!track) return;
+    try {
+        const all = JSON.parse(localStorage.getItem(AUDIO_PREF_KEY) || '{}');
+        delete all[`m${mediaId}`];
+        all[`m${mediaId}`] = { lang: track.lang, title: track.title };
+        // The shows chosen for most recently are kept
+        const keys = Object.keys(all);
+        for (const k of keys.slice(0, Math.max(0, keys.length - 200))) delete all[k];
+        localStorage.setItem(AUDIO_PREF_KEY, JSON.stringify(all));
+    } catch { /* not kept */ }
+}
+
+async function playbackInfo(avail, cfg, itemId, startTime, audioIndex = null) {
+    // The track goes in the query: Jellyfin 12 ignores AudioStreamIndex in the body and takes the one it
+    // remembered for the user instead — the previous choice, since AniRoll reports it (seen 2026-09-30)
+    const q = new URLSearchParams({ userId: cfg.userId });
+    if (audioIndex != null) q.set('AudioStreamIndex', String(audioIndex));
+    const res = await fetch(`${avail.base}/Items/${encodeURIComponent(itemId)}/PlaybackInfo?${q}`, {
         method: 'POST',
         headers: { ...jfAuth(cfg.apiKey), 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -230,6 +322,8 @@ async function playbackInfo(avail, cfg, itemId, startTime) {
             EnableDirectStream: true,
             EnableTranscoding: true,
             AutoOpenLiveStream: true,
+            // Another track than the file's first: Jellyfin repackages the file with it
+            ...(audioIndex != null ? { AudioStreamIndex: audioIndex } : {}),
         }),
         signal: AbortSignal.timeout(15000),
     });
@@ -238,8 +332,17 @@ async function playbackInfo(avail, cfg, itemId, startTime) {
     return res.json();
 }
 
-// Direct file, or the HLS stream Jellyfin prepared; and a word on what the server does for it
-function playPlan(base, cfg, itemId, source) {
+// Direct file, or the HLS stream Jellyfin prepared; and a word on what the server does for it.
+// `audioIndex`: the track asked for; the stream URL carries it, whatever Jellyfin put there
+function playPlan(base, cfg, itemId, source, audioIndex = null) {
+    if (source.TranscodingUrl && audioIndex != null) {
+        const [path, query = ''] = source.TranscodingUrl.split('?');
+        const q = new URLSearchParams(query);
+        if (q.get('AudioStreamIndex') !== String(audioIndex)) {
+            q.set('AudioStreamIndex', String(audioIndex));
+            source = { ...source, TranscodingUrl: `${path}?${q}` };
+        }
+    }
     if (source.TranscodingUrl) {
         const reasons = new URLSearchParams(source.TranscodingUrl.split('?')[1] || '').get('TranscodeReasons') || '';
         const video = /Video|Bitrate|Resolution|Framerate|Level|Profile|Anamorphic|Interlaced|RefFrames/.test(reasons);
@@ -261,6 +364,8 @@ function sessionBody(session, time, extra = {}) {
         PlayMethod: session.method,
         PositionTicks: Math.round((time || 0) * TICKS),
         CanSeek: true,
+        // Jellyfin keeps the choice for the series ("Remember audio selections")
+        ...(session.audioIndex != null ? { AudioStreamIndex: session.audioIndex } : {}),
         ...extra,
     };
 }
