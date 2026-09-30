@@ -1,13 +1,13 @@
-import * as api from '../api.js?v=120';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=120';
-import { getToken, isLoggedIn } from '../auth.js?v=120';
-import { getConfig, jfAuth, deviceId } from '../jellyfin.js?v=120';
-import { availability } from '../player/availability.js?v=120';
-import { findEpisode, jfGet } from '../player/library.js?v=120';
-import { deviceProfile } from '../player/profile.js?v=120';
-import { HtmlVideoEngine } from '../player/engine.js?v=120';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=120';
-import { createSubtitles } from '../player/subtitles.js?v=120';
+import * as api from '../api.js?v=121';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=121';
+import { getToken, isLoggedIn } from '../auth.js?v=121';
+import { getConfig, jfAuth, deviceId } from '../jellyfin.js?v=121';
+import { availability } from '../player/availability.js?v=121';
+import { findEpisode, jfGet } from '../player/library.js?v=121';
+import { deviceProfile } from '../player/profile.js?v=121';
+import { HtmlVideoEngine } from '../player/engine.js?v=121';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=121';
+import { createSubtitles } from '../player/subtitles.js?v=121';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -115,7 +115,12 @@ export async function render({ params, content }) {
             ? ep.positionTicks / TICKS : 0;
 
         status('Asking Jellyfin how to play it...');
-        let info = await playbackInfo(avail, cfg, ep.itemId, startTime);
+        session.quality = savedQuality();
+        // Auto: measured once per page (and kept a while); Max: the top step; else the step picked
+        let autoBitrate = null;
+        const bitrateFor = async (q) => (q === 'max' ? MAX_BITRATE : q !== 'auto' ? q
+            : (autoBitrate ??= await measureBitrate(avail, cfg)));
+        let info = await playbackInfo(avail, cfg, ep.itemId, startTime, { maxBitrate: await bitrateFor(session.quality) });
         if (closed) return cleanup;
         let source = info.MediaSources?.[0];
         if (!source) throw new Error(info.ErrorCode ? `Jellyfin cannot play this (${info.ErrorCode})` : 'Jellyfin found no playable file');
@@ -126,7 +131,7 @@ export async function render({ params, content }) {
         const wanted = preferredAudio(mediaId, audioTracks);
         session.audioIndex = source.DefaultAudioStreamIndex ?? audioTracks[0]?.id ?? null;
         if (wanted != null && wanted !== session.audioIndex) {
-            const again = await playbackInfo(avail, cfg, ep.itemId, startTime, wanted).catch(() => null);
+            const again = await playbackInfo(avail, cfg, ep.itemId, startTime, { audioIndex: wanted, maxBitrate: await bitrateFor(session.quality) }).catch(() => null);
             if (closed) return cleanup;
             if (again?.MediaSources?.[0]) {
                 info = again;
@@ -138,6 +143,8 @@ export async function render({ params, content }) {
         session.playSessionId = info.PlaySessionId;
 
         const plan = playPlan(avail.base, cfg, ep.itemId, source, session.audioIndex);
+        // What plays right now, for the stats
+        const now = { source, plan };
         session.hls = plan.hls;
         session.method = plan.method;
         $('player-method').textContent = plan.label;
@@ -147,26 +154,26 @@ export async function render({ params, content }) {
             onLoading: (on) => controls?.setSubtitlesLoading(on) });
         controls.setSubtitles(subtitles);
 
-        // Another audio track: the browser cannot switch inside a file, so Jellyfin serves the file again
-        // with that track (usually only repackaged), from where it is now
+        // Another audio track or quality: the browser cannot switch inside a file, so Jellyfin serves it
+        // again (with that track, under that bitrate) from where it is now
         let switching = false;
-        const switchAudio = async (id) => {
-            if (switching || closed || id === session.audioIndex) return;
+        const restart = async ({ audioIndex = session.audioIndex, quality = session.quality }, note) => {
+            if (switching || closed) return;
             switching = true;
             const at = engine.time;
             const wasPaused = engine.paused;
-            rememberAudio(mediaId, audioTracks.find(t => t.id === id));
             try {
                 engine.pause();
-                status('Switching the audio...');
+                status(note);
                 stopSession(session, at);
-                const next = await playbackInfo(avail, cfg, ep.itemId, at, id);
+                const next = await playbackInfo(avail, cfg, ep.itemId, at, { audioIndex, maxBitrate: await bitrateFor(quality) });
                 if (closed) return;
                 const src = next.MediaSources?.[0];
-                if (!src) throw new Error('Jellyfin cannot play this audio track');
-                const p = playPlan(avail.base, cfg, ep.itemId, src, id);
-                Object.assign(session, { mediaSourceId: src.Id, playSessionId: next.PlaySessionId, audioIndex: id,
+                if (!src) throw new Error('Jellyfin cannot play it this way');
+                const p = playPlan(avail.base, cfg, ep.itemId, src, audioIndex);
+                Object.assign(session, { mediaSourceId: src.Id, playSessionId: next.PlaySessionId, audioIndex, quality,
                     hls: p.hls, method: p.method, started: false, stopped: false });
+                Object.assign(now, { source: src, plan: p });
                 $('player-method').textContent = p.label;
                 await engine.load({ url: p.url, hls: p.hls, startTime: at });
                 if (closed) return;
@@ -182,8 +189,26 @@ export async function render({ params, content }) {
         controls.setAudio({
             list: () => audioTracks.map(t => ({ id: t.id, label: t.label })),
             current: () => session.audioIndex,
-            select: switchAudio,
+            select: (id) => {
+                if (id === session.audioIndex) return;
+                rememberAudio(mediaId, audioTracks.find(t => t.id === id));
+                restart({ audioIndex: id }, 'Switching the audio...');
+            },
         });
+        controls.setQuality({
+            list: () => [
+                { id: 'auto', label: autoBitrate ? `Auto (${fmtRate(autoBitrate)})` : 'Auto' },
+                { id: 'max', label: `Maximum (${fmtRate(MAX_BITRATE)})` },
+                ...BITRATES.map(b => ({ id: b, label: fmtRate(b) })),
+            ],
+            current: () => session.quality,
+            select: (q) => {
+                if (q === session.quality) return;
+                saveQuality(q);
+                restart({ quality: q }, 'Changing the quality...');
+            },
+        });
+        controls.setStats(() => statsFor({ now, session, engine, video, avail, cfg, subtitles, audioTracks, autoBitrate: () => autoBitrate }));
 
         status(plan.hls ? 'Starting the stream...' : 'Loading...');
         await engine.load({ url: plan.url, hls: plan.hls, startTime });
@@ -270,6 +295,123 @@ async function loadSegments(base, cfg, itemId) {
     }
 }
 
+// ===== Stats for nerds =====
+// [{ title, rows: [[label, value]] }], asked for about once a second while the panel shows. What Jellyfin's
+// converter does (speed, hardware) comes from its session list, fetched at most every 3 seconds.
+let transcodeInfo = { at: 0, value: null, busy: false };
+function refreshTranscodeInfo(avail, cfg) {
+    if (transcodeInfo.busy || Date.now() - transcodeInfo.at < 3000) return;
+    transcodeInfo.busy = true;
+    fetch(`${avail.base}/Sessions?deviceId=${encodeURIComponent(deviceId())}`, { headers: jfAuth(cfg.apiKey), signal: AbortSignal.timeout(5000) })
+        .then(r => (r.ok ? r.json() : []))
+        .then(list => { transcodeInfo.value = (list || []).find(x => x.TranscodingInfo)?.TranscodingInfo || null; })
+        .catch(() => { /* shown as unknown */ })
+        .finally(() => { transcodeInfo.at = Date.now(); transcodeInfo.busy = false; });
+}
+
+function statsFor({ now, session, engine, video, avail, cfg, subtitles, audioTracks, autoBitrate }) {
+    const src = now.source || {};
+    const streams = src.MediaStreams || [];
+    const v = streams.find(x => x.Type === 'Video') || {};
+    const a = streams.find(x => x.Type === 'Audio' && x.Index === session.audioIndex) || {};
+    const url = new URLSearchParams((now.plan?.url || '').split('?')[1] || '');
+    const reasons = (url.get('TranscodeReasons') || '').split(',').filter(Boolean).map(r => r.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase());
+    const rate = (bps) => (bps ? fmtRate(bps) : '–');
+    const res = (w, h) => (w && h ? `${w}×${h}` : '–');
+
+    const t = video.currentTime || 0;
+    let ahead = 0;
+    for (let i = 0; i < video.buffered.length; i++) if (video.buffered.start(i) <= t + 0.5) ahead = Math.max(ahead, video.buffered.end(i) - t);
+    const q = video.getVideoPlaybackQuality?.();
+    const hls = engine.hls;
+    const level = hls?.levels?.[hls.currentLevel];
+    const sub = subtitles?.list().find(x => x.id === subtitles.current());
+    const kind = sub ? (subtitles.kind?.(sub.id) || '') : '';
+
+    if (session.hls) refreshTranscodeInfo(avail, cfg);
+    const tc = session.hls ? transcodeInfo.value : null;
+    const quality = session.quality === 'auto' ? `Auto${autoBitrate() ? ` · ${fmtRate(autoBitrate())}` : ''}`
+        : session.quality === 'max' ? 'Maximum' : fmtRate(session.quality);
+
+    return [
+        { title: 'Playback', rows: [
+            ['Method', `${now.plan?.label || '–'}${session.hls ? ' (HLS)' : ''}`],
+            ...(reasons.length ? [['Why', reasons.join(', ')]] : []),
+            ['Quality', quality],
+            ['Server', `${avail.local ? 'Local' : 'Public'} · ${avail.base.replace(/^https?:\/\//, '')}`],
+        ] },
+        { title: 'Source', rows: [
+            ['Container', (src.Container || '–').toUpperCase()],
+            ['Video', [v.Codec?.toUpperCase(), v.Profile, v.BitDepth ? `${v.BitDepth}-bit` : '', res(v.Width, v.Height),
+                v.RealFrameRate ? `${+v.RealFrameRate.toFixed(3)} fps` : ''].filter(Boolean).join(' · ') || '–'],
+            ['Audio', [a.Codec?.toUpperCase(), a.ChannelLayout || (a.Channels ? `${a.Channels} ch` : ''), a.Language].filter(Boolean).join(' · ') || '–'],
+            ['Bitrate', rate(src.Bitrate)],
+        ] },
+        { title: 'Stream', rows: [
+            ['Video', session.hls ? [url.get('VideoCodec')?.split(',')[0]?.toUpperCase(), tc ? (tc.IsVideoDirect ? 'copied' : 'converted') : ''].filter(Boolean).join(' · ') || '–' : 'as is'],
+            ['Audio', session.hls ? [url.get('AudioCodec')?.split(',')[0]?.toUpperCase(), tc ? (tc.IsAudioDirect ? 'copied' : 'converted') : ''].filter(Boolean).join(' · ') || '–' : 'as is'],
+            ['Picture', res(video.videoWidth, video.videoHeight)],
+            ['Bitrate', rate(level?.bitrate || tc?.Bitrate || Number(url.get('VideoBitrate')) || 0)],
+            ...(tc ? [['Converter', [tc.HardwareAccelerationType ? `GPU (${tc.HardwareAccelerationType})` : 'CPU',
+                tc.Framerate ? `${Math.round(tc.Framerate)} fps` : '', tc.CompletionPercentage ? `${Math.round(tc.CompletionPercentage)} % done` : ''].filter(Boolean).join(' · ')]] : []),
+        ] },
+        { title: 'This browser', rows: [
+            ['Buffer', `${ahead.toFixed(1)} s ahead`],
+            ['Frames', q ? `${q.droppedVideoFrames} dropped of ${q.totalVideoFrames}` : '–'],
+            ...(hls ? [['Bandwidth', rate(hls.bandwidthEstimate)]] : []),
+            ['Subtitles', sub ? `${sub.label}${kind ? ` · ${kind}` : ''}` : 'Off'],
+            ['Audio tracks', String(audioTracks.length)],
+        ] },
+    ];
+}
+
+// ===== Quality: a bitrate cap, as in Jellyfin's own player (it picks the resolution to fit) =====
+const QUALITY_KEY = 'aniroll_player_quality';
+const BITRATES = [120e6, 80e6, 60e6, 40e6, 20e6, 15e6, 10e6, 8e6, 6e6, 4e6, 3e6, 1.5e6, 720e3, 420e3];
+const fmtRate = (bps) => (bps >= 1e6 ? `${+(bps / 1e6).toFixed(1)} Mbps` : `${Math.round(bps / 1e3)} kbps`);
+
+const MAX_BITRATE = BITRATES[0];
+
+// 'auto', 'max' or a bitrate in bits per second, kept for this browser
+function savedQuality() {
+    try {
+        const v = localStorage.getItem(QUALITY_KEY);
+        return v === 'max' ? 'max' : v && BITRATES.includes(Number(v)) ? Number(v) : 'auto';
+    } catch { return 'auto'; }
+}
+
+// Auto: what the way to the server carries right now, measured like Jellyfin's own player does
+// (a download from /Playback/BitrateTest), 80 % of it; kept ten minutes per server address.
+// Unmeasurable: the fixed guesses, generous at home, careful over the internet.
+const BITRATE_TEST_KEY = 'aniroll_bitrate_test';
+async function measureBitrate(avail, cfg) {
+    const fallback = avail.local ? LOCAL_BITRATE : PUBLIC_BITRATE;
+    try {
+        const kept = JSON.parse(sessionStorage.getItem(BITRATE_TEST_KEY) || 'null');
+        if (kept?.base === avail.base && Date.now() - kept.at < 10 * 60 * 1000) return kept.bps;
+    } catch { /* measure again */ }
+    const once = async (size) => {
+        const t = performance.now();
+        const res = await fetch(`${avail.base}/Playback/BitrateTest?Size=${size}`, { headers: jfAuth(cfg.apiKey), cache: 'no-store', signal: AbortSignal.timeout(6000) });
+        if (!res.ok) throw new Error(`bitrate test ${res.status}`);
+        const bytes = (await res.arrayBuffer()).byteLength;
+        return (bytes * 8) / Math.max(0.05, (performance.now() - t) / 1000);
+    };
+    try {
+        // A small one first; when that was quick, a bigger one tells more
+        let bps = await once(500_000);
+        if (bps > 10e6) bps = await once(3_000_000);
+        const cap = Math.max(BITRATES.at(-1), Math.min(MAX_BITRATE, Math.round(bps * 0.8)));
+        try { sessionStorage.setItem(BITRATE_TEST_KEY, JSON.stringify({ base: avail.base, at: Date.now(), bps: cap })); } catch { /* measured each time */ }
+        return cap;
+    } catch {
+        return fallback;
+    }
+}
+function saveQuality(q) {
+    try { q === 'auto' ? localStorage.removeItem(QUALITY_KEY) : localStorage.setItem(QUALITY_KEY, String(q)); } catch { /* not kept */ }
+}
+
 // ===== Audio tracks =====
 // { 'm<anilistId>': { lang, title } } — a letter first, so the keys keep their order (newest last)
 const AUDIO_PREF_KEY = 'aniroll_audio_pref';
@@ -305,18 +447,20 @@ function rememberAudio(mediaId, track) {
     } catch { /* not kept */ }
 }
 
-async function playbackInfo(avail, cfg, itemId, startTime, audioIndex = null) {
+// maxBitrate: the quality chosen, else what the way to the server carries
+async function playbackInfo(avail, cfg, itemId, startTime, { audioIndex = null, maxBitrate = null } = {}) {
+    const bitrate = maxBitrate || (avail.local ? LOCAL_BITRATE : PUBLIC_BITRATE);
     // The track goes in the query: Jellyfin 12 ignores AudioStreamIndex in the body and takes the one it
     // remembered for the user instead — the previous choice, since AniRoll reports it (seen 2026-09-30)
-    const q = new URLSearchParams({ userId: cfg.userId });
+    const q = new URLSearchParams({ userId: cfg.userId, MaxStreamingBitrate: String(bitrate) });
     if (audioIndex != null) q.set('AudioStreamIndex', String(audioIndex));
     const res = await fetch(`${avail.base}/Items/${encodeURIComponent(itemId)}/PlaybackInfo?${q}`, {
         method: 'POST',
         headers: { ...jfAuth(cfg.apiKey), 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
             UserId: cfg.userId,
-            DeviceProfile: deviceProfile(avail.local ? LOCAL_BITRATE : PUBLIC_BITRATE),
-            MaxStreamingBitrate: avail.local ? LOCAL_BITRATE : PUBLIC_BITRATE,
+            DeviceProfile: deviceProfile(bitrate),
+            MaxStreamingBitrate: bitrate,
             StartTimeTicks: Math.round(startTime * TICKS),
             EnableDirectPlay: true,
             EnableDirectStream: true,

@@ -125,8 +125,7 @@ function staticServer() {
     check('settings: tabs Appearance, Lists, Watch Party, Jellyfin; ?tab= opens one',
         settings.tabs === 'Appearance,Lists,Watch Party,Jellyfin' && settings.visible === 'settings-jellyfin', settings);
     await page.click('[data-settings-tab="appearance"]');
-    await page.click('.design-option[data-design="m3"]');
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(800);
     const m3 = await page.evaluate(() => ({
         attr: document.documentElement.dataset.design,
         css: !!document.querySelector('link#m3-css'),
@@ -134,16 +133,17 @@ function staticServer() {
         font: getComputedStyle(document.body).fontFamily,
         variantShown: !document.getElementById('m3-variant').hidden,
     }));
-    check('design: Material 3 Expressive applies (stylesheet, generated palette, Google Sans Flex)',
+    check('design: Material 3 Expressive is the default (stylesheet, generated palette, Google Sans Flex)',
         m3.attr === 'm3' && m3.css && /^(#[0-9a-f]{6}|rgb\()/.test(m3.primary) && m3.font.includes('Google Sans Flex') && m3.variantShown, m3);
     await page.click('[data-variant="vibrant"]');
     await page.waitForTimeout(800);
     const vibrant = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--md-primary').trim());
     check('design: colour style changes the palette', /^(#[0-9a-f]{6}|rgb\()/.test(vibrant) && vibrant !== m3.primary, { tonal: m3.primary, vibrant });
-    await page.click('.design-option[data-design="aniroll"]');
+    await page.click('#legacy-design');
     await page.waitForTimeout(300);
-    const off = await page.evaluate(() => ({ attr: document.documentElement.dataset.design || null, css: !!document.querySelector('link#m3-css') }));
-    check('design: back to AniRoll removes it again', off.attr === null && !off.css, off);
+    const off = await page.evaluate(() => ({ attr: document.documentElement.dataset.design || null, css: !!document.querySelector('link#m3-css'),
+        stored: localStorage.getItem('aniroll_design_v2'), accent: !document.getElementById('accent-card').hidden }));
+    check('design: the legacy switch brings back AniRoll’s first design (kept, accent colour offered)', off.attr === null && !off.css && off.stored === 'aniroll' && off.accent, off);
     // Accent by hex code: short codes expand, junk is flagged and not saved
     await page.fill('#accent-hex', 'zz');
     const junk = await page.evaluate(() => ({ invalid: document.getElementById('accent-hex').classList.contains('invalid'), saved: localStorage.getItem('aniroll_accent') }));
@@ -536,9 +536,10 @@ function staticServer() {
         });
         const info = calls.find(c => c.type === 'PlaybackInfo');
         const profile = info?.body?.DeviceProfile;
-        check('player: PlaybackInfo with this browser\'s profile (VP9 direct, no 10-bit H.264, bitrate cap on the public address)',
+        check('player: PlaybackInfo with this browser\'s profile (VP9 direct, no 10-bit H.264, Auto: the bitrate the line measured)',
             info?.item === 'ep2' && profile?.DirectPlayProfiles?.some(d => /webm/.test(d.Container) && /vp9/.test(d.VideoCodec))
-            && JSON.stringify(profile.CodecProfiles).includes('VideoBitDepth') && profile.MaxStreamingBitrate === 25000000, profile);
+            && JSON.stringify(profile.CodecProfiles).includes('VideoBitDepth') && profile.MaxStreamingBitrate > 0 && profile.MaxStreamingBitrate <= 120000000
+            && calls.some(c => c.type === 'bitrateTest'), profile);
         check('player: direct play from the static stream, subtitles shown, full screen',
             /\/Videos\/ep2\/stream\?static=true/.test(playing.src) && playing.ready >= 2 && playing.tracks.join() === 'English:showing'
             && playing.status === true && playing.method === 'Direct play' && playing.open, playing);
@@ -699,6 +700,31 @@ function staticServer() {
             && Object.values(dubbed.pref).some(v => v.lang === 'eng') && reportedAudio.includes(5) && !reportedAudio.includes(1),
             { audioMenu, asked, dubbed, checkedAfter, nextAsked, reportedAudio });
 
+        // Quality & stats: Auto (measured), Maximum and Jellyfin's bitrate steps; a step asks Jellyfin again under that
+        // bitrate from the same spot and is kept; I shows the stats for nerds
+        await p.mouse.move(640, 500);
+        await p.click('[data-act="settings"]').catch(() => {});
+        await p.waitForTimeout(300);
+        const qMenu = await p.$$eval('[data-quality]', els => els.map(e => `${e.textContent.trim()}:${e.getAttribute('aria-checked')}`));
+        const before7 = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep7').length;
+        await p.click('[data-quality="4000000"]').catch(() => {});
+        await p.waitForTimeout(2500);
+        const asked7 = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep7').slice(before7).map(c => c.bitrate);
+        const kept = await p.evaluate(() => localStorage.getItem('aniroll_player_quality'));
+        await p.keyboard.press('i');
+        await p.waitForTimeout(1300);
+        const nerd = await p.evaluate(() => ({ shown: !document.querySelector('.pl-stats').hidden,
+            titles: [...document.querySelectorAll('.pl-stats-title')].map(e => e.textContent),
+            quality: [...document.querySelectorAll('.pl-stats-row')].find(r => r.firstElementChild.textContent === 'Quality')?.lastElementChild.textContent }));
+        await p.keyboard.press('i');
+        const nerdGone = await p.evaluate(() => document.querySelector('.pl-stats').hidden);
+        await p.evaluate(() => localStorage.removeItem('aniroll_player_quality'));
+        check('player: quality menu (Auto measured, Maximum, bitrate steps) asks Jellyfin under the bitrate and keeps it; I toggles the stats',
+            /^Auto \(\d/.test(qMenu[0] || '') && qMenu[0].endsWith(':true') && /^Maximum \(120 Mbps\)/.test(qMenu[1] || '') && qMenu.some(q => q.startsWith('4 Mbps'))
+            && asked7.join() === '4000000' && kept === '4000000' && calls.some(c => c.type === 'bitrateTest')
+            && nerd.shown && nerd.titles.join() === 'Playback,Source,Stream,This browser' && nerd.quality === '4 Mbps' && nerdGone,
+            { qMenu: qMenu.slice(0, 3), asked7, kept, nerd, nerdGone });
+
         // The server cannot convert (graphics card full): a clear message, no endless spinner, the conversion ended
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/5'));
         await p.waitForTimeout(3500);
@@ -767,7 +793,7 @@ function staticServer() {
             online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
         check('admin: the owner sees tiles, four charts, who is online and who waits',
             adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
-        await sq.evaluate(() => import('/js/auth.js?v=120').then(m => m.logout()));
+        await sq.evaluate(() => import('/js/auth.js?v=121').then(m => m.logout()));
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();
@@ -831,7 +857,7 @@ function staticServer() {
     const back = await visitor({ aniroll_theme: 'dark' });
     const both = await back.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent));
     check('returning visitor who confirmed nothing: every change, oldest (the move) first',
-        (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === 7 && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home') && both[5].startsWith('Starting soon') && both[6].startsWith('Watch from your Jellyfin'), both);
+        (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === 7 && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home') && both[5].startsWith('Starting soon') && both[6].startsWith('Material 3 for everyone'), both);
     const demoTabs = await back.$$eval('.whatsnew-bar [data-k]', els => els.map(e => e.dataset.k).join(','));
     check('notice: animation ends on the new tab order', demoTabs === 'home,list,roll,discover,social', demoTabs);
     await back.click('.whatsnew [data-close]');
@@ -868,28 +894,22 @@ function staticServer() {
         return { words, stage, items: items.length, active: document.querySelector('.landing-tour-frame video.active')?.dataset.tour,
             selected: items[1]?.getAttribute('aria-selected'), navScrolled, cards };
     });
-    check('landing: headline words, stage clip, tour switches clips',
-        landing.words === 4 && landing.stage === 'media/roll.mp4' && landing.items === 3 && landing.active === 'calendar' && landing.selected === 'true', landing);
+    check('landing: headline words, stage clip, tour switches clips (the player included)',
+        landing.words === 6 && landing.stage === 'media/roll.mp4' && landing.items === 4 && landing.active === 'calendar' && landing.selected === 'true', landing);
     check('landing: nav frosted once scrolled; more-cards only for what the clips do not show',
         landing.navScrolled && landing.cards === 'Watch Party,Jellyfin Live Tracking,Social Feed', landing);
-    const designs = await fresh.evaluate(() => [...document.querySelectorAll('.landing-designs video')].map(v => v.getAttribute('src')).join());
-    check('landing: both designs presented, each with its clip', designs === 'media/design-aniroll.mp4,media/design-m3.mp4', designs);
-    await fresh.evaluate(() => document.querySelector('.landing-designs').scrollIntoView({ block: 'center' }));
-    await fresh.click('[data-try-design="m3"]');
-    await fresh.waitForTimeout(1500);
-    const tried = await fresh.evaluate(() => ({ design: document.documentElement.dataset.design, stored: localStorage.getItem('aniroll_design'),
-        pressed: document.querySelector('[data-try-design="m3"]').getAttribute('aria-pressed') }));
-    await fresh.click('[data-try-design="aniroll"]');
-    await fresh.waitForTimeout(1200);
-    const untried = await fresh.evaluate(() => document.documentElement.dataset.design || null);
-    check('landing: "Try this look" switches to Material 3 and back, logged out', tried.design === 'm3' && tried.stored === 'm3' && tried.pressed === 'true' && untried === null, { ...tried, untried });
+    // Material 3 only: shaped tiles with trending covers, the colour section with its clip, no design switch
+    const m3landing = await fresh.evaluate(() => ({ design: document.documentElement.dataset.design, tiles: document.querySelectorAll('.lp-tile').length,
+        colour: document.querySelector('.lp-colour video')?.getAttribute('src'), tryDesign: !!document.querySelector('[data-try-design], .landing-designs') }));
+    check('landing: Material 3 only, shaped cover tiles, the colours section, no design switch',
+        m3landing.design === 'm3' && m3landing.tiles === 6 && m3landing.colour === 'media/m3.mp4' && !m3landing.tryDesign, m3landing);
     await fresh.close();
 
     // Confirmed today's entry before it grew: its new id brings it back, on its own
-    const grown = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-25', aniroll_design: 'm3' });
+    const grown = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-25', aniroll_design_v2: 'aniroll' });
     const grownHeads = await grown.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent));
     check("a day's entry that grew after going live pops up again", grownHeads[0]?.startsWith('Roll recommendations'), grownHeads);
-    check('logged out: the chosen design applies (visitors can try Material 3 on the landing page)', await grown.evaluate(() => document.documentElement.dataset.design === 'm3' && !!document.querySelector('#m3-css')));
+    check('logged out: always Material 3, even with the legacy design chosen', await grown.evaluate(() => document.documentElement.dataset.design === 'm3' && !!document.querySelector('#m3-css')));
     await grown.close();
 
     const late = await visitor({ aniroll_theme: 'dark' }, new Date(2026, 10, 1, 9, 0));

@@ -114,7 +114,7 @@ const design = process.env.DESIGN || 'm3';
 
     // The player (Jellyfin mocked): paused mid-episode, playing with the subtitle menu, on a phone
     async function player(q, name, mobile) {
-        if (!want(name) && !want(name + '-menu') && !want(name + '-next') && !want(name + '-episodes')) return;
+        if (!want(name) && !want(name + '-menu') && !want(name + '-next') && !want(name + '-episodes') && !want(name + '-stats')) return;
         await mockJellyfin(q, { anyTitle: true });
         await q.evaluate(jf => { for (const [k, v] of Object.entries(jf)) localStorage.setItem(k, v); sessionStorage.clear(); }, JF_STORAGE);
         if (want(name + '-episodes')) {
@@ -139,6 +139,16 @@ const design = process.env.DESIGN || 'm3';
             await wait(900);
             await q.screenshot({ path: path.join(OUT, `${theme}-${name}-menu.png`) });
             console.log('shot', name + '-menu');
+        }
+        if (want(name + '-stats')) {
+            await q.keyboard.press('Escape');
+            await q.keyboard.press('i');
+            await q.click('[data-act="settings"]').catch(() => {});
+            await wait(1500);
+            await q.screenshot({ path: path.join(OUT, `${theme}-${name}-stats.png`) });
+            console.log('shot', name + '-stats');
+            await q.keyboard.press('Escape');
+            await q.keyboard.press('i');
         }
         if (want(name + '-next')) {
             await q.keyboard.press('Escape');
@@ -187,9 +197,21 @@ const design = process.env.DESIGN || 'm3';
         console.log('shot', name);
     }
     await admin(p, 'admin');
+    // The landing page, logged out, in the current design (full page)
+    async function landing(q, name) {
+        if (!want(name)) return;
+        await q.evaluate(() => { localStorage.removeItem('aniroll_token'); localStorage.removeItem('aniroll_user'); location.hash = '#/'; location.reload(); });
+        await wait(6000);
+        await q.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 500) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 120)); } window.scrollTo(0, 0); });
+        await wait(1500);
+        await q.screenshot({ path: path.join(OUT, `${theme}-${name}.png`), fullPage: true });
+        console.log('shot', name);
+    }
+    await landing(p, 'landing');
     await player(p, 'player', false);
     const m = await open(true);
     await player(m, 'm-player', true);
+    await landing(m, 'm-landing');
     await shot(m, 'm-home', null, { ms: 3000 });
     await shot(m, 'm-roll', '#/roll', { ms: 6000, act: async q => { await q.click('#roll-btn'); await wait(300); await settle(q); } });
     await shot(m, 'm-list', '#/list', { ms: 5000 });
