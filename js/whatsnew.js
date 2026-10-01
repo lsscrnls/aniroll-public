@@ -1,9 +1,9 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=127';
-import { openDialog } from './a11y.js?v=127';
-import { prefersReducedMotion } from './animations.js?v=127';
+import { esc } from './store.js?v=128';
+import { openDialog } from './a11y.js?v=128';
+import { prefersReducedMotion } from './animations.js?v=128';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More
@@ -15,7 +15,8 @@ const CHANGES = [
     {
         // '.2': subtitles kept per show, the feed fresh after a party
         // '.3': rewatches counted in Social
-        id: '2026-10-01.3',
+        // '.4': the Home countdown falls back to the next premiere
+        id: '2026-10-01.4',
         title: 'Browse by tag',
         items: [
             'The <strong>tags</strong> on a show’s page open Browse with every show that carries them; tap the tag chip there to switch it off again.',
@@ -23,6 +24,7 @@ const CHANGES = [
             'The <strong>subtitles</strong> you pick stay for the next episode of the show, switched off included.',
             'After a Watch Party, its post and your friends’ episodes show in Social right away instead of minutes later.',
             'Rewatches in Social say which time it is: <strong>rewatched a 2nd time</strong>, only in AniRoll.',
+            'Nothing you watch airing right now? The <strong>countdown</strong> on Home counts down to the next show from your Planning list instead.',
         ],
     },
     {

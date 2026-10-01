@@ -1,22 +1,22 @@
 // Home in AniRoll's own design: the show you're on, then a stats box. Same idea as Material 3's hero and widgets
 // (js/m3.js), built from AniRoll's own pieces so it reads like the rest of the app: the detail page's banner,
 // cover and stats box, Roll's red kicker, the usual pill buttons. Material 3 hides this section.
-import * as api from './api.js?v=127';
-import { esc, titlePref } from './store.js?v=127';
-import { prefersReducedMotion } from './animations.js?v=127';
-import { upNext, glance, greeting } from './upnext.js?v=127';
+import * as api from './api.js?v=128';
+import { esc, titlePref } from './store.js?v=128';
+import { prefersReducedMotion } from './animations.js?v=128';
+import { upNext, glance, greeting } from './upnext.js?v=128';
 
 const imgOf = (m) => m?.coverImage?.extraLarge || m?.coverImage?.large || '';
 
 let clockTimer = 0;
 let untilAt = 0;
 
-export function renderCinema(section, entries, name) {
+export function renderCinema(section, entries, name, planning = []) {
     if (!section) return () => {};
     const first = entries[0];
     const before = section.querySelector('.ar-home-head') ? 'shown' : null;
     section.hidden = false;
-    section.innerHTML = `${first ? heroHtml(first, name) : emptyHtml(name)}${entries.length ? stripHtml(entries) : ''}`;
+    section.innerHTML = `${first ? heroHtml(first, name) : emptyHtml(name)}${entries.length ? stripHtml(entries, planning) : ''}`;
     if (!prefersReducedMotion()) animateIn(section, before);
     startClock(section);
     return stop;
@@ -68,14 +68,14 @@ function emptyHtml(name) {
 }
 
 // The detail page's stats box: values centred, the countdown is the one in the accent colour
-function stripHtml(entries) {
-    const { next, airing, waitingTotal } = glance(entries);
+function stripHtml(entries, planning) {
+    const { next, airing, waitingTotal } = glance(entries, undefined, planning);
     untilAt = next ? next.media.nextAiringEpisode.airingAt : 0;
     const stat = (value, label, attrs = '') => `<div class="detail-stat"${attrs}><div class="detail-stat-value">${value}</div><div class="detail-stat-label">${label}</div></div>`;
     return `<div class="box detail-stats ar-home-stats">
         ${next ? `<button class="detail-stat ar-home-stat" data-open="${next.media.id}" title="${esc(titlePref(next.media.title))}">
             <div class="detail-stat-value ar-clock" style="color:var(--user-accent)"></div>
-            <div class="detail-stat-label">Until episode ${next.media.nextAiringEpisode.episode}</div>
+            <div class="detail-stat-label">${next.premiere ? 'Until it starts' : `Until episode ${next.media.nextAiringEpisode.episode}`}</div>
             <div class="ar-home-stat-title">${esc(titlePref(next.media.title))}</div>
         </button>` : stat('—', 'Nothing airing')}
         <a class="detail-stat ar-home-stat" href="#/list"><div class="detail-stat-value">${waitingTotal}</div><div class="detail-stat-label">Ready to watch</div></a>
