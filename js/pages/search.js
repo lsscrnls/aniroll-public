@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=124';
-import { enhanceSelect } from '../select.js?v=124';
-import { renderMediaCard, getState, esc, emptyIcon, renderPageSwitch } from '../store.js?v=124';
-import { getToken } from '../auth.js?v=124';
+import * as api from '../api.js?v=125';
+import { enhanceSelect } from '../select.js?v=125';
+import { renderMediaCard, getState, esc, emptyIcon, renderPageSwitch } from '../store.js?v=125';
+import { getToken } from '../auth.js?v=125';
 
 export async function render({ content, query: params }) {
     const token = getToken();
