@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=127';
-import { upNext, glance, DAYS, greeting } from './upnext.js?v=127';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=127';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=128';
+import { upNext, glance, DAYS, greeting } from './upnext.js?v=128';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=128';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -380,7 +380,7 @@ function heroHtml(entry, name, others = []) {
 
 
 function onContinue(e) {
-    const { entries, name } = e.detail || {};
+    const { entries, name, planning } = e.detail || {};
     const row = document.getElementById('continue-watching');
     const section = row?.closest('section');
     if (!section) return;
@@ -407,7 +407,7 @@ function onContinue(e) {
             if (document.body.dataset.m3Page === 'home') applyAppTheme();
         }
     }
-    renderWidgets(hero, entries || []);
+    renderWidgets(hero, entries || [], planning || []);
 
     const before = hero.querySelector('.m3-hero-ep-num')?.textContent;
     hero.innerHTML = heroHtml(entries?.[0], name, entries?.slice(1, 3) || []);
@@ -437,7 +437,7 @@ function countUp(el) {
 
 // ===== Widgets: small live tiles under the hero, like a desktop's clock and calendar =====
 
-function renderWidgets(hero, entries) {
+function renderWidgets(hero, entries, planning) {
     let box = document.querySelector('.m3-widgets');
     if (!entries.length) { box?.remove(); return; }
     if (!box) {
@@ -446,11 +446,11 @@ function renderWidgets(hero, entries) {
         box.setAttribute('aria-label', 'At a glance');
         hero.after(box);
     }
-    const { next, airing, waiting, waitingTotal: total, byDay, today } = glance(entries);
+    const { next, airing, waiting, waitingTotal: total, byDay, today } = glance(entries, undefined, planning);
 
     box.innerHTML = `
         ${next ? `<button class="m3-widget m3-widget-clock" data-open="${next.media.id}" data-m3-until="${next.media.nextAiringEpisode.airingAt}">
-            <span class="m3-widget-label">Next episode</span>
+            <span class="m3-widget-label">${next.premiere ? 'Starts in' : 'Next episode'}</span>
             <span class="m3-widget-clock-num"></span>
             <span class="m3-widget-sub">${esc(titlePref(next.media.title))} · Ep ${next.media.nextAiringEpisode.episode}</span>
         </button>` : ''}
