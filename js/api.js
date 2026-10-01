@@ -1,4 +1,4 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=124';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=125';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -725,12 +725,13 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
     // The feed carries the viewer's own list entry per show, so refresh it — but keep the old
     // copy: deleting it left the Friends section with nothing when the refetch was throttled
     expireCache('activities(');
+    expireCache('mediaList(userId_in');
 
     const saved = data.SaveMediaListEntry;
 
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
     if (mirror && saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=124').then(m =>
+        import('./jellyfin.js?v=125').then(m =>
             m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
     }
 
@@ -918,6 +919,20 @@ export async function getActivityFeed(page = 1, isFollowing = true, token = null
     return data.Page;
 }
 
+// How often people have rewatched shows, for the rewatch posts of one feed page: one request for
+// every person and show on it (AniList's posts only say "rewatched"). Private lists stay out.
+export async function getRewatchCounts(userIds, mediaIds, token = null) {
+    if (!userIds.length || !mediaIds.length) return [];
+    const data = await cachedQuery(`
+        query ($users: [Int], $media: [Int]) {
+            Page(perPage: 50) {
+                mediaList(userId_in: $users, mediaId_in: $media) { userId mediaId status repeat }
+            }
+        }
+    `, { users: userIds, media: mediaIds }, token, TTL.friends);
+    return data.Page.mediaList || [];
+}
+
 export async function getFriendsMediaStatus(mediaId, userId, token) {
     try {
         const data = await cachedQuery(`
@@ -1091,6 +1106,7 @@ export async function postTextActivity(text, token) {
     `, { text }, token);
     // The post shows in the feed right away (the Watch Party post leads to Social straight after)
     expireCache('activities(');
+    expireCache('mediaList(userId_in');
     return data.SaveTextActivity;
 }
 
