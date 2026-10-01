@@ -1,6 +1,6 @@
-import * as api from '../api.js?v=126';
-import { getState, toast, esc, titlePref, emptyIcon } from '../store.js?v=126';
-import { getToken, isLoggedIn } from '../auth.js?v=126';
+import * as api from '../api.js?v=127';
+import { getState, toast, esc, titlePref, emptyIcon } from '../store.js?v=127';
+import { getToken, isLoggedIn } from '../auth.js?v=127';
 
 export async function render({ content }) {
     const token = getToken();
@@ -518,7 +518,7 @@ const rewatchKind = (status) => {
     return null;
 };
 
-// Which viewing each rewatch post was, from the person's list entry: `repeat` counts finished
+// Which rewatch each rewatch post was, from the person's list entry: `repeat` counts finished
 // rewatches (AniList and AniRoll raise it when one ends). Walking the posts newest first, a finished
 // rewatch before the current run closes it, the next older one belongs to the viewing before; a
 // plain "completed"/"watched" post is the first viewing, so older posts get no number.
@@ -554,7 +554,9 @@ async function countRewatches(activities, runs, token) {
             if (state.closed) state.run -= 1;
             state.closed = true;
         }
-        if (state.run >= 2) a.viewing = state.run;
+        // The number is the rewatch's, not the viewing's: the first rewatch is the second viewing and
+        // stays a plain "Rewatched"; from the second rewatch on it says which one
+        if (state.run >= 2) { if (state.run >= 3) a.rewatchNo = state.run - 1; }
         else state.stop = true;
     }
 }
@@ -571,8 +573,8 @@ function getActivityStatusText(activity) {
 
     if (status.includes('plan')) return `Plans to ${manga ? 'read' : 'watch'} ${mediaName}`;
     const rewatch = rewatchKind(activity.status);
-    if (rewatch === 'done') return `${manga ? 'Reread' : 'Rewatched'} ${mediaName}${activity.viewing ? ` a ${ordinal(activity.viewing)} time` : ''}`;
-    if (rewatch) return `${manga ? 'Rereading' : 'Rewatching'} ${mediaName}${activity.viewing ? ` (${ordinal(activity.viewing)} time)` : ''}`;
+    if (rewatch === 'done') return `${manga ? 'Reread' : 'Rewatched'} ${mediaName}${activity.rewatchNo ? ` a ${ordinal(activity.rewatchNo)} time` : ''}`;
+    if (rewatch) return `${manga ? 'Rereading' : 'Rewatching'} ${mediaName}${activity.rewatchNo ? ` (${ordinal(activity.rewatchNo)} time)` : ''}`;
     if (status.includes('complet')) return `Completed ${mediaName}`;
     if (status.includes('drop')) return `Dropped ${mediaName}`;
     if (status.includes('paus')) return `Paused ${mediaName}`;

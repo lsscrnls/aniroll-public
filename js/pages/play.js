@@ -1,13 +1,13 @@
-import * as api from '../api.js?v=126';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=126';
-import { getToken, isLoggedIn } from '../auth.js?v=126';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=126';
-import { availability } from '../player/availability.js?v=126';
-import { findEpisode, jfGet } from '../player/library.js?v=126';
-import { deviceProfile } from '../player/profile.js?v=126';
-import { HtmlVideoEngine } from '../player/engine.js?v=126';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=126';
-import { createSubtitles } from '../player/subtitles.js?v=126';
+import * as api from '../api.js?v=127';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=127';
+import { getToken, isLoggedIn } from '../auth.js?v=127';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=127';
+import { availability } from '../player/availability.js?v=127';
+import { findEpisode, jfGet } from '../player/library.js?v=127';
+import { deviceProfile } from '../player/profile.js?v=127';
+import { HtmlVideoEngine } from '../player/engine.js?v=127';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=127';
+import { createSubtitles } from '../player/subtitles.js?v=127';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
