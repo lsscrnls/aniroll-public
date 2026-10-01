@@ -1,9 +1,9 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=123';
-import { openDialog } from './a11y.js?v=123';
-import { prefersReducedMotion } from './animations.js?v=123';
+import { esc } from './store.js?v=124';
+import { openDialog } from './a11y.js?v=124';
+import { prefersReducedMotion } from './animations.js?v=124';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More
@@ -13,11 +13,14 @@ const SEEN_KEY = 'aniroll_seen_changes';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-01',
+        // '.2': subtitles kept per show, the feed fresh after a party
+        id: '2026-10-01.2',
         title: 'Browse by tag',
         items: [
             'The <strong>tags</strong> on a show’s page open Browse with every show that carries them; tap the tag chip there to switch it off again.',
             'The wave on the player’s progress bar moves a little calmer.',
+            'The <strong>subtitles</strong> you pick stay for the next episode of the show, switched off included.',
+            'After a Watch Party, its post and your friends’ episodes show in Social right away instead of minutes later.',
         ],
     },
     {

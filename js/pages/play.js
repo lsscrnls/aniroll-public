@@ -1,13 +1,13 @@
-import * as api from '../api.js?v=123';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=123';
-import { getToken, isLoggedIn } from '../auth.js?v=123';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=123';
-import { availability } from '../player/availability.js?v=123';
-import { findEpisode, jfGet } from '../player/library.js?v=123';
-import { deviceProfile } from '../player/profile.js?v=123';
-import { HtmlVideoEngine } from '../player/engine.js?v=123';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=123';
-import { createSubtitles } from '../player/subtitles.js?v=123';
+import * as api from '../api.js?v=124';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=124';
+import { getToken, isLoggedIn } from '../auth.js?v=124';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=124';
+import { availability } from '../player/availability.js?v=124';
+import { findEpisode, jfGet } from '../player/library.js?v=124';
+import { deviceProfile } from '../player/profile.js?v=124';
+import { HtmlVideoEngine } from '../player/engine.js?v=124';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=124';
+import { createSubtitles } from '../player/subtitles.js?v=124';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -153,9 +153,18 @@ export async function render({ params, content }) {
         $('player-method').textContent = plan.label;
         $('player-method').hidden = false;
         controls = mountControls($('player'), video, { watchedAt: WATCHED_AT, runtime: () => (ep.runTimeTicks ? ep.runTimeTicks / TICKS : 0) });
+        // The subtitles chosen for this show before (or none), when this file has them
         subtitles = createSubtitles({ video, base: avail.base, cfg, itemId: ep.itemId, source,
+            pick: (tracks) => preferredSubs(mediaId, tracks),
             onLoading: (on) => controls?.setSubtitlesLoading(on) });
-        controls.setSubtitles(subtitles);
+        const subsManager = subtitles;
+        controls.setSubtitles({
+            ...subsManager,
+            select: (id) => {
+                subsManager.select(id);
+                rememberSubs(mediaId, subsManager.list().find(t => t.id === id));
+            },
+        });
 
         // Another audio track or quality: the browser cannot switch inside a file, so Jellyfin serves it
         // again (with that track, under that bitrate) from where it is now
@@ -465,6 +474,35 @@ function rememberAudio(mediaId, track) {
         const keys = Object.keys(all);
         for (const k of keys.slice(0, Math.max(0, keys.length - 200))) delete all[k];
         localStorage.setItem(AUDIO_PREF_KEY, JSON.stringify(all));
+    } catch { /* not kept */ }
+}
+
+// ===== Subtitles =====
+// { 'm<anilistId>': { lang, title, label, forced } or { off: true } } — like the audio, per show
+const SUBS_PREF_KEY = 'aniroll_subs_pref';
+
+// The track id to show (null: none), or undefined when nothing was chosen for this show or this file
+// lacks it: then Jellyfin's pick stays
+function preferredSubs(mediaId, tracks) {
+    let pref = null;
+    try { pref = JSON.parse(localStorage.getItem(SUBS_PREF_KEY) || '{}')[`m${mediaId}`] || null; } catch { /* none */ }
+    if (!pref) return undefined;
+    if (pref.off) return null;
+    // Same language, then the release's name for the track (Full, Signs & Songs), else what Jellyfin calls it
+    const same = tracks.filter(t => t.lang === pref.lang);
+    return ((pref.title && same.find(t => t.title === pref.title))
+        || same.find(t => t.label === pref.label)
+        || same.find(t => t.forced === pref.forced) || same[0])?.id;
+}
+
+function rememberSubs(mediaId, track) {
+    try {
+        const all = JSON.parse(localStorage.getItem(SUBS_PREF_KEY) || '{}');
+        delete all[`m${mediaId}`];
+        all[`m${mediaId}`] = track ? { lang: track.lang, title: track.title, label: track.label, forced: track.forced } : { off: true };
+        const keys = Object.keys(all);
+        for (const k of keys.slice(0, Math.max(0, keys.length - 200))) delete all[k];
+        localStorage.setItem(SUBS_PREF_KEY, JSON.stringify(all));
     } catch { /* not kept */ }
 }
 
