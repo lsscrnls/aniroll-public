@@ -590,6 +590,9 @@ function staticServer() {
         const after = await p.evaluate(() => ({ t: document.getElementById('player-video').currentTime, subs: [...document.getElementById('player-video').textTracks].map(t => t.mode).join() }));
         check('player: own controls — Space pauses, the wave follows, ← back 10 s, C toggles subtitles',
             !ui.native && ui.paused && ui.cls && ui.label === 'Play' && ui.now >= 11 && parseFloat(ui.pos) > 50 && after.t < 4 && after.subs === 'disabled', { ui, after });
+        // Off with C is kept for the show; the next checks start from Jellyfin's pick again
+        const offKept = await p.evaluate(() => { const v = Object.values(JSON.parse(localStorage.getItem('aniroll_subs_pref') || '{}'))[0]; localStorage.removeItem('aniroll_subs_pref'); return v; });
+        check('player: subtitles switched off are remembered for the show', offKept?.off === true, offKept);
 
         await p.evaluate(() => { location.hash = '#/anime/101/full'; });
         await p.waitForTimeout(1200);
@@ -681,6 +684,24 @@ function staticServer() {
         check('player: Blu-ray subtitles (PGS) drawn by libpgs where the disc places them, the loading note gone',
             pgs.canvas && pgs.noteGone && pgs.bar?.[3] > 200 && pgs.bar[0] > 200 && pgs.above?.[3] === 0 && pgs.textTracks === 'disabled'
             && calls.some(c => c.type === 'pgs') && pgsMenu.join('|') === 'Off|English|English [PGS]', { ...pgs, pgsMenu });
+
+        // Subtitles chosen in one episode stay for the next of the show: plain English on episode 4 (whose
+        // default is Blu-ray), then episode 3 starts with plain English instead of its ASS default
+        await p.waitForTimeout(300);
+        await p.mouse.move(640, 500);
+        await p.click('[data-act="subs"]').catch(() => {});
+        await p.waitForTimeout(300);
+        await p.click('[data-track="2"]').catch(() => {});
+        await p.waitForTimeout(500);
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));
+        await p.waitForTimeout(3000);
+        const keptSubs = await p.evaluate(() => ({
+            text: [...document.getElementById('player-video').textTracks].map(t => `${t.label}:${t.mode}`).join(),
+            pictures: [...document.querySelectorAll('.pl-subs-canvas')].some(c => !c.hidden),
+            pref: Object.values(JSON.parse(localStorage.getItem('aniroll_subs_pref') || '{}'))[0],
+        }));
+        await p.evaluate(() => localStorage.removeItem('aniroll_subs_pref'));
+        check('player: the subtitles picked carry over to the next episode', keptSubs.text === 'English:showing' && !keptSubs.pictures && keptSubs.pref?.label === 'English', keptSubs);
 
         // Audio tracks: a second section in the menu; picking the dub asks Jellyfin again with that track and
         // goes on from the same spot; the next episode of the show starts with the dub
@@ -808,7 +829,7 @@ function staticServer() {
             online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
         check('admin: the owner sees tiles, four charts, who is online and who waits',
             adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
-        await sq.evaluate(() => import('/js/auth.js?v=123').then(m => m.logout()));
+        await sq.evaluate(() => import('/js/auth.js?v=124').then(m => m.logout()));
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();

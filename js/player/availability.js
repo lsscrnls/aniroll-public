@@ -1,4 +1,4 @@
-import { getConfig, normalizeUrl } from '../jellyfin.js?v=123';
+import { getConfig, normalizeUrl } from '../jellyfin.js?v=124';
 
 // Is the user's Jellyfin reachable from this browser right now? AniRoll has to work the same
 // with the whole stack switched off, so this never blocks anything: a short timeout, the answer
