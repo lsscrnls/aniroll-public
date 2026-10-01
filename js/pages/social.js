@@ -1,6 +1,6 @@
-import * as api from '../api.js?v=124';
-import { getState, toast, esc, titlePref, emptyIcon } from '../store.js?v=124';
-import { getToken, isLoggedIn } from '../auth.js?v=124';
+import * as api from '../api.js?v=125';
+import { getState, toast, esc, titlePref, emptyIcon } from '../store.js?v=125';
+import { getToken, isLoggedIn } from '../auth.js?v=125';
 
 export async function render({ content }) {
     const token = getToken();
@@ -25,6 +25,8 @@ export async function render({ content }) {
     </div>`;
 
     let currentPage = 1;
+    // Per person and show, which viewing the next older post belongs to (kept across "Load More")
+    let rewatchRuns = new Map();
     let currentTab = 'following';
 
     async function loadFeed(page = 1, append = false) {
@@ -42,6 +44,8 @@ export async function render({ content }) {
 
             const isFollowing = currentTab === 'following';
             const result = await api.getActivityFeed(page, isFollowing, token);
+            if (!append) rewatchRuns = new Map();
+            await countRewatches(result.activities, rewatchRuns, token);
 
             const html = result.activities
                 .filter(a => a)
@@ -505,13 +509,70 @@ function renderActivity(activity) {
     return '';
 }
 
+// Rewatches, as AniRoll shows them (AniList itself only says "rewatched"): a post either finishes a
+// viewing ("rewatched"/"reread") or is an episode of one ("rewatched episode"/"reread chapter").
+const rewatchKind = (status) => {
+    const s = (status || '').toLowerCase();
+    if (s === 'rewatched' || s === 'reread') return 'done';
+    if (/^(rewatched|reread) /.test(s)) return 'part';
+    return null;
+};
+
+// Which viewing each rewatch post was, from the person's list entry: `repeat` counts finished
+// rewatches (AniList and AniRoll raise it when one ends). Walking the posts newest first, a finished
+// rewatch before the current run closes it, the next older one belongs to the viewing before; a
+// plain "completed"/"watched" post is the first viewing, so older posts get no number.
+// The entries cost one request per feed page, and only when the page has a rewatch on it.
+async function countRewatches(activities, runs, token) {
+    const lists = (activities || []).filter(a => a?.media && a.user && (a.type === 'ANIME_LIST' || a.type === 'MANGA_LIST'));
+    const rewatches = lists.filter(a => rewatchKind(a.status));
+    const unknown = rewatches.filter(a => !runs.has(`${a.user.id}:${a.media.id}`));
+    if (unknown.length) {
+        let entries = [];
+        try {
+            entries = await api.getRewatchCounts([...new Set(unknown.map(a => a.user.id))], [...new Set(unknown.map(a => a.media.id))], token);
+        } catch { /* the posts read "Rewatched" without a number */ }
+        for (const a of unknown) {
+            const key = `${a.user.id}:${a.media.id}`;
+            if (runs.has(key)) continue;
+            const e = entries.find(x => x.userId === a.user.id && x.mediaId === a.media.id);
+            // REPEATING: the viewing going on is repeat + 2, any finished one before it repeat + 1
+            runs.set(key, !e ? { stop: true }
+                : e.status === 'REPEATING' ? { run: (e.repeat || 0) + 2, closed: true }
+                : { run: (e.repeat || 0) + 1, closed: false });
+        }
+    }
+    for (const a of lists) {
+        const key = `${a.user.id}:${a.media.id}`;
+        const kind = rewatchKind(a.status);
+        // A plain post newer than any rewatch: the numbers cannot be told apart from there on
+        if (!runs.has(key)) { if (!kind) runs.set(key, { stop: true }); continue; }
+        const state = runs.get(key);
+        if (state.stop) continue;
+        if (!kind) { state.stop = true; continue; }
+        if (kind === 'done') {
+            if (state.closed) state.run -= 1;
+            state.closed = true;
+        }
+        if (state.run >= 2) a.viewing = state.run;
+        else state.stop = true;
+    }
+}
+
+const ordinal = (n) => {
+    const t = n % 100;
+    return `${n}${t >= 11 && t <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' })[n % 10] || 'th'}`;
+};
+
 function getActivityStatusText(activity) {
     const status = (activity.status || '').toLowerCase();
     const mediaName = esc(titlePref(activity.media?.title));
     const manga = activity.media?.type === 'MANGA';
 
     if (status.includes('plan')) return `Plans to ${manga ? 'read' : 'watch'} ${mediaName}`;
-    if (status.includes('rewat') || status.includes('reread')) return `${manga ? 'Rereading' : 'Rewatching'} ${mediaName}`;
+    const rewatch = rewatchKind(activity.status);
+    if (rewatch === 'done') return `${manga ? 'Reread' : 'Rewatched'} ${mediaName}${activity.viewing ? ` a ${ordinal(activity.viewing)} time` : ''}`;
+    if (rewatch) return `${manga ? 'Rereading' : 'Rewatching'} ${mediaName}${activity.viewing ? ` (${ordinal(activity.viewing)} time)` : ''}`;
     if (status.includes('complet')) return `Completed ${mediaName}`;
     if (status.includes('drop')) return `Dropped ${mediaName}`;
     if (status.includes('paus')) return `Paused ${mediaName}`;
