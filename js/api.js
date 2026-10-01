@@ -1,4 +1,4 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=123';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=124';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -730,7 +730,7 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
 
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
     if (mirror && saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=123').then(m =>
+        import('./jellyfin.js?v=124').then(m =>
             m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
     }
 
@@ -1089,6 +1089,8 @@ export async function postTextActivity(text, token) {
             SaveTextActivity(text: $text) { id }
         }
     `, { text }, token);
+    // The post shows in the feed right away (the Watch Party post leads to Social straight after)
+    expireCache('activities(');
     return data.SaveTextActivity;
 }
 

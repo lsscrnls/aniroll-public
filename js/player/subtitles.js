@@ -1,4 +1,4 @@
-import { jfAuth } from '../jellyfin.js?v=123';
+import { jfAuth } from '../jellyfin.js?v=124';
 
 // Every subtitle of a file behind one list, whatever draws it:
 //   ASS/SSA  -> JASSUB (libass in WebAssembly) with the fonts embedded in the MKV — typesetting, signs,
@@ -7,7 +7,7 @@ import { jfAuth } from '../jellyfin.js?v=123';
 //   PGS (Blu-ray pictures) -> libpgs on a canvas; Jellyfin hands the track out as is (Stream.pgssub,
 //               Stream.sup answers 400). The first request waits while Jellyfin extracts every track (~25 s).
 //   DVD/DVB pictures      -> not offered (one file in the library)
-//   manager = { list(), current(), select(id | null), destroy() }
+//   manager = { list(), current(), select(id | null), destroy() }; `pick` chooses the first track
 const JASSUB_URL = '../vendor/jassub-2.5.16/jassub.js';
 const LIBPGS_URL = '../vendor/libpgs-0.9.0/libpgs.js';
 const LIBPGS_WORKER = new URL('../vendor/libpgs-0.9.0/libpgs.worker.js', import.meta.url).href;
@@ -19,7 +19,7 @@ const kindOf = (codec) => {
     return ASS.has(c) ? 'ass' : PGS.has(c) ? 'pgs' : 'text';
 };
 
-export function createSubtitles({ video, base, cfg, itemId, source, onChange = () => {}, onLoading = () => {} }) {
+export function createSubtitles({ video, base, cfg, itemId, source, pick = () => undefined, onChange = () => {}, onLoading = () => {} }) {
     const streams = (source.MediaStreams || []).filter(s => s.Type === 'Subtitle');
     const url = (s, ext) => `${base}/Videos/${encodeURIComponent(itemId)}/${encodeURIComponent(source.Id)}/Subtitles/${s.Index}/0/Stream.${ext}?ApiKey=${encodeURIComponent(cfg.apiKey)}`;
 
@@ -165,10 +165,14 @@ export function createSubtitles({ video, base, cfg, itemId, source, onChange = (
     const first = (def != null && def >= 0 && tracks.find(t => t.id === def))
         || tracks.find(t => t.stream.IsForced) || tracks.find(t => t.stream.IsDefault)
         || tracks.find(t => /^(eng|en)$/i.test(t.stream.Language || '')) || tracks[0] || null;
-    if (first && def !== -1) select(first.id);
+    // pick: the track chosen for this show before (null: none), undefined leaves it to Jellyfin
+    const list = () => tracks.map(t => ({ id: t.id, label: t.label, lang: t.stream.Language || '', title: t.stream.Title || '', forced: !!t.stream.IsForced }));
+    const picked = pick(list());
+    if (picked !== undefined) { if (picked != null) select(picked); }
+    else if (first && def !== -1) select(first.id);
 
     return {
-        list: () => tracks.map(t => ({ id: t.id, label: t.label })),
+        list,
         current: () => active?.id ?? null,
         // What draws the track, for the stats
         kind: (id) => ({ ass: 'libass', pgs: 'libpgs', text: 'WebVTT' })[tracks.find(t => t.id === id)?.kind] || '',
