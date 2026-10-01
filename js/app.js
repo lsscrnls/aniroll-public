@@ -1,15 +1,15 @@
-import { route, startRouter, navigate } from './router.js?v=124';
-import { takeSeat } from './seat.js?v=124';
-import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl } from './auth.js?v=124';
-import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, setAccentColor, getAccentColors, esc, titlePref } from './store.js?v=124';
-import * as api from './api.js?v=124';
-import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js?v=124';
-import { openDialog, initActivation, showConfirm } from './a11y.js?v=124';
-import { noteVisitor, maybeShowMoveNotice, openChangelog, hasUnread } from './whatsnew.js?v=124';
-import { applyDesign, getDesign, getVariant, setDesign, switchDesign, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from './design.js?v=124';
+import { route, startRouter, navigate } from './router.js?v=125';
+import { takeSeat } from './seat.js?v=125';
+import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl } from './auth.js?v=125';
+import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, setAccentColor, getAccentColors, esc, titlePref } from './store.js?v=125';
+import * as api from './api.js?v=125';
+import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js?v=125';
+import { openDialog, initActivation, showConfirm } from './a11y.js?v=125';
+import { noteVisitor, maybeShowMoveNotice, openChangelog, hasUnread } from './whatsnew.js?v=125';
+import { applyDesign, getDesign, getVariant, setDesign, switchDesign, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from './design.js?v=125';
 
 const CLIENT_ID = '50643';
-const APP_VERSION = '124';
+const APP_VERSION = '125';
 
 // Report uncaught errors to our backend (api/server.js → data/client-errors.log).
 // Each distinct message once per page load, at most 10 — a loop must not flood the log.
@@ -73,25 +73,25 @@ async function init() {
 
     // Guests of a Watch Party keep syncing with the host on every page, not only on /watchparty
     if (isLoggedIn() && localStorage.getItem('aniroll_joined_party')) {
-        import('./pages/watchparty.js?v=124').then(m => m.initGuestSync());
+        import('./pages/watchparty.js?v=125').then(m => m.initGuestSync());
     }
     // Hosts get their running party back on a second device, and a pill leading back to it
     if (isLoggedIn()) {
-        import('./pages/watchparty.js?v=124').then(async m => {
+        import('./pages/watchparty.js?v=125').then(async m => {
             if (!localStorage.getItem('aniroll_watchparty')) await m.restoreHostParty();
             m.renderPartyPill();
         });
     }
     // The Jellyfin connection belongs to the AniList account, so pull it in on this device
     if (isLoggedIn()) {
-        import('./jellyfin.js?v=124').then(async m => {
+        import('./jellyfin.js?v=125').then(async m => {
             await m.loadAccountConfig();
             setupJellyfinLive();
         });
     }
     if (isLoggedIn()) setupPendingSaveRetry();
     if (isLoggedIn()) setupJellyfinPull();
-    if (isLoggedIn()) import('./drift.js?v=124').then(m => m.startDrift()).catch(() => { /* not essential */ });
+    if (isLoggedIn()) import('./drift.js?v=125').then(m => m.startDrift()).catch(() => { /* not essential */ });
     watchMaintenanceMode();
 }
 
@@ -174,7 +174,7 @@ function watchMaintenanceMode() {
 function setupJellyfinPull() {
     const pull = async () => {
         if (api.shouldHoldBackground()) return;
-        const { getConfig, isPullEnabled, pullFromJellyfin } = await import('./jellyfin.js?v=124');
+        const { getConfig, isPullEnabled, pullFromJellyfin } = await import('./jellyfin.js?v=125');
         if (!getConfig() || !isPullEnabled()) return;
         const user = getState().user;
         if (!user) return;
@@ -194,10 +194,10 @@ function setupJellyfinPull() {
 // Jellyfin webhook -> AniRoll backend: the chip in the navbar, toasts for tracked episodes,
 // and episodes the backend could not write (no access, AniList blocking it) applied from here
 async function setupJellyfinLive() {
-    const jf = await import('./jellyfin.js?v=124');
+    const jf = await import('./jellyfin.js?v=125');
     // Set up on another device: fetch the link once, only for people who use Jellyfin at all
     if (!jf.getHookSecret() && jf.getConfig()) await jf.loadHook().catch(() => null);
-    const np = await import('./nowplaying.js?v=124');
+    const np = await import('./nowplaying.js?v=125');
     window.addEventListener(jf.NOW_EVENT, (e) => np.renderNowChip(document.getElementById('jf-now-chip'), e.detail));
     jf.startNowPlaying({
         onTracked: (item) => {
@@ -207,6 +207,7 @@ async function setupJellyfinLive() {
                 // The server wrote it, so nothing here knew: the feed and friends' progress go stale
                 api.expireCache('activities(');
                 api.expireCache('mediaList(mediaId');
+                api.expireCache('mediaList(userId_in');
                 const text = item.type === 'Movie'
                     ? (item.rewatch ? `Jellyfin: ${item.title} counted as a rewatch` : `Jellyfin: ${item.title} saved to AniList as watched`)
                     : `Jellyfin: ${item.title} · ${item.rewatch ? 'rewatch ' : ''}episode ${item.episode} saved to AniList`;
@@ -291,7 +292,7 @@ async function loadViewer() {
 
 function setupRoutes() {
     route('/', async (ctx) => {
-        const { render, loadLandingTrending } = await import('./pages/home.js?v=124');
+        const { render, loadLandingTrending } = await import('./pages/home.js?v=125');
         const cleanup = await render(ctx);
         if (!isLoggedIn()) loadLandingTrending();
         refreshAnimations();
@@ -299,30 +300,30 @@ function setupRoutes() {
     });
 
     route('/studio/:id', async (ctx) => {
-        const { render } = await import('./pages/studio.js?v=124');
+        const { render } = await import('./pages/studio.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/staff/:id', async (ctx) => {
-        const { render } = await import('./pages/staff.js?v=124');
+        const { render } = await import('./pages/staff.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     // The owner's view of how busy AniRoll is (the server checks who asks)
     route('/admin', async (ctx) => {
-        const { render } = await import('./pages/admin.js?v=124');
+        const { render } = await import('./pages/admin.js?v=125');
         return render(ctx);
     });
 
     route('/shelf', async (ctx) => {
-        const { render } = await import('./pages/shelf.js?v=124');
+        const { render } = await import('./pages/shelf.js?v=125');
         return render(ctx);
     });
 
     route('/search', async (ctx) => {
-        const { render } = await import('./pages/search.js?v=124');
+        const { render } = await import('./pages/search.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
@@ -332,14 +333,14 @@ function setupRoutes() {
     });
 
     route('/anime/:id/full', async (ctx) => {
-        const { render } = await import('./pages/detail.js?v=124');
+        const { render } = await import('./pages/detail.js?v=125');
         await render({ params: { id: ctx.params.id }, content: ctx.content });
         refreshAnimations();
     });
 
     // The player loads only when something is played
     route('/play/:id/:episode', async (ctx) => {
-        const { render } = await import('./pages/play.js?v=124');
+        const { render } = await import('./pages/play.js?v=125');
         return render(ctx);
     });
 
@@ -348,74 +349,74 @@ function setupRoutes() {
     });
 
     route('/manga/:id/full', async (ctx) => {
-        const { render } = await import('./pages/detail.js?v=124');
+        const { render } = await import('./pages/detail.js?v=125');
         await render({ params: { id: ctx.params.id }, content: ctx.content });
         refreshAnimations();
     });
 
     route('/list', async (ctx) => {
-        const { render } = await import('./pages/list.js?v=124');
+        const { render } = await import('./pages/list.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/list/:username', async (ctx) => {
-        const { render } = await import('./pages/list.js?v=124');
+        const { render } = await import('./pages/list.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/social', async (ctx) => {
-        const { render } = await import('./pages/social.js?v=124');
+        const { render } = await import('./pages/social.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/profile', async (ctx) => {
-        const { render } = await import('./pages/profile.js?v=124');
+        const { render } = await import('./pages/profile.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/user/:username', async (ctx) => {
-        const { render } = await import('./pages/profile.js?v=124');
+        const { render } = await import('./pages/profile.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/season', async (ctx) => {
-        const { render } = await import('./pages/season.js?v=124');
+        const { render } = await import('./pages/season.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/season/:year/:season', async (ctx) => {
-        const { render } = await import('./pages/season.js?v=124');
+        const { render } = await import('./pages/season.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/roll', async (ctx) => {
-        const { render } = await import('./pages/roll.js?v=124');
+        const { render } = await import('./pages/roll.js?v=125');
         const cleanup = await render(ctx);
         refreshAnimations();
         return cleanup;
     });
 
     route('/calendar', async (ctx) => {
-        const { render } = await import('./pages/calendar.js?v=124');
+        const { render } = await import('./pages/calendar.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/notifications', async (ctx) => {
-        const { render } = await import('./pages/notifications.js?v=124');
+        const { render } = await import('./pages/notifications.js?v=125');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/watchparty', async (ctx) => {
-        const { render } = await import('./pages/watchparty.js?v=124');
+        const { render } = await import('./pages/watchparty.js?v=125');
         const cleanup = await render(ctx);
         refreshAnimations();
         return cleanup;
@@ -792,7 +793,7 @@ async function renderSettings({ content, query }) {
     document.getElementById('mal-xml-upload')?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        import('./pages/mal-import.js?v=124').then(m => m.startXMLImport(file));
+        import('./pages/mal-import.js?v=125').then(m => m.startXMLImport(file));
     });
 
     renderJellyfinSettings();
@@ -808,7 +809,7 @@ async function renderPartySyncSettings() {
         box.innerHTML = '<p class="dot-label">Log in to change this.</p>';
         return;
     }
-    const bg = await import('./background.js?v=124');
+    const bg = await import('./background.js?v=125');
     const mode = bg.getPartySyncMode();
     box.innerHTML = `
         <label class="settings-choice"><input type="radio" name="party-sync" value="open" ${mode === 'open' ? 'checked' : ''}>
@@ -882,7 +883,7 @@ async function renderJellyfinLive() {
         return;
     }
     const [jf, bg, np] = await Promise.all([
-        import('./jellyfin.js?v=124'), import('./background.js?v=124'), import('./nowplaying.js?v=124'),
+        import('./jellyfin.js?v=125'), import('./background.js?v=125'), import('./nowplaying.js?v=125'),
     ]);
     const head = `<h4 class="jf-live-title">Live tracking</h4>
         <p class="dot-label">See what you are watching right in AniRoll, and finished episodes and movies land on your AniList within seconds, even when AniRoll is closed. Uses the Webhook plugin of your Jellyfin server.</p>`;
@@ -1022,7 +1023,7 @@ async function renderJellyfinLive() {
 async function renderJellyfinSettings() {
     const box = document.getElementById('jf-settings');
     if (!box) return;
-    const jf = await import('./jellyfin.js?v=124');
+    const jf = await import('./jellyfin.js?v=125');
     await jf.loadAccountConfig();
     const cfg = jf.getConfig();
 
@@ -1108,7 +1109,7 @@ async function renderJellyfinSettings() {
     }
 
     const scope = jf.getScope();
-    const player = await import('./player/availability.js?v=124');
+    const player = await import('./player/availability.js?v=125');
     const localUrl = player.getLocalUrl();
     box.innerHTML = `
         <div class="jf-row"><span class="jf-dot jf-dot-checking" id="jf-settings-dot"></span><span id="jf-settings-state">Checking...</span></div>
@@ -1229,7 +1230,7 @@ async function refreshJellyfinStatus(force = false) {
     refreshPendingStatus();
     const item = document.getElementById('jf-status-item');
     if (!item) return;
-    const { getConfig, getStatus } = await import('./jellyfin.js?v=124');
+    const { getConfig, getStatus } = await import('./jellyfin.js?v=125');
     if (!getConfig()) {
         item.hidden = true;
         return;
@@ -1297,7 +1298,7 @@ async function openDetailPanel(id) {
     body.scrollTop = 0;
     body.innerHTML = '<div class="page-loader" style="padding:var(--space-3xl)"><div class="loader-spinner"></div></div>';
 
-    const { renderPanel } = await import('./pages/detail.js?v=124');
+    const { renderPanel } = await import('./pages/detail.js?v=125');
     await renderPanel(id, body);
     overlay.dataset.mediaType = body.querySelector('.detail-fullscreen-btn')?.dataset.type || 'anime';
 }
