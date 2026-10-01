@@ -392,6 +392,38 @@ function staticServer() {
         text: document.querySelector('#starting-soon-row .starting-soon-when')?.textContent.replace(/\s+/g, ' ').trim() }));
     check('home: a planned show that premieres soon, with its date', soon.shown && /^Episode 1 in 8d/.test(soon.text || ''), soon);
 
+    // Nothing being watched airs any more: the countdown on Home turns to the next premiere from Planning
+    const quiet = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    quiet.on('pageerror', e => errors.push(`premiere countdown: ${e.message}`));
+    await quiet.route('https://graphql.anilist.co/**', route => {
+        const answer = respond(route.request().postDataJSON());
+        for (const list of answer.data?.MediaListCollection?.lists || []) {
+            if (list.status === 'PLANNING' && list.entries[0]) {
+                Object.assign(list.entries[0].media, { status: 'NOT_YET_RELEASED', nextAiringEpisode: { episode: 1, airingAt: Math.floor(Date.now() / 1000) + 3 * 86400, timeUntilAiring: 3 * 86400 } });
+            }
+            if (list.status === 'CURRENT') for (const e of list.entries) Object.assign(e.media, { status: 'FINISHED', nextAiringEpisode: null });
+        }
+        route.fulfill({ contentType: 'application/json', body: JSON.stringify(answer) });
+    });
+    await quiet.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false}' }));
+    await quiet.route(/cdn|googleapis|gstatic/, route => route.abort());
+    await quiet.addInitScript(({ id, name }) => {
+        localStorage.setItem('aniroll_token', 'e2e-token');
+        localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+        localStorage.setItem('aniroll_user_ts', String(Date.now()));
+        localStorage.setItem('aniroll_seen_changes', '9999');
+    }, VIEWER);
+    await quiet.goto(base + '/#/');
+    await quiet.waitForTimeout(3500);
+    const premiereClock = await quiet.evaluate(() => {
+        const w = document.querySelector('.m3-widget-clock');
+        return { label: w?.querySelector('.m3-widget-label')?.textContent, num: w?.querySelector('.m3-widget-clock-num')?.textContent.replace(/\s+/g, ''),
+            sub: w?.querySelector('.m3-widget-sub')?.textContent };
+    });
+    check('home: nothing airing, the countdown shows the next premiere from Planning',
+        premiereClock.label === 'Starts in' && /^[23]d\d\dh$/.test(premiereClock.num || '') && /· Ep 1$/.test(premiereClock.sub || ''), premiereClock);
+    await quiet.close();
+
     await nxGo('#/list');
     const chips = await nx.evaluate(() => Object.fromEntries([...document.querySelectorAll('#list-formats [data-format]')].map(b => [b.dataset.format, !b.hidden])));
     const count = () => nx.evaluate(() => document.querySelectorAll('#list-content [data-media-id]').length);
@@ -829,7 +861,7 @@ function staticServer() {
             online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
         check('admin: the owner sees tiles, four charts, who is online and who waits',
             adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
-        await sq.evaluate(() => import('/js/auth.js?v=127').then(m => m.logout()));
+        await sq.evaluate(() => import('/js/auth.js?v=128').then(m => m.logout()));
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();

@@ -17,15 +17,20 @@ export function upNext(entry) {
     return { m, progress, next: progress + 1, total, airing, out, behind, done, status, canWatch: !done && (behind == null || behind > 0) };
 }
 
-// All of Continue Watching: the soonest airing episode, what's waiting, which weekday each show airs (Monday first)
-export function glance(entries, now = Date.now() / 1000) {
+// All of Continue Watching: the soonest airing episode, what's waiting, which weekday each show airs (Monday first).
+// Nothing on it airing? Then `next` is the next premiere from Planning (`premiere: true`), so the countdown stays
+export function glance(entries, now = Date.now() / 1000, planning = []) {
     const airing = entries.filter(e => e.media.nextAiringEpisode?.airingAt > now)
         .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt);
     const waiting = entries.map(e => ({ e, n: upNext(e).behind || 0 })).filter(x => x.n > 0);
     const byDay = Array.from({ length: 7 }, () => []);
     // A show airs weekly on the weekday of its next episode
     airing.forEach(e => byDay[weekday(e.media.nextAiringEpisode.airingAt)].push(e.media));
-    return { next: airing[0] || null, airing, waiting, waitingTotal: waiting.reduce((s, x) => s + x.n, 0), byDay, today: weekday(now) };
+    const premiere = airing.length ? null : planning
+        .filter(e => e.media.status === 'NOT_YET_RELEASED' && e.media.nextAiringEpisode?.airingAt > now)
+        .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt)[0];
+    const next = airing[0] || (premiere ? { ...premiere, premiere: true } : null);
+    return { next, airing, waiting, waitingTotal: waiting.reduce((s, x) => s + x.n, 0), byDay, today: weekday(now) };
 }
 
 export const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
