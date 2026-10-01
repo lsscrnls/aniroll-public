@@ -1,11 +1,11 @@
-import * as api from '../api.js?v=127';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=127';
-import { openDialog } from '../a11y.js?v=127';
-import { isLoggedIn, getToken } from '../auth.js?v=127';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=127';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=127';
-import { renderHeadline, renderStage, renderTour, renderColour, renderCollage, fillCollage, initLanding } from '../landing.js?v=127';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=127';
+import * as api from '../api.js?v=128';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=128';
+import { openDialog } from '../a11y.js?v=128';
+import { isLoggedIn, getToken } from '../auth.js?v=128';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=128';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=128';
+import { renderHeadline, renderStage, renderTour, renderColour, renderCollage, fillCollage, initLanding } from '../landing.js?v=128';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=128';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
@@ -83,7 +83,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=127'), import('../jellyfin.js?v=127')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=128'), import('../jellyfin.js?v=128')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
@@ -196,7 +196,8 @@ async function loadContinueWatching(token) {
         const user = getState().user;
         if (!user) return;
         const lists = await api.getMediaList(user.id, 'ANIME', token);
-        renderStartingSoon(lists.find(l => l.status === 'PLANNING')?.entries || []);
+        const planning = lists.find(l => l.status === 'PLANNING')?.entries || [];
+        renderStartingSoon(planning);
         const current = lists.find(l => l.status === 'CURRENT');
         const entries = (current?.entries || [])
             .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -206,18 +207,18 @@ async function loadContinueWatching(token) {
         if (!el) return;
 
         // For the M3 design's hero (js/m3.js); kept on window in case that module loads later
-        window.__anirollContinue = { entries, name: user.name };
+        window.__anirollContinue = { entries, name: user.name, planning };
         document.dispatchEvent(new CustomEvent('aniroll:continue-watching', { detail: window.__anirollContinue }));
 
         // AniRoll's own hero and data strip (js/home-cinema.js). "Watched episode N" goes through the card's
         // own +1, so saving and the row stay one code path; the hero follows a moment later
         const cinema = document.getElementById('ar-home');
-        renderCinema(cinema, entries, user.name);
+        renderCinema(cinema, entries, user.name, planning);
         cinema?.addEventListener('click', (ev) => {
             const inc = ev.target.closest('[data-ar-inc]');
             if (!inc) return;
             el.querySelector(`.cw-inc[data-entry-id="${inc.dataset.arInc}"]`)?.click();
-            setTimeout(() => renderCinema(cinema, entries, user.name), 60);
+            setTimeout(() => renderCinema(cinema, entries, user.name, planning), 60);
         });
 
         if (entries.length === 0) {
