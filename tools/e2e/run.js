@@ -818,6 +818,30 @@ function staticServer() {
             && nerd.shown && nerd.titles.join() === 'Playback,Source,Stream,This browser' && nerd.quality === '4 Mbps' && nerdGone,
             { qMenu: qMenu.slice(0, 3), asked7, kept, nerd, nerdGone });
 
+        // Connected with an API key, Jellyfin keeps nothing for the user by itself: AniRoll writes the spot
+        // where it stopped, and "played" from 90 %, for the user
+        await p.evaluate(() => localStorage.setItem('aniroll_jf_kind', 'key'));
+        const before = calls.length;
+        await p.evaluate(h => { location.hash = h; }, playHash);
+        await p.waitForTimeout(3000);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 9; });
+        await p.waitForTimeout(400);
+        await p.evaluate(() => { location.hash = '#/anime/101/full'; });
+        await p.waitForTimeout(800);
+        await p.evaluate(h => { location.hash = h; }, playHash);
+        await p.waitForTimeout(3000);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.3; return v.play(); }).catch(() => {});
+        await p.waitForTimeout(1200);
+        await p.evaluate(() => { location.hash = '#/anime/101/full'; });
+        await p.waitForTimeout(800);
+        await p.evaluate(() => localStorage.setItem('aniroll_jf_kind', 'user'));
+        const userData = calls.slice(before).filter(c => c.type === 'userData' && c.item === 'ep2');
+        const resumeAt = userData.find(c => c.body?.PlaybackPositionTicks > 0 && !c.body.Played);
+        const played = userData.filter(c => c.body?.Played === true);
+        check('player: with an API key, the resume spot and "played" (once) go to Jellyfin for the user',
+            !!resumeAt && Math.abs(resumeAt.body.PlaybackPositionTicks / 1e7 - 9) < 1.5 && played.length === 1 && played[0].item === 'ep2' && !!played[0].user,
+            userData.map(c => ({ item: c.item, user: !!c.user, body: c.body })));
+
         // The server cannot convert (graphics card full): a clear message, no endless spinner, the conversion ended
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/5'));
         await p.waitForTimeout(3500);
@@ -886,7 +910,7 @@ function staticServer() {
             online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
         check('admin: the owner sees tiles, four charts, who is online and who waits',
             adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
-        await sq.evaluate(() => import('/js/auth.js?v=130').then(m => m.logout()));
+        await sq.evaluate(() => import('/js/auth.js?v=131').then(m => m.logout()));
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();

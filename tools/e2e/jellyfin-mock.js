@@ -161,6 +161,11 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
             if (req.postDataJSON()?.AudioStreamIndex != null) lastAudio = req.postDataJSON().AudioStreamIndex;
             return route.fulfill({ status: 204, headers: CORS });
         }
+        // Played / resume position written for the user (connected with an API key)
+        if (/^\/UserItems\/[^/]+\/UserData$/.test(p) && req.method() === 'POST') {
+            calls.push({ type: 'userData', item: p.split('/')[2], user: url.searchParams.get('userId'), body: req.postDataJSON() });
+            return json({ Played: !!req.postDataJSON()?.Played });
+        }
         if (p === '/Videos/ActiveEncodings' && req.method() === 'DELETE') {
             calls.push({ type: 'stopEncoding', query: Object.fromEntries(url.searchParams) });
             return route.fulfill({ status: 204, headers: CORS });

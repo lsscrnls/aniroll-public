@@ -1,13 +1,13 @@
-import * as api from '../api.js?v=130';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=130';
-import { getToken, isLoggedIn } from '../auth.js?v=130';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=130';
-import { availability } from '../player/availability.js?v=130';
-import { findEpisode, jfGet } from '../player/library.js?v=130';
-import { deviceProfile } from '../player/profile.js?v=130';
-import { HtmlVideoEngine } from '../player/engine.js?v=130';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=130';
-import { createSubtitles } from '../player/subtitles.js?v=130';
+import * as api from '../api.js?v=131';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=131';
+import { getToken, isLoggedIn } from '../auth.js?v=131';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=131';
+import { availability } from '../player/availability.js?v=131';
+import { findEpisode, jfGet } from '../player/library.js?v=131';
+import { deviceProfile } from '../player/profile.js?v=131';
+import { HtmlVideoEngine } from '../player/engine.js?v=131';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=131';
+import { createSubtitles } from '../player/subtitles.js?v=131';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -111,6 +111,7 @@ export async function render({ params, content }) {
         if (closed) return cleanup;
         if (!ep) throw new Error(`Episode ${episode} is not in your Jellyfin library`);
         session.itemId = ep.itemId;
+        session.runtime = ep.runTimeTicks ? ep.runTimeTicks / TICKS : 0;
         $('player-episode').textContent = media.format === 'MOVIE' ? '' : `Episode ${episode}${ep.name && !/^episode \d+$/i.test(ep.name) ? ` · ${ep.name}` : ''}`;
 
         // Continue where it stopped, unless it was watched to the end
@@ -252,6 +253,8 @@ export async function render({ params, content }) {
             }
             if (!session.done && total && engine.time / total >= WATCHED_AT) {
                 session.done = true;
+                if (!session.runtime) session.runtime = total;
+                saveUserData(session, engine.time);
                 if (isLoggedIn()) saveEpisode(media, mediaId, episode, token);
             }
         });
@@ -594,11 +597,29 @@ function reportProgress(session, engine) {
     post(session, '/Sessions/Playing/Progress', sessionBody(session, engine.time, { IsPaused: engine.paused, EventName: 'timeupdate' }));
 }
 
+// Connected with an API key, Jellyfin ties the playback to no user ("User null stopped playback", seen
+// 2026-10-02) and keeps neither "played" nor where it stopped. AniRoll writes both for the user itself:
+// played from 90 %, else the position (not for the first moments). A signed-in user's session does it alone.
+function saveUserData(session, time) {
+    const cfg = getConfig();
+    if (!cfg || cfg.kind === 'user' || !cfg.userId || !session.base || !session.itemId) return;
+    const played = session.runtime > 0 && time / session.runtime >= WATCHED_AT;
+    if (played ? session.markedPlayed : time < Math.min(60, session.runtime * 0.05 || 60)) return;
+    if (played) session.markedPlayed = true;
+    fetch(`${session.base}/UserItems/${encodeURIComponent(session.itemId)}/UserData?userId=${encodeURIComponent(cfg.userId)}`, {
+        method: 'POST',
+        headers: { ...jfAuth(cfg.apiKey), 'Content-Type': 'application/json' },
+        body: JSON.stringify(played ? { Played: true, PlaybackPositionTicks: 0 } : { PlaybackPositionTicks: Math.round(time * TICKS) }),
+        keepalive: true,
+    }).catch(() => { /* best effort, like the reports */ });
+}
+
 // On leaving: tell Jellyfin where we stopped and end the conversion, so the graphics card is free again
 function stopSession(session, time) {
     if (!session.started || session.stopped) return;
     session.stopped = true;
     post(session, '/Sessions/Playing/Stopped', sessionBody(session, time), true);
+    saveUserData(session, time);
     if (session.hls && session.playSessionId) {
         const cfg = getConfig();
         if (cfg) {
