@@ -1,4 +1,4 @@
-import { jfAuth } from '../jellyfin.js?v=131';
+import { jfAuth } from '../jellyfin.js?v=132';
 
 // Every subtitle of a file behind one list, whatever draws it:
 //   ASS/SSA  -> JASSUB (libass in WebAssembly) with the fonts embedded in the MKV — typesetting, signs,

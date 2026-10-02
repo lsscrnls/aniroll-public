@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=131';
-import { upNext, glance, DAYS, greeting } from './upnext.js?v=131';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=131';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=132';
+import { upNext, glance, DAYS, greeting } from './upnext.js?v=132';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=132';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
