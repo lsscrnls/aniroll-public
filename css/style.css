@@ -5263,6 +5263,31 @@ body.player-open .cursor { display: none !important; }
 .pl-next-stay:hover { background: rgba(255,255,255,0.16); border-radius: 24px; }
 .pl-next-play:hover { border-radius: 24px; }
 .pl-next-play:active { transform: scale(.95); }
+/* No next episode: the same card, with what is next for the show and where to go */
+.pl-end {
+    position: absolute;
+    right: max(24px, env(safe-area-inset-right));
+    bottom: calc(100% + 16px);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    max-width: min(640px, calc(100% - 48px));
+    padding: 12px 12px 12px 20px;
+    border-radius: 28px;
+    background: var(--pl-surface);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    animation: plSkipIn .45s var(--pl-bounce);
+}
+.pl-end[hidden] { display: none; }
+.pl-end-title { font-weight: 700; }
+.pl-end-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.pl-end-actions a { display: inline-flex; align-items: center; text-decoration: none; }
+.pl-end-actions .pl-next-play { padding: 0 20px; }
+.player.is-idle .pl-bottom:has(.pl-end:not([hidden])) { opacity: 1; transform: none; }
+.player.is-idle .pl-bottom:has(.pl-end:not([hidden])) > :not(.pl-end) { opacity: 0; }
+.player.is-idle .pl-end { pointer-events: auto; }
+.player.is-idle .pl-end :is(a, button) { cursor: pointer !important; }
 .player.has-next .pl-skip-segment[data-type="Outro"] { display: none; }
 .player.is-idle .pl-bottom:has(.pl-next:not([hidden])) { opacity: 1; transform: none; }
 .player.is-idle .pl-bottom:has(.pl-next:not([hidden])) > :not(.pl-next, .pl-skip-segment, .pl-subs-note) { opacity: 0; }

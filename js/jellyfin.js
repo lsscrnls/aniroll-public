@@ -1,5 +1,5 @@
-import { toast } from './store.js?v=132';
-import { getToken } from './auth.js?v=132';
+import { toast } from './store.js?v=133';
+import { getToken } from './auth.js?v=133';
 
 // Jellyfin integration: when AniList progress moves forward, mark the matching
 // episodes watched on the user's own Jellyfin server.
@@ -572,7 +572,7 @@ function matchFit(media, group) {
 // Pushes AniList forward where Jellyfin is further along; returns what it changed
 export async function pullFromJellyfin(user, token) {
     if (!getConfig() || !isPullEnabled() || !user?.id || !token) return { updated: 0, changes: [] };
-    const api = await import('./api.js?v=132');
+    const api = await import('./api.js?v=133');
     if (api.isBackgroundPaused()) return { updated: 0, changes: [], skipped: 'maintenance' };
     if (api.isRateLimited()) return { updated: 0, changes: [], skipped: 'rate-limited' };
 
@@ -622,7 +622,7 @@ export async function pullFromJellyfin(user, token) {
             await api.saveMediaListEntry(api.progressVars(entry, target, m.episodes), token);
             changes.push({ title: titles[0], from: entry.progress || 0, to: target });
         } catch (err) {
-            if (err.rateLimited) break; // queued, try again later
+            if (err.rateLimited || err.offline) break; // queued, try again later
             console.warn('Jellyfin pull failed for', titles[0], err.message);
         }
         await new Promise(r => setTimeout(r, 700)); // stay under AniList's write limit

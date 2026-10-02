@@ -67,6 +67,10 @@ export function controlsHtml() {
                 <button class="pl-next-play" data-act="playNext">${icon('skipNext')}<span class="pl-next-label">Play now</span></button>
                 <button class="pl-next-stay" data-act="cancelNext">Watch credits</button>
             </div>
+            <div class="pl-end" role="group" aria-label="Episode over" hidden>
+                <div class="pl-next-text"><span class="pl-next-kicker"></span><span class="pl-end-title"></span></div>
+                <div class="pl-end-actions"></div>
+            </div>
             <div class="pl-subs-note" role="status" hidden><span class="pl-subs-note-dot" aria-hidden="true"></span>Loading subtitles…</div>
             <div class="pl-row">
                 <button class="pl-btn" data-act="nextEp" aria-label="Next episode" title="Next episode (N)" hidden>${icon('skipNext')}</button>
@@ -352,12 +356,15 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             root.classList.toggle('has-next', show);
             clearInterval(nextTimer);
             // Counts only while the video plays (or has ended): pausing on the credits holds it
-            if (show) nextTimer = setInterval(() => {
+            if (show) {
+                root.dispatchEvent(new CustomEvent('aniroll:player-upnext', { bubbles: true, detail: { box: nextBox } }));
+                nextTimer = setInterval(() => {
                 if (video.paused && !video.ended) return;
                 nextLeft -= 0.25;
                 paintNextCount();
                 if (nextLeft <= 0) playNext();
-            }, 250);
+                }, 250);
+            }
         }
     }
     function playNext() {
@@ -371,9 +378,46 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         paintNext();
         paintSegment();
     }
+    // How much of the stretch from the credits to the end really played (not skipped or jumped over), for
+    // whoever listens for 'aniroll:player-ended' on the player
+    let tailPlayed = 0;
+    let lastT = 0;
+    on(video, 'timeupdate', () => {
+        const t = video.currentTime;
+        const from = nextFrom();
+        const dt = t - lastT;
+        if (t < from - 1) tailPlayed = 0;
+        else if (dt > 0 && dt < 1.5 && !video.paused) tailPlayed += dt;
+        lastT = t;
+        if (!endBox.hidden && t < duration() - 1) paintEnd(false);
+    });
+
+    // ----- No next episode: a card instead of a black frame (what is next for the show, set by the page) -----
+    let endInfo = null;
+    const endBox = $('.pl-end');
+    function paintEnd(show) {
+        show = show && !!endInfo;
+        endBox.hidden = !show;
+        root.classList.toggle('has-end', show);
+        if (!show) return;
+        $('.pl-end .pl-next-kicker').textContent = endInfo.kicker;
+        $('.pl-end-title').textContent = endInfo.title;
+        const actions = $('.pl-end-actions');
+        actions.innerHTML = (endInfo.actions || []).map((a, i) => a.href
+            ? `<a class="${a.primary ? 'pl-next-play' : 'pl-next-stay'}" href="${escapeHtml(a.href)}">${escapeHtml(a.label)}</a>`
+            : `<button type="button" class="${a.primary ? 'pl-next-play' : 'pl-next-stay'}" data-end="${i}">${escapeHtml(a.label)}</button>`).join('');
+    }
+    on(endBox, 'click', (ev) => {
+        const btn = ev.target.closest('[data-end]');
+        if (btn) endInfo?.actions?.[Number(btn.dataset.end)]?.run?.(btn);
+    });
+
     // The end: straight on, unless the credits were watched — then the card asks once more, with its countdown
     on(video, 'ended', () => {
-        if (!next) return;
+        const span = duration() - nextFrom();
+        root.dispatchEvent(new CustomEvent('aniroll:player-ended', { bubbles: true,
+            detail: { credits: nextState === 'cancelled' || (span >= 10 && tailPlayed >= span * 0.8) } }));
+        if (!next) return paintEnd(true);
         if (nextState !== 'cancelled') return playNext();
         nextState = 'off';
         paintNext();
@@ -546,6 +590,11 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             $('[data-act="nextEp"]').hidden = false;
             $('.pl-next-title').textContent = info.title;
             paintNext();
+        },
+        // What the end card says when there is no next episode: { kicker, title, actions: [{ label, href | run, primary }] }
+        setEnd(info) {
+            endInfo = info;
+            if (!endBox.hidden || video.ended) paintEnd(true);
         },
         // [{ type: 'Intro' | 'Recap' | 'Outro' | ..., start, end }] in seconds
         setSegments(list) {

@@ -1,13 +1,14 @@
-import * as api from '../api.js?v=132';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=132';
-import { getToken, isLoggedIn } from '../auth.js?v=132';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=132';
-import { availability } from '../player/availability.js?v=132';
-import { findEpisode, jfGet } from '../player/library.js?v=132';
-import { deviceProfile } from '../player/profile.js?v=132';
-import { HtmlVideoEngine } from '../player/engine.js?v=132';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=132';
-import { createSubtitles } from '../player/subtitles.js?v=132';
+import * as api from '../api.js?v=133';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=133';
+import { getToken, isLoggedIn } from '../auth.js?v=133';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=133';
+import { availability } from '../player/availability.js?v=133';
+import { findEpisode, jfGet } from '../player/library.js?v=133';
+import { deviceProfile } from '../player/profile.js?v=133';
+import { HtmlVideoEngine } from '../player/engine.js?v=133';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=133';
+import { createSubtitles } from '../player/subtitles.js?v=133';
+import { neighbours } from '../player/episodes.js?v=133';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -64,9 +65,12 @@ export async function render({ params, content }) {
             : `<div class="pl-spinner" aria-hidden="true"></div><p>${esc(text)}</p>`) : '';
     };
 
-    // Try again: the same page from the start (the server may be free again)
+    // Try again: once playing, from the very second it stopped; before that, the same page from the start
+    // (the server may be free again)
+    let retryInPlace = null;
     content.addEventListener('click', (ev) => {
         if (!ev.target.closest('[data-retry]')) return;
+        if (retryInPlace) return retryInPlace();
         cleanup();
         window.dispatchEvent(new HashChangeEvent('hashchange'));
     });
@@ -236,7 +240,8 @@ export async function render({ params, content }) {
             ? Promise.resolve(null)
             : findEpisode(avail.base, media, nextNumber).catch(() => null);
         nextEp.then(n => {
-            if (closed || !n) return;
+            if (closed) return;
+            if (!n) return controls.setEnd(endCard(media, mediaId, episode, token));
             controls.setNext({
                 title: `Episode ${nextNumber}${n.name && !/^episode \d+$/i.test(n.name) ? ` · ${n.name}` : ''}`,
                 // Replaces this episode in the history: Back still leads to where Play was pressed
@@ -244,7 +249,18 @@ export async function render({ params, content }) {
             });
         });
 
-        engine.on('error', (err) => status(err.message, { error: true }));
+        // The connection broke off mid-episode (Wi-Fi, the stream through Cloudflare): one quiet try from the
+        // same second before saying anything. A file the browser cannot play, or a converter that failed
+        // (the graphics card full), would only fail again: those are shown at once.
+        let quietRetry = 0;
+        retryInPlace = () => restart({}, 'Reconnecting...');
+        engine.on('error', (err) => {
+            if ((err.kind === 'network' || err.kind === 'media') && Date.now() - quietRetry > 2 * 60 * 1000) {
+                quietRetry = Date.now();
+                return restart({}, 'Reconnecting...');
+            }
+            status(err.message, { error: true });
+        });
         video.addEventListener('timeupdate', () => {
             const total = runtime();
             if (!session.warmed && total && engine.time / total >= WARM_AT) {
@@ -628,6 +644,47 @@ function stopSession(session, time) {
             }).catch(() => {});
         }
     }
+}
+
+// ===== The end card =====
+// Jellyfin has no next episode: say why and what comes next, from what the page loaded anyway (the next
+// airing, the sequel season and whether it is on the list). Adding the sequel is the only request, on a tap.
+function endCard(media, mediaId, episode, token) {
+    const back = { label: 'Back to the show', href: `#/anime/${mediaId}` };
+    const roll = { label: 'Roll something new', href: '#/roll' };
+    const airing = media.nextAiringEpisode;
+    const total = media.episodes || null;
+    if (media.format === 'MOVIE') return { kicker: 'The end', title: titlePref(media.title), actions: [{ ...back, primary: true }, roll] };
+    if (airing && airing.episode === episode + 1) {
+        return { kicker: 'Up next', title: `Episode ${airing.episode} airs in ${api.timeUntil(api.untilAiring(airing))}`, actions: [{ ...back, primary: true }, roll] };
+    }
+    if ((total && episode < total) || (airing && airing.episode > episode + 1)) {
+        return { kicker: 'Up next', title: `Episode ${episode + 1} is not in your library yet`, actions: [{ ...back, primary: true }, roll] };
+    }
+    const sequel = neighbours(media).after;
+    if (!sequel) return { kicker: 'That was the last episode', title: titlePref(media.title), actions: [{ ...back, primary: true }, roll] };
+    const name = titlePref(sequel.title);
+    const add = {
+        label: 'Add to Planning',
+        primary: true,
+        run: async (btn) => {
+            btn.disabled = true;
+            try {
+                await api.saveMediaListEntry({ mediaId: sequel.id, status: 'PLANNING' }, token);
+                btn.textContent = 'On your Planning list';
+                emitListChange({ mediaId: sequel.id, status: 'PLANNING', progress: 0 });
+            } catch (err) {
+                btn.disabled = false;
+                toast(err.queued ? err.message : `AniList: ${err.message}`, 'error');
+            }
+        },
+    };
+    const open = { label: `Open ${name}`, href: `#/anime/${sequel.id}`, primary: true };
+    return {
+        kicker: 'That was the last episode',
+        title: sequel.status === 'NOT_YET_RELEASED' ? `${name} is announced` : `${name} is out`,
+        actions: [isLoggedIn() && !sequel.mediaListEntry ? add : open, back],
+    };
 }
 
 // ===== AniList =====

@@ -38,6 +38,8 @@ export class HtmlVideoEngine {
                     if (serverFailed) hls.stopLoad();
                     const err = new Error(hlsMessage(data));
                     err.code = data.response?.code || 0;
+                    // What broke, for the player to decide whether a quiet retry can help
+                    err.kind = serverFailed ? 'server' : data.type === 'networkError' ? 'network' : data.type === 'mediaError' ? 'media' : 'other';
                     if (!started) reject(err);
                     else this.emit('error', err);
                 });
@@ -51,13 +53,13 @@ export class HtmlVideoEngine {
         if (start) video.currentTime = start;
         await new Promise((resolve, reject) => {
             const ok = () => { off(); resolve(); };
-            const bad = () => { off(); reject(new Error(mediaMessage(video.error))); };
+            const bad = () => { off(); reject(mediaError(video.error)); };
             const off = () => { video.removeEventListener('loadedmetadata', ok); video.removeEventListener('error', bad); };
             video.addEventListener('loadedmetadata', ok);
             video.addEventListener('error', bad);
         });
         if (start && Math.abs(video.currentTime - start) > 1) video.currentTime = start;
-        const onError = () => this.emit('error', new Error(mediaMessage(video.error)));
+        const onError = () => this.emit('error', mediaError(video.error));
         video.addEventListener('error', onError);
         this.listeners.push(() => video.removeEventListener('error', onError));
     }
@@ -94,6 +96,13 @@ export class HtmlVideoEngine {
         this.video.removeAttribute('src');
         this.video.load();
     }
+}
+
+// kind: 'network' (code 2, the connection broke), 'unsupported' (code 4, the file itself), else 'other'
+function mediaError(error) {
+    const err = new Error(mediaMessage(error));
+    err.kind = error?.code === 2 ? 'network' : error?.code === 4 ? 'unsupported' : 'other';
+    return err;
 }
 
 function mediaMessage(error) {

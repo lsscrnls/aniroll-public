@@ -217,6 +217,20 @@ function staticServer() {
         check('+ saves progress', mutations.slice(saves).includes('SaveMediaListEntry'), mutations.slice(saves).join(', ') || 'no mutation');
         check('+ does not open the detail panel', !(await panelOpen()));
         await closePanel();
+
+        // Offline (no answer at all): the change is kept, not lost, and goes out once back online
+        const offline = (route) => (route.request().postDataJSON()?.query || '').includes('SaveMediaListEntry') ? route.abort('internetdisconnected') : route.fallback();
+        await page.route('https://graphql.anilist.co/**', offline);
+        await page.$eval('.list-card [data-action="inc"], .list-entry [data-action="inc"]', b => b.click());
+        await settle(1200);
+        const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_pending_saves') || '[]').length);
+        await page.unroute('https://graphql.anilist.co/**', offline);
+        const before = mutations.length;
+        await page.evaluate(() => window.dispatchEvent(new Event('online')));
+        await settle(3500);
+        const sent = mutations.slice(before).includes('SaveMediaListEntry');
+        const left = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_pending_saves') || '[]').length);
+        check('offline: a + is kept and sent once back online', kept >= 1 && sent && left === 0, { kept, sent, left });
     }
     const card = await page.$('.list-card[data-open], .list-entry-title[data-open]');
     if (card) {
@@ -842,6 +856,16 @@ function staticServer() {
             !!resumeAt && Math.abs(resumeAt.body.PlaybackPositionTicks / 1e7 - 9) < 1.5 && played.length === 1 && played[0].item === 'ep2' && !!played[0].user,
             userData.map(c => ({ item: c.item, user: !!c.user, body: c.body })));
 
+        // The last episode Jellyfin has: a card instead of a black frame, with what is next and a way back
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/12'));
+        await p.waitForTimeout(3000);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 19; return v.play(); }).catch(() => {});
+        await p.waitForTimeout(2500);
+        const endCard = await p.evaluate(() => { const b = document.querySelector('.pl-end');
+            return { shown: !!b && !b.hidden, kicker: b?.querySelector('.pl-next-kicker')?.textContent, title: b?.querySelector('.pl-end-title')?.textContent,
+                back: !!b?.querySelector('a[href^="#/anime/"]') }; });
+        check('player: the last episode ends on a card saying what is next, with a way back', endCard.shown && !!endCard.kicker && !!endCard.title && endCard.back, endCard);
+
         // The server cannot convert (graphics card full): a clear message, no endless spinner, the conversion ended
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/5'));
         await p.waitForTimeout(3500);
@@ -910,7 +934,7 @@ function staticServer() {
             online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
         check('admin: the owner sees tiles, four charts, who is online and who waits',
             adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
-        await sq.evaluate(() => import('/js/auth.js?v=132').then(m => m.logout()));
+        await sq.evaluate(() => import('/js/auth.js?v=133').then(m => m.logout()));
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();
