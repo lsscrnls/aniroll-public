@@ -1,4 +1,4 @@
-import { getConfig, jfAuth, normTitle, splitYear, splitSeason, nearYear, hasAniListId } from '../jellyfin.js?v=128';
+import { getConfig, jfAuth, normTitle, splitYear, splitSeason, nearYear, hasAniListId } from '../jellyfin.js?v=129';
 
 // AniList show + episode -> the Jellyfin item to play. The same title rules as the Jellyfin sync
 // (js/jellyfin.js, api/server.js) in the other direction: Jellyfin keeps one series with seasons,
@@ -92,16 +92,21 @@ async function findShow(base, cfg, media) {
     return null;
 }
 
+// A show missing from Jellyfin is looked for again after this long: it may have just been added
+// (Mashle was opened while its episode was still downloading and stayed "not there" for the whole tab)
+const MISSING_MS = 10 * 60 * 1000;
+
 // The Jellyfin show (or movie) behind an AniList entry, looked up once per session
 async function showFor(base, cfg, media) {
     const cache = readCache(cfg);
     let show = cache.map[media.id];
-    if (show === undefined) {
+    const stale = show === undefined || show === null || (show.missing && Date.now() - show.missing > MISSING_MS);
+    if (stale) {
         show = await findShow(base, cfg, media);
-        cache.map[media.id] = show; // null too: no need to search again this session
+        cache.map[media.id] = show || { missing: Date.now() };
         writeCache(cache);
     }
-    return show;
+    return show?.missing ? null : show;
 }
 
 // Every episode of the AniList entry's season in Jellyfin, in order, with a thumbnail; [] when none.
