@@ -1,4 +1,4 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=132';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=133';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -452,7 +452,7 @@ export async function getMedia(id, token = null) {
                 studios { edges { isMain node { id name isAnimationStudio } } }
                 relations { edges {
                     relationType(version: 2)
-                    node { id title { userPreferred english romaji native } coverImage { large } format type status meanScore }
+                    node { id title { userPreferred english romaji native } coverImage { large } format type status meanScore mediaListEntry { status } }
                 }}
                 characters(page: 1, perPage: 12, sort: [ROLE, RELEVANCE]) {
                     edges {
@@ -731,18 +731,27 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
 
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
     if (mirror && saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=132').then(m =>
+        import('./jellyfin.js?v=133').then(m =>
             m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
     }
 
     return saved;
 }
 
-// Runs the mutation; if AniList is rate limiting, the change is queued and retried later
+// Runs the mutation; if AniList is rate limiting, or the device is offline, the change is queued and
+// retried later (see setupPendingSaveRetry in js/app.js: every 5 minutes, and the moment it is back online)
 async function queryOrQueue(variables, token, queue, mutation) {
     try {
         return await query(mutation, variables, token);
     } catch (err) {
+        // fetch fails with a TypeError when no answer came at all (Wi-Fi gone, a tunnel): kept, not lost
+        if ((err instanceof TypeError || navigator.onLine === false) && queue) {
+            queuePendingSave(variables);
+            const queued = new Error('You are offline — change saved, AniRoll sends it once you are back');
+            queued.offline = true;
+            queued.queued = true;
+            throw queued;
+        }
         // Throttled by our own budget counts too, or the change would be lost
         if ((err.rateLimited || err.throttled) && queue) {
             queuePendingSave(variables);

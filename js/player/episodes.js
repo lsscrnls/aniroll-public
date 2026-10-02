@@ -1,19 +1,20 @@
-import * as api from '../api.js?v=132';
-import { esc, titlePref } from '../store.js?v=132';
-import { getToken } from '../auth.js?v=132';
-import { openDialog } from '../a11y.js?v=132';
-import { listEpisodes } from './library.js?v=132';
+import * as api from '../api.js?v=133';
+import { esc, titlePref } from '../store.js?v=133';
+import { getToken } from '../auth.js?v=133';
+import { openDialog } from '../a11y.js?v=133';
+import { listEpisodes } from './library.js?v=133';
 
 // "Episodes": every episode of a show that Jellyfin has, to start any of them — a rewatch, one skipped,
 // one further back than where the list stands. AniList keeps each season as its own entry, so the
 // seasons before and after are chips that switch the list over; what plays is tracked on that entry.
 //   openEpisodes(media, base)   media: AniList media with relations and mediaListEntry
+//   neighbours(media)           { before, after }: the prequel and sequel seasons (the player's end card)
 const TICKS = 10_000_000;
 const chevron = (dir) => `<svg data-icon="chevron_${dir}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:16px;height:16px;vertical-align:-3px"><path d="${dir === 'left' ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'}"/></svg>`;
 const SEASON_FORMATS = new Set(['TV', 'TV_SHORT', 'ONA', 'OVA']);
 
 // The directly neighbouring seasons: a prequel and a sequel that are series themselves
-function neighbours(media) {
+export function neighbours(media) {
     const edges = (media.relations?.edges || []).filter(e => e.node?.type === 'ANIME' && SEASON_FORMATS.has(e.node.format));
     return {
         before: edges.find(e => e.relationType === 'PREQUEL')?.node || null,
