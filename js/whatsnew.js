@@ -1,10 +1,10 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=132';
-import { openDialog } from './a11y.js?v=132';
-import { prefersReducedMotion } from './animations.js?v=132';
-import { accountState, saveAccountState } from './accountstate.js?v=132';
+import { esc } from './store.js?v=133';
+import { openDialog } from './a11y.js?v=133';
+import { prefersReducedMotion } from './animations.js?v=133';
+import { accountState, saveAccountState } from './accountstate.js?v=133';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
@@ -18,13 +18,17 @@ const CHANGES = [
     {
         // '.2': played and the resume spot reach Jellyfin with an API key too
         // '.3': confirmed changes follow the account
-        id: '2026-10-02.3',
+        // '.4': stream recovery, the end card, offline saves
+        id: '2026-10-02.4',
         title: 'Next episode, and intros to enjoy',
         items: [
             'A <strong>Next episode</strong> button sits next to the time in the player; N does the same.',
             '<strong>Skip intro</strong> and <strong>Skip credits</strong> step back after a few seconds, so the opening can play on its own. Move the mouse and they are there again.',
             'Connected to Jellyfin with an API key? Episodes you finish in AniRoll now count as <strong>played in Jellyfin</strong> too, and it remembers where you stopped.',
             'What you confirmed here stays confirmed on every device you sign in on: this list pops up once per change, not once per browser.',
+            'The player <strong>reconnects by itself</strong> when the stream drops, right where it stopped; Try again continues there too.',
+            'After the last episode you have, a card says what is next: when the next one airs, whether it is missing from your library, or the <strong>next season</strong> to add to Planning.',
+            'Offline for a moment? Changes to your list are kept and go out as soon as you are back.',
         ],
     },
     {
