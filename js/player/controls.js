@@ -26,6 +26,7 @@ const ICON = {
 export const icon = (name) => `<svg class="pl-icon" viewBox="0 -960 960 960" aria-hidden="true"><path d="${ICON[name]}"/></svg>`;
 
 const IDLE_MS = 3000;
+const SKIP_SHOW_S = 8; // Skip intro/credits stays on its own this long, then only with the controls
 const STEP = 10;
 const VOLUME_KEY = 'aniroll_player_volume';
 // Up next: seconds of playing time before the next episode starts by itself
@@ -68,6 +69,7 @@ export function controlsHtml() {
             </div>
             <div class="pl-subs-note" role="status" hidden><span class="pl-subs-note-dot" aria-hidden="true"></span>Loading subtitles…</div>
             <div class="pl-row">
+                <button class="pl-btn" data-act="nextEp" aria-label="Next episode" title="Next episode (N)" hidden>${icon('skipNext')}</button>
                 <span class="pl-time"><span class="pl-now">0:00</span> <span class="pl-total">/ 0:00</span></span>
                 <span class="pl-spacer"></span>
                 <div class="pl-volume">
@@ -262,7 +264,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             else if (act === 'pip') togglePip();
             else if (act === 'fullscreen') toggleFullscreen();
             else if (act === 'skipSegment') skipSegment();
-            else if (act === 'playNext') playNext();
+            else if (act === 'playNext' || act === 'nextEp') playNext();
             else if (act === 'cancelNext') cancelNext();
             return;
         }
@@ -294,6 +296,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     // ----- Skip intro / recap / credits (Jellyfin media segments, e.g. from the Intro Skipper plugin) -----
     let segments = [];
     let skipTarget = null;
+    let skipSeg = null;
+    let skipFrom = 0; // where in the video the button came up for this segment
     const skipBtn = $('.pl-skip-segment');
     const SKIP_LABEL = { Intro: 'Skip intro', Recap: 'Skip recap', Outro: 'Skip credits', Preview: 'Skip preview', Commercial: 'Skip ad' };
     function paintSegment() {
@@ -302,6 +306,10 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         const seg = segments.find(g => t >= g.start && t < g.end - 1 && !(g.type === 'Outro' && nextState === 'shown'));
         skipTarget = seg ? seg.end : null;
         skipBtn.hidden = !seg;
+        // After a few seconds it steps back, so the intro or the credits can play on their own; moving the
+        // mouse brings it with the controls. Seeking back before where it came up shows it again.
+        if (seg !== skipSeg || t < skipFrom) { skipSeg = seg; skipFrom = t; }
+        root.classList.toggle('skip-faded', !!seg && t - skipFrom >= SKIP_SHOW_S);
         if (seg && skipBtn.dataset.type !== seg.type) {
             skipBtn.dataset.type = seg.type;
             skipBtn.textContent = SKIP_LABEL[seg.type] || 'Skip';
@@ -442,6 +450,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             m: () => { video.muted = !video.muted; },
             c: toggleSubs,
             s: skipSegment,
+            n: () => { if (next) playNext(); else return false; },
             i: () => toggleStats(),
         }[key];
         if (handled && handled() !== false) {
@@ -534,6 +543,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         // The next episode, once it is known to be there: { title, go() }
         setNext(info) {
             next = info;
+            $('[data-act="nextEp"]').hidden = false;
             $('.pl-next-title').textContent = info.title;
             paintNext();
         },

@@ -1,9 +1,9 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=129';
-import { openDialog } from './a11y.js?v=129';
-import { prefersReducedMotion } from './animations.js?v=129';
+import { esc } from './store.js?v=130';
+import { openDialog } from './a11y.js?v=130';
+import { prefersReducedMotion } from './animations.js?v=130';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More
@@ -12,6 +12,14 @@ const SEEN_KEY = 'aniroll_seen_changes';
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
+    {
+        id: '2026-10-02',
+        title: 'Next episode, and intros to enjoy',
+        items: [
+            'A <strong>Next episode</strong> button sits next to the time in the player; N does the same.',
+            '<strong>Skip intro</strong> and <strong>Skip credits</strong> step back after a few seconds, so the opening can play on its own. Move the mouse and they are there again.',
+        ],
+    },
     {
         // '.2': subtitles kept per show, the feed fresh after a party
         // '.3': rewatches counted in Social
