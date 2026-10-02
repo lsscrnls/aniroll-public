@@ -152,9 +152,9 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
             calls.push({ type: 'segment', path: p });
             return route.fulfill({ status: 500, headers: CORS, body: '' });
         }
-        // The Intro Skipper plugin's intro: 2 s to 7 s
+        // The Intro Skipper plugin's intro: 2 s to 14 s (long enough for Skip intro to step back)
         if (/^\/MediaSegments\/ep\d+$/.test(p)) {
-            return json({ Items: [{ Id: 's1', ItemId: p.split('/')[2], Type: 'Intro', StartTicks: 2 * 10_000_000, EndTicks: 7 * 10_000_000 }], TotalRecordCount: 1 });
+            return json({ Items: [{ Id: 's1', ItemId: p.split('/')[2], Type: 'Intro', StartTicks: 2 * 10_000_000, EndTicks: 14 * 10_000_000 }], TotalRecordCount: 1 });
         }
         if (p.startsWith('/Sessions/Playing')) {
             calls.push({ type: p.replace('/Sessions/', ''), body: req.postDataJSON(), auth: req.headers().authorization || '' });

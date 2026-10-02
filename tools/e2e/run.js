@@ -599,10 +599,26 @@ function staticServer() {
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 3; return v.play(); }).catch(() => {});
         await p.waitForTimeout(700);
         const skip = await p.evaluate(() => { const b = document.querySelector('.pl-skip-segment'); return { shown: b && !b.hidden, text: b?.textContent }; });
+        // After 8 s of the intro it goes with the controls: hidden while they are, back when they are
+        await p.evaluate(() => { document.getElementById('player-video').currentTime = 11.5; });
+        await p.waitForTimeout(500);
+        await p.evaluate(() => document.getElementById('player').classList.add('is-idle'));
+        await p.waitForTimeout(600);
+        const faded = await p.evaluate(() => {
+            const pl = document.getElementById('player');
+            const b = document.querySelector('.pl-skip-segment');
+            const idle = getComputedStyle(b).opacity;
+            pl.classList.remove('is-idle');
+            return { cls: pl.classList.contains('skip-faded'), idle, shown: !b.hidden, nextBtn: !document.querySelector('[data-act="nextEp"]').hidden };
+        });
+        await p.waitForTimeout(600);
+        faded.awake = await p.evaluate(() => getComputedStyle(document.querySelector('.pl-skip-segment')).opacity);
+        check('player: Skip intro steps back after 8 s and comes with the controls; a Next episode button',
+            faded.cls && faded.idle === '0' && faded.awake === '1' && faded.shown && faded.nextBtn, faded);
         await p.click('.pl-skip-segment').catch(() => {});
         await p.waitForTimeout(400);
         const skipped = await p.evaluate(() => ({ t: document.getElementById('player-video').currentTime, hidden: document.querySelector('.pl-skip-segment').hidden }));
-        check('player: Skip intro from the media segments, jumps past it', skip.shown && skip.text === 'Skip intro' && skipped.t >= 6.9 && skipped.hidden, { skip, skipped });
+        check('player: Skip intro from the media segments, jumps past it', skip.shown && skip.text === 'Skip intro' && skipped.t >= 13.9 && skipped.hidden, { skip, skipped });
 
         // Own M3 controls: no native ones, Space pauses, the wave follows, ← jumps back 10 s, C switches subtitles off
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 12; return v.play(); }).catch(() => {});
@@ -645,6 +661,15 @@ function staticServer() {
         check('player: a started episode asks Continue at 0:10 or Start over; Start over plays from the beginning',
             resume.shown && resume.label === 'Continue at 0:10' && resume.paused && resume.focused === 'continue'
             && restarted.gone && restarted.t < 3 && restarted.playing, { resume, restarted });
+
+        // N (or the button next to the time) goes straight to the next episode
+        await p.evaluate(h => { location.hash = h; }, playHash);
+        await p.waitForTimeout(2500);
+        await p.mouse.move(640, 420);
+        await p.keyboard.press('n');
+        await p.waitForTimeout(1500);
+        const viaN = await p.evaluate(() => location.hash);
+        check('player: N plays the next episode', /\/3$/.test(viaN), viaN);
 
         // Up next: from the last seconds a card counts down; Cancel keeps the episode, going back and
         // forward brings it again, Play now opens the next one. Halfway, the next subtitles are unpacked ahead
@@ -861,7 +886,7 @@ function staticServer() {
             online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
         check('admin: the owner sees tiles, four charts, who is online and who waits',
             adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
-        await sq.evaluate(() => import('/js/auth.js?v=129').then(m => m.logout()));
+        await sq.evaluate(() => import('/js/auth.js?v=130').then(m => m.logout()));
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();
@@ -925,7 +950,7 @@ function staticServer() {
     const back = await visitor({ aniroll_theme: 'dark' });
     const both = await back.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent));
     check('returning visitor who confirmed nothing: every change, oldest (the move) first',
-        (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === 8 && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home') && both[5].startsWith('Starting soon') && both[6].startsWith('Material 3 for everyone') && both[7].startsWith('Browse by tag'), both);
+        (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === 9 && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home') && both[5].startsWith('Starting soon') && both[6].startsWith('Material 3 for everyone') && both[7].startsWith('Browse by tag') && both[8].startsWith('Next episode'), both);
     const demoTabs = await back.$$eval('.whatsnew-bar [data-k]', els => els.map(e => e.dataset.k).join(','));
     check('notice: animation ends on the new tab order', demoTabs === 'home,list,roll,discover,social', demoTabs);
     await back.click('.whatsnew [data-close]');
@@ -943,7 +968,7 @@ function staticServer() {
     // Confirmed the move with "Got it" already: only what came after it
     const confirmed = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-22' });
     const only = await confirmed.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, demo: !!document.querySelector('.whatsnew-demo'), sections: document.querySelectorAll('.whatsnew .whatsnew-entry').length }));
-    check('returning visitor who confirmed the move: only what came after, no tab animation', only.title === 'A few things changed' && !only.demo && only.sections === 7, only);
+    check('returning visitor who confirmed the move: only what came after, no tab animation', only.title === 'A few things changed' && !only.demo && only.sections === 8, only);
     await confirmed.close();
 
     const fresh = await visitor({});
@@ -1006,7 +1031,7 @@ function staticServer() {
     await late.click('.landing-foot .whatsnew-link');
     await late.clock.runFor(500);
     const log = await late.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, entries: document.querySelectorAll('.whatsnew-entry').length }));
-    check('changelog: still there, marked unread, opens with all entries', unread && log.title === "What's new" && log.entries === 8, { unread, ...log });
+    check('changelog: still there, marked unread, opens with all entries', unread && log.title === "What's new" && log.entries === 9, { unread, ...log });
 
     // An entry with a clip: it sits behind "See it in action"; opening it widens the dialog
     const clipped = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-26' });
