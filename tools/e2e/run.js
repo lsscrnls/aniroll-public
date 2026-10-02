@@ -910,7 +910,7 @@ function staticServer() {
             online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
         check('admin: the owner sees tiles, four charts, who is online and who waits',
             adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
-        await sq.evaluate(() => import('/js/auth.js?v=131').then(m => m.logout()));
+        await sq.evaluate(() => import('/js/auth.js?v=132').then(m => m.logout()));
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();

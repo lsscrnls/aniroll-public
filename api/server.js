@@ -143,6 +143,12 @@ function readMaintenance() {
     } catch { return null; }
 }
 
+// Per-account values synced across devices (see "/api/me/state")
+const USER_STATE_FILE = path.join(DATA_DIR, 'user-state.json');
+const USER_STATE_NAME = /^[a-z]{1,16}$/;
+const USER_STATE_MAX_KEYS = 16;
+const USER_STATE_MAX_BYTES = 4096;
+
 function loadJellyfin() {
     return readJson(JF_FILE);
 }
@@ -1345,6 +1351,33 @@ async function handle(req, res) {
             return json(res, 405, { error: 'Method not allowed' });
         }
         return json(res, 200, { enabled: !!all[key], savedAt: all[key] ? all[key].savedAt : null });
+    }
+
+    // A few small values that belong to the AniList account rather than one browser, so every device
+    // agrees (which changes were confirmed, ...). The browser merges; this only keeps the last word.
+    if (pathname === '/api/me/state') {
+        const auth = await verifyViewer(req);
+        if (auth.status !== 'ok') return refuseAuth(res, auth);
+        const all = readJson(USER_STATE_FILE);
+        const key = String(auth.viewer.id);
+
+        if (req.method === 'GET') return json(res, 200, { state: all[key] || {} });
+
+        if (req.method === 'PUT') {
+            const body = await readBody(req);
+            const name = typeof body.key === 'string' ? body.key : '';
+            if (!USER_STATE_NAME.test(name) || body.value === undefined) return json(res, 400, { error: 'Invalid key or value' });
+            const size = JSON.stringify(body.value).length;
+            if (size > USER_STATE_MAX_BYTES) return json(res, 413, { error: 'Value too large' });
+            const mine = { ...(all[key] || {}) };
+            if (!(name in mine) && Object.keys(mine).length >= USER_STATE_MAX_KEYS) return json(res, 400, { error: 'Too many keys' });
+            mine[name] = body.value;
+            all[key] = mine;
+            writeJson(USER_STATE_FILE, all, { pretty: false, mode: 0o600 });
+            return json(res, 200, { ok: true });
+        }
+
+        return json(res, 405, { error: 'Method not allowed' });
     }
 
     // Jellyfin connection of the logged-in AniList account
