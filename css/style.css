@@ -5324,9 +5324,11 @@ body.player-open .cursor { display: none !important; }
 .pl-skip-segment:active { transform: scale(.95); }
 .pl-skip-segment[hidden] { display: none; }
 @keyframes plSkipIn { from { opacity: 0; transform: translateY(16px) scale(.9); } }
-.player.is-idle .pl-bottom:has(.pl-skip-segment:not([hidden])) { opacity: 1; transform: none; }
-.player.is-idle .pl-bottom:has(.pl-skip-segment:not([hidden])) > :not(.pl-skip-segment) { opacity: 0; }
+.player.is-idle:not(.skip-faded) .pl-bottom:has(.pl-skip-segment:not([hidden])) { opacity: 1; transform: none; }
+.player.is-idle:not(.skip-faded) .pl-bottom:has(.pl-skip-segment:not([hidden])) > :not(.pl-skip-segment) { opacity: 0; }
 .player.is-idle .pl-skip-segment { pointer-events: auto; cursor: pointer !important; }
+/* After its first seconds it goes with the controls (see SKIP_SHOW_S in js/player/controls.js) */
+.player.is-idle.skip-faded .pl-skip-segment { opacity: 0; pointer-events: none; transition: opacity .4s; }
 
 /* Volume: the slider opens next to its button */
 .pl-volume { display: flex; align-items: center; }
