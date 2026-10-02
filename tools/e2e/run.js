@@ -19,6 +19,29 @@ function check(name, ok, detail) {
     console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || detail === undefined ? '' : '\n      ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)).slice(0, 600)}`);
 }
 
+// Waiting for "done" instead of a fixed time: no request of the page in flight and nothing on it changed
+// for a moment (clocks and the player's own bar left out), a video that has its metadata. `max` is the
+// longest it may take, the old fixed wait. Not for pages on a fake clock, nor for waits that let the app's
+// own timers run (debounces, notices that come after a delay, video time).
+const QUIET_MS = 450;
+const TRACK = `(() => {
+    let inFlight = 0, last = Date.now();
+    const fetch0 = window.fetch;
+    window.fetch = function (...args) { inFlight++; last = Date.now(); return fetch0.apply(this, args).finally(() => { inFlight--; last = Date.now(); }); };
+    const busy = (t) => t && t.nodeType === 1 && t.closest('.pl-bottom, .ar-clock, [data-m3-until]');
+    new MutationObserver(list => { if (list.some(m => !busy(m.target.nodeType === 1 ? m.target : m.target.parentElement))) last = Date.now(); })
+        .observe(document, { subtree: true, childList: true, characterData: true });
+    window.__e2eIdle = (quiet) => {
+        const v = document.getElementById('player-video');
+        if (v && v.currentSrc && v.readyState < 1 && !document.querySelector('#player-status.error')) return false;
+        return inFlight === 0 && Date.now() - last >= quiet;
+    };
+})();`;
+async function idle(page, max = 3000) {
+    await page.waitForTimeout(120);
+    await page.waitForFunction(q => window.__e2eIdle ? window.__e2eIdle(q) : true, QUIET_MS, { timeout: max, polling: 60 }).catch(() => { /* the old fixed wait */ });
+}
+
 function staticServer() {
     const server = http.createServer((req, res) => {
         const url = decodeURIComponent(req.url.split('?')[0]);
@@ -37,10 +60,16 @@ function staticServer() {
     const server = await staticServer();
     const base = `http://127.0.0.1:${server.address().port}`;
     const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
+    // Every page gets the tracker idle() reads
+    const newPage = browser.newPage.bind(browser);
+    browser.newPage = async (options) => { const p = await newPage(options); await p.addInitScript(TRACK); return p; };
     // Wide enough for the wider Discover pages to show
+    const errors = [];
+    const groups = {};
+
+    groups.main = async () => {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
-    const errors = [];
     const mutations = [];
     page.on('pageerror', e => errors.push(`${page.url().split('#')[1] || '/'}: ${e.message}`));
     page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(`${page.url().split('#')[1] || '/'}: console: ${m.text()}`); });
@@ -68,7 +97,7 @@ function staticServer() {
     }, VIEWER);
 
     const settle = async (ms = 900) => {
-        await page.waitForTimeout(ms);
+        await idle(page, Math.max(ms, 600) * 2);
         // The test browser barely draws frames: finish animations instead of waiting for them
         await page.evaluate(() => {
             window.gsap?.globalTimeline.getChildren(true, true, false).forEach(t => t.progress(1));
@@ -227,7 +256,9 @@ function staticServer() {
         await page.unroute('https://graphql.anilist.co/**', offline);
         const before = mutations.length;
         await page.evaluate(() => window.dispatchEvent(new Event('online')));
-        await settle(3500);
+        // The app sends after a short pause of its own
+        await page.waitForFunction(() => !JSON.parse(localStorage.getItem('aniroll_pending_saves') || '[]').length, null, { timeout: 8000 }).catch(() => {});
+        await page.waitForTimeout(300);
         const sent = mutations.slice(before).includes('SaveMediaListEntry');
         const left = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_pending_saves') || '[]').length);
         check('offline: a + is kept and sent once back online', kept >= 1 && sent && left === 0, { kept, sent, left });
@@ -330,9 +361,14 @@ function staticServer() {
         localStorage.setItem('aniroll_user', me);
         return { separate: a !== b, reused: a === a2, countA, countB };
     });
+    check('without the "reduce motion" setting smooth scrolling stays on', await page.evaluate(() => document.documentElement.classList.contains('lenis')));
     check("accounts: another account never gets this one's cached answers or queued saves",
         isolation.separate && isolation.reused && isolation.countA === 2 && isolation.countB === 1, isolation);
 
+    await page.close();
+    };
+
+    groups.party = async () => {
     // Watch Party as a guest: the invite link shows the host's party, joining starts the sync; then the
     // host's own view. Runs against the obfuscated build too (scripts/deploy.sh), where joining once broke
     const wp = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -353,7 +389,7 @@ function staticServer() {
     }, VIEWER);
     const wpText = () => wp.evaluate(() => document.getElementById('content').innerText.replace(/\s+/g, ' '));
     await wp.goto(base + '/#/watchparty?host=Hosty&anime=21');
-    await wp.waitForTimeout(3000);
+    await idle(wp, 3000);
     const invited = await wpText();
     // Clicked only when there: a broken page must fail this check, not stop the whole run
     const joinBtn = wp.locator('button:has-text("Join Watch Party")');
@@ -371,11 +407,14 @@ function staticServer() {
         localStorage.setItem('aniroll_watchparty', JSON.stringify({ hostName: n, mediaId: 21, hostKey: 'k', mediaTitle: 'One Piece', startEp: 2 }));
         location.hash = `/watchparty?host=${n}&anime=21`;
     }, VIEWER.name);
-    await wp.waitForTimeout(3000);
+    await idle(wp, 3000);
     const hosting = await wpText();
     check("watch party: the host's view with its episode counter", /You are the host/.test(hosting) && /EPISODE COUNTER/i.test(hosting), hosting.slice(0, 160));
     await wp.close();
 
+    };
+
+    groups.discover = async () => {
     // What came from comparing notes with a friend's app: shows from Planning that start soon (Home), format
     // chips (My List), studios as cards with a page of their own and related shows as covers (detail)
     const nx = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -399,9 +438,9 @@ function staticServer() {
         localStorage.setItem('aniroll_user_ts', String(Date.now()));
         localStorage.setItem('aniroll_seen_changes', '9999');
     }, VIEWER);
-    const nxGo = async (hash) => { await nx.evaluate(h => { localStorage.removeItem('aniroll_req_times'); location.hash = h; }, hash); await nx.waitForTimeout(2500); };
+    const nxGo = async (hash) => { await nx.evaluate(h => { localStorage.removeItem('aniroll_req_times'); location.hash = h; }, hash); await idle(nx, 2500); };
     await nx.goto(base + '/#/');
-    await nx.waitForTimeout(3000);
+    await idle(nx, 3000);
     const soon = await nx.evaluate(() => ({ shown: !document.getElementById('starting-soon')?.hidden,
         text: document.querySelector('#starting-soon-row .starting-soon-when')?.textContent.replace(/\s+/g, ' ').trim() }));
     check('home: a planned show that premieres soon, with its date', soon.shown && /^Episode 1 in 8d/.test(soon.text || ''), soon);
@@ -428,7 +467,7 @@ function staticServer() {
         localStorage.setItem('aniroll_seen_changes', '9999');
     }, VIEWER);
     await quiet.goto(base + '/#/');
-    await quiet.waitForTimeout(3500);
+    await idle(quiet, 3500);
     const premiereClock = await quiet.evaluate(() => {
         const w = document.querySelector('.m3-widget-clock');
         return { label: w?.querySelector('.m3-widget-label')?.textContent, num: w?.querySelector('.m3-widget-clock-num')?.textContent.replace(/\s+/g, ''),
@@ -455,19 +494,22 @@ function staticServer() {
     check('detail: studios as cards that open their page, related shows as covers',
         detail.studios.length > 0 && detail.studios.every(h => /^#\/studio\/\d+$/.test(h)) && detail.related > 0, detail);
     await nx.click('.detail-studio');
-    await nx.waitForTimeout(2500);
+    await idle(nx, 2500);
     const studio = await nx.evaluate(() => ({ hash: location.hash, title: document.getElementById('studio-title')?.textContent.trim(),
         cards: document.querySelectorAll('#studio-grid .media-card').length, discover: document.querySelector('.nav-links [data-page="discover"]')?.classList.contains('active') }));
     // From the side panel: the studio page opens and the panel goes
     await nx.evaluate(() => window.__openDetailPanel(101));
-    await nx.waitForTimeout(2500);
+    await idle(nx, 2500);
     await nx.click('#detail-panel-overlay .detail-studio');
-    await nx.waitForTimeout(2000);
+    await idle(nx, 2000);
     const fromPanel = await nx.evaluate(() => ({ hash: location.hash, panelOpen: document.getElementById('detail-panel-overlay').classList.contains('open') }));
     check('detail panel: a studio card opens the studio page and closes the panel', /^#\/studio\//.test(fromPanel.hash) && !fromPanel.panelOpen, fromPanel);
     check('studio page: its name and its anime, under Discover', /^#\/studio\/\d+$/.test(studio.hash) && !!studio.title && studio.cards > 0 && studio.discover, studio);
     await nx.close();
 
+    };
+
+    groups.player = async () => {
     // Jellyfin player. A page logged in to AniList and to Jellyfin (a friend's sign-in, not an API key)
     async function playerPage(jellyfinUp, signedIn = true) {
         const p = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -531,7 +573,7 @@ function staticServer() {
         check('player, Jellyfin off: detail page as always, no Play button, no errors',
             !off.play && off.slotHidden === true && !!off.title && shownAfter < 4000 && !pageErrors.length, { ...off, shownAfter, pageErrors });
         await p.evaluate(() => { location.hash = '#/play/101/2'; });
-        await p.waitForTimeout(2500);
+        await idle(p, 2500);
         const msg = await p.evaluate(() => document.getElementById('player-status')?.textContent.trim());
         check('player, Jellyfin off: #/play says the server cannot be reached', /cannot be reached/.test(msg || ''), msg);
         await p.close();
@@ -678,17 +720,17 @@ function staticServer() {
 
         // N (or the button next to the time) goes straight to the next episode
         await p.evaluate(h => { location.hash = h; }, playHash);
-        await p.waitForTimeout(2500);
+        await idle(p, 2500);
         await p.mouse.move(640, 420);
         await p.keyboard.press('n');
-        await p.waitForTimeout(1500);
+        await idle(p, 1500);
         const viaN = await p.evaluate(() => location.hash);
         check('player: N plays the next episode', /\/3$/.test(viaN), viaN);
 
         // Up next: from the last seconds a card counts down; Cancel keeps the episode, going back and
         // forward brings it again, Play now opens the next one. Halfway, the next subtitles are unpacked ahead
         await p.evaluate(h => { location.hash = h; }, playHash);
-        await p.waitForTimeout(2500);
+        await idle(p, 2500);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.6; v.play(); });
         await p.waitForTimeout(800);
         const upNext = await p.evaluate(() => ({ shown: !document.querySelector('.pl-next').hidden,
@@ -704,7 +746,7 @@ function staticServer() {
         await p.waitForTimeout(800);
         const again = await p.evaluate(() => !document.querySelector('.pl-next').hidden);
         await p.click('[data-act="playNext"]');
-        await p.waitForTimeout(2500);
+        await idle(p, 2500);
         const moved = await p.evaluate(() => location.hash);
         const askedOnUpNext = await p.evaluate(() => !!document.querySelector('.pl-resume'));
         check('player: Up next counts down from the end, Watch credits hides it until the very end, Play now opens the next episode, its subtitles warmed',
@@ -715,7 +757,7 @@ function staticServer() {
 
         // Styled ASS: drawn by JASSUB on its canvas with the MKV's fonts, listed in the menu
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));
-        await p.waitForTimeout(4000);
+        await idle(p, 4000);
         const ass = await p.evaluate(() => {
             const c = document.querySelector('.pl-subs-canvas');
             return { canvas: !!c, shown: c && !c.hidden, w: c?.width || 0, textTracks: [...document.getElementById('player-video').textTracks].map(t => t.mode).join() };
@@ -731,7 +773,9 @@ function staticServer() {
 
         // Blu-ray subtitles (PGS): libpgs draws the picture on its own canvas, at the place the disc puts it
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/4'));
-        await p.waitForTimeout(3500);
+        // libpgs draws in a worker (its requests are not the page's): wait for the picture itself
+        await p.waitForFunction(() => [...document.querySelectorAll('.pl-subs-canvas')].some(c => !c.hidden && c.width > 300), null, { timeout: 8000 }).catch(() => {});
+        await p.waitForTimeout(400);
         const pgs = await p.evaluate(() => {
             const v = document.getElementById('player-video');
             const c = [...document.querySelectorAll('.pl-subs-canvas')].find(x => !x.hidden);
@@ -765,7 +809,7 @@ function staticServer() {
         await p.click('[data-track="2"]').catch(() => {});
         await p.waitForTimeout(500);
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));
-        await p.waitForTimeout(3000);
+        await idle(p, 3000);
         const keptSubs = await p.evaluate(() => ({
             text: [...document.getElementById('player-video').textTracks].map(t => `${t.label}:${t.mode}`).join(),
             pictures: [...document.querySelectorAll('.pl-subs-canvas')].some(c => !c.hidden),
@@ -777,7 +821,7 @@ function staticServer() {
         // Audio tracks: a second section in the menu; picking the dub asks Jellyfin again with that track and
         // goes on from the same spot; the next episode of the show starts with the dub
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/6'));
-        await p.waitForTimeout(3000);
+        await idle(p, 3000);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 6; });
         await p.waitForTimeout(500);
         await p.mouse.move(640, 500);
@@ -788,7 +832,7 @@ function staticServer() {
             audio: [...document.querySelectorAll('[data-audio]')].map(e => `${e.textContent.trim()}:${e.getAttribute('aria-checked')}`),
         }));
         await p.click('[data-audio="5"]').catch(() => {});
-        await p.waitForTimeout(2500);
+        await idle(p, 2500);
         const dubbed = await p.evaluate(() => ({ time: document.getElementById('player-video').currentTime,
             pref: JSON.parse(localStorage.getItem('aniroll_audio_pref') || '{}') }));
         const asked = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep6').map(c => c.audio);
@@ -798,7 +842,7 @@ function staticServer() {
         const checkedAfter = await p.evaluate(() => document.querySelector('[data-audio][aria-checked="true"]')?.dataset.audio);
         await p.keyboard.press('Escape');
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/7'));
-        await p.waitForTimeout(3000);
+        await idle(p, 3000);
         const nextAsked = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep7').map(c => c.audio);
         const reportedAudio = calls.filter(c => c.type === 'Playing' && c.body?.ItemId === 'ep7').map(c => c.body.AudioStreamIndex);
         check('player: audio tracks in the menu, switching asks Jellyfin for that track from the same spot, the show remembers the dub',
@@ -815,7 +859,7 @@ function staticServer() {
         const qMenu = await p.$$eval('[data-quality]', els => els.map(e => `${e.textContent.trim()}:${e.getAttribute('aria-checked')}`));
         const before7 = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep7').length;
         await p.click('[data-quality="4000000"]').catch(() => {});
-        await p.waitForTimeout(2500);
+        await idle(p, 2500);
         const asked7 = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep7').slice(before7).map(c => c.bitrate);
         const kept = await p.evaluate(() => localStorage.getItem('aniroll_player_quality'));
         await p.keyboard.press('i');
@@ -837,13 +881,13 @@ function staticServer() {
         await p.evaluate(() => localStorage.setItem('aniroll_jf_kind', 'key'));
         const before = calls.length;
         await p.evaluate(h => { location.hash = h; }, playHash);
-        await p.waitForTimeout(3000);
+        await idle(p, 3000);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 9; });
         await p.waitForTimeout(400);
         await p.evaluate(() => { location.hash = '#/anime/101/full'; });
         await p.waitForTimeout(800);
         await p.evaluate(h => { location.hash = h; }, playHash);
-        await p.waitForTimeout(3000);
+        await idle(p, 3000);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.3; return v.play(); }).catch(() => {});
         await p.waitForTimeout(1200);
         await p.evaluate(() => { location.hash = '#/anime/101/full'; });
@@ -858,7 +902,7 @@ function staticServer() {
 
         // The last episode Jellyfin has: a card instead of a black frame, with what is next and a way back
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/12'));
-        await p.waitForTimeout(3000);
+        await idle(p, 3000);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 19; return v.play(); }).catch(() => {});
         await p.waitForTimeout(2500);
         const endCard = await p.evaluate(() => { const b = document.querySelector('.pl-end');
@@ -868,7 +912,7 @@ function staticServer() {
 
         // The server cannot convert (graphics card full): a clear message, no endless spinner, the conversion ended
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/5'));
-        await p.waitForTimeout(3500);
+        await idle(p, 3500);
         const failed = await p.evaluate(() => ({ text: document.getElementById('player-status')?.textContent.trim(), error: document.getElementById('player-status')?.classList.contains('error') }));
         const segTries = calls.filter(c => c.type === 'segment').length;
         check('player: a failed conversion says so at once (no endless retrying), with Try again',
@@ -877,6 +921,9 @@ function staticServer() {
         await p.close();
     }
 
+    };
+
+    groups.seats = async () => {
     // A full house: logged in, the app waits on the waiting page with the place in line, nothing of the app
     // underneath, and lets the person in by itself once the server has a seat; logout gives the seat back
     {
@@ -954,20 +1001,23 @@ function staticServer() {
             localStorage.setItem('aniroll_seen_changes', '9999');
         });
         await na.goto(base + '/#/admin');
-        await na.waitForTimeout(2500);
+        await idle(na, 2500);
         const other = await na.evaluate(() => ({ link: document.getElementById('admin-link')?.hidden, text: document.querySelector('.adm-page')?.textContent || '',
             tiles: document.querySelectorAll('.adm-tile').length }));
         check('admin: no link and no numbers for anyone but the owner', other.link === true && /only for AniRoll/.test(other.text) && !other.tiles, other);
         await na.close();
     }
 
+    };
+
+    groups.misc = async () => {
     // "Reduce motion": no smooth scrolling (Lenis marks <html>), no cards flying in, no count-up
     const calm = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
     await calm.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
     await calm.route(`${base}/api/**`, route => route.fulfill({ contentType: 'application/json', body: '{"maintenance":false}' }));
     await calm.route(/cdn|googleapis|gstatic/, route => route.abort());
     await calm.goto(base + '/#/');
-    await calm.waitForTimeout(1500);
+    await idle(calm, 1500);
     const motion = await calm.evaluate(() => ({
         lenis: document.documentElement.classList.contains('lenis'),
         hiddenCards: [...document.querySelectorAll('.media-card, .landing-feature')].filter(el => getComputedStyle(el).opacity !== '1').length,
@@ -975,8 +1025,6 @@ function staticServer() {
     }));
     check('reduced motion: no smooth scrolling, no fly-in, no transitions',
         !motion.lenis && motion.hiddenCards === 0 && motion.transition.split(',').every(t => parseFloat(t) < 0.001), motion);
-    const normal = await page.evaluate(() => document.documentElement.classList.contains('lenis'));
-    check('without the setting smooth scrolling stays on', normal);
     await calm.close();
 
     // "What's new": returning visitors get everything they have not confirmed, on every visit until "Got it";
@@ -1093,9 +1141,26 @@ function staticServer() {
     await clipped.close();
     await late.close();
 
+    };
+
     // Checks kept out of the published source, when present
     const extra = path.join(__dirname, 'private.js');
-    if (fs.existsSync(extra)) await require(extra)({ browser, base, check, respond, VIEWER, errors });
+    if (fs.existsSync(extra)) groups.private = () => require(extra)({ browser, base, check, respond, VIEWER, errors, idle });
+
+    // The groups share nothing but the browser: several run at once, each in its own tabs (E2E_WORKERS,
+    // default 3). E2E_ONLY=player,private runs just those (handy while working on one part; the deploy
+    // always runs everything). The longest go first.
+    const only = (process.env.E2E_ONLY || '').split(',').map(x => x.trim()).filter(Boolean);
+    const unknown = only.filter(n => !groups[n]);
+    if (unknown.length) throw new Error(`E2E_ONLY: no group ${unknown.join(', ')} (there are ${Object.keys(groups).join(', ')})`);
+    const order = ['player', 'main', 'misc', 'private', 'discover', 'seats', 'party'].filter(n => groups[n] && (!only.length || only.includes(n)));
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.max(1, Number(process.env.E2E_WORKERS) || 3) }, async () => {
+        while (next < order.length) {
+            const name = order[next++];
+            try { await groups[name](); } catch (e) { check(`${name}: the group runs to its end`, false, e.stack || e.message); }
+        }
+    }));
 
     check('no errors on any page', !errors.length, errors.join('\n      '));
     await browser.close();
