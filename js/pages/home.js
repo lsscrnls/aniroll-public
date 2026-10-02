@@ -1,11 +1,11 @@
-import * as api from '../api.js?v=130';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=130';
-import { openDialog } from '../a11y.js?v=130';
-import { isLoggedIn, getToken } from '../auth.js?v=130';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=130';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=130';
-import { renderHeadline, renderStage, renderTour, renderColour, renderCollage, fillCollage, initLanding } from '../landing.js?v=130';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=130';
+import * as api from '../api.js?v=131';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=131';
+import { openDialog } from '../a11y.js?v=131';
+import { isLoggedIn, getToken } from '../auth.js?v=131';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=131';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=131';
+import { renderHeadline, renderStage, renderTour, renderColour, renderCollage, fillCollage, initLanding } from '../landing.js?v=131';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=131';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
@@ -83,7 +83,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=130'), import('../jellyfin.js?v=130')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=131'), import('../jellyfin.js?v=131')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
