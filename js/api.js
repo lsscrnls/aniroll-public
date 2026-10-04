@@ -1,6 +1,6 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=138';
-import { dismissedIds } from './dismissed.js?v=138';
-import { statusLabel } from './store.js?v=138';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=139';
+import { dismissedIds } from './dismissed.js?v=139';
+import { statusLabel } from './store.js?v=139';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -692,7 +692,7 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update.
     // Only when this save set the progress: a new score or status leaves Jellyfin alone.
     if (mirror && saved?.mediaId && saved.progress && variables.progress !== undefined) {
-        import('./jellyfin.js?v=138').then(m =>
+        import('./jellyfin.js?v=139').then(m =>
             m.syncProgress(saved.progress, () => mediaForSync(saved.mediaId, token)));
     }
 
