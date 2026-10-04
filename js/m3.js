@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=136';
-import { upNext, glance, DAYS, greeting } from './upnext.js?v=136';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=136';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=137';
+import { upNext, glance, DAYS, greeting, playFromHero } from './upnext.js?v=137';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=137';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -442,7 +442,8 @@ function heroHtml(entry, name, others = []) {
             <h2 class="m3-hero-title">${esc(titlePref(m.title))}</h2>
             ${status ? `<p class="m3-hero-meta"><span class="m3-hero-chip">${esc(status)}</span></p>` : ''}
             <div class="m3-hero-actions">
-                ${canWatch ? `<button class="glass-btn glass-btn-primary m3-btn-lg" data-hero-inc="${entry.id}">Watched episode ${next}</button>` : ''}
+                ${canWatch ? `<span class="hero-play-slot" data-hero-play hidden></span>
+                <button class="glass-btn glass-btn-primary m3-btn-lg" data-hero-inc="${entry.id}">Watched episode ${next}</button>` : ''}
                 <button class="glass-btn glass-btn-secondary m3-btn-lg" data-open="${m.id}">Details</button>
             </div>
         </div>
@@ -489,6 +490,7 @@ function onContinue(e) {
 
     const before = hero.querySelector('.m3-hero-ep-num')?.textContent;
     hero.innerHTML = heroHtml(entries?.[0], name, entries?.slice(1, 3) || []);
+    playFromHero(hero, entries?.[0], 'm3-btn-lg');
     setScope(hero, entries?.[0]?.media?.coverImage?.color || null);
     const glow = hero.querySelector('.m3-hero-glow[data-cover]');
     if (glow) glow.appendChild(tinyCover(glow.dataset.cover, (c) => c.classList.add('on')));

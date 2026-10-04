@@ -1,10 +1,10 @@
 // Home in AniRoll's own design: the show you're on, then a stats box. Same idea as Material 3's hero and widgets
 // (js/m3.js), built from AniRoll's own pieces so it reads like the rest of the app: the detail page's banner,
 // cover and stats box, Roll's red kicker, the usual pill buttons. Material 3 hides this section.
-import * as api from './api.js?v=136';
-import { esc, titlePref } from './store.js?v=136';
-import { prefersReducedMotion } from './animations.js?v=136';
-import { upNext, glance, greeting } from './upnext.js?v=136';
+import * as api from './api.js?v=137';
+import { esc, titlePref } from './store.js?v=137';
+import { prefersReducedMotion } from './animations.js?v=137';
+import { upNext, glance, greeting, playFromHero } from './upnext.js?v=137';
 
 const imgOf = (m) => m?.coverImage?.extraLarge || m?.coverImage?.large || '';
 
@@ -17,6 +17,7 @@ export function renderCinema(section, entries, name, planning = []) {
     const before = section.querySelector('.ar-home-head') ? 'shown' : null;
     section.hidden = false;
     section.innerHTML = `${first ? heroHtml(first, name) : emptyHtml(name)}${entries.length ? stripHtml(entries, planning) : ''}`;
+    if (first) playFromHero(section, first);
     if (!prefersReducedMotion()) animateIn(section, before);
     startClock(section);
     return stop;
@@ -49,7 +50,8 @@ function heroHtml(entry, name) {
                 <div class="detail-meta">${tags.map(t => `<span class="detail-tag">${esc(t)}</span>`).join('')}</div>
                 ${total ? `<div class="ar-home-progress" aria-label="${progress} of ${total} episodes watched"><span style="width:${pct}%"></span></div>` : ''}
                 <div class="detail-actions">
-                    ${canWatch ? `<button class="glass-btn glass-btn-primary" data-ar-inc="${entry.id}">Watched episode ${next}</button>` : ''}
+                    ${canWatch ? `<span class="hero-play-slot" data-hero-play hidden></span>
+                    <button class="glass-btn glass-btn-primary" data-ar-inc="${entry.id}">Watched episode ${next}</button>` : ''}
                     <button class="glass-btn glass-btn-secondary" data-open="${m.id}">Details</button>
                 </div>
             </div>
