@@ -158,7 +158,8 @@ function sharePage(entry, id) {
 }
 
 // A watch party invite's preview: "<host> is hosting a Watch Party · <show> · Episode N", the cover
-function partyPage(host, info) {
+// `stamp`: the link's ?s=<show>-<episode>, echoed in og:url so a scraper keys the preview by it too
+function partyPage(host, info, stamp = '') {
     const target = `/#/watchparty?host=${encodeURIComponent(host)}`;
     const title = info ? `${info.hostName} is hosting a Watch Party` : `${host}'s Watch Party`;
     const description = info
@@ -175,7 +176,7 @@ function partyPage(host, info) {
 <meta property="og:type" content="website">
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
-<meta property="og:url" content="${SITE}/w/${encodeURIComponent(host)}">
+<meta property="og:url" content="${SITE}/w/${encodeURIComponent(host)}${stamp ? `?s=${stamp}` : ''}">
 <meta property="og:image" content="${escapeHtml(image)}">
 <meta name="twitter:card" content="${card}">
 <meta name="twitter:title" content="${escapeHtml(title)}">
@@ -191,8 +192,8 @@ function partyPage(host, info) {
 </html>`;
 }
 
-function html(res, code, body) {
-    res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+function html(res, code, body, cache = 'public, max-age=300') {
+    res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': cache });
     res.end(body);
 }
 
@@ -1355,7 +1356,9 @@ async function handle(req, res) {
     if (invite && req.method === 'GET') {
         let host = '';
         try { host = decodeURIComponent(invite[1]).slice(0, 40); } catch { return html(res, 400, sharePage(null, null)); }
-        return html(res, 200, partyPage(host, party.preview(host)));
+        // What a party shows changes every few minutes: never kept by a cache on the way
+        const stamp = new URL(req.url, 'http://x').searchParams.get('s') || '';
+        return html(res, 200, partyPage(host, party.preview(host), /^\d{1,9}(-\d{1,5})?$/.test(stamp) ? stamp : ''), 'no-store');
     }
 
     // The browser hands us the display fields when a title is shared. Nobody can check them
