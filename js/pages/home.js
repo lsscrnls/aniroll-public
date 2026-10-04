@@ -1,12 +1,12 @@
-import * as api from '../api.js?v=137';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=137';
-import { openDialog, showScorePrompt } from '../a11y.js?v=137';
-import { isLoggedIn, getToken } from '../auth.js?v=137';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=137';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=137';
-import { renderHeadline, renderStage, renderTour, renderColour, renderCollage, fillCollage, initLanding } from '../landing.js?v=137';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=137';
-import { setDismissed, syncDismissed } from '../dismissed.js?v=137';
+import * as api from '../api.js?v=138';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=138';
+import { openDialog, showScorePrompt } from '../a11y.js?v=138';
+import { isLoggedIn, getToken } from '../auth.js?v=138';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=138';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=138';
+import { renderHeadline, renderStage, renderTour, renderColour, renderCollage, fillCollage, initLanding } from '../landing.js?v=138';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=138';
+import { setDismissed, syncDismissed } from '../dismissed.js?v=138';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
@@ -85,7 +85,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=137'), import('../jellyfin.js?v=137')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=138'), import('../jellyfin.js?v=138')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
@@ -128,6 +128,7 @@ function showAnimePickerForParty() {
         sub: 'Pick an anime to watch with friends',
         onPick: async (pick) => {
             await startParty(pick.mediaId, pick.title, user.name, pick.progress, pick.cover);
+            toast('Watch Party started! Link copied.', 'success');
             window.location.hash = '#/watchparty';
         },
     });
@@ -1049,7 +1050,7 @@ function setupTryRoll(media) {
         const winner = pool[Math.floor(Math.random() * pool.length)];
         const strip = Array.from({ length: 21 }, () => pool[Math.floor(Math.random() * pool.length)]);
         strip.push(winner);
-        const { playReel } = await import('../reel.js?v=137');
+        const { playReel } = await import('../reel.js?v=138');
         playReel({
             windowEl: box.querySelector('#try-window'),
             reelEl: box.querySelector('#try-reel'),

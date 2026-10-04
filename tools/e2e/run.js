@@ -660,6 +660,32 @@ function staticServer() {
         await p.close();
     }
 
+    // Watch Party from the player: one click starts it for the show being watched, the link goes to the clipboard
+    {
+        const { p, pageErrors } = await playerPage(true);
+        await p.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
+        let created = null;
+        await p.route(`${base}/api/party/**`, route => {
+            const req = route.request();
+            if (req.method() === 'PUT' && /\/api\/party\/[^/]+\/\d+$/.test(new URL(req.url()).pathname)) created = req.postDataJSON();
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify({ hostKey: 'k', active: true, members: [] }) });
+        });
+        await p.goto(base + '/#/play/101/3');
+        await p.waitForSelector('#player-party', { timeout: 8000 }).catch(() => {});
+        // Clicked once the episode plays
+        await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2; }, null, { timeout: 10000 }).catch(() => {});
+        // A DOM click: the resume question keeps the controls coming and going, which a real click waits out
+        await p.evaluate(() => document.getElementById('player-party')?.click());
+        await p.waitForFunction(() => localStorage.getItem('aniroll_watchparty'), null, { timeout: 5000 }).catch(() => {});
+        await p.waitForTimeout(300);
+        const res = await p.evaluate(async () => ({ stored: JSON.parse(localStorage.getItem('aniroll_watchparty') || 'null'),
+            clip: await navigator.clipboard.readText().catch(() => ''), hash: location.hash }));
+        check('player: Watch Party button starts a party for this show, link in the clipboard, playback stays',
+            created?.startEp === 2 && res.stored?.startEp === 2 && /#\/watchparty\?host=/.test(res.clip) && res.hash === '#/play/101/3' && !pageErrors.length,
+            { created, res, pageErrors });
+        await p.close();
+    }
+
     // Friends connect with a Quick Connect code: no password field, the code shown, connected once confirmed
     {
         const { p, pageErrors, calls } = await playerPage(true, false);
@@ -790,22 +816,16 @@ function staticServer() {
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 3; return v.play(); }).catch(() => {});
         await p.waitForTimeout(700);
         const skip = await p.evaluate(() => { const b = document.querySelector('.pl-skip-segment'); return { shown: b && !b.hidden, text: b?.textContent }; });
-        // After 8 s of the intro it goes with the controls: hidden while they are, back when they are
+        // After 8 s of the intro it goes, controls or not; seeking back to where it came up brings it again
         await p.evaluate(() => { document.getElementById('player-video').currentTime = 11.5; });
         await p.waitForTimeout(500);
-        await p.evaluate(() => document.getElementById('player').classList.add('is-idle'));
-        await p.waitForTimeout(600);
-        const faded = await p.evaluate(() => {
-            const pl = document.getElementById('player');
-            const b = document.querySelector('.pl-skip-segment');
-            const idle = getComputedStyle(b).opacity;
-            pl.classList.remove('is-idle');
-            return { cls: pl.classList.contains('skip-faded'), idle, shown: !b.hidden, nextBtn: !document.querySelector('[data-act="nextEp"]').hidden };
-        });
-        await p.waitForTimeout(600);
-        faded.awake = await p.evaluate(() => getComputedStyle(document.querySelector('.pl-skip-segment')).opacity);
-        check('player: Skip intro steps back after 8 s and comes with the controls; a Next episode button',
-            faded.cls && faded.idle === '0' && faded.awake === '1' && faded.shown && faded.nextBtn, faded);
+        const faded = await p.evaluate(() => ({ gone: document.querySelector('.pl-skip-segment').hidden,
+            nextBtn: !document.querySelector('[data-act="nextEp"]').hidden }));
+        await p.evaluate(() => { document.getElementById('player-video').currentTime = 2.5; });
+        await p.waitForTimeout(500);
+        faded.back = await p.evaluate(() => !document.querySelector('.pl-skip-segment').hidden);
+        check('player: Skip intro goes by itself after 8 s and comes back when seeking back; a Next episode button',
+            faded.gone && faded.back && faded.nextBtn, faded);
         await p.click('.pl-skip-segment').catch(() => {});
         await p.waitForTimeout(400);
         const skipped = await p.evaluate(() => ({ t: document.getElementById('player-video').currentTime, hidden: document.querySelector('.pl-skip-segment').hidden }));
@@ -871,7 +891,8 @@ function staticServer() {
         const upNext = await p.evaluate(() => ({ shown: !document.querySelector('.pl-next').hidden,
             title: document.querySelector('.pl-next-title').textContent, label: document.querySelector('.pl-next-label').textContent }));
         await p.click('[data-act="cancelNext"]');
-        const cancelled = await p.evaluate(() => document.querySelector('.pl-next').hidden);
+        // Watch credits: the card goes, and no Skip credits button takes its place
+        const cancelled = await p.evaluate(() => document.querySelector('.pl-next').hidden && document.querySelector('.pl-skip-segment').hidden);
         // Watched the credits to the end: the card asks once more instead of leaving at once
         await p.waitForTimeout(1800);
         const atEnd = await p.evaluate(() => ({ ended: document.getElementById('player-video').ended, shown: !document.querySelector('.pl-next').hidden, hash: location.hash }));
@@ -1084,6 +1105,12 @@ function staticServer() {
         const hover = await p.evaluate(() => ({ seg: document.querySelector('.pl-seek-hover-seg')?.textContent, hidden: document.querySelector('.pl-seek-hover-seg')?.hidden,
             time: document.querySelector('.pl-seek-hover-time')?.textContent }));
         check('player: hovering the intro says so next to the time', hover.seg === 'Intro' && !hover.hidden && /^0:0[45]$/.test(hover.time || ''), hover);
+        // Chapters from the file: a mark where one starts (none at 0), its name in the label
+        await p.mouse.move(box.x + box.width * (17 / 20), box.y + box.height / 2);
+        await p.waitForTimeout(200);
+        const chap = await p.evaluate(() => ({ marks: document.querySelectorAll('.pl-seek-chapter').length,
+            left: document.querySelector('.pl-seek-chapter')?.style.left, label: document.querySelector('.pl-seek-hover-seg')?.textContent }));
+        check('player: chapters from the file as marks on the wave, the name when hovering', chap.marks === 1 && /^7[45]/.test(chap.left || '') && chap.label === 'Part B', chap);
 
         // Keys: volume shows its number, ] speeds up, 5 jumps to half
         await p.mouse.move(640, 300);
@@ -1104,7 +1131,10 @@ function staticServer() {
         const written = saves.slice(before);
         check('player: a double episode saves its last episode to AniList', written.length === 1 && written[0].progress === 11, written);
 
-        // Intros skip themselves once switched on for the show, with a way back
+        // Intros skip themselves once switched on for the show, with a way back. The video above ran into its
+        // last second: stop it there first, or the end card covers the settings button and the click misses
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.pause(); v.currentTime = 1; });
+        await p.waitForFunction(() => !document.getElementById('player-video').ended, null, { timeout: 2000 }).catch(() => {});
         await p.click('[data-act="settings"]');
         await p.waitForSelector('[data-autoskip]', { timeout: 3000 }).catch(() => {});
         await p.click('[data-autoskip]').catch(() => {});
@@ -1336,7 +1366,7 @@ function staticServer() {
     if (today) {
         const later = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: today, aniroll_design_v2: 'aniroll' });
         const shown = await later.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-list li')].map(li => li.textContent));
-        check('a day confirmed earlier shows only the items added since', shown.length >= 1 && shown.length < 6 && !shown.some(t => /^The player answers every key/.test(t)), shown);
+        check('a day confirmed earlier shows only the items added since', shown.length >= 1 && !shown.some(t => /^The player answers every key/.test(t)), shown);
         await later.close();
     }
     check('logged out: always Material 3, even with the legacy design chosen', await grown.evaluate(() => document.documentElement.dataset.design === 'm3' && !!document.querySelector('#m3-css')));

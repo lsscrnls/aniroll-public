@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=137';
-import { enhanceSelect } from '../select.js?v=137';
-import { tasteMatch } from '../taste.js?v=137';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=137';
-import { getToken, isLoggedIn } from '../auth.js?v=137';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=137';
-import { showConfirm } from '../a11y.js?v=137';
+import * as api from '../api.js?v=138';
+import { enhanceSelect } from '../select.js?v=138';
+import { tasteMatch } from '../taste.js?v=138';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=138';
+import { getToken, isLoggedIn } from '../auth.js?v=138';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=138';
+import { showConfirm } from '../a11y.js?v=138';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -52,7 +52,7 @@ async function loadPlayButton(media, root) {
     const slot = root.querySelector('#detail-play');
     if (!slot || media.type !== 'ANIME') return;
     try {
-        const { mountPlayButton } = await import('../player/playbutton.js?v=137');
+        const { mountPlayButton } = await import('../player/playbutton.js?v=138');
         await mountPlayButton(slot, media, nextEpisode(media));
     } catch (err) {
         console.warn('Jellyfin player unavailable:', err.message);
@@ -521,11 +521,9 @@ function setupListActions(media, token, root = document) {
                 startEp = 0;
             } catch (e) { return toast(e.message, 'error'); }
         }
-        let link;
         try {
-            link = await startParty(media.id, titlePref(media.title), user.name, startEp, media.coverImage?.large);
+            await startParty(media.id, titlePref(media.title), user.name, startEp, media.coverImage?.large);
         } catch (e) { return toast(e.message, 'error'); }
-        navigator.clipboard?.writeText(link).catch(() => {});
         toast('Watch Party started! Link copied.', 'success');
         window.location.hash = '#/watchparty';
     });

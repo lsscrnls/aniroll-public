@@ -5,7 +5,7 @@
 // Watch Party: the host counts episodes on their AniList, guests follow along and their lists move
 // with them. The server side is api/party.js, reached through /api/party/*.
 //
-// Used by: js/app.js, js/pages/detail.js, js/pages/home.js, js/pages/roll.js
+// Used by: js/app.js, js/pages/detail.js, js/pages/home.js, js/pages/play.js, js/pages/roll.js
 
 // The party this browser hosts, or null.
 export function getActiveParty() { return null; }
@@ -15,6 +15,10 @@ export function createPartyLink(mediaId, hostName, episode = null) { return null
 
 // Starts a party as its host. With `handOver`, the members of the previous party follow.
 export async function startParty(mediaId, mediaTitle, hostName, startEp, coverImage, { handOver = false } = {}) { return null; }
+
+export async function copyPartyLink(link) { return null; }
+
+export async function partyFromPlayer(media, episode) { return null; }
 
 // Moves the running party to another show; members and the invite link stay.
 export async function switchPartyTo(target, fromProgress) { return null; }
