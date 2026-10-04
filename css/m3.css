@@ -1635,6 +1635,24 @@
 :root[data-design="m3"] .m3-widget-clock :is(.m3-widget-label, .m3-widget-sub) { color: inherit; opacity: .8; }
 :root[data-design="m3"] .m3-widget-clock-num { display: flex; flex-direction: column; font-size: 2.6rem; line-height: .95; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin: 4px 0 8px; }
 :root[data-design="m3"] .m3-widget-clock-num small { font-size: .45em; font-weight: 700; margin-left: 3px; opacity: .7; }
+:root[data-design="m3"] .m3-widget-clock > :not(.m3-clock-cover, .m3-clock-ring) { position: relative; z-index: 1; }
+/* The show's cover, peeking in tilted from the right edge like the hero's deck */
+:root[data-design="m3"] .m3-clock-cover { position: absolute; right: -22px; bottom: -26px; width: 92px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 14px; transform: rotate(12deg); box-shadow: 0 8px 24px rgb(0 0 0 / .35); transition: transform .5s var(--m3-bouncy); pointer-events: none; }
+:root[data-design="m3"] .m3-widget-clock:hover .m3-clock-cover { transform: rotate(6deg) translate(-6px, -8px); }
+:root[data-design="m3"] .m3-widget-clock .m3-widget-sub { padding-right: 72px; }
+/* Fills up towards the start; breathes in the last hour */
+:root[data-design="m3"] .m3-clock-ring { position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; transform: rotate(-90deg); }
+:root[data-design="m3"] .m3-clock-ring circle { fill: none; stroke-width: 4; stroke-linecap: round; }
+:root[data-design="m3"] .m3-clock-ring-track { stroke: color-mix(in srgb, currentColor 18%, transparent); }
+:root[data-design="m3"] .m3-clock-ring-fill { stroke: currentColor; transition: stroke-dashoffset 1s var(--md-standard); }
+:root[data-design="m3"] .m3-widget-clock.is-soon .m3-clock-ring { animation: m3ClockBreathe 2s ease-in-out infinite; }
+@keyframes m3ClockBreathe { 50% { transform: rotate(-90deg) scale(1.12); } }
+:root[data-design="m3"] .m3-clock-when { font-size: .8125rem; font-weight: 600; opacity: .85; }
+:root[data-design="m3"] .m3-clock-chip { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: .6875rem; font-weight: 700; background: var(--md-on-primary-container); color: var(--md-primary-container); vertical-align: 1px; }
+:root[data-design="m3"] .m3-clock-now { font-size: .7em; }
+:root[data-design="m3"] .m3-widget-clock.is-now .m3-clock-now { animation: m3ClockBreathe2 1.6s ease-in-out infinite; }
+@keyframes m3ClockBreathe2 { 50% { opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { :root[data-design="m3"] .m3-widget-clock :is(.m3-clock-ring, .m3-clock-now) { animation: none; } }
 /* Queue: a huge count, the shows as overlapping round faces */
 :root[data-design="m3"] .m3-widget-big { font-size: 4.25rem; line-height: 1; font-weight: 850; letter-spacing: -0.04em; color: var(--md-tertiary); }
 :root[data-design="m3"] .m3-widget-faces { position: absolute; right: 18px; top: 18px; display: flex; }

@@ -1,5 +1,5 @@
-import { toast } from './store.js?v=140';
-import { getToken } from './auth.js?v=140';
+import { toast } from './store.js?v=141';
+import { getToken } from './auth.js?v=141';
 
 // Jellyfin integration: when AniList progress moves forward, mark the matching
 // episodes watched on the user's own Jellyfin server.
@@ -49,8 +49,8 @@ export function getScope() {
 // The player keeps "is Jellyfin reachable" for five minutes and the found shows per tab. Another
 // server or user makes both wrong at once, so they are dropped right away.
 function forgetPlayerCaches() {
-    import('./player/availability.js?v=140').then(m => m.forgetAvailability()).catch(() => {});
-    import('./player/library.js?v=140').then(m => m.forgetMatches()).catch(() => {});
+    import('./player/availability.js?v=141').then(m => m.forgetAvailability()).catch(() => {});
+    import('./player/library.js?v=141').then(m => m.forgetMatches()).catch(() => {});
 }
 
 function writeLocal(cfg, scope) {
@@ -355,8 +355,8 @@ export async function markWatched(media, episode) {
     const cfg = getConfig();
     if (!cfg || !episode || !media?.id) return null;
     const [{ availability }, { markPlayedUpTo }] = await Promise.all([
-        import('./player/availability.js?v=140'),
-        import('./player/library.js?v=140'),
+        import('./player/availability.js?v=141'),
+        import('./player/library.js?v=141'),
     ]);
     const avail = await availability();
     if (!avail) return { marked: 0, reason: 'unreachable' };
@@ -559,7 +559,7 @@ function matchFit(media, group) {
 // Pushes AniList forward where Jellyfin is further along; returns what it changed
 export async function pullFromJellyfin(user, token) {
     if (!getConfig() || !isPullEnabled() || !user?.id || !token) return { updated: 0, changes: [] };
-    const api = await import('./api.js?v=140');
+    const api = await import('./api.js?v=141');
     if (api.isBackgroundPaused()) return { updated: 0, changes: [], skipped: 'maintenance' };
     if (api.isRateLimited()) return { updated: 0, changes: [], skipped: 'rate-limited' };
 
@@ -574,7 +574,7 @@ export async function pullFromJellyfin(user, token) {
     // Which played Jellyfin series each list entry stands for. Series linked by hand (js/jflinks.js) first,
     // with their episode numbers moved by the link's offset
     const claims = [];
-    const { linkForSeries } = await import('./jflinks.js?v=140');
+    const { linkForSeries } = await import('./jflinks.js?v=141');
     const linked = new Set();
     for (const p of played) {
         const link = linkForSeries(p.seriesName, p.season);

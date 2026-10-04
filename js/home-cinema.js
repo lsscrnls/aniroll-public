@@ -1,10 +1,10 @@
 // Home in AniRoll's own design: the show you're on, then a stats box. Same idea as Material 3's hero and widgets
 // (js/m3.js), built from AniRoll's own pieces so it reads like the rest of the app: the detail page's banner,
 // cover and stats box, Roll's red kicker, the usual pill buttons. Material 3 hides this section.
-import * as api from './api.js?v=140';
-import { esc, titlePref } from './store.js?v=140';
-import { prefersReducedMotion } from './animations.js?v=140';
-import { upNext, glance, greeting, playFromHero } from './upnext.js?v=140';
+import * as api from './api.js?v=141';
+import { esc, titlePref } from './store.js?v=141';
+import { prefersReducedMotion } from './animations.js?v=141';
+import { upNext, glance, greeting, playFromHero } from './upnext.js?v=141';
 
 const imgOf = (m) => m?.coverImage?.extraLarge || m?.coverImage?.large || '';
 

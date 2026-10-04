@@ -1,7 +1,7 @@
-import { getToken, isLoggedIn } from '../auth.js?v=140';
-import { getState, esc, toast } from '../store.js?v=140';
-import { showConfirm } from '../a11y.js?v=140';
-import * as api from '../api.js?v=140';
+import { getToken, isLoggedIn } from '../auth.js?v=141';
+import { getState, esc, toast } from '../store.js?v=141';
+import { showConfirm } from '../a11y.js?v=141';
+import * as api from '../api.js?v=141';
 
 // #/admin: how busy AniRoll is — seats, the line, requests, Jellyfin playback, errors — for its owner,
 // and what they can change: the limit, the VIPs, letting someone in, freeing a seat, maintenance mode,
