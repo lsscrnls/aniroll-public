@@ -45,3 +45,14 @@ export function greeting() {
     const h = new Date().getHours();
     return h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
+
+// "Play episode N" in Home's hero, from the user's own Jellyfin; loaded only when Jellyfin is set up
+export function playFromHero(root, entry, size = '') {
+    let configured = false;
+    try { configured = !!localStorage.getItem('aniroll_jf_url'); } catch { /* storage blocked */ }
+    if (!entry || !configured) return;
+    const { m, next, canWatch } = upNext(entry);
+    if (!canWatch) return;
+    // List entries come without `type`: Home's hero is anime only
+    import('./player/playbutton.js?v=137').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
+}

@@ -1,5 +1,5 @@
-import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=136';
-import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=136';
+import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=137';
+import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=137';
 
 // The landing page, in Material 3 Expressive (the only design logged out): the headline arrives word by word,
 // covers of what's trending pop into shaped tiles, the big clip tilts upright while it scrolls in, and the

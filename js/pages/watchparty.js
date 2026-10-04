@@ -11,7 +11,7 @@
 export function getActiveParty() { return null; }
 
 // The invite link to a host's party; it keeps working when the host switches shows.
-export function createPartyLink(mediaId, hostName) { return null; }
+export function createPartyLink(mediaId, hostName, episode = null) { return null; }
 
 // Starts a party as its host. With `handOver`, the members of the previous party follow.
 export async function startParty(mediaId, mediaTitle, hostName, startEp, coverImage, { handOver = false } = {}) { return null; }

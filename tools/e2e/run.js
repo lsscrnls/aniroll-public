@@ -712,6 +712,18 @@ function staticServer() {
             return a ? { href: a.getAttribute('href'), text: a.textContent.trim() } : null;
         });
         check('player: Play button for the next episode when Jellyfin has it', /^#\/play\/\d+\/2$/.test(button?.href || '') && /Play episode 2/.test(button.text), button);
+        // Home's Up next hero: Play beside "Watched episode N", which steps back to a secondary button
+        await p.evaluate(() => { location.hash = '#/'; });
+        await p.waitForSelector('.hero-play', { timeout: 8000 }).catch(() => {});
+        const hero = await p.evaluate(() => {
+            const a = document.querySelector('.hero-play');
+            const w = document.querySelector('[data-hero-inc], [data-ar-inc]');
+            return a ? { href: a.getAttribute('href'), text: a.textContent.trim(), watched: w?.className } : { slot: !!document.querySelector('[data-hero-play]'), title: document.querySelector('.m3-hero-title, .ar-home-head .detail-title')?.textContent, jf: localStorage.aniroll_jf_url };
+        });
+        check('home: the Up next hero plays the next episode from Jellyfin', /^#\/play\/\d+\/\d+$/.test(hero?.href || '')
+            && /Play episode \d+|Resume episode \d+/.test(hero.text) && /glass-btn-secondary/.test(hero.watched || ''), hero);
+        await p.goto(base + '/#/anime/101/full');
+        await p.waitForSelector('.detail-play', { timeout: 8000 }).catch(() => {});
 
         // Episodes: every episode Jellyfin has, the next one marked, watched and started ones told apart;
         // the sequel's chip switches the list over (the mock Jellyfin has none of its episodes)
