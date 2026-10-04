@@ -1,10 +1,10 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=139';
-import { openDialog } from './a11y.js?v=139';
-import { prefersReducedMotion } from './animations.js?v=139';
-import { accountState, saveAccountState } from './accountstate.js?v=139';
+import { esc } from './store.js?v=140';
+import { openDialog } from './a11y.js?v=140';
+import { prefersReducedMotion } from './animations.js?v=140';
+import { accountState, saveAccountState } from './accountstate.js?v=140';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it

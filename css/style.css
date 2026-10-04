@@ -5201,6 +5201,8 @@ body.player-open .cursor { display: none !important; }
 .pl-seek-hover-seg[hidden] { display: none; }
 /* Intro, recap and credits as lighter stretches on the track */
 .pl-seek-segments { left: 0; right: 0; height: 4px; margin-top: -2px; }
+/* Only on the part still to come: under the wave a stretch read as a second, straight line */
+.pl-seek-segments { clip-path: inset(-4px 0 -4px calc(var(--pl-pos, 0%) + 8px)); }
 .pl-seek-seg { position: absolute; top: 0; height: 100%; border-radius: 2px; background: rgba(255,255,255,0.42); }
 .pl-seek-seg[data-type="Outro"], .pl-seek-seg[data-type="Preview"] { background: color-mix(in srgb, var(--pl-primary) 45%, transparent); }
 .pl-seek:hover .pl-seek-segments, .player.is-seeking .pl-seek-segments { height: 6px; margin-top: -3px; transition: height .2s var(--pl-bounce), margin .2s var(--pl-bounce); }
