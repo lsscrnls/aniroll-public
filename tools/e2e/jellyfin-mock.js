@@ -115,6 +115,9 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
         if (/^\/Items\/ep\d+\/Images\/Primary$/.test(p)) {
             return route.fulfill({ status: 200, headers: CORS, contentType: 'image/jpeg', body: THUMB });
         }
+        // One item with its chapters, the way newer servers ask for it: a named one at 15 s
+        const one = p.match(/^\/Items\/(ep\d+)$/);
+        if (one) return json({ ...episode(Number(one[1].slice(2))), Chapters: [{ Name: 'Chapter 1', StartPositionTicks: 0 }, { Name: 'Part B', StartPositionTicks: 15 * 10_000_000 }] });
         const item = p.match(new RegExp(`^/Users/${JF_USER}/Items/(ep\\d+)$`));
         if (item) return json({ ...episode(Number(item[1].slice(2))), MediaSources: [mediaSource(item[1])] });
         const info = p.match(/^\/Items\/(ep\d+)\/PlaybackInfo$/);
