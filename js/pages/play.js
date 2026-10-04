@@ -1,14 +1,14 @@
-import * as api from '../api.js?v=138';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=138';
-import { getToken, isLoggedIn } from '../auth.js?v=138';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=138';
-import { availability } from '../player/availability.js?v=138';
-import { findEpisode, jfGet } from '../player/library.js?v=138';
-import { deviceProfile } from '../player/profile.js?v=138';
-import { HtmlVideoEngine } from '../player/engine.js?v=138';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=138';
-import { createSubtitles } from '../player/subtitles.js?v=138';
-import { neighbours } from '../player/episodes.js?v=138';
+import * as api from '../api.js?v=139';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=139';
+import { getToken, isLoggedIn } from '../auth.js?v=139';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=139';
+import { availability } from '../player/availability.js?v=139';
+import { findEpisode, jfGet } from '../player/library.js?v=139';
+import { deviceProfile } from '../player/profile.js?v=139';
+import { HtmlVideoEngine } from '../player/engine.js?v=139';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=139';
+import { createSubtitles } from '../player/subtitles.js?v=139';
+import { neighbours } from '../player/episodes.js?v=139';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -28,7 +28,7 @@ export async function render({ params, content }) {
     const token = getToken();
 
     content.innerHTML = `
-        <div class="player is-paused is-loading" id="player">
+        <div class="player is-paused is-loading" id="player" data-lenis-prevent>
             <video class="player-video" id="player-video" playsinline crossorigin="anonymous"></video>
             ${controlsHtml()}
             <div class="player-top">
@@ -38,7 +38,7 @@ export async function render({ params, content }) {
                     <div class="player-episode" id="player-episode">Episode ${episode}</div>
                 </div>
                 <div class="player-method" id="player-method" hidden></div>
-                ${isLoggedIn() ? `<button class="pl-btn player-party" id="player-party" type="button" aria-label="Watch Party: start one for this show and copy the link" title="Watch Party: start one for this show, link to the clipboard">${PARTY_ICON}</button>` : ''}
+                ${isLoggedIn() ? `<button class="pl-btn player-party" id="player-party" type="button" aria-label="Watch Party: start one for this show and copy the link" title="Watch Party: start one for this show, link to the clipboard">${icon('party')}</button>` : ''}
             </div>
             <div class="player-status" id="player-status" role="status"><div class="loader-spinner"></div></div>
         </div>`;
@@ -113,7 +113,7 @@ export async function render({ params, content }) {
         if (closed) return cleanup;
         $('player-show').textContent = titlePref(media.title);
         $('player-party')?.addEventListener('click', async () => {
-            const { partyFromPlayer } = await import('./watchparty.js?v=138');
+            const { partyFromPlayer } = await import('./watchparty.js?v=139');
             partyFromPlayer(media, episode);
         });
         if (!avail) throw new Error('Your Jellyfin server cannot be reached right now');
@@ -400,8 +400,6 @@ async function loadChapters(base, cfg, itemId) {
     }
     return [];
 }
-
-const PARTY_ICON = '<svg class="pl-icon" data-icon="groups" viewBox="0 0 24 24" style="fill:none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 13.6c2.6.2 4.5 2.1 4.5 4.9"/></svg>';
 
 // ===== Stats for nerds =====
 // [{ title, rows: [[label, value]] }], asked for about once a second while the panel shows. What Jellyfin's
