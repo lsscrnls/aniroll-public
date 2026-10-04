@@ -6,8 +6,10 @@
 // (JSON answers, body parsing, token checks, moving a list forward) and gets back:
 //   route(req, res, pathname)  answers /api/party/* and /api/parties/*; true when it did
 //   syncMembers()              moves guests who opted in along with the host, once a minute
+//   preview(host)              what an invite link's preview shows, or null
+//   closeStreams(), liveCount()  the open live-update streams (shutdown, admin stats)
 // This stub answers nothing, so those paths are a 404 and the server runs without parties.
 
 module.exports = function createParty() {
-    return { route: async () => false, syncMembers: async () => {} };
+    return { route: async () => false, syncMembers: async () => {}, preview: () => null, closeStreams: () => {}, liveCount: () => 0 };
 };

@@ -474,6 +474,8 @@ function staticServer() {
     await wp.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
     await wp.route(`${base}/api/**`, route => {
         const p = new URL(route.request().url()).pathname;
+        // The live stream: one event per connection, the browser comes back for the next after `retry`
+        if (p.endsWith('/events')) return route.fulfill({ contentType: 'text/event-stream', body: `retry: 1000\ndata: ${JSON.stringify(party)}\n\n` });
         if (p.startsWith('/api/party/')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify(party) });
         route.fulfill({ status: p === '/api/maintenance' ? 200 : 404, contentType: 'application/json', body: '{"maintenance":false}' });
     });
@@ -499,6 +501,12 @@ function staticServer() {
     const joined = await wpText();
     check('watch party: an invite shows the host, joining starts the sync',
         /Host progress/.test(invited) && /Auto-sync active/.test(joined) && !/is not a function/.test(invited + joined), { invited: invited.slice(0, 160), joined: joined.slice(0, 160) });
+    // The host moves on: the live stream brings it in seconds (the regular sync would take 20)
+    party.hostProgress = 7;
+    const pushed = await wp.waitForFunction(() => document.getElementById('wp-host-ep')?.textContent === '7', null, { timeout: 5000 })
+        .then(() => true, () => false);
+    check('watch party: the host\'s next episode arrives live, not with the next poll', pushed,
+        await wp.evaluate(() => document.getElementById('wp-host-ep')?.textContent));
     Object.assign(party, { hostName: VIEWER.name, hostKey: 'k' });
     await wp.evaluate(n => {
         localStorage.setItem('aniroll_watchparty', JSON.stringify({ hostName: n, mediaId: 21, hostKey: 'k', mediaTitle: 'One Piece', startEp: 2 }));
@@ -632,6 +640,24 @@ function staticServer() {
             for (const [k, v] of Object.entries(jf)) localStorage.setItem(k, v);
         }, { ...VIEWER, jf: signedIn ? JF_STORAGE : {} });
         return { p, pageErrors, saves, calls };
+    }
+
+    // Watch Party: "Play episode N" right on the party page — the one after the host's counter
+    {
+        const { p, pageErrors } = await playerPage(true);
+        const party = { hostName: 'Hosty', mediaId: 101, mediaTitle: 'Show', active: true, members: [], hostProgress: 1, startedAt: Date.now(), startEp: 0 };
+        await p.route(`${base}/api/party/**`, route => route.request().url().endsWith('/events')
+            ? route.fulfill({ contentType: 'text/event-stream', body: `retry: 1000\ndata: ${JSON.stringify(party)}\n\n` })
+            : route.fulfill({ contentType: 'application/json', body: JSON.stringify(party) }));
+        await p.goto(base + '/#/watchparty?host=Hosty&anime=101');
+        await p.waitForSelector('.wp-play', { timeout: 8000 }).catch(() => {});
+        const play = await p.evaluate(() => {
+            const a = document.querySelector('.wp-play');
+            return a ? { href: a.getAttribute('href'), text: a.textContent.trim(), episodes: !!document.querySelector('.wp-episodes') } : null;
+        });
+        check('watch party: Play the episode the group watches next, straight from the party', /^#\/play\/\d+\/2$/.test(play?.href || '')
+            && /Play episode 2/.test(play.text) && play.episodes && !pageErrors.length, { play, pageErrors });
+        await p.close();
     }
 
     // Friends connect with a Quick Connect code: no password field, the code shown, connected once confirmed
@@ -1292,6 +1318,15 @@ function staticServer() {
     const grown = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-25', aniroll_design_v2: 'aniroll' });
     const grownHeads = await grown.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent));
     check("a day's entry that grew after going live pops up again", grownHeads[0]?.startsWith('Roll recommendations'), grownHeads);
+
+    // Confirmed the first release of a day: the pop-up shows only what the later releases added
+    const today = (fs.readFileSync(path.join(ROOT, 'js', 'whatsnew.js'), 'utf8').match(/id: '(\d{4}-\d\d-\d\d)\.\d+'/) || [])[1];
+    if (today) {
+        const later = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: today, aniroll_design_v2: 'aniroll' });
+        const shown = await later.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-list li')].map(li => li.textContent));
+        check('a day confirmed earlier shows only the items added since', shown.length >= 1 && shown.length < 6 && !shown.some(t => /^The player answers every key/.test(t)), shown);
+        await later.close();
+    }
     check('logged out: always Material 3, even with the legacy design chosen', await grown.evaluate(() => document.documentElement.dataset.design === 'm3' && !!document.querySelector('#m3-css')));
     await grown.close();
 
