@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=140';
-import { upNext, glance, DAYS, greeting, playFromHero } from './upnext.js?v=140';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=140';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=141';
+import { upNext, glance, DAYS, greeting, playFromHero } from './upnext.js?v=141';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=141';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -529,11 +529,7 @@ function renderWidgets(hero, entries, planning) {
     const { next, airing, waiting, waitingTotal: total, byDay, today } = glance(entries, undefined, planning);
 
     box.innerHTML = `
-        ${next ? `<button class="m3-widget m3-widget-clock" data-open="${next.media.id}" data-m3-until="${next.media.nextAiringEpisode.airingAt}">
-            <span class="m3-widget-label">${next.premiere ? 'Starts in' : 'Next episode'}</span>
-            <span class="m3-widget-clock-num"></span>
-            <span class="m3-widget-sub">${esc(titlePref(next.media.title))} · Ep ${next.media.nextAiringEpisode.episode}</span>
-        </button>` : ''}
+        ${next ? clockWidgetHtml(next) : ''}
         <a class="m3-widget m3-widget-queue" href="#/list">
             <span class="m3-widget-label">Ready to watch</span>
             <span class="m3-widget-big">${total}</span>
@@ -549,15 +545,71 @@ function renderWidgets(hero, entries, planning) {
             <span class="m3-widget-sub">${airing.length ? `${airing.length} ${airing.length === 1 ? 'show airs' : 'shows air'} this week` : 'Nothing airing'}</span>
         </a>`;
     box.querySelectorAll('[data-m3-until]').forEach(renderCountdown);
+    // A premiere takes the colours of its cover
+    const clock = box.querySelector('.m3-widget-clock.is-premiere');
+    if (clock) setScope(clock, next.media.coverImage?.color || null);
 }
 
-// Big stacked digits like a desktop clock: days and hours, or hours and minutes
+// The countdown to the next episode: the show's cover peeking in from the side, a ring that fills up
+// towards the start, and when it airs ("Tomorrow, 17:30") under the digits
+const RING_R = 16;
+const RING_C = 2 * Math.PI * RING_R;
+function clockWidgetHtml(next) {
+    const m = next.media;
+    const ep = m.nextAiringEpisode.episode;
+    const premiere = next.premiere || ep === 1;
+    const cover = m.coverImage?.large || m.coverImage?.extraLarge || '';
+    return `<button class="m3-widget m3-widget-clock${premiere ? ' is-premiere' : ''}" data-open="${m.id}" data-m3-until="${m.nextAiringEpisode.airingAt}" data-m3-span="${premiere ? 30 * 86400 : 7 * 86400}">
+            ${cover ? `<img class="m3-clock-cover" src="${esc(cover)}" alt="" aria-hidden="true">` : ''}
+            <svg class="m3-clock-ring" viewBox="0 0 40 40" aria-hidden="true"><circle class="m3-clock-ring-track" cx="20" cy="20" r="${RING_R}"/><circle class="m3-clock-ring-fill" cx="20" cy="20" r="${RING_R}" stroke-dasharray="${RING_C.toFixed(2)}" stroke-dashoffset="${RING_C.toFixed(2)}"/></svg>
+            <span class="m3-widget-label">${next.premiere ? 'Starts in' : 'Next episode'}${premiere ? ' <span class="m3-clock-chip">Premiere</span>' : ''}</span>
+            <span class="m3-widget-clock-num"></span>
+            <span class="m3-clock-when"></span>
+            <span class="m3-widget-sub">${esc(titlePref(m.title))} · Ep ${ep}</span>
+        </button>`;
+}
+
+// "Today, 17:30", "Tomorrow, 09:00", "Fri, 20:00", or a date further out
+function airsWhen(at) {
+    const date = new Date(at * 1000);
+    const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const days = Math.round((day(date) - day(new Date())) / 86400000);
+    if (days === 0) return `Today, ${time}`;
+    if (days === 1) return `Tomorrow, ${time}`;
+    if (days < 7) return `${date.toLocaleDateString('en-GB', { weekday: 'short' })}, ${time}`;
+    return `${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+// Big stacked digits like a desktop clock: days and hours, or hours and minutes; the last hour counts
+// minutes and seconds live, and once it airs the widget says so (it opens the show either way)
 function renderCountdown(el) {
-    const left = Math.max(0, Number(el.dataset.m3Until) - Date.now() / 1000);
-    const d = Math.floor(left / 86400), h = Math.floor(left % 86400 / 3600), m = Math.floor(left % 3600 / 60);
-    const [a, ua, b, ub] = d > 0 ? [d, 'd', h, 'h'] : [h, 'h', m, 'm'];
+    if (!el.isConnected) return;
+    const at = Number(el.dataset.m3Until);
+    const left = Math.max(0, at - Date.now() / 1000);
+    const d = Math.floor(left / 86400), h = Math.floor(left % 86400 / 3600), m = Math.floor(left % 3600 / 60), s = Math.floor(left % 60);
     const num = el.querySelector('.m3-widget-clock-num');
-    if (num) num.innerHTML = `<span>${a}<small>${ua}</small></span><span>${String(b).padStart(2, '0')}<small>${ub}</small></span>`;
+    const soon = left > 0 && left < 3600;
+    el.classList.toggle('is-soon', soon);
+    el.classList.toggle('is-now', left <= 0);
+    if (num) {
+        if (left <= 0) num.innerHTML = '<span class="m3-clock-now">Out now</span>';
+        else {
+            const [a, ua, b, ub] = d > 0 ? [d, 'd', h, 'h'] : soon ? [m, 'm', s, 's'] : [h, 'h', m, 'm'];
+            num.innerHTML = `<span>${a}<small>${ua}</small></span><span>${String(b).padStart(2, '0')}<small>${ub}</small></span>`;
+        }
+    }
+    const when = el.querySelector('.m3-clock-when');
+    if (when) when.textContent = left <= 0 ? 'Watch it now' : airsWhen(at);
+    const fill = el.querySelector('.m3-clock-ring-fill');
+    if (fill) {
+        const span = Number(el.dataset.m3Span) || 7 * 86400;
+        const done = Math.min(1, Math.max(0, 1 - left / span));
+        fill.style.strokeDashoffset = (RING_C * (1 - done)).toFixed(2);
+    }
+    // The 30-second tick is too slow for seconds: the last hour ticks itself
+    clearTimeout(el._m3Tick);
+    if (soon) el._m3Tick = setTimeout(() => renderCountdown(el), 1000);
 }
 
 // ===== Cursor =====

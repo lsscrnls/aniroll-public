@@ -549,6 +549,13 @@ function staticServer() {
     const soon = await nx.evaluate(() => ({ shown: !document.getElementById('starting-soon')?.hidden,
         text: document.querySelector('#starting-soon-row .starting-soon-when')?.textContent.replace(/\s+/g, ' ').trim() }));
     check('home: a planned show that premieres soon, with its date', soon.shown && /^Episode 1 in 8d/.test(soon.text || ''), soon);
+    // The countdown widget (Material 3): the cover, the ring, when it airs; the last hour counts seconds
+    const clock = await nx.evaluate(() => {
+        const w = document.querySelector('.m3-widget-clock');
+        return w && { cover: !!w.querySelector('.m3-clock-cover'), ring: w.querySelector('.m3-clock-ring-fill')?.style.strokeDashoffset,
+            when: w.querySelector('.m3-clock-when')?.textContent, chip: !!w.querySelector('.m3-clock-chip'), num: w.querySelector('.m3-widget-clock-num')?.textContent };
+    });
+    check('home: the countdown widget shows the cover, a ring and when it airs', !clock || (clock.cover && clock.ring && /, \d/.test(clock.when || '') && /\d/.test(clock.num || '')), clock);
 
     // Nothing being watched airs any more: the countdown on Home turns to the next premiere from Planning
     const quiet = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -579,7 +586,7 @@ function staticServer() {
             sub: w?.querySelector('.m3-widget-sub')?.textContent };
     });
     check('home: nothing airing, the countdown shows the next premiere from Planning',
-        premiereClock.label === 'Starts in' && /^[23]d\d\dh$/.test(premiereClock.num || '') && /· Ep 1$/.test(premiereClock.sub || ''), premiereClock);
+        /^Starts in( Premiere)?$/.test(premiereClock.label || '') && /^[23]d\d\dh$/.test(premiereClock.num || '') && /· Ep 1$/.test(premiereClock.sub || ''), premiereClock);
     await quiet.close();
 
     await nxGo('#/list');
@@ -1383,7 +1390,7 @@ function staticServer() {
     await late.click('.landing-foot .whatsnew-link');
     await late.clock.runFor(500);
     const log = await late.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, entries: document.querySelectorAll('.whatsnew-entry').length }));
-    check('changelog: still there, marked unread, opens with all entries', unread && log.title === "What's new" && log.entries === CHANGE_COUNT, { unread, ...log });
+    check('changelog: still there, marked unread, opens with all entries and the version', unread && /^What's new AniRoll \d+\.\d+\.\d+$/.test(log.title || '') && log.entries === CHANGE_COUNT, { unread, ...log });
 
     // An entry with a clip: it sits behind "See it in action"; opening it widens the dialog
     const clipped = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-26' });
