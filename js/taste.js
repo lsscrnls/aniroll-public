@@ -5,7 +5,7 @@
 // Taste match: how well a show fits what you liked, from the genres and tags of your own list.
 // It measures "your kind of show", never the global rating.
 //
-// Used by: js/api.js, js/pages/detail.js
+// Used by: js/api.js, js/pages/detail.js, js/pages/roll.js
 
 // `entries`: list entries with a score (0-100), a status and the show's genres and tags.
 // Returns a profile, or null when the list has too little to go on.

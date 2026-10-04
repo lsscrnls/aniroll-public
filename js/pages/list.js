@@ -1,12 +1,14 @@
-import * as api from '../api.js?v=133';
-import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched } from '../store.js?v=133';
-import { getToken, isLoggedIn } from '../auth.js?v=133';
-import { enhanceSelect } from '../select.js?v=133';
+import * as api from '../api.js?v=134';
+import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched, emitListChange, LIST_EVENT, loginState } from '../store.js?v=134';
+import { getToken, isLoggedIn } from '../auth.js?v=134';
+import { enhanceSelect } from '../select.js?v=134';
+import { showScorePrompt } from '../a11y.js?v=134';
 
 // View, sort and the airing filter are remembered per browser; the search text is not
 const VIEW_KEY = 'aniroll_list_view';
 const SORT_KEY = 'aniroll_list_sort';
 const AIRING_KEY = 'aniroll_list_airing';
+const BEHIND_KEY = 'aniroll_list_behind';
 const FORMAT_KEY = 'aniroll_list_format';
 // Anime formats to filter by; TV counts TV shorts too
 const FORMATS = { TV: ['TV', 'TV_SHORT'], MOVIE: ['MOVIE'], OVA: ['OVA'], ONA: ['ONA'], SPECIAL: ['SPECIAL'] };
@@ -16,6 +18,13 @@ const totalOf = (e) => e.media.episodes || e.media.chapters || 0;
 const shareOf = (e) => (totalOf(e) ? e.progress / totalOf(e) : 0);
 const nextAiringIn = (e) => (e.media.nextAiringEpisode ? api.untilAiring(e.media.nextAiringEpisode) ?? Infinity : Infinity);
 const titleOf = (e) => titlePref(e.media.title) || '';
+const dateNum = (d) => (d?.year ? d.year * 10000 + (d.month || 0) * 100 + (d.day || 0) : 0);
+// Aired episodes not watched yet: the next one to air minus one, minus what was watched
+export const behindOf = (e) => {
+    const next = e.media?.nextAiringEpisode?.episode;
+    if (!next || !['CURRENT', 'REPEATING', 'PAUSED'].includes(e.status)) return 0;
+    return Math.max(0, next - 1 - (e.progress || 0));
+};
 
 const SORTS = {
     updated: { label: 'Last updated', compare: (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0) },
@@ -23,6 +32,11 @@ const SORTS = {
     score: { label: 'Your score', compare: (a, b) => (b.score || 0) - (a.score || 0) || titleOf(a).localeCompare(titleOf(b)) },
     progress: { label: 'Progress', compare: (a, b) => shareOf(b) - shareOf(a) || b.progress - a.progress },
     airing: { label: 'Next episode', compare: (a, b) => nextAiringIn(a) - nextAiringIn(b) },
+    behind: { label: 'Most behind', compare: (a, b) => behindOf(b) - behindOf(a) || nextAiringIn(a) - nextAiringIn(b) },
+    started: { label: 'Started', compare: (a, b) => dateNum(b.startedAt) - dateNum(a.startedAt) },
+    finished: { label: 'Finished', compare: (a, b) => dateNum(b.completedAt) - dateNum(a.completedAt) },
+    mean: { label: 'AniList score', compare: (a, b) => (b.media.meanScore || 0) - (a.media.meanScore || 0) },
+    year: { label: 'Release year', compare: (a, b) => dateNum(b.media.startDate) - dateNum(a.media.startDate) },
 };
 
 const ICON_LIST = '<svg data-icon="view_list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>';
@@ -44,7 +58,7 @@ export async function render({ params, content }) {
     const user = getState().user;
 
     if (!params.username && (!isLoggedIn() || !user)) {
-        content.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${emptyIcon('lock')}</div><div class="empty-state-text">Log in to view your list</div></div>`;
+        content.innerHTML = loginState(emptyIcon('lock'), 'Log in to view your list', 'Your AniList, with one tap per episode and your progress on every device.');
         return;
     }
 
@@ -56,6 +70,8 @@ export async function render({ params, content }) {
     let view = readPref(VIEW_KEY, 'grid', ['list', 'grid']);
     let sort = readPref(SORT_KEY, 'updated', Object.keys(SORTS));
     let airingOnly = readPref(AIRING_KEY, 'off', ['on', 'off']) === 'on';
+    let behindOnly = readPref(BEHIND_KEY, 'off', ['on', 'off']) === 'on';
+    let genre = '';
     let format = readPref(FORMAT_KEY, 'ALL', ['ALL', ...Object.keys(FORMATS)]);
     let search = '';
 
@@ -77,9 +93,12 @@ export async function render({ params, content }) {
             <select class="glass-select" id="list-sort" aria-label="Sort">
                 ${Object.entries(SORTS).map(([key, s]) => `<option value="${key}" ${key === sort ? 'selected' : ''}>${s.label}</option>`).join('')}
             </select>
+            <select class="glass-select" id="list-genre" aria-label="Genre"><option value="">All genres</option></select>
             <button class="list-chip${airingOnly ? ' active' : ''}" id="list-airing" aria-pressed="${airingOnly}" title="Only shows that are airing right now">Airing</button>
+            <button class="list-chip${behindOnly ? ' active' : ''}" id="list-behind" aria-pressed="${behindOnly}" title="Only shows with aired episodes you have not watched">Behind</button>
             <div class="list-formats" id="list-formats" role="group" aria-label="Format">${Object.keys(FORMATS).map(f =>
                 `<button class="list-chip${format === f ? ' active' : ''}" data-format="${f}" aria-pressed="${format === f}">${FORMAT_LABELS[f]}</button>`).join('')}</div>
+            ${isOwn ? `<button class="list-chip" id="list-export" title="Download this list as a MyAnimeList XML file (for MAL or a backup)">Export</button>` : ''}
             <div class="list-view-toggle" role="group" aria-label="View">
                 <button class="list-view-btn${view === 'list' ? ' active' : ''}" data-view="list" aria-pressed="${view === 'list'}" title="List">${ICON_LIST}</button>
                 <button class="list-view-btn${view === 'grid' ? ' active' : ''}" data-view="grid" aria-pressed="${view === 'grid'}" title="Covers">${ICON_GRID}</button>
@@ -96,6 +115,8 @@ export async function render({ params, content }) {
     const listContent = document.getElementById('list-content');
     const toolbar = document.getElementById('list-toolbar');
     const airingChip = document.getElementById('list-airing');
+    const behindChip = document.getElementById('list-behind');
+    const genreSelect = document.getElementById('list-genre');
     const formatChips = document.getElementById('list-formats');
 
     let currentType = 'ANIME';
@@ -108,13 +129,15 @@ export async function render({ params, content }) {
         if (!listContent || !tabsEl) return;
         // Manga have no airing schedule, and formats of their own
         airingChip.hidden = type !== 'ANIME';
+        behindChip.hidden = type !== 'ANIME';
         formatChips.hidden = type !== 'ANIME';
 
         listContent.classList.remove('is-grid');
         listContent.innerHTML = '<div class="page-loader"><div class="loader-spinner"></div></div>';
 
         try {
-            lists = await api.getMediaList(targetUser.id, type, token);
+            // A copy of the outer array: the "All" tab added below must not end up in the cached answer
+            lists = [...await api.getMediaList(targetUser.id, type, token)];
         } catch (err) {
             tabsEl.innerHTML = '';
             listContent.innerHTML = `<div class="empty-state" style="padding:var(--space-lg)"><div class="empty-state-sub">${esc(err.message)}</div></div>`;
@@ -126,25 +149,44 @@ export async function render({ params, content }) {
         formatChips.querySelectorAll('[data-format]').forEach(b => { b.hidden = !FORMATS[b.dataset.format].some(f => present.has(f)); });
         if (format !== 'ALL' && formatChips.querySelector(`[data-format="${format}"]`).hidden) setFormat('ALL');
 
+        // Status lists first, in the usual order; custom lists after them, in the order the user gave
+        // them on AniList (they have no status, so they would otherwise jump to the front)
         const statusOrder = ['CURRENT', 'REPEATING', 'PLANNING', 'PAUSED', 'COMPLETED', 'DROPPED'];
-        lists.sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
+        const options = targetUser?.mediaListOptions?.[type === 'ANIME' ? 'animeList' : 'mangaList'] || {};
+        const customOrder = options.customLists || [];
+        const rank = (l) => (l.isCustomList || !l.status
+            ? 100 + (customOrder.indexOf(l.name) + 1 || 99)
+            : statusOrder.indexOf(l.status) + 1 || 50);
+        lists.sort((a, b) => rank(a) - rank(b));
+        // "All": every entry once, whatever lists it sits in
+        const seen = new Set();
+        const everything = lists.flatMap(l => l.entries).filter(e => !seen.has(e.id) && seen.add(e.id));
+        if (lists.length > 1) lists.push({ name: 'All', status: null, isAll: true, entries: everything });
         activeIndex = 0;
 
-        tabsEl.innerHTML = lists.map((l, i) =>
-            `<button class="list-tab${i === 0 ? ' active' : ''}" data-index="${i}">${esc(l.name)} <small style="opacity:0.6">(${l.entries.length})</small></button>`
-        ).join('');
+        // Genres of this list, for the genre filter
+        const genres = [...new Set(everything.flatMap(e => e.media.genres || []))].sort();
+        if (genre && !genres.includes(genre)) genre = '';
+        genreSelect.innerHTML = `<option value="">All genres</option>` + genres.map(g => `<option value="${esc(g)}"${g === genre ? ' selected' : ''}>${esc(g)}</option>`).join('');
 
-        tabsEl.querySelectorAll('.list-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                tabsEl.querySelectorAll('.list-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                activeIndex = Number(tab.dataset.index);
-                renderEntries();
-            });
-        });
-
+        paintTabs();
         renderEntries();
     }
+
+    function paintTabs() {
+        const tabsEl = document.getElementById('list-tabs');
+        if (!tabsEl || !lists) return;
+        tabsEl.innerHTML = lists.map((l, i) =>
+            `<button class="list-tab${i === activeIndex ? ' active' : ''}" data-index="${i}" aria-pressed="${i === activeIndex}">${esc(l.name)} <small style="opacity:0.6">(${l.entries.length})</small></button>`
+        ).join('');
+    }
+    document.getElementById('list-tabs')?.addEventListener('click', (ev) => {
+        const tab = ev.target.closest('.list-tab');
+        if (!tab) return;
+        activeIndex = Number(tab.dataset.index);
+        paintTabs();
+        renderEntries();
+    });
 
     function visibleEntries(entries) {
         const q = search.trim().toLowerCase();
@@ -156,6 +198,8 @@ export async function render({ params, content }) {
             });
         }
         if (airingOnly && currentType === 'ANIME') out = out.filter(e => e.media.nextAiringEpisode);
+        if (behindOnly && currentType === 'ANIME') out = out.filter(e => behindOf(e) > 0);
+        if (genre) out = out.filter(e => (e.media.genres || []).includes(genre));
         if (format !== 'ALL' && currentType === 'ANIME') out = out.filter(e => FORMATS[format].includes(e.media.format));
         return [...out].sort(SORTS[sort].compare);
     }
@@ -164,9 +208,10 @@ export async function render({ params, content }) {
     const airingText = (m) => (m.nextAiringEpisode
         ? `Ep ${m.nextAiringEpisode.episode} in ${api.timeUntil(api.untilAiring(m.nextAiringEpisode))}`
         : '');
+    const behindText = (e) => (behindOf(e) ? `${behindOf(e)} behind` : '');
     const cardSub = (e) => [
         `${e.progress}${totalOf(e) ? `/${totalOf(e)}` : ''} ${unitOf()}`,
-        airingText(e.media),
+        behindText(e) || airingText(e.media),
     ].filter(Boolean).join(' · ');
 
     function listRow(e) {
@@ -174,11 +219,13 @@ export async function render({ params, content }) {
         const total = totalOf(e);
         const pct = total ? (e.progress / total * 100) : 0;
         const airing = airingText(m) ? `<span style="color:var(--success);font-size:0.7rem;margin-left:4px">${airingText(m)}</span>` : '';
+        const behind = behindOf(e) ? `<span class="behind-badge" title="Aired, not watched yet">${behindOf(e)} behind</span>` : '';
+        const volumes = currentType === 'MANGA' && (e.progressVolumes || m.volumes) ? ` · Vol ${e.progressVolumes || 0}${m.volumes ? `/${m.volumes}` : ''}` : '';
         return `<div class="list-entry" data-entry-id="${e.id}" data-media-id="${m.id}">
-            <img class="list-entry-img" src="${esc(m.coverImage?.large || '')}" alt="${esc(titlePref(m.title))}" loading="lazy" data-open="${m.id}">
+            <img class="list-entry-img" src="${esc(m.coverImage?.large || '')}" alt="" loading="lazy" data-open="${m.id}">
             <div class="list-entry-info">
                 <div class="list-entry-title" data-open="${m.id}" role="button" tabindex="0">${esc(titlePref(m.title))}</div>
-                <div class="list-entry-meta">${api.formatFormat(m.format) || ''}${m.meanScore ? ` · ${m.meanScore}%` : ''}${airing}</div>
+                <div class="list-entry-meta">${api.formatFormat(m.format) || ''}${m.meanScore ? ` · ${m.meanScore}%` : ''}${volumes}${airing}${behind}</div>
                 <div class="progress-bar" style="margin-top:4px;width:100%;max-width:200px">
                     <div class="progress-bar-fill" style="width:${pct}%"></div>
                 </div>
@@ -188,7 +235,9 @@ export async function render({ params, content }) {
                 <span class="progress-text">${e.progress}/${total || '?'}</span>
                 ${isOwn ? `<button class="progress-btn" data-action="inc" data-entry="${e.id}">+</button>` : ''}
             </div>
-            <div class="list-entry-score">${e.score ? fmtScore(e.score) : '—'}</div>
+            ${isOwn
+                ? `<button class="list-entry-score is-editable" data-score-entry="${e.id}" title="Change your score" aria-label="Your score: ${e.score ? fmtScore(e.score) : 'none'}. Change it">${e.score ? fmtScore(e.score) : '—'}</button>`
+                : `<div class="list-entry-score">${e.score ? fmtScore(e.score) : '—'}</div>`}
         </div>`;
     }
 
@@ -197,15 +246,17 @@ export async function render({ params, content }) {
         const total = totalOf(e);
         const pct = total ? (e.progress / total * 100) : 0;
         const unitWord = currentType === 'ANIME' ? 'episode' : 'chapter';
-        return `<div class="media-card list-card" data-entry-id="${e.id}" data-media-id="${m.id}" data-open="${m.id}" role="button" tabindex="0">
-            <img class="media-card-img" src="${esc(m.coverImage?.large || '')}" alt="${esc(titlePref(m.title))}" loading="lazy">
+        // Not a button itself when it holds −/+1: the title opens the show, from the keyboard too
+        const own = isOwn;
+        return `<div class="media-card list-card" data-entry-id="${e.id}" data-media-id="${m.id}" data-open="${m.id}"${own ? '' : ' role="button" tabindex="0"'}>
+            <img class="media-card-img" src="${esc(m.coverImage?.large || '')}" alt="" loading="lazy">
             ${e.score ? `<div class="media-card-score" title="Your score">${fmtScore(e.score)}</div>` : ''}
             ${isOwn ? `<div class="list-card-actions">
                 <button class="cw-inc" data-action="dec" data-entry="${e.id}" title="One ${unitWord} back" ${e.progress <= 0 ? 'hidden' : ''}>−</button>
                 <button class="cw-inc" data-action="inc" data-entry="${e.id}" title="Mark next ${unitWord} done" ${total && e.progress >= total ? 'hidden' : ''}>+1</button>
             </div>` : ''}
             <div class="media-card-overlay">
-                <div class="media-card-title">${esc(titlePref(m.title))}</div>
+                <div class="media-card-title"${own ? ` data-open="${m.id}" role="button" tabindex="0"` : ''}>${esc(titlePref(m.title))}</div>
                 <div class="media-card-sub">${esc(cardSub(e))}</div>
             </div>
             <div class="progress-bar list-card-progress"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
@@ -256,7 +307,27 @@ export async function render({ params, content }) {
     // −/+ in both views. Capture phase, so a card's own onclick (open detail) never fires;
     // saves are serialized per entry so rapid clicks can't land out of order on AniList.
     const chains = new Map();
+    // A score on the 100 scale, asked in a dialog; saved with one request
+    async function askScore(entry, message = '') {
+        const score = await showScorePrompt({ title: titleOf(entry), value: entry.score, message });
+        if (score === null || score === Math.round(entry.score || 0)) return;
+        try {
+            const saved = await api.saveMediaListEntry({ id: entry.id, scoreRaw: score }, token, { mirror: false });
+            entry.score = saved.score;
+            emitListChange({ mediaId: entry.media.id, status: saved.status, progress: saved.progress, score: saved.score });
+            toast(score ? `Score saved: ${score}` : 'Score removed', 'success');
+            renderEntries();
+        } catch (err) { toast(err.queued ? err.message : err.message, 'error'); }
+    }
+
     listContent.addEventListener('click', (ev) => {
+        const scoreBtn = ev.target.closest('[data-score-entry]');
+        if (scoreBtn && isOwn) {
+            ev.stopPropagation();
+            const entry = findEntry(Number(scoreBtn.dataset.scoreEntry));
+            if (entry) askScore(entry);
+            return;
+        }
         const btn = ev.target.closest('[data-action]');
         if (!btn || !isOwn) return;
         ev.stopPropagation();
@@ -277,7 +348,11 @@ export async function render({ params, content }) {
             try {
                 const saved = await api.saveMediaListEntry(vars, token);
                 Object.assign(entry, { status: saved.status, startedAt: saved.startedAt, completedAt: saved.completedAt, repeat: saved.repeat });
-                if (vars.status === 'COMPLETED') toast(`Completed ${titlePref(entry.media.title)}`, 'success');
+                if (vars.status === 'COMPLETED') {
+                    toast(`Completed ${titlePref(entry.media.title)}`, 'success');
+                    // Finishing is the moment people rate a show: ask once, when it has no score yet
+                    if (!entry.score) askScore(entry, 'You finished it. How was it?');
+                }
             } catch (err) { toast(err.message, 'error'); }
         }));
     }, true);
@@ -315,6 +390,63 @@ export async function render({ params, content }) {
         setFormat(format === chip.dataset.format ? 'ALL' : chip.dataset.format);
         renderEntries();
     });
+
+    behindChip?.addEventListener('click', () => {
+        behindOnly = !behindOnly;
+        writePref(BEHIND_KEY, behindOnly ? 'on' : 'off');
+        behindChip.classList.toggle('active', behindOnly);
+        behindChip.setAttribute('aria-pressed', String(behindOnly));
+        renderEntries();
+    });
+
+    enhanceSelect(genreSelect);
+    genreSelect?.addEventListener('change', () => {
+        genre = genreSelect.value;
+        renderEntries();
+    });
+
+    document.getElementById('list-export')?.addEventListener('click', () => {
+        if (!lists) return;
+        const all = lists.find(l => l.isAll)?.entries || lists.flatMap(l => l.entries);
+        downloadMalXml(all, currentType, user);
+    });
+
+    // A change made elsewhere (the detail panel, the player, Home) shows here at once: the entry moves to
+    // its new list, a removed one goes. A show that was not on the list yet needs the list read again.
+    const onListChange = (ev) => {
+        if (!listContent.isConnected) return window.removeEventListener(LIST_EVENT, onListChange);
+        const d = ev.detail || {};
+        if (!lists || !isOwn || !d.mediaId) return;
+        const copies = lists.flatMap(l => l.entries).filter(e => e.media.id === d.mediaId);
+        if (!copies.length) {
+            if (!d.removed) loadList(currentType);
+            return;
+        }
+        for (const l of lists) {
+            if (d.removed) { l.entries = l.entries.filter(e => e.media.id !== d.mediaId); continue; }
+            for (const e of l.entries.filter(x => x.media.id === d.mediaId)) {
+                if (d.progress != null) e.progress = d.progress;
+                if (d.score != null) e.score = d.score;
+                if (d.status) e.status = d.status;
+                e.updatedAt = Math.floor(Date.now() / 1000);
+            }
+        }
+        // Status lists hold an entry by its status: move it over
+        const entry = copies[0];
+        if (!d.removed && d.status) {
+            for (const l of lists) {
+                if (l.isCustomList || l.isAll || !l.status) continue;
+                const has = l.entries.some(e => e.id === entry.id);
+                if (l.status === d.status && !has) l.entries.unshift(entry);
+                if (l.status !== d.status && has) l.entries = l.entries.filter(e => e.id !== entry.id);
+            }
+        }
+        const allTab = lists.find(l => l.isAll);
+        if (allTab && d.removed) allTab.entries = allTab.entries.filter(e => e.media.id !== d.mediaId);
+        paintTabs();
+        renderEntries();
+    };
+    window.addEventListener(LIST_EVENT, onListChange);
 
     airingChip?.addEventListener('click', () => {
         airingOnly = !airingOnly;
@@ -360,15 +492,71 @@ export async function render({ params, content }) {
     loadList('ANIME');
 }
 
-const STATUS_LABELS = {
-    ALL: 'All',
-    CURRENT: 'Watching',
-    PLANNING: 'Planning',
-    COMPLETED: 'Completed',
-    PAUSED: 'Paused',
-    DROPPED: 'Dropped',
-    REPEATING: 'Rewatching'
-};
+// The list as MyAnimeList's export file, built from what is on screen already (no request). MAL and
+// AniRoll's own import read it; entries without a MAL id are left out, MAL could not place them.
+const MAL_STATUS = { CURRENT: 'Watching', REPEATING: 'Watching', PLANNING: 'Plan to Watch', COMPLETED: 'Completed', PAUSED: 'On-Hold', DROPPED: 'Dropped' };
+const MAL_STATUS_MANGA = { ...MAL_STATUS, CURRENT: 'Reading', REPEATING: 'Reading', PLANNING: 'Plan to Read' };
+function downloadMalXml(entries, type, user) {
+    const anime = type === 'ANIME';
+    const x = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const date = (d) => (d?.year ? `${d.year}-${String(d.month || 0).padStart(2, '0')}-${String(d.day || 0).padStart(2, '0')}` : '0000-00-00');
+    const statusWords = anime ? MAL_STATUS : MAL_STATUS_MANGA;
+    const rows = entries.filter(e => e.media.idMal).map(e => {
+        const m = e.media;
+        const score = Math.round((e.score || 0) / 10);
+        return anime ? `
+    <anime>
+        <series_animedb_id>${m.idMal}</series_animedb_id>
+        <series_title><![CDATA[${titlePref(m.title)}]]></series_title>
+        <series_episodes>${m.episodes || 0}</series_episodes>
+        <my_watched_episodes>${e.progress || 0}</my_watched_episodes>
+        <my_start_date>${date(e.startedAt)}</my_start_date>
+        <my_finish_date>${date(e.completedAt)}</my_finish_date>
+        <my_score>${score}</my_score>
+        <my_status>${statusWords[e.status] || 'Plan to Watch'}</my_status>
+        <my_times_watched>${e.repeat || 0}</my_times_watched>
+        <my_rewatching>${e.status === 'REPEATING' ? 1 : 0}</my_rewatching>
+        <my_comments><![CDATA[${(e.notes || '').replace(/]]>/g, ']] >')}]]></my_comments>
+        <update_on_import>1</update_on_import>
+    </anime>` : `
+    <manga>
+        <manga_mangadb_id>${m.idMal}</manga_mangadb_id>
+        <manga_title><![CDATA[${titlePref(m.title)}]]></manga_title>
+        <manga_chapters>${m.chapters || 0}</manga_chapters>
+        <manga_volumes>${m.volumes || 0}</manga_volumes>
+        <my_read_chapters>${e.progress || 0}</my_read_chapters>
+        <my_read_volumes>${e.progressVolumes || 0}</my_read_volumes>
+        <my_start_date>${date(e.startedAt)}</my_start_date>
+        <my_finish_date>${date(e.completedAt)}</my_finish_date>
+        <my_score>${score}</my_score>
+        <my_status>${statusWords[e.status] || 'Plan to Read'}</my_status>
+        <my_times_read>${e.repeat || 0}</my_times_read>
+        <my_comments><![CDATA[${(e.notes || '').replace(/]]>/g, ']] >')}]]></my_comments>
+        <update_on_import>1</update_on_import>
+    </manga>`;
+    }).join('');
+    const xml = `<?xml version="1.0" encoding="UTF-8" ?>
+<myanimelist>
+    <myinfo>
+        <user_name>${x(user?.name || '')}</user_name>
+        <user_export_type>${anime ? 1 : 2}</user_export_type>
+    </myinfo>${rows}
+</myanimelist>
+`;
+    const url = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aniroll-${anime ? 'anime' : 'manga'}-${new Date().toISOString().slice(0, 10)}.xml`;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    const left = entries.length - entries.filter(e => e.media.idMal).length;
+    toast(`Exported ${entries.length - left} entries${left ? ` (${left} without a MAL id left out)` : ''}`, 'success');
+}
+
+// The compare view's status filter: every status, in this order (labels from statusLabel)
+const COMPARE_FILTERS = ['ALL', 'CURRENT', 'PLANNING', 'COMPLETED', 'PAUSED', 'DROPPED', 'REPEATING'];
 
 async function openCompare(friendUser, myUser, type, token, content) {
     const compareView = document.getElementById('compare-view');
@@ -453,8 +641,8 @@ async function openCompare(friendUser, myUser, type, token, content) {
                     <div class="compare-stat ${activeScope === 'ONLY_ME' ? 'active' : ''}" data-scope="ONLY_ME" style="cursor:pointer"><span class="compare-stat-num">${onlyMe}</span> Only You</div>
                 </div>
                 <div class="list-controls" style="margin-bottom:var(--space-md)">
-                    ${Object.entries(STATUS_LABELS).map(([key, label]) =>
-                        `<button class="list-tab ${key === activeFilter ? 'active' : ''}" data-filter="${key}">${key === 'ALL' ? label : statusLabel(key, type)}</button>`
+                    ${COMPARE_FILTERS.map(key =>
+                        `<button class="list-tab ${key === activeFilter ? 'active' : ''}" data-filter="${key}">${key === 'ALL' ? 'All' : statusLabel(key, type)}</button>`
                     ).join('')}
                 </div>
                 <div class="box" style="padding:var(--space-sm)">

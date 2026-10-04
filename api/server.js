@@ -24,7 +24,14 @@ function writeFileAtomic(file, text, mode) {
     ensureDataDir();
     const tmp = `${file}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
     try {
-        fs.writeFileSync(tmp, text, mode ? { mode } : undefined);
+        // fsync before the rename: after a power cut the new name must not point at an empty file
+        const fd = fs.openSync(tmp, 'w', mode);
+        try {
+            fs.writeSync(fd, text);
+            fs.fsyncSync(fd);
+        } finally {
+            fs.closeSync(fd);
+        }
         fs.renameSync(tmp, file);
     } catch (e) {
         try { fs.unlinkSync(tmp); } catch { /* never created */ }
@@ -32,28 +39,44 @@ function writeFileAtomic(file, text, mode) {
     }
 }
 
+// Every data file is read once and then kept in memory: all requests share the same object.
+// A handler that loads, waits for AniList or the request body, and saves afterwards therefore
+// saves everyone's changes, not an old copy of the file that drops what happened meanwhile.
+// Files written by other programs (maintenance.json) are not read through here.
+const stores = new Map();
+
 function writeJson(file, data, { mode, pretty = true } = {}) {
     writeFileAtomic(file, JSON.stringify(data, null, pretty ? 2 : 0), mode);
+    stores.set(file, data);
 }
 
 // A missing file is empty. A file that cannot be parsed is moved aside, not treated as empty:
 // the next save would otherwise overwrite it and every stored token or webhook would be gone.
+// Any other read error (permissions, too many open files) throws for the same reason.
 function readJson(file) {
+    if (stores.has(file)) return stores.get(file);
     let text;
     try {
         text = fs.readFileSync(file, 'utf8');
     } catch (e) {
-        if (e.code !== 'ENOENT') console.error(`cannot read ${path.basename(file)}: ${e.code}`);
-        return {};
+        if (e.code !== 'ENOENT') {
+            console.error(`cannot read ${path.basename(file)}: ${e.code}`);
+            throw e;
+        }
+        text = null;
     }
-    try {
-        return JSON.parse(text);
-    } catch {
-        const aside = `${file}.corrupt-${Date.now()}`;
-        try { fs.renameSync(file, aside); } catch { /* keep going with an empty store */ }
-        console.error(`${path.basename(file)} was unreadable, moved to ${path.basename(aside)} - restore it from there or the backup`);
-        return {};
+    let data = {};
+    if (text !== null) {
+        try {
+            data = JSON.parse(text);
+        } catch {
+            const aside = `${file}.corrupt-${Date.now()}`;
+            try { fs.renameSync(file, aside); } catch { /* keep going with an empty store */ }
+            console.error(`${path.basename(file)} was unreadable, moved to ${path.basename(aside)} - restore it from there or the backup`);
+        }
     }
+    stores.set(file, data);
+    return data;
 }
 
 // ===== Jellyfin config, stored per AniList account =====
@@ -74,11 +97,18 @@ function loadShare() {
     return readJson(SHARE_FILE);
 }
 
+// Previews from someone without a confirmed account only get a small corner of the store, and
+// they go first when it is full: anyone can post them, so they must not push out real ones.
+const SHARE_UNVERIFIED_MAX = 300;
+
 function saveShare(all) {
+    const oldestFirst = (ids) => ids.sort((a, b) => (all[a].savedAt || 0) - (all[b].savedAt || 0));
+    const unverified = oldestFirst(Object.keys(all).filter(id => !all[id].verified));
+    unverified.slice(0, Math.max(0, unverified.length - SHARE_UNVERIFIED_MAX)).forEach(id => delete all[id]);
     const ids = Object.keys(all);
     if (ids.length > SHARE_MAX) {
-        // Drop the least recently shared entries
-        ids.sort((a, b) => (all[a].savedAt || 0) - (all[b].savedAt || 0))
+        // Drop unconfirmed previews first, then the least recently shared ones
+        ids.sort((a, b) => (!!all[a].verified - !!all[b].verified) || ((all[a].savedAt || 0) - (all[b].savedAt || 0)))
             .slice(0, ids.length - SHARE_MAX)
             .forEach(id => delete all[id]);
     }
@@ -123,6 +153,40 @@ function sharePage(entry, id) {
 </head>
 <body>
 <p>Opening <a href="${target}">${escapeHtml(entry ? entry.title : 'AniRoll')}</a> …</p>
+</body>
+</html>`;
+}
+
+// A watch party invite's preview: "<host> is hosting a Watch Party · <show> · Episode N", the cover
+function partyPage(host, info) {
+    const target = `/#/watchparty?host=${encodeURIComponent(host)}`;
+    const title = info ? `${info.hostName} is hosting a Watch Party` : `${host}'s Watch Party`;
+    const description = info
+        ? `${info.title}${info.episode ? ` · at episode ${info.episode}` : ''}${info.members ? ` · ${info.members} watching` : ''}. Join and your episode counter follows along.`
+        : 'Watch anime together: join and your AniList follows the host episode by episode.';
+    const image = info && /^https:\/\/s4\.anilist\.co\//.test(info.cover) ? info.cover : `${SITE}/og-image-v3.jpg`;
+    const card = info && info.cover ? 'summary' : 'summary_large_image';
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(title)} · AniRoll</title>
+<meta property="og:site_name" content="AniRoll">
+<meta property="og:type" content="website">
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="${escapeHtml(description)}">
+<meta property="og:url" content="${SITE}/w/${encodeURIComponent(host)}">
+<meta property="og:image" content="${escapeHtml(image)}">
+<meta name="twitter:card" content="${card}">
+<meta name="twitter:title" content="${escapeHtml(title)}">
+<meta name="twitter:description" content="${escapeHtml(description)}">
+<meta name="twitter:image" content="${escapeHtml(image)}">
+<meta name="theme-color" content="#d13438">
+<meta http-equiv="refresh" content="0; url=${escapeHtml(target)}">
+<style>body{background:#0a0a0a;color:#fff;font-family:system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0}a{color:#d13438}</style>
+</head>
+<body>
+<p>Opening <a href="${escapeHtml(target)}">${escapeHtml(title)}</a> …</p>
 </body>
 </html>`;
 }
@@ -371,7 +435,7 @@ const HOOK_TEMPLATE = '{"event":"{{NotificationType}}","itemId":"{{ItemId}}","ty
     + '"name":"{{Name}}","series":"{{SeriesName}}","season":"{{SeasonNumber}}","episode":"{{EpisodeNumber}}",'
     + '"episodeEnd":"{{EpisodeNumberEnd}}","year":"{{Year}}","position":"{{PlaybackPositionTicks}}",'
     + '"runtime":"{{RunTimeTicks}}","paused":"{{IsPaused}}","completed":"{{PlayedToCompletion}}",'
-    + '"device":"{{DeviceName}}","deviceId":"{{DeviceId}}","client":"{{ClientName}}"}';
+    + '"device":"{{DeviceName}}","deviceId":"{{DeviceId}}","client":"{{ClientName}}","userId":"{{UserId}}"}';
 const MEDIA_FIELDS = 'id episodes format seasonYear startDate { year } synonyms title { romaji english native userPreferred } coverImage { large }';
 
 const nowPlaying = new Map(); // userId -> Map(deviceId|itemId -> session)
@@ -514,10 +578,33 @@ function matchResult(media, entry) {
     };
 }
 
+// A Jellyfin series the user linked to an AniList entry by hand (account state "jflinks", written by
+// the browser): { "<series>|<season>": [mediaId, offset] }. offset: Jellyfin episodes before the
+// entry's first ("Part 2" filed as episodes 13–24 of season 1 has 12)
+function linkFor(userId, info) {
+    if (info.type !== 'Episode') return null;
+    let links = null;
+    try { links = (readJson(USER_STATE_FILE)[String(userId)] || {}).jflinks; } catch { return null; }
+    if (!links || typeof links !== 'object') return null;
+    const key = `${normTitle(splitYear(info.series).title)}|${info.season === null || info.season === undefined ? 1 : info.season}`;
+    const link = links[key];
+    return Array.isArray(link) && Number.isInteger(link[0]) ? { mediaId: link[0], offset: Math.max(0, parseInt(link[1], 10) || 0) } : null;
+}
+
 // The user's own list first; a show not on it yet — or one whose entry does not fit the
 // episode or year — is looked up (exact title only)
 async function matchItem(userId, info) {
     const entries = await listEntries(userId);
+    const link = linkFor(userId, info);
+    if (link) {
+        const entry = entries.find(e => e.media && e.media.id === link.mediaId) || null;
+        let media = entry && entry.media;
+        if (!media) {
+            const body = await anilist(`query ($id: Int) { Media(id: $id) { ${MEDIA_FIELDS} } }`, { id: link.mediaId });
+            media = body.data && body.data.Media;
+        }
+        if (media) return { ...matchResult(media, entry), offset: link.offset };
+    }
     const own = entries.filter(e => e.media && mediaMatches(e.media, info)).map(e => ({ media: e.media, entry: e }));
     let best = bestFit(own, info);
     if (best && best.fit >= 0) return matchResult(best.media, best.entry);
@@ -605,10 +692,11 @@ async function resolveMatch(userId, session) {
 }
 
 async function trackSession(userId, session) {
-    const target = session.type === 'Movie' ? 1 : (session.episodeEnd || session.episode);
-    if (!target) return;
-    session.tracked = 'saving';
     const match = session.match && session.match.mediaId ? session.match : null;
+    // A linked series may start the entry later than its episode 1 (offset): Jellyfin 14 is AniList 2
+    const target = session.type === 'Movie' ? 1 : (session.episodeEnd || session.episode) - ((match && match.offset) || 0);
+    if (!target || target < 1) return;
+    session.tracked = 'saving';
     if (!match) {
         if (session.match && session.match.error === 'not-found') {
             session.tracked = 'unmatched';
@@ -636,11 +724,25 @@ async function trackSession(userId, session) {
     }
 }
 
+// The webhook plugin sends every user's playback to a destination unless "select your user" was
+// ticked. Events of someone else (a friend on the same server) must not move this account along.
+// Templates from before the user field, and accounts without a stored Jellyfin user, send or
+// know nothing to compare: those are let through as before.
+function hookUserMatches(userId, eventUser) {
+    const norm = (v) => String(v || '').replace(/-/g, '').toLowerCase();
+    if (!norm(eventUser) || /^\{\{/.test(eventUser)) return true;
+    let own = null;
+    try { own = jfEntry(loadJellyfin(), String(userId)); } catch { /* unreadable: let it through */ }
+    if (!own || !norm(own.userId)) return true;
+    return norm(own.userId) === norm(eventUser);
+}
+
 async function handleJellyfinEvent(userId, body) {
     const event = hookField(body, 'event', 40);
     const type = hookField(body, 'type', 20);
     const itemId = hookField(body, 'itemId', 64);
     if (!/^Playback(Start|Progress|Stop)$/.test(event) || !['Episode', 'Movie'].includes(type) || !itemId) return;
+    if (!hookUserMatches(userId, hookField(body, 'userId', 64))) return;
     hookSeen.set(userId, Date.now());
 
     const num = (name) => {
@@ -719,7 +821,7 @@ async function retryPending() {
 function publicSession(s) {
     const match = s.match && s.match.mediaId ? s.match : null;
     return {
-        type: s.type, name: s.name, series: s.series, season: s.season, episode: s.episode, episodeEnd: s.episodeEnd,
+        type: s.type, itemId: s.itemId, name: s.name, series: s.series, season: s.season, episode: s.episode, episodeEnd: s.episodeEnd,
         position: s.position, runtime: s.runtime, paused: !!s.paused, stopped: !!s.stoppedAt,
         device: s.device, client: s.client, updatedAt: s.updatedAt, tracked: s.tracked || null, rewatch: !!s.rewatch,
         match: match ? { mediaId: match.mediaId, title: match.title, cover: match.cover, episodes: match.episodes } : null,
@@ -727,9 +829,17 @@ function publicSession(s) {
     };
 }
 
-// nginx is the only way in (the container listens on 127.0.0.1), so X-Real-IP is trustworthy
+// nginx is the only way in (the container listens on 127.0.0.1), so X-Real-IP is trustworthy.
+// An IPv6 address counts per /64: one connection usually owns the whole block, so counting single
+// addresses would let anyone step around every limit.
 function clientIp(req) {
-    return String(req.headers['x-real-ip'] || req.socket.remoteAddress || '');
+    const ip = String(req.headers['x-real-ip'] || req.socket.remoteAddress || '');
+    if (!ip.includes(':') || ip.startsWith('::ffff:')) return ip;
+    const [head, tail] = ip.split('::');
+    const left = head ? head.split(':') : [];
+    const right = tail !== undefined && tail ? tail.split(':') : [];
+    const groups = tail === undefined ? left : [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill('0'), ...right];
+    return groups.slice(0, 4).map(g => (g || '0').toLowerCase().replace(/^0+(?=.)/, '')).join(':') + '::/64';
 }
 
 // Sliding one-window counter per bucket and key; true once `max` hits are used up
@@ -745,8 +855,18 @@ function overLimit(bucket, key, max, windowMs) {
     }
     recent.push(now);
     rateHits.set(id, recent);
-    if (rateHits.size > 10000) rateHits.clear();
+    if (rateHits.size > 10000) sweepRateHits();
     return false;
+}
+
+// Drops only counters whose hits are all older than the longest window. Clearing everything at
+// once would also reset the global AniList check cap, which is exactly what must hold under load.
+const RATE_KEEP_MS = 10 * 60 * 1000;
+function sweepRateHits() {
+    const now = Date.now();
+    for (const [id, hits] of rateHits) {
+        if (!hits.length || now - hits[hits.length - 1] > RATE_KEEP_MS) rateHits.delete(id);
+    }
 }
 
 // ===== AniList token check =====
@@ -798,7 +918,11 @@ async function verifyViewer(req) {
         const body = await res.json().catch(() => null);
         const viewer = body && body.data && body.data.Viewer;
         if (viewer) {
-            if (viewerCache.size > 500) viewerCache.clear();
+            // Drop the oldest answers only: clearing all would send everyone back to AniList at once
+            // and run straight into the check cap above
+            if (viewerCache.size >= 500) {
+                for (const key of [...viewerCache.keys()].slice(0, 100)) viewerCache.delete(key);
+            }
             viewerCache.set(token, { viewer, ts: Date.now() });
             return { status: 'ok', viewer };
         }
@@ -966,7 +1090,15 @@ function adminStats() {
         parties,
         anilist: { verifyPausedFor: Math.max(0, verifyPausedUntil - now) },
         errors: recentClientErrors(now),
-        server: { uptime: now - startedAt, rss: process.memoryUsage().rss, node: process.version },
+        server: {
+            uptime: now - startedAt, rss: process.memoryUsage().rss, node: process.version,
+            answers: answerCounts, serverErrors: serverErrors.slice(-10),
+            // Sizes of what the server keeps in memory, so growth shows before it hurts
+            maps: {
+                rateHits: rateHits.size, viewerCache: viewerCache.size, listCache: listCache.size,
+                nowPlaying: nowPlaying.size, jfRecent: jfRecent.size, seats: seats.size, queue: seatQueue.size,
+            },
+        },
     };
 }
 
@@ -1034,7 +1166,17 @@ function setCors(req, res) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Host-Key, X-Hook-Secret');
 }
 
+// Answers per status class since the start, and the paths of the last server errors, for the
+// admin page: problems show up there instead of only in docker logs
+const answerCounts = { ok: 0, client: 0, server: 0 };
+const serverErrors = [];
+
 function json(res, code, data) {
+    answerCounts[code >= 500 ? 'server' : code >= 400 ? 'client' : 'ok']++;
+    if (code >= 500 && res.req) {
+        serverErrors.push({ at: Date.now(), path: String(res.req.url || '').split('?')[0].replace(/[a-f0-9]{32,}/g, '…'), code });
+        if (serverErrors.length > 20) serverErrors.shift();
+    }
     res.writeHead(code, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(data));
 }
@@ -1207,6 +1349,14 @@ async function handle(req, res) {
         return html(res, 200, sharePage(entry, id));
     }
 
+    // Watch party invites (/w/<host> through nginx): the running party as a link preview, then on to it
+    const invite = pathname.match(/^\/share\/party\/([^/]+)$/);
+    if (invite && req.method === 'GET') {
+        let host = '';
+        try { host = decodeURIComponent(invite[1]).slice(0, 40); } catch { return html(res, 400, sharePage(null, null)); }
+        return html(res, 200, partyPage(host, party.preview(host)));
+    }
+
     // The browser hands us the display fields when a title is shared. Nobody can check them
     // against AniList here, so a stored preview is only replaced by a confirmed account —
     // otherwise anyone could put their own text on /a/<id> for every popular title.
@@ -1230,10 +1380,13 @@ async function handle(req, res) {
         const all = loadShare();
         const stored = all[String(id)];
         const changes = stored && ['title', 'cover', 'description', 'type'].some(k => stored[k] !== entry[k]);
-        if (changes && (await verifyViewer(req)).status !== 'ok') {
+        if (stored && !changes) return json(res, 200, { ok: true, url });
+        const verified = (await verifyViewer(req)).status === 'ok';
+        if (changes && !verified) {
             // The link works either way; keep the preview as it is
             return json(res, 200, { ok: true, url, kept: true });
         }
+        if (verified) entry.verified = true;
         all[String(id)] = entry;
         saveShare(all);
         return json(res, 200, { ok: true, url });
@@ -1270,6 +1423,18 @@ async function handle(req, res) {
         if (owner.key !== ADMIN_KEY) return json(res, 403, { error: 'Not for you' });
         const done = adminAction(await readBody(req));
         return done.status === 200 ? json(res, 200, adminStats()) : json(res, done.status, { error: done.error });
+    }
+
+    // For deploy.sh: the server answers and can read and write its data folder
+    if (pathname === '/api/health' && req.method === 'GET') {
+        try {
+            const probe = path.join(DATA_DIR, '.health');
+            writeFileAtomic(probe, String(Date.now()));
+            fs.readFileSync(probe, 'utf8');
+            return json(res, 200, { ok: true, uptime: Date.now() - startedAt });
+        } catch (e) {
+            return json(res, 503, { ok: false, error: e.code || e.message });
+        }
     }
 
     if (pathname === '/api/maintenance' && req.method === 'GET') {
@@ -1502,3 +1667,14 @@ setInterval(function() {
 server.listen(PORT, '0.0.0.0', function() {
     console.log('Aniroll API running on port ' + PORT);
 });
+
+// docker stop sends SIGTERM: stop taking requests, let the running ones finish, then leave.
+// Without this, Node as PID 1 ignores the signal and is killed hard after ten seconds.
+function shutDown(signal) {
+    console.log(`${signal}: shutting down`);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 3000).unref();
+}
+process.on('SIGTERM', () => shutDown('SIGTERM'));
+process.on('SIGINT', () => shutDown('SIGINT'));
+process.on('unhandledRejection', (e) => console.error('unhandled rejection:', e && e.stack || e));

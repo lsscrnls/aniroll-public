@@ -1,7 +1,7 @@
-import { getToken, isLoggedIn } from '../auth.js?v=133';
-import { getState, esc, toast } from '../store.js?v=133';
-import { showConfirm } from '../a11y.js?v=133';
-import * as api from '../api.js?v=133';
+import { getToken, isLoggedIn } from '../auth.js?v=134';
+import { getState, esc, toast } from '../store.js?v=134';
+import { showConfirm } from '../a11y.js?v=134';
+import * as api from '../api.js?v=134';
 
 // #/admin: how busy AniRoll is — seats, the line, requests, Jellyfin playback, errors — for its owner,
 // and what they can change: the limit, the VIPs, letting someone in, freeing a seat, maintenance mode,
@@ -17,7 +17,7 @@ const RANGES = [
 // A gap this long (server restarted, nothing sampled) breaks the line instead of bridging it
 const GAP_MS = 3 * 60 * 1000;
 
-const fmtTime = (t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const fmtClock = (t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const fmtAgo = (t, now) => {
     const s = Math.max(0, Math.round((now - t) / 1000));
     return s < 60 ? `${s} s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`;
@@ -67,7 +67,7 @@ function lineChart(host, points, { from, to, height = 220, limit = null, unit = 
     host.innerHTML = `<svg class="adm-chart-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-hidden="true">
         ${yTicks.map(v => `<line class="adm-grid" x1="${pad.l}" x2="${width - pad.r}" y1="${y(v)}" y2="${y(v)}"/>
             <text class="adm-axis" x="${pad.l - 8}" y="${y(v) + 4}" text-anchor="end">${Math.round(v)}</text>`).join('')}
-        ${compact ? '' : xTicks.map(t => `<text class="adm-axis" x="${x(t)}" y="${height - 6}" text-anchor="middle">${fmtTime(t)}</text>`).join('')}
+        ${compact ? '' : xTicks.map(t => `<text class="adm-axis" x="${x(t)}" y="${height - 6}" text-anchor="middle">${fmtClock(t)}</text>`).join('')}
         ${limit != null ? `<line class="adm-limit" x1="${pad.l}" x2="${width - pad.r}" y1="${y(limit)}" y2="${y(limit)}"/>
             <text class="adm-limit-label" x="${width - pad.r}" y="${y(limit) - 6}" text-anchor="end">Limit ${limit}</text>` : ''}
         ${runs.map(r => `<path class="adm-area" d="${area(r)}"/><path class="adm-line" d="${line(r)}"/>`).join('')}
@@ -92,7 +92,7 @@ function lineChart(host, points, { from, to, height = 220, limit = null, unit = 
         cross.querySelector('circle').setAttribute('cx', cx);
         cross.querySelector('circle').setAttribute('cy', cy);
         tip.hidden = false;
-        tip.innerHTML = `<strong>${esc(String(best.v))}${unit}</strong><span>${fmtTime(best.t)}</span>`;
+        tip.innerHTML = `<strong>${esc(String(best.v))}${unit}</strong><span>${fmtClock(best.t)}</span>`;
         const left = (cx / width) * r.width;
         tip.style.left = `${Math.min(r.width - 90, Math.max(0, left - 45))}px`;
         // Above the point, or below it when the point is at the top (the tooltip would hide it)
@@ -198,12 +198,12 @@ export async function render({ content }) {
         const day = d.samples.filter(s => s.t >= now - 24 * 3600e3);
         const peak = day.reduce((m, s) => (s.seats > m.seats ? s : m), { seats: d.seats, t: now });
 
-        $('adm-updated').textContent = `Updated ${fmtTime(now)} · refreshes every 30 s`;
+        $('adm-updated').textContent = `Updated ${fmtClock(now)} · refreshes every 30 s`;
         $('adm-tiles').innerHTML = [
             tile('Online now', `${d.seats}<small> / ${d.max}</small>`, d.seats >= d.max ? 'Full: newcomers wait in line' : `${d.max - d.seats} seats free`, d.seats / d.max),
             tile('In line', String(d.queue), d.queue ? 'Waiting for a seat' : 'Nobody waiting'),
             tile('VIPs online', String(d.vip), 'On top of the limit'),
-            tile('Peak, 24 h', String(peak.seats), peak.t ? `at ${fmtTime(peak.t)}` : ''),
+            tile('Peak, 24 h', String(peak.seats), peak.t ? `at ${fmtClock(peak.t)}` : ''),
             tile('Watching', String(d.watching), 'On Jellyfin, right now'),
             tile('Watch parties', String(d.parties), 'Running'),
         ].join('');
@@ -224,7 +224,7 @@ export async function render({ content }) {
             hours.set(k, row);
         }
         $('adm-seats-table').innerHTML = `<table class="adm-table"><thead><tr><th>Hour</th><th>Most online</th><th>Most in line</th><th>Requests</th></tr></thead><tbody>
-            ${[...hours].reverse().map(([t, r]) => `<tr><td>${fmtTime(t)}</td><td>${r.seats}</td><td>${r.queue}</td><td>${r.req}</td></tr>`).join('') || '<tr><td colspan="4">No samples yet</td></tr>'}
+            ${[...hours].reverse().map(([t, r]) => `<tr><td>${fmtClock(t)}</td><td>${r.seats}</td><td>${r.queue}</td><td>${r.req}</td></tr>`).join('') || '<tr><td colspan="4">No samples yet</td></tr>'}
         </tbody></table>`;
 
         $('adm-online').innerHTML = d.online.length ? `<table class="adm-table"><tbody>${d.online.map(u => `<tr>
@@ -232,10 +232,10 @@ export async function render({ content }) {
             <td class="adm-muted">${fmtAgo(u.seen, now)}</td>
             <td class="adm-act">${u.vip ? '' : `<button class="glass-btn glass-btn-secondary glass-btn-sm" data-free="${esc(u.key)}" data-name="${esc(u.name)}">Free seat</button>`}</td></tr>`).join('')}</tbody></table>` : '<p class="adm-note">Nobody online.</p>';
         $('adm-waiting').innerHTML = d.waiting.length ? `<table class="adm-table"><tbody>${d.waiting.map((u, i) => `<tr>
-            <td class="adm-num">${i + 1}</td><td>${esc(u.name)}</td><td class="adm-muted">since ${fmtTime(u.since)}</td>
+            <td class="adm-num">${i + 1}</td><td>${esc(u.name)}</td><td class="adm-muted">since ${fmtClock(u.since)}</td>
             <td class="adm-act"><button class="glass-btn glass-btn-primary glass-btn-sm" data-let-in="${esc(u.key)}">Let in</button></td></tr>`).join('')}</tbody></table>` : '<p class="adm-note">Nobody waiting.</p>';
         $('adm-errors').innerHTML = `<p class="adm-big">${d.errors.count}</p>` + (d.errors.latest.length
-            ? `<table class="adm-table"><tbody>${d.errors.latest.map(e => `<tr><td class="adm-muted">${fmtTime(Date.parse(e.at))}</td>
+            ? `<table class="adm-table"><tbody>${d.errors.latest.map(e => `<tr><td class="adm-muted">${fmtClock(Date.parse(e.at))}</td>
                 <td><span class="adm-err">${esc(e.message)}</span><span class="adm-muted"> · ${esc(e.route || '')} · v${esc(e.version || '?')}</span></td></tr>`).join('')}</tbody></table>`
             : '<p class="adm-note">None in the last 24 hours.</p>');
         $('adm-vips').innerHTML = `<table class="adm-table"><tbody>${d.vips.map(v => `<tr>
@@ -245,7 +245,7 @@ export async function render({ content }) {
         const limitInput = $('adm-limit');
         if (document.activeElement !== limitInput) limitInput.value = String(d.max);
         const maint = d.maintenance;
-        $('adm-maint-state').textContent = maint ? `On since ${fmtTime(Date.parse(maint.since))}${maint.note ? `: “${maint.note}”` : ''}` : 'Off: background sync runs, nobody sees a notice.';
+        $('adm-maint-state').textContent = maint ? `On since ${fmtClock(Date.parse(maint.since))}${maint.note ? `: “${maint.note}”` : ''}` : 'Off: background sync runs, nobody sees a notice.';
         $('adm-maint-btn').textContent = maint ? 'Switch off' : 'Switch on';
         $('adm-maint-note').closest('.adm-field').hidden = !!maint;
         $('adm-clear-errors').hidden = !d.errors.count;

@@ -1,4 +1,4 @@
-import { esc, emptyIcon } from './store.js?v=133';
+import { esc, emptyIcon } from './store.js?v=134';
 
 const routes = [];
 let currentCleanup = null;
@@ -48,6 +48,10 @@ export async function resolve() {
             content.innerHTML = '<div class="page-loader"><div class="loader-spinner"></div></div>';
             // Right away, not after loading: the calendar waits for its schedule first
             updateActiveNav(path);
+            // A page may name itself (a studio, the player); otherwise its heading does, below
+            document.title = 'AniRoll';
+            const focusWasOnPage = !document.activeElement || document.activeElement === document.body || main.contains(document.activeElement)
+                || !!document.activeElement.closest?.('.nav-links, .mobile-tabbar');
 
             try {
                 const cleanup = await r.handler({ params, query, content });
@@ -57,6 +61,7 @@ export async function resolve() {
                     return;
                 }
                 if (typeof cleanup === 'function') currentCleanup = cleanup;
+                announcePage(content, id, focusWasOnPage);
             } catch (err) {
                 if (id !== navId) return;
                 console.error('Route error:', err);
@@ -78,12 +83,27 @@ export async function resolve() {
         </div>`;
 }
 
+// After a page change: the tab title says which page this is, and focus moves to the page's heading so a
+// screen reader reads where you are and Tab continues from there (not on the first load, and not when focus
+// is somewhere else on purpose, e.g. in the search box)
+function announcePage(content, id, focusWasOnPage) {
+    const h1 = content.querySelector('h1');
+    const name = h1?.textContent.trim().replace(/\s+/g, ' ');
+    if (document.title === 'AniRoll' && name && name !== 'AniRoll') document.title = `${name} · AniRoll`;
+    if (id === 1 || !focusWasOnPage || !h1 || document.querySelector('[aria-modal="true"]')) return;
+    if (!h1.hasAttribute('tabindex')) h1.setAttribute('tabindex', '-1');
+    h1.focus({ preventScroll: true });
+}
+
 function updateActiveNav(path) {
     const page = path === '/' ? 'home' : path.split('/')[1];
     // A studio page is reached from a detail page, but belongs with discovering shows
     const group = DISCOVER_PAGES.includes(page) || page === 'studio' ? 'discover' : null;
     document.querySelectorAll('[data-page]').forEach(el => {
-        el.classList.toggle('active', el.dataset.page === page || el.dataset.page === group);
+        const on = el.dataset.page === page || el.dataset.page === group;
+        el.classList.toggle('active', on);
+        if (on) el.setAttribute('aria-current', 'page');
+        else el.removeAttribute('aria-current');
     });
     // The Discover tab brings you back to the view you used last
     if (group) {

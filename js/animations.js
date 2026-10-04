@@ -3,6 +3,7 @@ const cursorEl = document.getElementById('cursor');
 let magneticCleanups = [];
 let scrollTriggers = [];
 let lenisRafId = null;
+let lenisWake = null;
 let cursorInitialized = false;
 
 // "Reduce motion" in the system settings: no smooth scrolling, nothing flies in, moves along
@@ -33,7 +34,7 @@ export function startLenis() {
 }
 
 export function lenisScrollTo(target, opts) {
-    if (lenis) lenis.scrollTo(target, opts);
+    if (lenis) { lenis.scrollTo(target, opts); lenisWake?.(); }
     else {
         // Without Lenis (reduce motion): a number, or an element and the offset above it
         const top = typeof target === 'number' ? target
@@ -46,7 +47,7 @@ export function refreshAnimations() {
     scrollTriggers.forEach(st => st.kill());
     scrollTriggers = [];
 
-    if (lenis) lenis.scrollTo(0, { immediate: true });
+    if (lenis) { lenis.scrollTo(0, { immediate: true }); lenisWake?.(); }
     else window.scrollTo(0, 0);
 
     initMagnetics();
@@ -81,10 +82,16 @@ function initLenis() {
 
     lenis.on('scroll', () => window.ScrollTrigger?.update());
 
+    // Lenis needs a frame only while it scrolls; with the page at rest the loop sleeps until the next wheel,
+    // touch or key, instead of running 60 times a second forever (and under the player, where it is stopped)
     function raf(time) {
         lenis.raf(time);
-        lenisRafId = requestAnimationFrame(raf);
+        lenisRafId = lenis.isScrolling || lenis.isStopped === false && lenis.velocity ? requestAnimationFrame(raf) : null;
     }
+    const wake = () => { if (!lenisRafId && lenis) lenisRafId = requestAnimationFrame(raf); };
+    lenis.on('scroll', wake);
+    for (const ev of ['wheel', 'touchstart', 'touchmove', 'keydown', 'pointerdown']) window.addEventListener(ev, wake, { passive: true });
+    lenisWake = wake;
     lenisRafId = requestAnimationFrame(raf);
 }
 
@@ -98,11 +105,11 @@ function initCursor() {
     document.documentElement.addEventListener('mouseenter', () => cursorEl.classList.remove('hide'));
 }
 
+// Material 3 hides this cursor and draws its own (js/m3.js): nothing to move then
 function onMouseMove(e) {
-    if (cursorEl) {
-        cursorEl.style.left = e.clientX + 'px';
-        cursorEl.style.top = e.clientY + 'px';
-    }
+    if (!cursorEl || document.documentElement.dataset.design === 'm3') return;
+    cursorEl.style.left = e.clientX + 'px';
+    cursorEl.style.top = e.clientY + 'px';
 }
 
 function initMagnetics() {
@@ -116,16 +123,20 @@ function initMagnetics() {
         let tweenMove = null;
         let tweenLeave = null;
 
+        // The box is measured when the pointer comes in, not on every move; quickTo reuses one tween
+        let rect = null;
+        const toX = gsap.quickTo(el, 'x', { duration: 0.3, ease: 'power2.out' });
+        const toY = gsap.quickTo(el, 'y', { duration: 0.3, ease: 'power2.out' });
         function onMove(e) {
-            const rect = el.getBoundingClientRect();
-            const x = e.clientX - rect.left - rect.width / 2;
-            const y = e.clientY - rect.top - rect.height / 2;
-            if (tweenLeave) tweenLeave.kill();
-            tweenMove = gsap.to(el, { x: x * strength, y: y * strength, duration: 0.3, ease: 'power2.out', overwrite: true });
+            rect ||= el.getBoundingClientRect();
+            if (tweenLeave) { tweenLeave.kill(); tweenLeave = null; }
+            toX((e.clientX - rect.left - rect.width / 2) * strength);
+            toY((e.clientY - rect.top - rect.height / 2) * strength);
             cursorEl?.classList.add('grow');
         }
 
         function onLeave() {
+            rect = null;
             if (tweenMove) tweenMove.kill();
             tweenLeave = gsap.to(el, { x: 0, y: 0, duration: 0.5, ease: 'elastic.out(1, 0.4)', overwrite: true });
             cursorEl?.classList.remove('grow');
@@ -145,10 +156,11 @@ function initMagnetics() {
 function initScrollReveals() {
     if (!window.ScrollTrigger || prefersReducedMotion()) return;
 
-    // Material 3 deals its cards in with its own motion (css/m3.css), so they are left out there
+    // Material 3 deals cards, rows and posts in with its own springs (css/m3.css), so they are left out there
     const m3 = document.documentElement.dataset.design === 'm3';
+    const ownMotion = '.media-card, .activity-card, .list-entry, .schedule-item, .notif-item';
     document.querySelectorAll('.media-card, .activity-card, .list-entry, .schedule-item, .notif-item, .landing-feature, .stat-chart').forEach(el => {
-        if (el._revealDone || (m3 && el.classList.contains('media-card'))) return;
+        if (el._revealDone || (m3 && el.matches(ownMotion))) return;
 
         const tween = gsap.from(el, {
             y: 32,
@@ -192,9 +204,12 @@ function initParallax() {
     });
 }
 
+// One observer for every page: a new one per page kept the old pages' numbers alive
+let counterObserver = null;
 function initSmoothCounter() {
     if (prefersReducedMotion()) return; // the numbers are already in the markup
-    const observer = new IntersectionObserver((entries) => {
+    counterObserver?.disconnect();
+    const observer = counterObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 animateCounter(entry.target);

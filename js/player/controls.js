@@ -2,8 +2,10 @@
 // player uses the fixed colour roles of the scheme, which read the same in light and dark mode).
 // The seek bar is the same wave as every progress bar in AniRoll: wave up to where you are, a handle,
 // flat track after it. The dot on the track marks 90%, where AniList counts the episode.
-//   mountControls(root, video, { watchedAt }) -> destroy()
+//   mountControls(root, video, { watchedAt, runtime, autoSkip }) -> { set...(), act(name), destroy() }
 // Icons: Material Symbols Rounded 400 (Apache-2.0), inline so both designs show them.
+import { esc } from '../store.js?v=134';
+
 
 const ICON = {
     play: 'M320-258v-450q0-14 9-22t21-8q4 0 8 1t8 3l354 226q7 5 10.5 11t3.5 14q0 8-3.5 14T720-458L366-232q-4 2-8 3t-8 1q-12 0-21-8t-9-22Z',
@@ -31,6 +33,16 @@ const STEP = 10;
 const VOLUME_KEY = 'aniroll_player_volume';
 // Up next: seconds of playing time before the next episode starts by itself
 const COUNTDOWN = 10;
+// After this many episodes in a row that started by themselves, Up next asks instead of counting down
+const AUTOPLAY_RUN = 3;
+const AUTOPLAY_KEY = 'aniroll_autoplay_run';
+const STOP_AFTER_KEY = 'aniroll_stop_after';
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const SUB_SIZE_KEY = 'aniroll_sub_size';
+const SUB_SIZES = { s: 'Small', m: 'Medium', l: 'Large', xl: 'Extra large' };
+const SEGMENT_NAMES = { Intro: 'Intro', Recap: 'Recap', Outro: 'Credits', Preview: 'Preview', Commercial: 'Ad' };
+const sessionNumber = (key) => { try { return Number(sessionStorage.getItem(key)) || 0; } catch { return 0; } };
+const setSession = (key, value) => { try { value ? sessionStorage.setItem(key, String(value)) : sessionStorage.removeItem(key); } catch { /* not kept */ } };
 
 export function fmtTime(s) {
     if (!Number.isFinite(s) || s < 0) s = 0;
@@ -47,6 +59,7 @@ export function controlsHtml() {
             <div class="pl-stats-head"><span>Stats for nerds</span><button class="pl-btn pl-stats-close" data-act="stats" aria-label="Close the stats" title="Close (I)">${icon('close')}</button></div>
             <div class="pl-stats-body"></div>
         </div>
+        <div class="pl-osd" role="status" aria-live="polite" hidden></div>
         <div class="pl-center">
             <button class="pl-btn pl-btn-tonal pl-skip" data-act="back10" aria-label="Back 10 seconds" title="Back 10 s (←)">${icon('back10')}</button>
             <button class="pl-btn pl-play" data-act="play" aria-label="Play" title="Play (Space)">${icon('play')}</button>
@@ -55,15 +68,20 @@ export function controlsHtml() {
         <div class="pl-bottom">
             <div class="pl-seek" role="slider" tabindex="0" aria-label="Position" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0:00">
                 <div class="pl-seek-track"></div>
+                <div class="pl-seek-segments" aria-hidden="true"></div>
                 <div class="pl-seek-buffer"></div>
                 <div class="pl-seek-wave"></div>
                 <div class="pl-seek-mark" title="From here the episode counts as watched"></div>
                 <div class="pl-seek-handle"></div>
-                <div class="pl-seek-hover" aria-hidden="true"></div>
+                <div class="pl-seek-hover" aria-hidden="true">
+                    <div class="pl-seek-thumb" hidden></div>
+                    <div class="pl-seek-hover-row"><span class="pl-seek-hover-seg" hidden></span><span class="pl-seek-hover-time">0:00</span></div>
+                </div>
             </div>
             <button class="pl-skip-segment" data-act="skipSegment" hidden></button>
             <div class="pl-next" role="group" aria-label="Up next" hidden>
-                <div class="pl-next-text"><span class="pl-next-kicker">Up next</span><span class="pl-next-title"></span></div>
+                <div class="pl-next-thumb" hidden><img alt="" loading="lazy" decoding="async"></div>
+                <div class="pl-next-text"><span class="pl-next-kicker">Up next</span><span class="pl-next-title"></span><span class="pl-next-meta" hidden></span></div>
                 <button class="pl-next-play" data-act="playNext">${icon('skipNext')}<span class="pl-next-label">Play now</span></button>
                 <button class="pl-next-stay" data-act="cancelNext">Watch credits</button>
             </div>
@@ -92,7 +110,8 @@ export function controlsHtml() {
 }
 
 // root: the .player element (holds controlsHtml()), video: its <video>
-export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 } = {}) {
+// autoSkip: { get() -> bool, set(bool) } — skip intros and recaps by themselves, kept per show by the page
+export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0, autoSkip = null } = {}) {
     const $ = (sel) => root.querySelector(sel);
     const seek = $('.pl-seek');
     const playBtn = $('.pl-play');
@@ -120,6 +139,27 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
 
     const duration = () => (Number.isFinite(video.duration) && video.duration) || runtime() || 0;
     $('.pl-seek-mark').style.left = `${watchedAt * 100}%`;
+    let subSize = 'm';
+    try { subSize = SUB_SIZES[localStorage.getItem(SUB_SIZE_KEY)] ? localStorage.getItem(SUB_SIZE_KEY) : 'm'; } catch { /* default */ }
+    root.dataset.subSize = subSize;
+
+    // ----- A short word in the middle when a key changed something the controls may not show -----
+    const osdBox = $('.pl-osd');
+    let osdTimer = 0;
+    function osd(text, action = null) {
+        clearTimeout(osdTimer);
+        osdBox.innerHTML = `<span>${esc(text)}</span>${action ? `<button type="button" class="pl-osd-act">${esc(action.label)}</button>` : ''}`;
+        osdBox.hidden = false;
+        osdBox.classList.remove('is-in');
+        void osdBox.offsetWidth;
+        osdBox.classList.add('is-in');
+        if (action) osdBox.querySelector('.pl-osd-act').onclick = (ev) => { ev.stopPropagation(); action.run(); hideOsd(); };
+        osdTimer = setTimeout(hideOsd, action ? 5000 : 1200);
+    }
+    function hideOsd() {
+        osdBox.classList.remove('is-in');
+        osdTimer = setTimeout(() => { osdBox.hidden = true; }, 200);
+    }
 
     try {
         const saved = JSON.parse(localStorage.getItem(VOLUME_KEY) || 'null');
@@ -175,6 +215,27 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     // ----- Actions -----
     const togglePlay = () => (video.paused ? video.play().catch(() => {}) : video.pause());
     const jump = (s) => { video.currentTime = Math.max(0, Math.min(duration() || Infinity, video.currentTime + s)); paintTime(); wake(); };
+    const setSpeed = (rate) => {
+        video.playbackRate = rate;
+        osd(rate === 1 ? 'Normal speed' : `Speed ${rate}×`);
+    };
+    const stepSpeed = (dir) => {
+        const i = SPEEDS.indexOf(video.playbackRate);
+        const at = i === -1 ? SPEEDS.indexOf(1) : i;
+        setSpeed(SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, at + dir))]);
+    };
+    const shiftSubs = (by) => {
+        if (!subs.setDelay || subs.current() == null) return osd('No subtitles on');
+        const d = subs.setDelay(by === 0 ? 0 : (subs.delay() || 0) + by);
+        osd(d === 0 ? 'Subtitle timing reset' : `Subtitles ${d > 0 ? 'later' : 'earlier'} by ${Math.abs(d).toFixed(1)} s`);
+    };
+    let stopAfter = sessionNumber(STOP_AFTER_KEY) === 1;
+    const toggleStopAfter = () => {
+        stopAfter = !stopAfter;
+        setSession(STOP_AFTER_KEY, stopAfter ? 1 : 0);
+        osd(stopAfter ? 'Stops after this episode' : 'Keeps playing the next episode');
+        paintNext();
+    };
     const toggleFullscreen = () => {
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         // The whole document, not the player: the next episode is a new page and keeps full screen
@@ -198,8 +259,13 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     const openSettings = () => {
         const nowQ = quality.current();
         menu.innerHTML = `<div class="pl-menu-title">Quality</div>`
-            + quality.list().map(q => menuItem(escapeHtml(q.label), 'data-quality', q.id, q.id === nowQ)).join('')
+            + quality.list().map(q => menuItem(esc(q.label), 'data-quality', q.id, q.id === nowQ)).join('')
             + '<div class="pl-menu-divider" role="separator"></div>'
+            + `<div class="pl-menu-title">Speed</div><div class="pl-menu-chips" role="group" aria-label="Speed">`
+            + SPEEDS.map(r => `<button class="pl-menu-chip${r === video.playbackRate ? ' is-on' : ''}" data-speed="${r}" aria-pressed="${r === video.playbackRate}">${r === 1 ? 'Normal' : `${r}×`}</button>`).join('')
+            + '</div><div class="pl-menu-divider" role="separator"></div>'
+            + (autoSkip ? menuItem('Skip intros automatically', 'data-autoskip', '1', !!autoSkip.get(), 'menuitemcheckbox') : '')
+            + menuItem('Stop after this episode', 'data-stopafter', '1', stopAfter, 'menuitemcheckbox')
             + menuItem('Stats for nerds', 'data-stats', '1', !statsBox.hidden, 'menuitemcheckbox');
         menuKind = 'settings';
         menu.hidden = false;
@@ -216,13 +282,21 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         const nowAudio = audio.current();
         menu.innerHTML = (tracks.length > 1
             ? `<div class="pl-menu-title">Audio</div>`
-                + tracks.map(t => item(escapeHtml(t.label), 'data-audio', t.id, t.id === nowAudio)).join('')
+                + tracks.map(t => item(esc(t.label), 'data-audio', t.id, t.id === nowAudio)).join('')
                 + (list.length ? '<div class="pl-menu-divider" role="separator"></div>' : '')
             : '')
             + (list.length
                 ? `<div class="pl-menu-title">Subtitles</div>`
                     + item('Off', 'data-track', 'off', current == null)
-                    + list.map(t => item(escapeHtml(t.label), 'data-track', t.id, t.id === current)).join('')
+                    + list.map(t => item(esc(t.label), 'data-track', t.id, t.id === current)).join('')
+                    + (subs.setDelay ? '<div class="pl-menu-divider" role="separator"></div>'
+                        + `<div class="pl-menu-title">Timing${subs.delay?.() ? ` · ${subs.delay() > 0 ? '+' : ''}${subs.delay().toFixed(1)} s` : ''}</div><div class="pl-menu-chips" role="group" aria-label="Subtitle timing">`
+                        + `<button class="pl-menu-chip" data-subdelay="-0.5" title="Earlier (Z: 0.1 s)">−0.5 s</button>`
+                        + `<button class="pl-menu-chip" data-subdelay="0">Reset</button>`
+                        + `<button class="pl-menu-chip" data-subdelay="0.5" title="Later (X: 0.1 s)">+0.5 s</button></div>` : '')
+                    + `<div class="pl-menu-title">Size</div><div class="pl-menu-chips" role="group" aria-label="Subtitle size">`
+                    + Object.entries(SUB_SIZES).map(([k, label]) => `<button class="pl-menu-chip${k === subSize ? ' is-on' : ''}" data-subsize="${k}" aria-pressed="${k === subSize}" title="${label}">${k.toUpperCase()}</button>`).join('')
+                    + '</div>'
                 : '');
         menuKind = 'subs';
         menu.hidden = false;
@@ -243,8 +317,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     const paintStats = () => {
         let sections = [];
         try { sections = stats() || []; } catch { /* a moment without numbers */ }
-        $('.pl-stats-body').innerHTML = sections.map(sec => `<div class="pl-stats-sec"><div class="pl-stats-title">${escapeHtml(sec.title)}</div>`
-            + sec.rows.map(([k, v]) => `<div class="pl-stats-row"><span>${escapeHtml(k)}</span><span>${escapeHtml(String(v))}</span></div>`).join('') + '</div>').join('');
+        $('.pl-stats-body').innerHTML = sections.map(sec => `<div class="pl-stats-sec"><div class="pl-stats-title">${esc(sec.title)}</div>`
+            + sec.rows.map(([k, v]) => `<div class="pl-stats-row"><span>${esc(k)}</span><span>${esc(String(v))}</span></div>`).join('') + '</div>').join('');
     };
     const toggleStats = (show = statsBox.hidden) => {
         statsBox.hidden = !show;
@@ -272,6 +346,21 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
             else if (act === 'cancelNext') cancelNext();
             return;
         }
+        const chip = ev.target.closest('.pl-menu-chip');
+        if (chip) {
+            if (chip.dataset.speed) setSpeed(Number(chip.dataset.speed));
+            else if (chip.dataset.subdelay != null) shiftSubs(Number(chip.dataset.subdelay));
+            else if (chip.dataset.subsize) {
+                subSize = chip.dataset.subsize;
+                root.dataset.subSize = subSize;
+                try { localStorage.setItem(SUB_SIZE_KEY, subSize); } catch { /* not kept */ }
+            }
+            // The menu stays open for another step; redraw it with the new choice
+            const reopen = menuKind === 'settings' ? openSettings : openMenu;
+            reopen();
+            menu.querySelector(`.pl-menu-chip[data-${Object.keys(chip.dataset)[0]}="${Object.values(chip.dataset)[0]}"]`)?.focus();
+            return;
+        }
         const item = ev.target.closest('.pl-menu-item');
         if (item) {
             if (item.dataset.audio != null) {
@@ -282,6 +371,11 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
                 if (q !== quality.current()) quality.select(q);
             } else if (item.dataset.stats != null) {
                 toggleStats();
+            } else if (item.dataset.autoskip != null) {
+                autoSkip.set(!autoSkip.get());
+                osd(autoSkip.get() ? 'Intros are skipped for this show' : 'Intros play again');
+            } else if (item.dataset.stopafter != null) {
+                toggleStopAfter();
             } else {
                 setSubs(item.dataset.track === 'off' ? null : Number(item.dataset.track));
             }
@@ -304,8 +398,29 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     let skipFrom = 0; // where in the video the button came up for this segment
     const skipBtn = $('.pl-skip-segment');
     const SKIP_LABEL = { Intro: 'Skip intro', Recap: 'Skip recap', Outro: 'Skip credits', Preview: 'Skip preview', Commercial: 'Skip ad' };
+    // Intro and recap skip themselves when the show asks for it — only when playback ran into them, not after
+    // a jump into the middle (someone who seeks back into the opening wants to see it), and once per segment
+    const autoSkipped = new Set();
+    let segLastT = 0;
+    function autoSkipCheck(seg, t) {
+        const ranInto = segLastT < seg.start + 0.5 && t - segLastT < 2;
+        if (!autoSkip?.get() || !ranInto || autoSkipped.has(seg) || !['Intro', 'Recap'].includes(seg.type)) return false;
+        autoSkipped.add(seg);
+        const back = seg.start;
+        video.currentTime = Math.min(seg.end, (duration() || seg.end) - 0.5);
+        osd(`Skipped ${SEGMENT_NAMES[seg.type].toLowerCase()}`, { label: 'Undo', run: () => { video.currentTime = back; } });
+        return true;
+    }
+    function paintSegmentBar() {
+        const d = duration();
+        $('.pl-seek-segments').innerHTML = d ? segments.map(g => `<span class="pl-seek-seg" data-type="${esc(g.type)}"
+            style="left:${(g.start / d) * 100}%;width:${((g.end - g.start) / d) * 100}%"></span>`).join('') : '';
+    }
     function paintSegment() {
         const t = video.currentTime;
+        const inSeg = segments.find(g => t >= g.start && t < g.end - 1);
+        if (inSeg && autoSkipCheck(inSeg, t)) { segLastT = video.currentTime; return; }
+        segLastT = t;
         // Shown from the segment's start until a second before it ends
         const seg = segments.find(g => t >= g.start && t < g.end - 1 && !(g.type === 'Outro' && nextState === 'shown'));
         skipTarget = seg ? seg.end : null;
@@ -328,6 +443,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
 
     // ----- Up next: from the credits (or the last 30 s) a card counts down to the next episode -----
     let next = null;
+    let prev = null;
     let nextState = 'off'; // 'off' | 'shown' | 'cancelled'
     let nextLeft = COUNTDOWN;
     let nextTimer = 0;
@@ -344,6 +460,9 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         $('.pl-next-label').textContent = `Play now · ${left}`;
         nextBox.style.setProperty('--pl-next-done', `${(1 - Math.max(0, nextLeft) / COUNTDOWN) * 100}%`);
     }
+    // Up next waits for a tap instead of counting down: asked to stop after this episode, or several
+    // episodes in a row started by themselves (someone may have fallen asleep)
+    const holdNext = () => stopAfter || sessionNumber(AUTOPLAY_KEY) >= AUTOPLAY_RUN;
     function paintNext() {
         if (!next) return;
         const before = video.currentTime < nextFrom() - 1;
@@ -351,26 +470,34 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         if (before) nextState = 'off';
         else if (nextState === 'off') { nextState = 'shown'; nextLeft = COUNTDOWN; paintNextCount(); }
         const show = nextState === 'shown';
+        const hold = holdNext();
+        nextBox.classList.toggle('is-held', hold);
+        $('.pl-next-kicker').textContent = hold ? (stopAfter ? 'Stopping here' : 'Still watching?') : 'Up next';
+        if (hold) $('.pl-next-label').textContent = stopAfter ? 'Play it anyway' : 'Keep watching';
+        else if (show) paintNextCount();
         if (nextBox.hidden === show) {
             nextBox.hidden = !show;
             root.classList.toggle('has-next', show);
             clearInterval(nextTimer);
             // Counts only while the video plays (or has ended): pausing on the credits holds it
-            if (show) {
+            if (show && !hold) {
                 root.dispatchEvent(new CustomEvent('aniroll:player-upnext', { bubbles: true, detail: { box: nextBox } }));
                 nextTimer = setInterval(() => {
                 if (video.paused && !video.ended) return;
                 nextLeft -= 0.25;
                 paintNextCount();
-                if (nextLeft <= 0) playNext();
+                if (nextLeft <= 0) playNext(true);
                 }, 250);
             }
         }
     }
-    function playNext() {
+    // auto: the countdown ran out, nobody chose it
+    function playNext(auto = false) {
         if (!next || nextState === 'gone') return;
         nextState = 'gone';
         clearInterval(nextTimer);
+        setSession(AUTOPLAY_KEY, auto ? sessionNumber(AUTOPLAY_KEY) + 1 : 0);
+        if (stopAfter) { stopAfter = false; setSession(STOP_AFTER_KEY, 0); }
         next.go();
     }
     function cancelNext() {
@@ -403,13 +530,26 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         $('.pl-end .pl-next-kicker').textContent = endInfo.kicker;
         $('.pl-end-title').textContent = endInfo.title;
         const actions = $('.pl-end-actions');
-        actions.innerHTML = (endInfo.actions || []).map((a, i) => a.href
-            ? `<a class="${a.primary ? 'pl-next-play' : 'pl-next-stay'}" href="${escapeHtml(a.href)}">${escapeHtml(a.label)}</a>`
-            : `<button type="button" class="${a.primary ? 'pl-next-play' : 'pl-next-stay'}" data-end="${i}">${escapeHtml(a.label)}</button>`).join('');
+        const rate = endInfo.rate;
+        actions.innerHTML = (rate ? `<div class="pl-rate">
+                <label class="pl-rate-label" for="pl-rate-input">Your score <output class="pl-rate-value">${rate.value || '–'}</output></label>
+                <input id="pl-rate-input" class="pl-rate-input" type="range" min="0" max="100" step="5" value="${rate.value || 0}" aria-label="Your score out of 100">
+                <button type="button" class="pl-next-play pl-rate-save" data-rate>${rate.value ? 'Update score' : 'Save score'}</button>
+            </div>` : '') + (endInfo.actions || []).map((a, i) => a.href
+            ? `<a class="${a.primary ? 'pl-next-play' : 'pl-next-stay'}" href="${esc(a.href)}">${esc(a.label)}</a>`
+            : `<button type="button" class="${a.primary ? 'pl-next-play' : 'pl-next-stay'}" data-end="${i}">${esc(a.label)}</button>`).join('');
     }
     on(endBox, 'click', (ev) => {
         const btn = ev.target.closest('[data-end]');
         if (btn) endInfo?.actions?.[Number(btn.dataset.end)]?.run?.(btn);
+        const save = ev.target.closest('[data-rate]');
+        if (save && endInfo?.rate) {
+            const value = Number(endBox.querySelector('.pl-rate-input').value);
+            endInfo.rate.save(value, save);
+        }
+    });
+    on(endBox, 'input', (ev) => {
+        if (ev.target.classList.contains('pl-rate-input')) endBox.querySelector('.pl-rate-value').textContent = ev.target.value;
     });
 
     // The end: straight on, unless the credits were watched — then the card asks once more, with its countdown
@@ -418,7 +558,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         root.dispatchEvent(new CustomEvent('aniroll:player-ended', { bubbles: true,
             detail: { credits: nextState === 'cancelled' || (span >= 10 && tailPlayed >= span * 0.8) } }));
         if (!next) return paintEnd(true);
-        if (nextState !== 'cancelled') return playNext();
+        if (holdNext()) return;
+        if (nextState !== 'cancelled') return playNext(true);
         nextState = 'off';
         paintNext();
     });
@@ -433,16 +574,28 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         dragging = true;
         seek.setPointerCapture(ev.pointerId);
         root.classList.add('is-seeking');
+        paintHover(ev.clientX);
         paintTime(timeAt(ev.clientX));
         wake();
     });
-    on(seek, 'pointermove', (ev) => {
-        const t = timeAt(ev.clientX);
+    // The label over the wave: the time and, inside an intro or the credits, which one. It is a column with
+    // room for a picture above, so preview thumbnails can go in without moving anything
+    const hoverBox = $('.pl-seek-hover');
+    const paintHover = (clientX) => {
+        const t = timeAt(clientX);
         const r = seek.getBoundingClientRect();
-        const hover = $('.pl-seek-hover');
-        hover.textContent = fmtTime(t);
-        hover.style.left = `${Math.max(24, Math.min(r.width - 24, ev.clientX - r.left))}px`;
-        if (dragging) paintTime(t);
+        $('.pl-seek-hover-time').textContent = fmtTime(t);
+        const seg = segments.find(g => t >= g.start && t < g.end);
+        const segEl = $('.pl-seek-hover-seg');
+        segEl.hidden = !seg;
+        if (seg) segEl.textContent = SEGMENT_NAMES[seg.type] || seg.type;
+        root.dispatchEvent(new CustomEvent('aniroll:player-hover', { detail: { time: t, thumb: $('.pl-seek-thumb') } }));
+        const half = Math.max(24, hoverBox.offsetWidth / 2);
+        hoverBox.style.left = `${Math.max(half, Math.min(r.width - half, clientX - r.left))}px`;
+    };
+    on(seek, 'pointermove', (ev) => {
+        paintHover(ev.clientX);
+        if (dragging) paintTime(timeAt(ev.clientX));
     });
     const endDrag = (ev) => {
         if (!dragging) return;
@@ -481,21 +634,38 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         }
         const key = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
         const onButton = ev.target.closest?.('button');
+        // Any key counts as someone being there: the next Up next counts down again
+        setSession(AUTOPLAY_KEY, 0);
+        // 0-9: to 0 % … 90 % of the episode, as on YouTube
+        if (/^[0-9]$/.test(ev.key) && duration()) {
+            ev.preventDefault();
+            video.currentTime = (Number(ev.key) / 10) * duration();
+            paintTime();
+            wake();
+            return;
+        }
         const handled = {
             ' ': () => { if (!onButton) togglePlay(); else return false; },
             k: togglePlay,
-            ArrowLeft: () => jump(-STEP),
-            ArrowRight: () => jump(STEP),
-            j: () => jump(-STEP),
-            l: () => jump(STEP),
-            ArrowUp: () => { video.muted = false; video.volume = Math.min(1, video.volume + 0.1); },
-            ArrowDown: () => { video.volume = Math.max(0, video.volume - 0.1); },
+            ArrowLeft: () => { jump(-STEP); osd(`−${STEP} s`); },
+            ArrowRight: () => { jump(STEP); osd(`+${STEP} s`); },
+            j: () => { jump(-STEP); osd(`−${STEP} s`); },
+            l: () => { jump(STEP); osd(`+${STEP} s`); },
+            ArrowUp: () => { video.muted = false; video.volume = Math.min(1, video.volume + 0.1); osd(`Volume ${Math.round(video.volume * 100)} %`); },
+            ArrowDown: () => { video.volume = Math.max(0, video.volume - 0.1); osd(`Volume ${Math.round(video.volume * 100)} %`); },
             f: toggleFullscreen,
-            m: () => { video.muted = !video.muted; },
-            c: toggleSubs,
+            m: () => { video.muted = !video.muted; osd(video.muted ? 'Muted' : `Volume ${Math.round(video.volume * 100)} %`); },
+            c: () => { toggleSubs(); osd(subs.current() == null ? 'Subtitles off' : 'Subtitles on'); },
             s: skipSegment,
-            n: () => { if (next) playNext(); else return false; },
+            // Shift+N: the episode before
+            n: () => {
+                if (ev.shiftKey) { if (prev) prev.go(); else return false; } else if (next) playNext(); else return false;
+            },
             i: () => toggleStats(),
+            '[': () => stepSpeed(-1),
+            ']': () => stepSpeed(1),
+            z: () => shiftSubs(-0.1),
+            x: () => shiftSubs(0.1),
         }[key];
         if (handled && handled() !== false) {
             ev.preventDefault();
@@ -504,10 +674,11 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
     });
 
     on(root, 'pointermove', wake);
+    on(root, 'pointerdown', () => setSession(AUTOPLAY_KEY, 0));
     on(root, 'focusin', wake);
     on(video, 'timeupdate', () => { if (!dragging) paintTime(); paintNext(); if (segments.length) paintSegment(); });
     on(video, 'progress', () => paintTime());
-    on(video, 'durationchange', () => paintTime());
+    on(video, 'durationchange', () => { paintTime(); paintSegmentBar(); });
     on(video, 'play', paintPlay);
     on(video, 'pause', paintPlay);
     on(video, 'volumechange', paintVolume);
@@ -584,12 +755,35 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         setSubtitlesLoading(on) {
             $('.pl-subs-note').hidden = !on;
         },
-        // The next episode, once it is known to be there: { title, go() }
+        // The next episode, once it is known to be there: { title, go(), image?, meta? }
         setNext(info) {
             next = info;
             $('[data-act="nextEp"]').hidden = false;
             $('.pl-next-title').textContent = info.title;
+            const thumb = $('.pl-next-thumb');
+            thumb.hidden = !info.image;
+            if (info.image) thumb.querySelector('img').src = info.image;
+            $('.pl-next-meta').hidden = !info.meta;
+            $('.pl-next-meta').textContent = info.meta || '';
             paintNext();
+        },
+        // The episode before, for Shift+N: { go() }
+        setPrev(info) {
+            prev = info;
+        },
+        // For the media keys and the lock screen (Media Session): the same actions as the buttons
+        act(name, arg) {
+            ({
+                play: () => video.play().catch(() => {}),
+                pause: () => video.pause(),
+                toggle: togglePlay,
+                back: () => jump(-(arg || STEP)),
+                forward: () => jump(arg || STEP),
+                seek: () => { video.currentTime = Math.max(0, Math.min(duration() || Infinity, arg)); paintTime(); },
+                next: () => playNext(),
+                previous: () => prev?.go(),
+                skip: skipSegment,
+            })[name]?.();
         },
         // What the end card says when there is no next episode: { kicker, title, actions: [{ label, href | run, primary }] }
         setEnd(info) {
@@ -599,19 +793,18 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0 
         // [{ type: 'Intro' | 'Recap' | 'Outro' | ..., start, end }] in seconds
         setSegments(list) {
             segments = (list || []).filter(g => g.end - g.start >= 3);
+            paintSegmentBar();
             paintSegment();
         },
-                destroy() {
+        destroy() {
             clearTimeout(idleTimer);
             offs.forEach(off => off());
             clearInterval(nextTimer);
             clearInterval(statsTimer);
+            clearTimeout(osdTimer);
             // Leaving for another episode keeps full screen; leaving the player ends it
             if (document.fullscreenElement && !location.hash.startsWith('#/play/')) document.exitFullscreen().catch(() => {});
         },
     };
 }
 
-function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
