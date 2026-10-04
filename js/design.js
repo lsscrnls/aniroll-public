@@ -5,7 +5,7 @@
 // with Google's Material Color Utilities (2025 spec, the one M3 Expressive uses). The scheme is written as a
 // <style> with a light and a dark block, so System/Light/Dark keep working without recomputing; it is cached
 // in localStorage so a reload paints M3 colours before the colour library has even loaded.
-import { BASELINE_TONAL_CSS } from './m3-baseline.js?v=140';
+import { BASELINE_TONAL_CSS } from './m3-baseline.js?v=141';
 
 // 'aniroll' only when chosen as legacy. A new key: choices from the time AniRoll's design was the default
 // (and M3 the one to try) do not carry over, so everyone starts in Material 3 once
@@ -15,7 +15,7 @@ const VARIANT_KEY = 'aniroll_m3_variant';   // 'tonal' | 'vibrant' | 'expressive
 const SEED_KEY = 'aniroll_m3_seed';         // M3 has its own palette, unrelated to AniRoll's accent colour
 const CACHE_KEY = 'aniroll_m3_scheme3';     // { key, css } — new name when the generated CSS changes
 const SHOW_KEY = 'aniroll_m3_show';         // { color, cover } of the show you're on: the app's "wallpaper" 
-const CSS_HREF = 'css/m3.css?v=31';
+const CSS_HREF = 'css/m3.css?v=32';
 // m3.css used to @import these two; as links of their own they load in parallel instead of after it
 const EXTRA_CSS = [['m3-icons-css', 'css/m3-icons.css?v=2'], ['m3-shapes-css', 'css/m3-shapes.css?v=1']];
 
@@ -140,7 +140,7 @@ export async function applyDesign(loggedIn) {
     }
     // Page additions only M3 has (hero, search bar, rail FAB ...)
     if (enhancer) enhancer.then(m => m.refresh());
-    enhancer ??= import('./m3.js?v=140').then(m => { m.setup(); return m; });
+    enhancer ??= import('./m3.js?v=141').then(m => { m.setup(); return m; });
 
     // Stylesheet first; keep the page hidden until it's there, so AniRoll's look never flashes
     let sheet = null;

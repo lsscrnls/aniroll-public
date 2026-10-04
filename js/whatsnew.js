@@ -1,11 +1,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=140';
-import { openDialog } from './a11y.js?v=140';
-import { prefersReducedMotion } from './animations.js?v=140';
-import { accountState, saveAccountState } from './accountstate.js?v=140';
+import { esc } from './store.js?v=141';
+import { openDialog } from './a11y.js?v=141';
+import { prefersReducedMotion } from './animations.js?v=141';
+import { accountState, saveAccountState } from './accountstate.js?v=141';
 
+// The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
+export const RELEASE = '1.4.0';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -17,9 +19,11 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-04.5',
+        id: '2026-10-04.6',
         title: 'A smarter player, your list at a glance, and a faster start',
         items: [
+            { rev: 6, text: 'The countdown on Home shows the show’s cover, a ring that fills up until it starts, and when it airs. The last hour counts down to the second.' },
+            { rev: 6, text: 'AniRoll has a version number now: you find it next to the title of What’s new.' },
             { rev: 5, text: '<strong>Start a Watch Party right from the player</strong>: one button, and the invite link is in your clipboard. Starting a party anywhere else copies the link too.' },
             { rev: 5, text: 'The player shows the file’s <strong>chapters</strong> on the wave, with their names when you point at them.' },
             { rev: 5, text: 'Skip intro and Skip credits step aside after a few seconds, and Watch credits really means it.' },
@@ -333,7 +337,7 @@ function showDialog(mode) {
             <div class="whatsnew-actions"><button type="button" class="glass-btn glass-btn-primary" data-close>Got it</button></div>
         </div>`
         : `<div class="modal-content whatsnew">
-            <h2 class="modal-title">What's new</h2>
+            <h2 class="modal-title">What's new <span class="whatsnew-release">AniRoll ${RELEASE}</span></h2>
             ${CHANGES.map((c, i) => `<section class="whatsnew-entry">
                 <div class="whatsnew-date">${dateOf(c)} · ${esc(c.title)}</div>
                 ${c.tabs && CHANGES.findIndex(x => x.tabs) === i ? tabBar() : ''}

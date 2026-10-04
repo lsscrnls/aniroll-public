@@ -5956,3 +5956,6 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pl-seek-chapters { left: 0; right: 0; height: 0; }
 .pl-seek-chapter { position: absolute; top: -2.5px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px rgba(0,0,0,0.45); }
 .pl-seek:hover .pl-seek-chapter, .player.is-seeking .pl-seek-chapter { transform: scale(1.3); transition: transform .2s var(--pl-bounce); }
+
+/* The public version next to the changelog's title */
+.whatsnew-release { margin-left: 8px; font-size: .8rem; font-weight: 600; color: var(--md-on-surface-variant, var(--text-secondary)); vertical-align: 2px; }
