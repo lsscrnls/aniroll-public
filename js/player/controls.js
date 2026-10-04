@@ -4,7 +4,7 @@
 // flat track after it. The dot on the track marks 90%, where AniList counts the episode.
 //   mountControls(root, video, { watchedAt, runtime, autoSkip }) -> { set...(), act(name), destroy() }
 // Icons: Material Symbols Rounded 400 (Apache-2.0), inline so both designs show them.
-import { esc } from '../store.js?v=137';
+import { esc } from '../store.js?v=138';
 
 
 const ICON = {
@@ -28,7 +28,7 @@ const ICON = {
 export const icon = (name) => `<svg class="pl-icon" viewBox="0 -960 960 960" aria-hidden="true"><path d="${ICON[name]}"/></svg>`;
 
 const IDLE_MS = 3000;
-const SKIP_SHOW_S = 8; // Skip intro/credits stays on its own this long, then only with the controls
+const SKIP_SHOW_S = 8; // Skip intro/credits shows this long, then goes (seeking back before that brings it again)
 const STEP = 10;
 const VOLUME_KEY = 'aniroll_player_volume';
 // Up next: seconds of playing time before the next episode starts by itself
@@ -71,6 +71,7 @@ export function controlsHtml() {
                 <div class="pl-seek-segments" aria-hidden="true"></div>
                 <div class="pl-seek-buffer"></div>
                 <div class="pl-seek-wave"></div>
+                <div class="pl-seek-chapters" aria-hidden="true"></div>
                 <div class="pl-seek-mark" title="From here the episode counts as watched"></div>
                 <div class="pl-seek-handle"></div>
                 <div class="pl-seek-hover" aria-hidden="true">
@@ -411,6 +412,15 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
         osd(`Skipped ${SEGMENT_NAMES[seg.type].toLowerCase()}`, { label: 'Undo', run: () => { video.currentTime = back; } });
         return true;
     }
+    // ----- Chapters (from the file, e.g. an MKV's chapter list) -----
+    let chapters = [];
+    const chapterAt = (t) => chapters.findLast(c => c.start <= t) || null;
+    function paintChapterBar() {
+        const d = duration();
+        // The first chapter starts the episode: no mark at 0
+        $('.pl-seek-chapters').innerHTML = d ? chapters.filter(c => c.start > 1 && c.start < d - 1)
+            .map(c => `<span class="pl-seek-chapter" style="left:${(c.start / d) * 100}%"></span>`).join('') : '';
+    }
     function paintSegmentBar() {
         const d = duration();
         $('.pl-seek-segments').innerHTML = d ? segments.map(g => `<span class="pl-seek-seg" data-type="${esc(g.type)}"
@@ -421,19 +431,21 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
         const inSeg = segments.find(g => t >= g.start && t < g.end - 1);
         if (inSeg && autoSkipCheck(inSeg, t)) { segLastT = video.currentTime; return; }
         segLastT = t;
-        // Shown from the segment's start until a second before it ends
-        const seg = segments.find(g => t >= g.start && t < g.end - 1 && !(g.type === 'Outro' && nextState === 'shown'));
-        skipTarget = seg ? seg.end : null;
-        skipBtn.hidden = !seg;
-        // After a few seconds it steps back, so the intro or the credits can play on their own; moving the
-        // mouse brings it with the controls. Seeking back before where it came up shows it again.
+        // Shown from the segment's start until a second before it ends. Not for the credits while Up next
+        // shows, nor once "Watch credits" said they are wanted
+        const seg = segments.find(g => t >= g.start && t < g.end - 1 && !(g.type === 'Outro' && nextState !== 'off'));
+        // After a few seconds it goes, so the intro or the credits play on their own, controls or not.
+        // Seeking back before where it came up shows it again.
         if (seg !== skipSeg || t < skipFrom) { skipSeg = seg; skipFrom = t; }
-        root.classList.toggle('skip-faded', !!seg && t - skipFrom >= SKIP_SHOW_S);
+        const gone = !!seg && t - skipFrom >= SKIP_SHOW_S;
+        skipTarget = seg && !gone ? seg.end : null;
+        skipBtn.hidden = !seg || gone;
+        root.classList.toggle('skip-faded', gone);
         if (seg && skipBtn.dataset.type !== seg.type) {
             skipBtn.dataset.type = seg.type;
             skipBtn.textContent = SKIP_LABEL[seg.type] || 'Skip';
         }
-        root.classList.toggle('has-skip', !!seg);
+        root.classList.toggle('has-skip', !!seg && !gone);
     }
     function skipSegment() {
         if (skipTarget == null) return;
@@ -586,9 +598,11 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
         const r = seek.getBoundingClientRect();
         $('.pl-seek-hover-time').textContent = fmtTime(t);
         const seg = segments.find(g => t >= g.start && t < g.end);
+        // An intro or the credits say so; elsewhere the chapter's name, when the file has named chapters
+        const label = seg ? (SEGMENT_NAMES[seg.type] || seg.type) : chapterAt(t)?.name || '';
         const segEl = $('.pl-seek-hover-seg');
-        segEl.hidden = !seg;
-        if (seg) segEl.textContent = SEGMENT_NAMES[seg.type] || seg.type;
+        segEl.hidden = !label;
+        segEl.textContent = label;
         root.dispatchEvent(new CustomEvent('aniroll:player-hover', { detail: { time: t, thumb: $('.pl-seek-thumb') } }));
         const half = Math.max(24, hoverBox.offsetWidth / 2);
         hoverBox.style.left = `${Math.max(half, Math.min(r.width - half, clientX - r.left))}px`;
@@ -678,7 +692,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
     on(root, 'focusin', wake);
     on(video, 'timeupdate', () => { if (!dragging) paintTime(); paintNext(); if (segments.length) paintSegment(); });
     on(video, 'progress', () => paintTime());
-    on(video, 'durationchange', () => { paintTime(); paintSegmentBar(); });
+    on(video, 'durationchange', () => { paintTime(); paintSegmentBar(); paintChapterBar(); });
     on(video, 'play', paintPlay);
     on(video, 'pause', paintPlay);
     on(video, 'volumechange', paintVolume);
@@ -795,6 +809,11 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             segments = (list || []).filter(g => g.end - g.start >= 3);
             paintSegmentBar();
             paintSegment();
+        },
+        // [{ name, start }] in seconds, in order; name '' when the file only numbers them
+        setChapters(list) {
+            chapters = (list || []).slice().sort((a, b) => a.start - b.start);
+            paintChapterBar();
         },
         destroy() {
             clearTimeout(idleTimer);

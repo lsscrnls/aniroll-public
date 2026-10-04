@@ -1,10 +1,10 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=137';
-import { openDialog } from './a11y.js?v=137';
-import { prefersReducedMotion } from './animations.js?v=137';
-import { accountState, saveAccountState } from './accountstate.js?v=137';
+import { esc } from './store.js?v=138';
+import { openDialog } from './a11y.js?v=138';
+import { prefersReducedMotion } from './animations.js?v=138';
+import { accountState, saveAccountState } from './accountstate.js?v=138';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
@@ -17,9 +17,12 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-04.4',
+        id: '2026-10-04.5',
         title: 'A smarter player, your list at a glance, and a faster start',
         items: [
+            { rev: 5, text: '<strong>Start a Watch Party right from the player</strong>: one button, and the invite link is in your clipboard. Starting a party anywhere else copies the link too.' },
+            { rev: 5, text: 'The player shows the file’s <strong>chapters</strong> on the wave, with their names when you point at them.' },
+            { rev: 5, text: 'Skip intro and Skip credits step aside after a few seconds, and Watch credits really means it.' },
             { rev: 4, text: '<strong>Play the next episode right from Home</strong>: the Up next card has a Play button when your Jellyfin has the episode.' },
             { rev: 4, text: 'Watch Party invites show the show you are on right now in Discord and other chats: copy the link again after switching shows.' },
             { rev: 3, text: 'Watch Parties are live: the host’s next episode, who joined, votes and “Roll together” reach everyone within a second instead of up to half a minute.' },

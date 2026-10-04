@@ -5049,7 +5049,7 @@ body.player-open .cursor { display: none !important; }
     gap: 12px;
     padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
 }
-.player-back { background: rgba(255,255,255,0.12); }
+.player-back, .player-party { background: rgba(255,255,255,0.12); }
 .player-title { min-width: 0; flex: 1; }
 .player-show { font-weight: 700; font-size: 1.15rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .player-episode { font-size: 0.875rem; color: rgba(255,255,255,0.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -5950,3 +5950,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 
 /* Home hero: Play from Jellyfin next to "Watched episode N" */
 .hero-play-slot:not([hidden]) { display: contents; }
+/* Chapters from the file: small dots on the track, the name shows in the hover label */
+.pl-seek-chapters { left: 0; right: 0; height: 0; }
+.pl-seek-chapter { position: absolute; top: -2.5px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px rgba(0,0,0,0.45); }
+.pl-seek:hover .pl-seek-chapter, .player.is-seeking .pl-seek-chapter { transform: scale(1.3); transition: transform .2s var(--pl-bounce); }

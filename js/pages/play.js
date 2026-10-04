@@ -1,14 +1,14 @@
-import * as api from '../api.js?v=137';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=137';
-import { getToken, isLoggedIn } from '../auth.js?v=137';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=137';
-import { availability } from '../player/availability.js?v=137';
-import { findEpisode, jfGet } from '../player/library.js?v=137';
-import { deviceProfile } from '../player/profile.js?v=137';
-import { HtmlVideoEngine } from '../player/engine.js?v=137';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=137';
-import { createSubtitles } from '../player/subtitles.js?v=137';
-import { neighbours } from '../player/episodes.js?v=137';
+import * as api from '../api.js?v=138';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=138';
+import { getToken, isLoggedIn } from '../auth.js?v=138';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=138';
+import { availability } from '../player/availability.js?v=138';
+import { findEpisode, jfGet } from '../player/library.js?v=138';
+import { deviceProfile } from '../player/profile.js?v=138';
+import { HtmlVideoEngine } from '../player/engine.js?v=138';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=138';
+import { createSubtitles } from '../player/subtitles.js?v=138';
+import { neighbours } from '../player/episodes.js?v=138';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -38,6 +38,7 @@ export async function render({ params, content }) {
                     <div class="player-episode" id="player-episode">Episode ${episode}</div>
                 </div>
                 <div class="player-method" id="player-method" hidden></div>
+                ${isLoggedIn() ? `<button class="pl-btn player-party" id="player-party" type="button" aria-label="Watch Party: start one for this show and copy the link" title="Watch Party: start one for this show, link to the clipboard">${PARTY_ICON}</button>` : ''}
             </div>
             <div class="player-status" id="player-status" role="status"><div class="loader-spinner"></div></div>
         </div>`;
@@ -111,6 +112,10 @@ export async function render({ params, content }) {
         const [avail, media] = await Promise.all([availability(true), carriedMedia(mediaId) || api.getMedia(mediaId, token)]);
         if (closed) return cleanup;
         $('player-show').textContent = titlePref(media.title);
+        $('player-party')?.addEventListener('click', async () => {
+            const { partyFromPlayer } = await import('./watchparty.js?v=138');
+            partyFromPlayer(media, episode);
+        });
         if (!avail) throw new Error('Your Jellyfin server cannot be reached right now');
         session.base = avail.base;
 
@@ -319,6 +324,7 @@ export async function render({ params, content }) {
         video.addEventListener('seeked', report);
 
         loadSegments(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setSegments(list); });
+        loadChapters(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setChapters(list); });
         await reportStart(session, engine);
         reportTimer = setInterval(report, REPORT_EVERY);
         // Stopped part-way before: continue there or start over. Not when Up next brought us here
@@ -372,6 +378,30 @@ async function loadSegments(base, cfg, itemId) {
         return [];
     }
 }
+
+// Chapters as the file has them (an MKV's chapter list, read by Jellyfin): [{ name, start }] in seconds.
+// Jellyfin can also make up chapters every few minutes for its chapter pictures; evenly spaced ones
+// like that say nothing about the episode and are left out. Older and newer servers name the item
+// path differently, so both are tried. Nothing there or no answer: no marks.
+async function loadChapters(base, cfg, itemId) {
+    const id = encodeURIComponent(itemId);
+    const user = encodeURIComponent(cfg.userId || '');
+    for (const path of [`/Items/${id}?userId=${user}&fields=Chapters`, `/Users/${user}/Items/${id}`]) {
+        let item;
+        try { item = await jfGet(base, path, cfg.apiKey); } catch { continue; }
+        const list = (item?.Chapters || []).map(c => ({
+            start: (c.StartPositionTicks || 0) / TICKS,
+            // "Chapter 3" only numbers it: the mark stays, the label does not
+            name: /^(chapter|kapitel|chapitre)\s*\d+$/i.test(String(c.Name || '').trim()) ? '' : String(c.Name || '').trim().slice(0, 60),
+        })).sort((a, b) => a.start - b.start);
+        const gaps = list.slice(1).map((c, i) => c.start - list[i].start);
+        const madeUp = gaps.length >= 2 && gaps.every(g => Math.abs(g - gaps[0]) < 1) && list.every(c => !c.name);
+        return list.length >= 2 && !madeUp ? list : [];
+    }
+    return [];
+}
+
+const PARTY_ICON = '<svg class="pl-icon" data-icon="groups" viewBox="0 0 24 24" style="fill:none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 13.6c2.6.2 4.5 2.1 4.5 4.9"/></svg>';
 
 // ===== Stats for nerds =====
 // [{ title, rows: [[label, value]] }], asked for about once a second while the panel shows. What Jellyfin's
