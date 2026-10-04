@@ -38,7 +38,7 @@ export function leaveJoinedParty() { return null; }
 export function initGuestSync() { return null; }
 
 // Catches up with the host right away.
-export async function syncGuestNow() { return null; }
+export async function syncGuestNow(pushed) { return null; }
 
 // The small indicator shown on every page while a party runs.
 export function renderPartyPill() { return null; }

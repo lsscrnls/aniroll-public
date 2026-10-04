@@ -1088,6 +1088,7 @@ function adminStats() {
         samples: statsHistory,
         accounts: { backgroundSync: countEntries(TOKEN_FILE), jellyfin: countEntries(JF_FILE), webhooks: countEntries(HOOK_FILE) },
         parties,
+        partyStreams: party.liveCount(),
         anilist: { verifyPausedFor: Math.max(0, verifyPausedUntil - now) },
         errors: recentClientErrors(now),
         server: {
@@ -1319,7 +1320,7 @@ async function targetAllowed(target) {
 // Watch parties live in api/party.js; it gets what it needs from here
 const party = require('./party')({
     dataDir: DATA_DIR, readJson, writeJson, moveForward, verifyViewer, refuseAuth,
-    json, readBody, str, tokenHash, bearerToken,
+    json, readBody, str, tokenHash, bearerToken, clientIp,
 });
 
 async function handle(req, res) {
@@ -1673,6 +1674,7 @@ server.listen(PORT, '0.0.0.0', function() {
 function shutDown(signal) {
     console.log(`${signal}: shutting down`);
     server.close(() => process.exit(0));
+    party.closeStreams();
     setTimeout(() => process.exit(0), 3000).unref();
 }
 process.on('SIGTERM', () => shutDown('SIGTERM'));
