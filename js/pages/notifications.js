@@ -1,12 +1,12 @@
-import * as api from '../api.js?v=133';
-import { esc, titlePref, emptyIcon } from '../store.js?v=133';
-import { getToken, isLoggedIn } from '../auth.js?v=133';
+import * as api from '../api.js?v=134';
+import { esc, titlePref, emptyIcon, loginState } from '../store.js?v=134';
+import { getToken, isLoggedIn } from '../auth.js?v=134';
 
 export async function render({ content }) {
     const token = getToken();
 
     if (!isLoggedIn()) {
-        content.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${emptyIcon('bell')}</div><div class="empty-state-text">Log in to see your notifications</div></div>`;
+        content.innerHTML = loginState(emptyIcon('bell'), 'Log in to see your notifications', 'New episodes of your shows, replies and likes from AniList, in one place.');
         return;
     }
 
@@ -30,7 +30,7 @@ export async function render({ content }) {
             const result = await api.getNotifications(p, token);
             const html = (result.notifications || []).map(renderNotification).filter(Boolean).join('');
 
-            if (append) list.innerHTML += html;
+            if (append) list.insertAdjacentHTML('beforeend', html);
             else list.innerHTML = html || '<div class="empty-state" style="padding:var(--space-lg)"><div class="empty-state-sub">No notifications</div></div>';
 
             document.getElementById('notif-more').hidden = !result.pageInfo.hasNextPage;
@@ -44,6 +44,38 @@ export async function render({ content }) {
     }
 
     document.getElementById('load-more-notif')?.addEventListener('click', () => loadNotifs(page + 1, true));
+
+    // A post's thread under its notification: the replies, and the way to the whole post on AniList
+    const list = document.getElementById('notif-list');
+    const openThread = async (item) => {
+        const box = item.querySelector('.notif-thread');
+        const id = Number(item.dataset.activity);
+        if (!box || !id) return;
+        const open = box.hidden;
+        box.hidden = !open;
+        item.setAttribute('aria-expanded', String(open));
+        if (!open || box.dataset.loaded) return;
+        box.innerHTML = '<div class="activity-replies-status">Loading…</div>';
+        try {
+            const [replies, { renderReply }] = await Promise.all([api.getActivityReplies(id, token), import('./social.js?v=134')]);
+            box.dataset.loaded = '1';
+            box.innerHTML = (replies.length ? replies.slice(-5).map(renderReply).join('') : '<div class="activity-replies-status">No replies yet</div>')
+                + `<a class="notif-thread-link" href="https://anilist.co/activity/${id}" target="_blank" rel="noopener">Open on AniList</a>`;
+        } catch (err) {
+            box.innerHTML = `<div class="activity-replies-status">${esc(err.message)}</div>`;
+        }
+    };
+    list?.addEventListener('click', (ev) => {
+        const item = ev.target.closest('.notif-activity');
+        if (!item || ev.target.closest('a, button, .notif-thread')) return;
+        openThread(item);
+    });
+    list?.addEventListener('keydown', (ev) => {
+        const item = ev.target.closest?.('.notif-activity');
+        if (!item || ev.target !== item || (ev.key !== 'Enter' && ev.key !== ' ')) return;
+        ev.preventDefault();
+        openThread(item);
+    });
 
     loadNotifs();
 }
@@ -73,26 +105,24 @@ function renderNotification(n) {
         </div>`;
     }
 
-    if (n.type === 'ACTIVITY_LIKE') {
-        return `<div class="notif-item">
+    // Everything about one of your posts: a tap opens its thread right here
+    const ABOUT_ACTIVITY = {
+        ACTIVITY_LIKE: 'liked your activity',
+        ACTIVITY_REPLY: 'replied to your activity',
+        ACTIVITY_MENTION: 'mentioned you',
+        ACTIVITY_MESSAGE: 'sent you a message',
+        ACTIVITY_REPLY_SUBSCRIBED: 'replied to an activity you follow',
+        ACTIVITY_REPLY_LIKE: 'liked your reply',
+    };
+    if (ABOUT_ACTIVITY[n.type]) {
+        return `<div class="notif-item notif-activity" data-activity="${n.activityId || ''}" role="button" tabindex="0" aria-expanded="false">
             <div class="notif-icon">
                 <img src="${n.user?.avatar?.medium || ''}" alt="" style="width:100%;height:100%;border-radius:var(--radius-full);object-fit:cover">
             </div>
-            <div>
-                <div class="notif-text"><strong>${esc(n.user?.name)}</strong> liked your activity</div>
+            <div class="notif-body">
+                <div class="notif-text"><strong>${esc(n.user?.name)}</strong> ${ABOUT_ACTIVITY[n.type]}</div>
                 <div class="notif-time">${api.timeAgo(n.createdAt)}</div>
-            </div>
-        </div>`;
-    }
-
-    if (n.type === 'ACTIVITY_REPLY') {
-        return `<div class="notif-item">
-            <div class="notif-icon">
-                <img src="${n.user?.avatar?.medium || ''}" alt="" style="width:100%;height:100%;border-radius:var(--radius-full);object-fit:cover">
-            </div>
-            <div>
-                <div class="notif-text"><strong>${esc(n.user?.name)}</strong> replied to your activity</div>
-                <div class="notif-time">${api.timeAgo(n.createdAt)}</div>
+                <div class="notif-thread" hidden></div>
             </div>
         </div>`;
     }

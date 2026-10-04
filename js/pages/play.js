@@ -1,14 +1,14 @@
-import * as api from '../api.js?v=133';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=133';
-import { getToken, isLoggedIn } from '../auth.js?v=133';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=133';
-import { availability } from '../player/availability.js?v=133';
-import { findEpisode, jfGet } from '../player/library.js?v=133';
-import { deviceProfile } from '../player/profile.js?v=133';
-import { HtmlVideoEngine } from '../player/engine.js?v=133';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=133';
-import { createSubtitles } from '../player/subtitles.js?v=133';
-import { neighbours } from '../player/episodes.js?v=133';
+import * as api from '../api.js?v=134';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=134';
+import { getToken, isLoggedIn } from '../auth.js?v=134';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=134';
+import { availability } from '../player/availability.js?v=134';
+import { findEpisode, jfGet } from '../player/library.js?v=134';
+import { deviceProfile } from '../player/profile.js?v=134';
+import { HtmlVideoEngine } from '../player/engine.js?v=134';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=134';
+import { createSubtitles } from '../player/subtitles.js?v=134';
+import { neighbours } from '../player/episodes.js?v=134';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -49,6 +49,7 @@ export async function render({ params, content }) {
     const session = { base: null, itemId: null, mediaSourceId: null, playSessionId: null, hls: false, started: false, done: false };
     let reportTimer = null;
     let closed = false;
+    let endInfo = null;
     let controls = null;
     let subtitles = null;
     let offTracked = () => {};
@@ -83,9 +84,12 @@ export async function render({ params, content }) {
         }
     });
 
+    const pageTitle = document.title;
     const cleanup = () => {
         if (closed) return;
         closed = true;
+        document.title = pageTitle;
+        clearMediaSession();
         clearInterval(reportTimer);
         controls?.destroy();
         subtitles?.destroy();
@@ -116,7 +120,11 @@ export async function render({ params, content }) {
         if (!ep) throw new Error(`Episode ${episode} is not in your Jellyfin library`);
         session.itemId = ep.itemId;
         session.runtime = ep.runTimeTicks ? ep.runTimeTicks / TICKS : 0;
-        $('player-episode').textContent = media.format === 'MOVIE' ? '' : `Episode ${episode}${ep.name && !/^episode \d+$/i.test(ep.name) ? ` · ${ep.name}` : ''}`;
+        // A file with two episodes ("E05-E06") counts as both: AniList gets 6, Up next is episode 7
+        const lastEp = Math.max(episode, Math.min(ep.episodeEnd || episode, media.episodes || Infinity));
+        const epLabel = lastEp > episode ? `Episodes ${episode}–${lastEp}` : `Episode ${episode}`;
+        $('player-episode').textContent = media.format === 'MOVIE' ? '' : `${epLabel}${ep.name && !/^episode \d+$/i.test(ep.name) ? ` · ${ep.name}` : ''}`;
+        document.title = media.format === 'MOVIE' ? `${titlePref(media.title)} · AniRoll` : `${titlePref(media.title)} · ${epLabel} · AniRoll`;
 
         // Continue where it stopped, unless it was watched to the end
         const startTime = !ep.played && ep.positionTicks && ep.runTimeTicks && ep.positionTicks < ep.runTimeTicks * WATCHED_AT
@@ -157,7 +165,12 @@ export async function render({ params, content }) {
         session.method = plan.method;
         $('player-method').textContent = plan.label;
         $('player-method').hidden = false;
-        controls = mountControls($('player'), video, { watchedAt: WATCHED_AT, runtime: () => (ep.runTimeTicks ? ep.runTimeTicks / TICKS : 0) });
+        controls = mountControls($('player'), video, {
+            watchedAt: WATCHED_AT,
+            runtime: () => (ep.runTimeTicks ? ep.runTimeTicks / TICKS : 0),
+            autoSkip: { get: () => autoSkipFor(mediaId), set: (on) => setAutoSkip(mediaId, on) },
+        });
+        setupMediaSession(media, epLabel, controls, engine);
         // The subtitles chosen for this show before (or none), when this file has them
         subtitles = createSubtitles({ video, base: avail.base, cfg, itemId: ep.itemId, source,
             pick: (tracks) => preferredSubs(mediaId, tracks),
@@ -235,19 +248,28 @@ export async function render({ params, content }) {
         const runtime = () => (ep.runTimeTicks ? ep.runTimeTicks / TICKS : 0) || engine.duration;
 
         // The next episode, if Jellyfin has it: the Up next card, and its subtitles unpacked ahead
-        const nextNumber = episode + 1;
-        const nextEp = media.format === 'MOVIE' || (media.episodes && episode >= media.episodes)
+        const nextNumber = lastEp + 1;
+        const nextEp = media.format === 'MOVIE' || (media.episodes && lastEp >= media.episodes)
             ? Promise.resolve(null)
             : findEpisode(avail.base, media, nextNumber).catch(() => null);
         nextEp.then(n => {
             if (closed) return;
-            if (!n) return controls.setEnd(endCard(media, mediaId, episode, token));
+            if (!n) {
+                endInfo = endCard(media, mediaId, lastEp, token);
+                return controls.setEnd(endInfo);
+            }
+            const mins = n.runTimeTicks ? Math.round(n.runTimeTicks / TICKS / 60) : 0;
             controls.setNext({
                 title: `Episode ${nextNumber}${n.name && !/^episode \d+$/i.test(n.name) ? ` · ${n.name}` : ''}`,
+                image: n.image,
+                meta: mins ? `${mins} min` : '',
                 // Replaces this episode in the history: Back still leads to where Play was pressed
                 go: () => { upNextArrival = `${mediaId}/${nextNumber}`; location.replace(`#/play/${mediaId}/${nextNumber}`); },
             });
         });
+        if (media.format !== 'MOVIE' && episode > 1) {
+            controls.setPrev({ go: () => location.replace(`#/play/${mediaId}/${episode - 1}`) });
+        }
 
         // The connection broke off mid-episode (Wi-Fi, the stream through Cloudflare): one quiet try from the
         // same second before saying anything. A file the browser cannot play, or a converter that failed
@@ -271,20 +293,27 @@ export async function render({ params, content }) {
                 session.done = true;
                 if (!session.runtime) session.runtime = total;
                 saveUserData(session, engine.time);
-                if (isLoggedIn()) saveEpisode(media, mediaId, episode, token);
+                if (isLoggedIn()) {
+                    saveEpisode(media, mediaId, lastEp, token).then(saved => {
+                        // The last episode: ask for a score right on the end card
+                        if (closed || !saved || saved.status !== 'COMPLETED' || !endInfo) return;
+                        endInfo = { ...endInfo, rate: scorePrompt(media, saved, token) };
+                        controls.setEnd(endInfo);
+                    });
+                }
             }
         });
         // Jellyfin's webhook got there first (our server wrote it): nothing left to write from here
         const onTracked = (e) => {
             const item = e.detail;
-            if (item?.status !== 'saved' || item.mediaId !== mediaId || !(item.progress >= episode)) return;
+            if (item?.status !== 'saved' || item.mediaId !== mediaId || !(item.progress >= lastEp)) return;
             session.done = true;
             media.mediaListEntry = { ...(media.mediaListEntry || {}), progress: item.progress, ...(item.entryStatus ? { status: item.entryStatus } : {}) };
             carry(mediaId, media);
         };
         window.addEventListener(TRACKED_EVENT, onTracked);
         offTracked = () => window.removeEventListener(TRACKED_EVENT, onTracked);
-        const report = () => reportProgress(session, engine);
+        const report = () => { reportProgress(session, engine); mediaPosition(engine); };
         video.addEventListener('pause', report);
         video.addEventListener('play', report);
         video.addEventListener('seeked', report);
@@ -461,8 +490,24 @@ function saveQuality(q) {
     try { q === 'auto' ? localStorage.removeItem(QUALITY_KEY) : localStorage.setItem(QUALITY_KEY, String(q)); } catch { /* not kept */ }
 }
 
+// ===== Choices kept per show (audio, subtitles, skipping intros) =====
+// { 'm<anilistId>': value } — a letter first, so the keys keep their order (newest last); the 200 shows
+// chosen for most recently are kept
+function showPref(key, mediaId) {
+    try { return JSON.parse(localStorage.getItem(key) || '{}')[`m${mediaId}`] ?? null; } catch { return null; }
+}
+function setShowPref(key, mediaId, value) {
+    try {
+        const all = JSON.parse(localStorage.getItem(key) || '{}');
+        delete all[`m${mediaId}`];
+        if (value != null) all[`m${mediaId}`] = value;
+        const keys = Object.keys(all);
+        for (const k of keys.slice(0, Math.max(0, keys.length - 200))) delete all[k];
+        localStorage.setItem(key, JSON.stringify(all));
+    } catch { /* not kept */ }
+}
+
 // ===== Audio tracks =====
-// { 'm<anilistId>': { lang, title } } — a letter first, so the keys keep their order (newest last)
 const AUDIO_PREF_KEY = 'aniroll_audio_pref';
 
 function audioList(source) {
@@ -476,24 +521,14 @@ function audioList(source) {
 
 // The track matching what was chosen for this show: same language and name, else same language
 function preferredAudio(mediaId, tracks) {
-    let pref = null;
-    try { pref = JSON.parse(localStorage.getItem(AUDIO_PREF_KEY) || '{}')[`m${mediaId}`] || null; } catch { /* none */ }
+    const pref = showPref(AUDIO_PREF_KEY, mediaId);
     if (!pref || tracks.length < 2) return null;
     const same = tracks.filter(t => t.lang === pref.lang);
     return (same.find(t => t.title === pref.title) || same[0])?.id ?? null;
 }
 
 function rememberAudio(mediaId, track) {
-    if (!track) return;
-    try {
-        const all = JSON.parse(localStorage.getItem(AUDIO_PREF_KEY) || '{}');
-        delete all[`m${mediaId}`];
-        all[`m${mediaId}`] = { lang: track.lang, title: track.title };
-        // The shows chosen for most recently are kept
-        const keys = Object.keys(all);
-        for (const k of keys.slice(0, Math.max(0, keys.length - 200))) delete all[k];
-        localStorage.setItem(AUDIO_PREF_KEY, JSON.stringify(all));
-    } catch { /* not kept */ }
+    if (track) setShowPref(AUDIO_PREF_KEY, mediaId, { lang: track.lang, title: track.title });
 }
 
 // ===== Subtitles =====
@@ -503,8 +538,7 @@ const SUBS_PREF_KEY = 'aniroll_subs_pref';
 // The track id to show (null: none), or undefined when nothing was chosen for this show or this file
 // lacks it: then Jellyfin's pick stays
 function preferredSubs(mediaId, tracks) {
-    let pref = null;
-    try { pref = JSON.parse(localStorage.getItem(SUBS_PREF_KEY) || '{}')[`m${mediaId}`] || null; } catch { /* none */ }
+    const pref = showPref(SUBS_PREF_KEY, mediaId);
     if (!pref) return undefined;
     if (pref.off) return null;
     // Same language, then the release's name for the track (Full, Signs & Songs), else what Jellyfin calls it
@@ -515,14 +549,7 @@ function preferredSubs(mediaId, tracks) {
 }
 
 function rememberSubs(mediaId, track) {
-    try {
-        const all = JSON.parse(localStorage.getItem(SUBS_PREF_KEY) || '{}');
-        delete all[`m${mediaId}`];
-        all[`m${mediaId}`] = track ? { lang: track.lang, title: track.title, label: track.label, forced: track.forced } : { off: true };
-        const keys = Object.keys(all);
-        for (const k of keys.slice(0, Math.max(0, keys.length - 200))) delete all[k];
-        localStorage.setItem(SUBS_PREF_KEY, JSON.stringify(all));
-    } catch { /* not kept */ }
+    setShowPref(SUBS_PREF_KEY, mediaId, track ? { lang: track.lang, title: track.title, label: track.label, forced: track.forced } : { off: true });
 }
 
 // maxBitrate: the quality chosen, else what the way to the server carries
@@ -728,7 +755,83 @@ async function saveEpisode(media, mediaId, episode, token) {
         emitListChange({ mediaId: media.id, status: saved.status, progress: saved.progress });
         emitWatched(media);
         toast(saved.status === 'COMPLETED' ? `${titlePref(media.title)} completed` : `Episode ${saved.progress} saved to AniList`, 'success');
+        return saved;
     } catch (err) {
         toast(err.queued ? err.message : `AniList: ${err.message}`, 'error');
+        return null;
+    }
+}
+
+// The end card's score: a slider on the 100 scale, saved with one request when tapped
+function scorePrompt(media, saved, token) {
+    return {
+        value: saved.score || 0,
+        save: async (score, btn) => {
+            btn.disabled = true;
+            try {
+                const out = await api.saveMediaListEntry({ id: saved.id, scoreRaw: score }, token, { mirror: false });
+                media.mediaListEntry = { ...(media.mediaListEntry || {}), ...out };
+                emitListChange({ mediaId: media.id, status: out.status, progress: out.progress, score: out.score });
+                btn.textContent = 'Saved';
+                btn.classList.add('is-saved');
+                toast(`Scored ${titlePref(media.title)} ${score}`, 'success');
+            } catch (err) {
+                btn.disabled = false;
+                toast(err.queued ? err.message : `AniList: ${err.message}`, 'error');
+            }
+        },
+    };
+}
+
+// ===== Intros skipped by themselves, per show =====
+const AUTOSKIP_KEY = 'aniroll_autoskip';
+const autoSkipFor = (mediaId) => !!showPref(AUTOSKIP_KEY, mediaId);
+const setAutoSkip = (mediaId, on) => setShowPref(AUTOSKIP_KEY, mediaId, on ? 1 : null);
+
+// ===== Media keys, headset buttons, the lock screen and the browser's media hub =====
+// Each part is asked for on its own: some browsers lack the position or some of the actions
+function setupMediaSession(media, epLabel, controls, engine) {
+    const ms = navigator.mediaSession;
+    if (!ms) return;
+    try {
+        const cover = media.coverImage?.extraLarge || media.coverImage?.large;
+        ms.metadata = new MediaMetadata({
+            title: media.format === 'MOVIE' ? titlePref(media.title) : epLabel,
+            artist: titlePref(media.title),
+            album: 'AniRoll',
+            // AniList's cover, never a Jellyfin address with a key in it
+            artwork: cover ? [{ src: cover, sizes: '460x650', type: 'image/jpeg' }] : [],
+        });
+    } catch { /* no metadata */ }
+    const handlers = {
+        play: () => controls.act('play'),
+        pause: () => controls.act('pause'),
+        seekbackward: (d) => controls.act('back', d?.seekOffset),
+        seekforward: (d) => controls.act('forward', d?.seekOffset),
+        seekto: (d) => { if (d?.seekTime != null) controls.act('seek', d.seekTime); },
+        nexttrack: () => controls.act('next'),
+        previoustrack: () => controls.act('previous'),
+        skipad: () => controls.act('skip'),
+    };
+    for (const [name, fn] of Object.entries(handlers)) {
+        try { ms.setActionHandler(name, fn); } catch { /* not supported here */ }
+    }
+    mediaPosition(engine);
+}
+
+function mediaPosition(engine) {
+    const ms = navigator.mediaSession;
+    if (!ms?.setPositionState) return;
+    const duration = engine.duration;
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    try { ms.setPositionState({ duration, position: Math.min(duration, Math.max(0, engine.time || 0)), playbackRate: engine.video?.playbackRate || 1 }); } catch { /* ignored */ }
+}
+
+function clearMediaSession() {
+    const ms = navigator.mediaSession;
+    if (!ms) return;
+    try { ms.metadata = null; } catch { /* nothing set */ }
+    for (const name of ['play', 'pause', 'seekbackward', 'seekforward', 'seekto', 'nexttrack', 'previoustrack', 'skipad']) {
+        try { ms.setActionHandler(name, null); } catch { /* not supported */ }
     }
 }

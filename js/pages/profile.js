@@ -1,6 +1,6 @@
-import * as api from '../api.js?v=133';
-import { getState, renderMediaCard, esc, emptyIcon } from '../store.js?v=133';
-import { getToken, isLoggedIn } from '../auth.js?v=133';
+import * as api from '../api.js?v=134';
+import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref } from '../store.js?v=134';
+import { getToken, isLoggedIn } from '../auth.js?v=134';
 
 export async function render({ params, content }) {
     const token = getToken();
@@ -8,7 +8,7 @@ export async function render({ params, content }) {
     const username = params.username;
 
     if (!username && (!isLoggedIn() || !currentUser)) {
-        content.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${emptyIcon('lock')}</div><div class="empty-state-text">Log in to see your profile</div></div>`;
+        content.innerHTML = loginState(emptyIcon('lock'), 'Log in to see your profile', 'Your stats, favourite genres and studios, from your AniList.');
         return;
     }
 
@@ -56,6 +56,7 @@ export async function render({ params, content }) {
         </div>
 
         ${animeStats ? renderAnimeStats(animeStats) : ''}
+        <div id="hot-takes"></div>
         ${mangaStats ? renderMangaStats(mangaStats) : ''}
 
         ${favourites?.anime?.nodes?.length ? `
@@ -81,6 +82,54 @@ export async function render({ params, content }) {
                         </div>`).join('')}
                 </div>
             </div>` : ''}
+    </div>`;
+
+    // Where this person and everyone else disagree most, from the list (usually read already)
+    api.getMediaList(user.id, 'ANIME', token).then(lists => {
+        const box = content.querySelector('#hot-takes');
+        if (box) box.innerHTML = renderHotTakes(lists, user.name === currentUser?.name);
+    }).catch(() => { /* no section */ });
+}
+
+// The biggest gaps between a score and AniList's average: loved what most found fine, and the other way
+function renderHotTakes(lists, own) {
+    const seen = new Set();
+    const rated = lists.flatMap(l => l.entries)
+        .filter(e => e.score > 0 && e.media.meanScore && !seen.has(e.id) && seen.add(e.id))
+        .map(e => ({ e, diff: Math.round(e.score - e.media.meanScore) }));
+    const loved = rated.filter(x => x.diff >= 10).sort((a, b) => b.diff - a.diff).slice(0, 4);
+    const cooler = rated.filter(x => x.diff <= -10).sort((a, b) => a.diff - b.diff).slice(0, 4);
+    if (!loved.length && !cooler.length) return '';
+    const row = ({ e, diff }) => `<div class="hot-take" data-open="${e.media.id}" role="button" tabindex="0">
+        <img src="${esc(e.media.coverImage?.large || '')}" alt="" loading="lazy">
+        <div class="hot-take-text">
+            <div class="hot-take-title">${esc(titlePref(e.media.title))}</div>
+            <div class="hot-take-meta">${own ? 'You' : 'Them'} ${Math.round(e.score)} · AniList ${e.media.meanScore}</div>
+        </div>
+        <span class="hot-take-diff ${diff > 0 ? 'pos' : 'neg'}">${diff > 0 ? '+' : '−'}${Math.abs(diff)}</span>
+    </div>`;
+    return `<div style="margin-top:var(--space-xl)">
+        <h3 class="section-title" style="margin-bottom:var(--space-md)">Hot takes</h3>
+        <div class="stats-grid">
+            ${loved.length ? `<div class="box stat-chart" style="background:var(--bg-secondary)"><div class="stat-chart-title">Liked more than most</div>${loved.map(row).join('')}</div>` : ''}
+            ${cooler.length ? `<div class="box stat-chart" style="background:var(--bg-secondary)"><div class="stat-chart-title">Liked less than most</div>${cooler.map(row).join('')}</div>` : ''}
+        </div>
+    </div>`;
+}
+
+// One bar chart box; rows: [{ label, value, count, note }] (note: the line under the bar's number)
+function barChart(title, rows) {
+    if (!rows.length) return '';
+    const max = Math.max(...rows.map(r => r.count), 1);
+    return `<div class="box stat-chart" style="background:var(--bg-secondary)">
+        <div class="stat-chart-title">${esc(title)}</div>
+        <div class="stat-bar-chart">
+            ${rows.map(r => `<div class="stat-bar-row"${r.note ? ` title="${esc(r.note)}"` : ''}>
+                <span class="stat-bar-label">${esc(r.label)}</span>
+                <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${(r.count / max * 100)}%"></div></div>
+                <span class="stat-bar-value">${esc(String(r.value ?? r.count))}</span>
+            </div>`).join('')}
+        </div>
     </div>`;
 }
 
@@ -122,6 +171,13 @@ function renderAnimeStats(stats) {
                     </div>`).join('')}
                 </div>
             </div>` : ''}
+            ${barChart('Top tags', (stats.tags || []).slice(0, 8).map(t => ({ label: t.tag?.name || '', count: t.count, note: t.meanScore ? `Your average ${Math.round(t.meanScore)}` : '' })))}
+            ${barChart('Your average per genre', (stats.genres || []).filter(g => g.meanScore).slice(0, 8)
+                .sort((a, b) => b.meanScore - a.meanScore).map(g => ({ label: g.genre, count: g.meanScore, value: Math.round(g.meanScore), note: `${g.count} shows` })))}
+            ${barChart('Your era (release year)', (stats.releaseYears || []).slice().sort((a, b) => b.releaseYear - a.releaseYear).slice(0, 10)
+                .map(y => ({ label: String(y.releaseYear), count: y.count })))}
+            ${barChart('Started watching', (stats.startYears || []).slice().sort((a, b) => b.startYear - a.startYear).slice(0, 10)
+                .map(y => ({ label: String(y.startYear), count: y.count })))}
             ${stats.studios?.length ? `<div class="box stat-chart" style="background:var(--bg-secondary)">
                 <div class="stat-chart-title">Top Studios</div>
                 <div class="stat-bar-chart">

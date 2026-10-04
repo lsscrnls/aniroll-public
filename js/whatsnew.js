@@ -1,10 +1,10 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=133';
-import { openDialog } from './a11y.js?v=133';
-import { prefersReducedMotion } from './animations.js?v=133';
-import { accountState, saveAccountState } from './accountstate.js?v=133';
+import { esc } from './store.js?v=134';
+import { openDialog } from './a11y.js?v=134';
+import { prefersReducedMotion } from './animations.js?v=134';
+import { accountState, saveAccountState } from './accountstate.js?v=134';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
@@ -15,6 +15,29 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
+    {
+        id: '2026-10-04',
+        title: 'A smarter player, your list at a glance, and a faster start',
+        items: [
+            'The player answers every key: volume, speed (<strong>[</strong> and <strong>]</strong>), subtitle timing (<strong>Z</strong> and <strong>X</strong>), <strong>0–9</strong> to jump, <strong>Shift+N</strong> for the episode before. Speed, subtitle timing and size are in the menus too.',
+            '<strong>Skip intros automatically</strong>, per show, with Undo. Intro and credits show on the wave, and the label above it says when you are in one.',
+            'Up next shows the episode’s picture and length. After a few episodes in a row it asks whether you are still watching, and <strong>Stop after this episode</strong> waits for you.',
+            'Finished a show? Rate it right there: on the player’s last card, or when +1 completes it on Home or My List.',
+            'Media keys, headset buttons and the lock screen control the player; the tab shows the episode.',
+            'Jellyfin marks only the right season as played now, and only when your progress changed. Files with two episodes count as both. A series AniRoll cannot match can be <strong>linked by hand</strong>, even when its second part starts at episode 13.',
+            'Invite friends to your Jellyfin with a link: it opens AniRoll with your server filled in.',
+            'My List: an <strong>All</strong> tab, <strong>Behind</strong> and genre filters, more ways to sort, your score in one tap, an <strong>export</strong> for MyAnimeList, and changes from anywhere show at once.',
+            'Home tells you what aired since your last visit and how long catching up takes; shows you have not touched in weeks can go to Paused in one tap.',
+            '<strong>Not interested</strong> on a recommendation keeps it away, on every device.',
+            'Search finds your own shows from the first letter. Related titles say where they stand on your list and add a sequel with one tap.',
+            'Social hides posts and replies about episodes you have not seen yet, and a binge shows as one post. Notifications include mentions and messages, and open the thread right there.',
+            'Watch Party: rate each episode together, edit the post before it goes out, see who else is watching, and invite links show the show in chat apps.',
+            'Roll: the match for your own Planning shows, <strong>Fits you best</strong>, and a time filter: tonight, a weekend, or a long haul.',
+            'Calendar: <strong>Add to my calendar</strong> puts the week into your phone’s calendar.',
+            'AniRoll starts faster, and saving an episode no longer reloads your whole list.',
+            'Easier to use with a keyboard and a screen reader, and on phones the details slide up as a proper sheet.',
+        ],
+    },
     {
         // '.2': played and the resume spot reach Jellyfin with an API key too
         // '.3': confirmed changes follow the account

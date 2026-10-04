@@ -1,5 +1,5 @@
-import { toast } from './store.js?v=133';
-import { getToken } from './auth.js?v=133';
+import { toast } from './store.js?v=134';
+import { getToken } from './auth.js?v=134';
 
 // Jellyfin integration: when AniList progress moves forward, mark the matching
 // episodes watched on the user's own Jellyfin server.
@@ -46,7 +46,15 @@ export function getScope() {
     return localStorage.getItem(KEYS.scope) === 'account' ? 'account' : 'device';
 }
 
+// The player keeps "is Jellyfin reachable" for five minutes and the found shows per tab. Another
+// server or user makes both wrong at once, so they are dropped right away.
+function forgetPlayerCaches() {
+    import('./player/availability.js?v=134').then(m => m.forgetAvailability()).catch(() => {});
+    import('./player/library.js?v=134').then(m => m.forgetMatches()).catch(() => {});
+}
+
 function writeLocal(cfg, scope) {
+    if (localStorage.getItem(KEYS.url) !== cfg.url || localStorage.getItem(KEYS.userId) !== cfg.userId) forgetPlayerCaches();
     localStorage.setItem(KEYS.url, cfg.url);
     localStorage.setItem(KEYS.apiKey, cfg.apiKey);
     localStorage.setItem(KEYS.userId, cfg.userId);
@@ -60,6 +68,7 @@ function writeLocal(cfg, scope) {
 function clearLocal() {
     Object.values(KEYS).forEach(k => localStorage.removeItem(k));
     statusCache = null;
+    forgetPlayerCaches();
 }
 
 export function normalizeUrl(raw) {
@@ -309,7 +318,10 @@ export async function getStatus(force = false) {
                 userName: cfg.userName,
             };
         } else {
-            value = { state: 'error', error: (info.status === 401 || info.status === 403) ? 'API key rejected' : `HTTP ${info.status}` };
+            // A Quick Connect sign-in ends when it is signed out in Jellyfin or runs out: say so, it is fixed with a new code
+            const refused = info.status === 401 || info.status === 403;
+            value = { state: 'error', expired: refused && cfg.kind === 'user',
+                error: refused ? (cfg.kind === 'user' ? 'Sign-in expired' : 'API key rejected') : `HTTP ${info.status}` };
         }
     } catch {
         value = { state: 'error', error: 'Server not reachable' };
@@ -318,7 +330,6 @@ export async function getStatus(force = false) {
     return value;
 }
 
-export function invalidateStatus() { statusCache = null; }
 
 export const normTitle = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 
@@ -335,58 +346,34 @@ export function hasAniListId(item, anilistId) {
     return Object.entries(item?.ProviderIds || {}).some(([k, v]) => k.toLowerCase() === 'anilist' && String(v) === String(anilistId));
 }
 
-// Jellyfin libraries rarely carry AniList ids, so fall back to a title search. Jellyfin finds
-// nothing for "False Memory (2026)", so the year is searched apart and has to fit the series.
-async function findSeries(cfg, anilistId, titles, year) {
-    for (const providerId of [`anilist.${anilistId}`, `AniList.${anilistId}`]) {
-        const r = await request(cfg, `/Users/${encodeURIComponent(cfg.userId)}/Items?AnyProviderIdEquals=${encodeURIComponent(providerId)}&IncludeItemTypes=Series&Recursive=true&Limit=5&fields=ProviderIds`);
-        // Jellyfin 12 answers an unknown provider filter with the whole library: check the id
-        const hit = (r.data?.Items || []).find(i => hasAniListId(i, anilistId));
-        if (hit) return hit;
-    }
-    for (const raw of (titles || []).filter(Boolean)) {
-        const { title, year: titleYear } = splitYear(raw);
-        const r = await request(cfg, `/Users/${encodeURIComponent(cfg.userId)}/Items?searchTerm=${encodeURIComponent(title)}&IncludeItemTypes=Series&Recursive=true&limit=5`);
-        const items = (r.data?.Items || []).filter(i =>
-            nearYear(titleYear || year, splitYear(i.Name).year || i.ProductionYear));
-        const exact = items.find(i => normTitle(splitYear(i.Name).title) === normTitle(title));
-        if (exact || items.length === 1) return exact || items[0];
-    }
-    return null;
-}
-
 // Marks every episode up to `episode` as played — progress can jump by more than one
-// (party sync, several +1 in a row); episodes already played are skipped.
-export async function markWatched(anilistId, episode, titles, year = null) {
+// (party sync, several +1 in a row); episodes already played are skipped. The show is found the
+// way the player finds it (js/player/library.js): season-aware, so progress 5 on season 1 never
+// touches season 2, and only the episodes this AniList entry has.
+// media: { id, format, episodes, title, synonyms, seasonYear, startDate }
+export async function markWatched(media, episode) {
     const cfg = getConfig();
-    if (!cfg || !episode) return null;
-
-    const series = await findSeries(cfg, anilistId, titles, year);
-    if (!series) return { marked: 0, reason: 'series-not-found' };
-
-    const eps = await request(cfg, `/Shows/${encodeURIComponent(series.Id)}/Episodes?userId=${encodeURIComponent(cfg.userId)}&fields=UserData`);
-    const pending = (eps.data?.Items || []).filter(e =>
-        e.ParentIndexNumber !== 0 && e.IndexNumber && e.IndexNumber <= episode && !e.UserData?.Played);
-
-    let marked = 0;
-    for (const e of pending) {
-        const r = await request(cfg, `/Users/${encodeURIComponent(cfg.userId)}/PlayedItems/${encodeURIComponent(e.Id)}`, 'POST');
-        if (r.status >= 200 && r.status < 300) marked++;
-    }
-    return { marked, series: series.Name, reason: pending.length ? null : 'already-played' };
+    if (!cfg || !episode || !media?.id) return null;
+    const [{ availability }, { markPlayedUpTo }] = await Promise.all([
+        import('./player/availability.js?v=134'),
+        import('./player/library.js?v=134'),
+    ]);
+    const avail = await availability();
+    if (!avail) return { marked: 0, reason: 'unreachable' };
+    return markPlayedUpTo(avail.base, media, episode);
 }
 
-// Fire-and-forget hook from saveMediaListEntry — never blocks or breaks a list update
-// getMedia resolves to { titles, year }
-export async function syncProgress(anilistId, episode, getMedia) {
+// Fire-and-forget hook from saveMediaListEntry — never blocks or breaks a list update.
+// getMedia resolves to the AniList media (see markWatched)
+export async function syncProgress(episode, getMedia) {
     if (!getConfig() || !episode) return;
     try {
-        const { titles = [], year = null } = (typeof getMedia === 'function' ? await getMedia().catch(() => null) : getMedia) || {};
-        const res = await markWatched(anilistId, episode, titles, year);
+        const media = typeof getMedia === 'function' ? await getMedia().catch(() => null) : getMedia;
+        const res = await markWatched(media, episode);
         if (res?.marked) {
             toast(`Jellyfin: ${res.marked} episode${res.marked > 1 ? 's' : ''} marked watched`, 'success');
         } else if (res?.reason === 'series-not-found') {
-            console.warn('Jellyfin: no series found for AniList id', anilistId, titles);
+            console.warn('Jellyfin: no series found for AniList id', media?.id);
         }
     } catch (err) {
         console.error('Jellyfin sync failed:', err);
@@ -572,7 +559,7 @@ function matchFit(media, group) {
 // Pushes AniList forward where Jellyfin is further along; returns what it changed
 export async function pullFromJellyfin(user, token) {
     if (!getConfig() || !isPullEnabled() || !user?.id || !token) return { updated: 0, changes: [] };
-    const api = await import('./api.js?v=133');
+    const api = await import('./api.js?v=134');
     if (api.isBackgroundPaused()) return { updated: 0, changes: [], skipped: 'maintenance' };
     if (api.isRateLimited()) return { updated: 0, changes: [], skipped: 'rate-limited' };
 
@@ -580,12 +567,25 @@ export async function pullFromJellyfin(user, token) {
     if (!played.length) return { updated: 0, changes: [] };
 
     const lists = await api.getMediaList(user.id, 'ANIME', token);
-    const entries = ['CURRENT', 'PAUSED', 'REPEATING']
-        .flatMap(status => lists.find(l => l.status === status)?.entries || []);
+    // Planning too: a show started in Jellyfin moves to Watching (progressVars does that)
+    const entries = ['CURRENT', 'PAUSED', 'REPEATING', 'PLANNING']
+        .flatMap(status => lists.find(l => l.status === status && !l.isCustomList)?.entries || []);
 
-    // Which played Jellyfin series each list entry stands for
+    // Which played Jellyfin series each list entry stands for. Series linked by hand (js/jflinks.js) first,
+    // with their episode numbers moved by the link's offset
     const claims = [];
+    const { linkForSeries } = await import('./jflinks.js?v=134');
+    const linked = new Set();
+    for (const p of played) {
+        const link = linkForSeries(p.seriesName, p.season);
+        const entry = link && entries.find(e => e.media.id === link.mediaId);
+        if (!entry || p.maxEpisode - link.offset < 1) continue;
+        const m = entry.media;
+        claims.push({ entry, hit: { ...p, maxEpisode: p.maxEpisode - link.offset }, titles: [m.title?.userPreferred, m.title?.romaji].filter(Boolean).map(splitYear), fit: 100 });
+        linked.add(entry.id);
+    }
     for (const entry of entries) {
+        if (linked.has(entry.id)) continue;
         const m = entry.media;
         const titles = [m.title?.romaji, m.title?.english, m.title?.userPreferred, m.title?.native].filter(Boolean).map(splitYear);
         const wanted = splitSeason(titles[0]?.title);
@@ -619,7 +619,7 @@ export async function pullFromJellyfin(user, token) {
         if (hit.playedAt && entry.updatedAt && hit.playedAt <= entry.updatedAt * 1000) continue;
 
         try {
-            await api.saveMediaListEntry(api.progressVars(entry, target, m.episodes), token);
+            await api.saveMediaListEntry(api.progressVars(entry, target, m.episodes), token, { mirror: false });
             changes.push({ title: titles[0], from: entry.progress || 0, to: target });
         } catch (err) {
             if (err.rateLimited || err.offline) break; // queued, try again later

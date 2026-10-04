@@ -10,6 +10,10 @@ const { respond, VIEWER } = require('./mock');
 const { mockJellyfin, JF_URL, JF_STORAGE } = require('./jellyfin-mock');
 
 const ROOT = path.join(__dirname, '..', '..');
+// The release under test and the number of changelog entries, read from the code instead of written here,
+// so a release or a new changelog day needs no edit in this file
+const APP_VERSION = fs.readFileSync(path.join(ROOT, 'js', 'app.js'), 'utf8').match(/APP_VERSION = '(\d+)'/)[1];
+const CHANGE_COUNT = (fs.readFileSync(path.join(ROOT, 'js', 'whatsnew.js'), 'utf8').match(/^\s*id: '\d{4}-/gm) || []).length;
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
     '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json' };
 
@@ -263,7 +267,8 @@ function staticServer() {
         const left = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_pending_saves') || '[]').length);
         check('offline: a + is kept and sent once back online', kept >= 1 && sent && left === 0, { kept, sent, left });
     }
-    const card = await page.$('.list-card[data-open], .list-entry-title[data-open]');
+    // A card with −/+1 in it is not a button itself: its title is
+    const card = await page.$('.list-card [role="button"][data-open], .list-card[role="button"][data-open], .list-entry-title[data-open]');
     if (card) {
         await card.focus();
         await page.keyboard.press('Enter');
@@ -364,6 +369,91 @@ function staticServer() {
     check('without the "reduce motion" setting smooth scrolling stays on', await page.evaluate(() => document.documentElement.classList.contains('lenis')));
     check("accounts: another account never gets this one's cached answers or queued saves",
         isolation.separate && isolation.reused && isolation.countA === 2 && isolation.countB === 1, isolation);
+
+    // ===== v134 =====
+    // My List: an "All" tab, filters, the score as a button, and a change in the detail panel shows at once
+    await go('#/list');
+    const listUi = await page.evaluate(() => ({
+        tabs: [...document.querySelectorAll('#list-tabs .list-tab')].map(t => t.textContent.trim().split(' ')[0]),
+        behind: !!document.getElementById('list-behind'), genre: !!document.querySelector('#list-toolbar .glass-menu'),
+        exportBtn: !!document.getElementById('list-export'), current: document.querySelector('#list-tabs [aria-pressed="true"]')?.textContent || '',
+    }));
+    check('My List: status lists first, an All tab last, Behind and genre filters, export', listUi.tabs.at(-1) === 'All' && listUi.behind && listUi.genre && listUi.exportBtn && !!listUi.current, listUi);
+    await page.click('#list-tabs .list-tab:last-child');
+    await settle(300);
+    const firstCard = await page.$eval('#list-content [data-media-id]', el => Number(el.dataset.mediaId)).catch(() => null);
+    if (firstCard) {
+        await page.evaluate((id) => window.dispatchEvent(new CustomEvent('aniroll:list-changed', { detail: { mediaId: id, removed: true } })), firstCard);
+        await settle(300);
+        const gone = await page.evaluate((id) => !document.querySelector(`#list-content [data-media-id="${id}"]`), firstCard);
+        check('My List: an entry removed elsewhere leaves the list at once', gone);
+    }
+
+    // Search: your own shows from the first letter, without asking AniList
+    await page.evaluate(() => document.getElementById('search-btn').click());
+    await settle(300);
+    const reqBefore = await page.evaluate(() => performance.getEntriesByType('resource').filter(r => r.name.includes('graphql')).length);
+    await page.fill('#search-input', 'Sh');
+    await page.waitForTimeout(400);
+    const own = await page.evaluate(() => ({ group: document.querySelector('.search-group-title')?.textContent, rows: document.querySelectorAll('#search-results .search-result-item').length,
+        status: !!document.querySelector('.search-result-status') }));
+    const reqAfter = await page.evaluate(() => performance.getEntriesByType('resource').filter(r => r.name.includes('graphql')).length);
+    check('search: your own shows at once, with their status, no request', own.group === 'On your list' && own.rows > 0 && own.status && reqAfter === reqBefore, { ...own, reqBefore, reqAfter });
+    await page.keyboard.press('Escape');
+    await settle(300);
+
+    // Season: format chips and "Not on my list"; a page heading names the tab and takes focus
+    await go('#/season');
+    const season = await page.evaluate(() => ({ chips: document.querySelectorAll('#season-formats [data-format]:not([hidden])').length,
+        notListed: !document.getElementById('season-not-listed').hidden, title: document.title, focus: document.activeElement?.tagName }));
+    check('season: format chips and Not on my list; the tab says which page', season.chips >= 1 && season.notListed && /Season · AniRoll/.test(season.title), season);
+
+    // Calendar: the week as a calendar file
+    await go('#/calendar');
+    const download = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
+    await page.click('#cal-ics').catch(() => {});
+    const file = await download;
+    let ics = '';
+    if (file) { const pathOnDisk = await file.path(); ics = pathOnDisk ? fs.readFileSync(pathOnDisk, 'utf8') : ''; }
+    check('calendar: Add to my calendar downloads the episodes as an .ics file', /BEGIN:VCALENDAR/.test(ics) && /BEGIN:VEVENT/.test(ics) && /#\/anime\/\d+/.test(ics), ics.slice(0, 200));
+
+    // Profile: where your scores and AniList's differ most
+    // The test account carries no statistics: give the cached one some, as AniList's Viewer would
+    await page.evaluate((v) => import(`/js/store.js?v=${v}`).then(st => st.setState({ user: { ...st.getState().user, statistics: { anime: {
+        count: 40, minutesWatched: 30000, episodesWatched: 500, meanScore: 78,
+        genres: [{ genre: 'Action', count: 20, meanScore: 80 }, { genre: 'Drama', count: 10, meanScore: 70 }],
+        tags: [{ tag: { name: 'Isekai' }, count: 8, meanScore: 72 }],
+        scores: [{ score: 80, count: 10 }], formats: [{ format: 'TV', count: 30 }],
+        releaseYears: [{ releaseYear: 2024, count: 9 }, { releaseYear: 2025, count: 12 }], startYears: [{ startYear: 2025, count: 20 }], studios: [],
+    } } } })), APP_VERSION);
+    await go('#/profile');
+    await settle(600);
+    const takes = await page.evaluate(() => ({ title: [...document.querySelectorAll('#hot-takes .section-title')].map(h => h.textContent).join(), rows: document.querySelectorAll('.hot-take').length,
+        charts: [...document.querySelectorAll('.stat-chart-title')].map(t => t.textContent) }));
+    check('profile: tags, averages per genre and the release years are shown', takes.charts.includes('Top tags') && takes.charts.includes('Your era (release year)'), takes);
+
+    // Login: the page you were on comes back after AniList's login
+    const back = await page.evaluate(async (v) => {
+        const auth = await import(`/js/auth.js?v=${v}`);
+        const keep = localStorage.getItem('aniroll_token');
+        history.replaceState(null, '', '#/watchparty?host=Friend');
+        auth.rememberReturn();
+        history.replaceState(null, '', '#access_token=new-token&token_type=Bearer');
+        const ok = auth.handleOAuthCallback();
+        const hash = location.hash;
+        localStorage.setItem('aniroll_token', keep);
+        history.replaceState(null, '', '#/');
+        return { ok, hash };
+    }, APP_VERSION);
+    check('login: back on the page where Log in was pressed (a party invite)', back.ok && back.hash === '#/watchparty?host=Friend', back);
+
+    // Toasts are read out; the skip link is the first stop
+    await go('#/list');
+    const a11y = await page.evaluate(() => ({ live: document.getElementById('toast-container').getAttribute('aria-live'),
+        skip: document.querySelector('a.skip-link')?.getAttribute('href'), current: document.querySelector('.nav-links [aria-current="page"]')?.dataset.page,
+        title: document.title }));
+    check('a11y: toasts in a live region, a skip link, the current page marked in the nav and the tab title',
+        a11y.live === 'polite' && a11y.skip === '#content' && a11y.current === 'list' && /My List · AniRoll/.test(a11y.title), a11y);
 
     await page.close();
     };
@@ -609,7 +699,7 @@ function staticServer() {
         await p.waitForTimeout(300);
         const epsClosed = await p.evaluate(() => !document.querySelector('.ep-dialog'));
         check('player: Episodes lists every episode, marks the next, watched and started; seasons switch; Escape closes',
-            eps.rows === 12 && /^#\/play\/\d+\/2$/.test(eps.next || '') && eps.watched && eps.started && /\/Items\/ep1\/Images\/Primary/.test(eps.thumb)
+            eps.rows === 11 && /^#\/play\/\d+\/2$/.test(eps.next || '') && eps.watched && eps.started && /\/Items\/ep1\/Images\/Primary/.test(eps.thumb)
             && /^#\/play\/\d+\/4$/.test(eps.play || '') && eps.chip && (switched.empty || (!!switched.first && switched.first.split('/')[2] !== (eps.next || '').split('/')[2])) && epsClosed, { ...eps, ...switched, epsClosed });
 
         const playHash = button?.href || '#/play/101/2';
@@ -846,7 +936,7 @@ function staticServer() {
         const nextAsked = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep7').map(c => c.audio);
         const reportedAudio = calls.filter(c => c.type === 'Playing' && c.body?.ItemId === 'ep7').map(c => c.body.AudioStreamIndex);
         check('player: audio tracks in the menu, switching asks Jellyfin for that track from the same spot, the show remembers the dub',
-            audioMenu.titles.join() === 'Audio,Subtitles' && audioMenu.audio.join('|') === 'Japanese - Opus - Stereo:true|English - Opus - Stereo:false'
+            audioMenu.titles.join() === 'Audio,Subtitles,Timing,Size' && audioMenu.audio.join('|') === 'Japanese - Opus - Stereo:true|English - Opus - Stereo:false'
             && asked.join() === ',5' && dubbed.time > 4 && checkedAfter === '5'
             && Object.values(dubbed.pref).some(v => v.lang === 'eng') && reportedAudio.includes(5) && !reportedAudio.includes(1),
             { audioMenu, asked, dubbed, checkedAfter, nextAsked, reportedAudio });
@@ -921,6 +1011,86 @@ function staticServer() {
         await p.close();
     }
 
+    // v134: a double episode, the keys and what they show, the media keys, segments on the wave, intros
+    // skipped by themselves, and the AniList progress mirrored to Jellyfin season by season
+    {
+        const { p, pageErrors, saves, calls } = await playerPage(true);
+        await p.goto(base + '/#/play/101/10');
+        await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2; }, null, { timeout: 10000 }).catch(() => {});
+        await p.waitForTimeout(1200);
+        const dbl = await p.evaluate(() => ({
+            label: document.getElementById('player-episode')?.textContent || '',
+            title: document.title,
+            next: document.querySelector('.pl-next-title')?.textContent || '',
+            thumb: !document.querySelector('.pl-next-thumb')?.hidden,
+            session: navigator.mediaSession?.metadata ? { title: navigator.mediaSession.metadata.title, artist: navigator.mediaSession.metadata.artist } : null,
+            segs: [...document.querySelectorAll('.pl-seek-seg')].map(x => x.dataset.type),
+        }));
+        check('player: a double-episode file plays as episodes 10–11, Up next is 12 with its picture, the tab and media keys know it',
+            /Episodes 10–11/.test(dbl.label) && /Episodes 10–11/.test(dbl.title) && /Episode 12/.test(dbl.next) && dbl.thumb
+            && /Episodes 10–11/.test(dbl.session?.title || '') && !!dbl.session?.artist, dbl);
+        check('player: the intro shows as a stretch on the wave', dbl.segs.join() === 'Intro', dbl.segs);
+
+        // The label over the wave names the intro when the pointer is in it
+        const seek = await p.$('.pl-seek');
+        const box = await seek.boundingBox();
+        await p.mouse.move(box.x + box.width * (5 / 20), box.y + box.height / 2);
+        await p.waitForTimeout(200);
+        const hover = await p.evaluate(() => ({ seg: document.querySelector('.pl-seek-hover-seg')?.textContent, hidden: document.querySelector('.pl-seek-hover-seg')?.hidden,
+            time: document.querySelector('.pl-seek-hover-time')?.textContent }));
+        check('player: hovering the intro says so next to the time', hover.seg === 'Intro' && !hover.hidden && /^0:0[45]$/.test(hover.time || ''), hover);
+
+        // Keys: volume shows its number, ] speeds up, 5 jumps to half
+        await p.mouse.move(640, 300);
+        await p.keyboard.press('ArrowDown');
+        await p.waitForTimeout(150);
+        const osd = await p.evaluate(() => ({ text: document.querySelector('.pl-osd')?.textContent, shown: !document.querySelector('.pl-osd')?.hidden }));
+        await p.keyboard.press(']');
+        await p.keyboard.press('5');
+        await p.waitForTimeout(200);
+        const keys = await p.evaluate(() => { const v = document.getElementById('player-video'); return { rate: v.playbackRate, t: v.currentTime, d: v.duration }; });
+        check('player: keys answer on screen — volume, ] for speed, 5 for half way', osd.shown && /^Volume \d+ %$/.test(osd.text || '') && keys.rate === 1.25 && Math.abs(keys.t - keys.d / 2) < 1.5, { osd, keys });
+        await p.keyboard.press('[');
+
+        // Past 90 %: AniList gets 11, the file's last episode, not 10
+        const before = saves.length;
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.8; return v.play(); }).catch(() => {});
+        await p.waitForTimeout(900);
+        const written = saves.slice(before);
+        check('player: a double episode saves its last episode to AniList', written.length === 1 && written[0].progress === 11, written);
+
+        // Intros skip themselves once switched on for the show, with a way back
+        await p.click('[data-act="settings"]');
+        await p.waitForSelector('[data-autoskip]', { timeout: 3000 }).catch(() => {});
+        await p.click('[data-autoskip]').catch(() => {});
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 1.2; return v.play(); }).catch(() => {});
+        await p.waitForTimeout(2200);
+        const auto = await p.evaluate(() => ({ t: document.getElementById('player-video').currentTime, osd: document.querySelector('.pl-osd')?.textContent || '',
+            undo: !!document.querySelector('.pl-osd-act'), kept: JSON.parse(localStorage.getItem('aniroll_autoskip') || '{}') }));
+        check('player: intros skip themselves for a show once asked, with Undo', auto.t >= 13.9 && /Skipped intro/.test(auto.osd) && auto.undo && auto.kept.m101 === 1, auto);
+
+        // AniList progress mirrored to Jellyfin: only season 1, up to that episode, not what was played already
+        await p.route('https://graphql.anilist.co/**', route => {
+            const body = route.request().postDataJSON();
+            if (/^\s*mutation/.test(body.query) && /SaveMediaListEntry/.test(body.query)) {
+                return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: { SaveMediaListEntry: {
+                    id: 5, mediaId: 101, status: 'CURRENT', score: 0, progress: 3, progressVolumes: 0, repeat: 0, notes: null, startedAt: null, completedAt: null } } }) });
+            }
+            return route.fallback();
+        });
+        const playedBefore = calls.filter(c => c.type === 'played').length;
+        await p.evaluate((v) => import(`/js/api.js?v=${v}`).then(api => api.saveMediaListEntry({ id: 5, progress: 3 }, 'e2e-token')), APP_VERSION);
+        await p.waitForTimeout(1500);
+        const scoreOnly = calls.filter(c => c.type === 'played').length;
+        await p.evaluate((v) => import(`/js/api.js?v=${v}`).then(api => api.saveMediaListEntry({ id: 5, scoreRaw: 80 }, 'e2e-token')), APP_VERSION);
+        await p.waitForTimeout(1200);
+        const marked = calls.filter(c => c.type === 'played').map(c => c.item);
+        check('jellyfin: progress 3 marks episodes 2 and 3 of the right season played, a score change touches nothing',
+            marked.slice(playedBefore).join() === 'ep2,ep3' && calls.filter(c => c.type === 'played').length === scoreOnly, { marked });
+        check('player v134: no errors', !pageErrors.length, pageErrors);
+        await p.close();
+    }
+
     };
 
     groups.seats = async () => {
@@ -981,7 +1151,7 @@ function staticServer() {
             online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
         check('admin: the owner sees tiles, four charts, who is online and who waits',
             adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
-        await sq.evaluate(() => import('/js/auth.js?v=133').then(m => m.logout()));
+        await sq.evaluate((v) => import(`/js/auth.js?v=${v}`).then(m => m.logout()), APP_VERSION);
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();
@@ -1046,7 +1216,7 @@ function staticServer() {
     const back = await visitor({ aniroll_theme: 'dark' });
     const both = await back.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent));
     check('returning visitor who confirmed nothing: every change, oldest (the move) first',
-        (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === 9 && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home') && both[5].startsWith('Starting soon') && both[6].startsWith('Material 3 for everyone') && both[7].startsWith('Browse by tag') && both[8].startsWith('Next episode'), both);
+        (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === CHANGE_COUNT && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home') && both[5].startsWith('Starting soon') && both[6].startsWith('Material 3 for everyone') && both[7].startsWith('Browse by tag') && both[8].startsWith('Next episode'), both);
     const demoTabs = await back.$$eval('.whatsnew-bar [data-k]', els => els.map(e => e.dataset.k).join(','));
     check('notice: animation ends on the new tab order', demoTabs === 'home,list,roll,discover,social', demoTabs);
     await back.click('.whatsnew [data-close]');
@@ -1064,7 +1234,7 @@ function staticServer() {
     // Confirmed the move with "Got it" already: only what came after it
     const confirmed = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-22' });
     const only = await confirmed.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, demo: !!document.querySelector('.whatsnew-demo'), sections: document.querySelectorAll('.whatsnew .whatsnew-entry').length }));
-    check('returning visitor who confirmed the move: only what came after, no tab animation', only.title === 'A few things changed' && !only.demo && only.sections === 8, only);
+    check('returning visitor who confirmed the move: only what came after, no tab animation', only.title === 'A few things changed' && !only.demo && only.sections === CHANGE_COUNT - 1, only);
     await confirmed.close();
 
     const fresh = await visitor({});
@@ -1127,7 +1297,7 @@ function staticServer() {
     await late.click('.landing-foot .whatsnew-link');
     await late.clock.runFor(500);
     const log = await late.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, entries: document.querySelectorAll('.whatsnew-entry').length }));
-    check('changelog: still there, marked unread, opens with all entries', unread && log.title === "What's new" && log.entries === 9, { unread, ...log });
+    check('changelog: still there, marked unread, opens with all entries', unread && log.title === "What's new" && log.entries === CHANGE_COUNT, { unread, ...log });
 
     // An entry with a clip: it sits behind "See it in action"; opening it widens the dialog
     const clipped = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-26' });

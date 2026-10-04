@@ -1,4 +1,4 @@
-import { jfAuth } from '../jellyfin.js?v=133';
+import { jfAuth } from '../jellyfin.js?v=134';
 
 // Every subtitle of a file behind one list, whatever draws it:
 //   ASS/SSA  -> JASSUB (libass in WebAssembly) with the fonts embedded in the MKV — typesetting, signs,
@@ -7,7 +7,8 @@ import { jfAuth } from '../jellyfin.js?v=133';
 //   PGS (Blu-ray pictures) -> libpgs on a canvas; Jellyfin hands the track out as is (Stream.pgssub,
 //               Stream.sup answers 400). The first request waits while Jellyfin extracts every track (~25 s).
 //   DVD/DVB pictures      -> not offered (one file in the library)
-//   manager = { list(), current(), select(id | null), destroy() }; `pick` chooses the first track
+//   manager = { list(), current(), select(id | null), delay(), setDelay(seconds), destroy() }; `pick` chooses the first track
+//   delay: seconds the lines come later (negative: earlier), for a release timed off by a bit
 const JASSUB_URL = '../vendor/jassub-2.5.16/jassub.js';
 const LIBPGS_URL = '../vendor/libpgs-0.9.0/libpgs.js';
 const LIBPGS_WORKER = new URL('../vendor/libpgs-0.9.0/libpgs.worker.js', import.meta.url).href;
@@ -39,6 +40,18 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
     let pgsFrame = 0;
     let closed = false;
     let pending = 0;
+    let offset = 0;
+
+    // WebVTT: every cue moved by the delay, from the times the file gave it
+    function shiftCues(t) {
+        const cues = t?.el?.track?.cues;
+        if (!cues) return;
+        for (const cue of cues) {
+            if (cue.aniStart === undefined) { cue.aniStart = cue.startTime; cue.aniEnd = cue.endTime; }
+            cue.startTime = Math.max(0, cue.aniStart + offset);
+            cue.endTime = Math.max(0, cue.aniEnd + offset);
+        }
+    }
 
     // One chosen track at a time: loading ends when it is there, fails, or another is chosen
     let loadingFor = null;
@@ -55,7 +68,7 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         video.append(el);
         t.el = el;
         el.track.mode = 'disabled';
-        el.addEventListener('load', () => loaded(t));
+        el.addEventListener('load', () => { shiftCues(t); loaded(t); });
         el.addEventListener('error', () => loaded(t));
     }
 
@@ -95,6 +108,7 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
             video,
             subContent,
             fonts: fontData,
+            timeOffset: -offset,
             // No "allow fonts" prompt: embedded fonts and the default face are enough
             queryFonts: false,
         });
@@ -112,7 +126,7 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         const tick = (_, meta) => {
             pgsFrame = 0;
             if (closed || active?.kind !== 'pgs' || !pgs) return;
-            pgs.renderAtTimestamp(meta.mediaTime);
+            pgs.renderAtTimestamp(meta.mediaTime - offset);
             pgsFrame = video.requestVideoFrameCallback(tick);
         };
         pgsFrame = video.requestVideoFrameCallback(tick);
@@ -127,13 +141,13 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
             pgs.renderAtTimestamp(-1);
             pgs.loadFromUrl(subUrl);
         } else {
-            pgs = new PgsRenderer({ video, subUrl, workerUrl: LIBPGS_WORKER, aspectRatio: 'contain' });
+            pgs = new PgsRenderer({ video, subUrl, workerUrl: LIBPGS_WORKER, aspectRatio: 'contain', timeOffset: -offset });
             pgs.canvas.classList.add('pl-subs-canvas');
         }
         pgs.canvas.hidden = false;
         followFrames();
         await pgs.ready;
-        if (!closed && active === t) pgs.renderAtTimestamp(video.currentTime);
+        if (!closed && active === t) pgs.renderAtTimestamp(video.currentTime - offset);
     }
 
     function hidePgs() {
@@ -151,6 +165,7 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         loading(t && !(t.el && t.el.readyState === 2) ? t : null);
         if (t?.kind !== 'ass') hideAss();
         if (t?.kind !== 'pgs') hidePgs();
+        if (t?.kind === 'text') shiftCues(t);
         if (t?.kind === 'ass') {
             if (jassub?._canvas) jassub._canvas.hidden = false;
             showAss(t).catch(err => console.warn('ASS subtitles failed:', err.message)).finally(() => loaded(t));
@@ -177,6 +192,17 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         // What draws the track, for the stats
         kind: (id) => ({ ass: 'libass', pgs: 'libpgs', text: 'WebVTT' })[tracks.find(t => t.id === id)?.kind] || '',
         select,
+        delay: () => offset,
+        setDelay(seconds) {
+            offset = Math.round(Math.max(-30, Math.min(30, Number(seconds) || 0)) * 10) / 10;
+            for (const t of tracks) if (t.kind === 'text') shiftCues(t);
+            if (jassub) jassub.timeOffset = -offset;
+            if (pgs) {
+                pgs.timeOffset = -offset;
+                if (active?.kind === 'pgs') pgs.renderAtTimestamp(video.currentTime - offset);
+            }
+            return offset;
+        },
         destroy() {
             closed = true;
             loading(null);

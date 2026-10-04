@@ -1,13 +1,13 @@
-import * as api from '../api.js?v=133';
-import { getState, toast, esc, titlePref, emptyIcon } from '../store.js?v=133';
-import { getToken, isLoggedIn } from '../auth.js?v=133';
+import * as api from '../api.js?v=134';
+import { getState, toast, esc, titlePref, emptyIcon, loginState } from '../store.js?v=134';
+import { getToken, isLoggedIn } from '../auth.js?v=134';
 
 export async function render({ content }) {
     const token = getToken();
     const user = getState().user;
 
     if (!isLoggedIn() || !user) {
-        content.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${emptyIcon('user')}</div><div class="empty-state-text">Log in to see the social feed</div></div>`;
+        content.innerHTML = loginState(emptyIcon('user'), 'Log in to see the social feed', 'What the people you follow on AniList watch, rate and say about it.');
         return;
     }
 
@@ -47,18 +47,19 @@ export async function render({ content }) {
             if (!append) rewatchRuns = new Map();
             await countRewatches(result.activities, rewatchRuns, token);
 
-            const html = result.activities
-                .filter(a => a)
+            const html = collapseRuns(result.activities.filter(a => a))
                 .map(a => renderActivity(a))
                 .join('');
 
-            if (append) socialContent.innerHTML += html;
+            // Added below, not redrawn: a reply being typed further up stays
+            if (append) socialContent.insertAdjacentHTML('beforeend', html);
             else socialContent.innerHTML = html || '<div class="empty-state"><div class="empty-state-sub">No activity yet</div></div>';
 
             document.getElementById('load-more-social').hidden = !result.pageInfo.hasNextPage;
             currentPage = page;
 
-            socialContent.querySelectorAll('.like-btn').forEach(btn => {
+            socialContent.querySelectorAll('.like-btn:not([data-bound])').forEach(btn => {
+                btn.dataset.bound = '1';
                 btn.addEventListener('click', async () => {
                     const actId = parseInt(btn.dataset.id);
                     const type = btn.dataset.actType;
@@ -113,7 +114,22 @@ export async function render({ content }) {
                     }
                     const replyBtn = e.target.closest('.reply-toggle');
                     if (replyBtn) {
+                        // Ahead of you on a show: the replies may give away what you have not seen; one
+                        // tap says so, the next shows them
+                        const card = replyBtn.closest('.activity-card');
+                        if (card?.dataset.ahead && !card.dataset.shown && replyBtn.getAttribute('aria-expanded') !== 'true') {
+                            card.dataset.shown = '1';
+                            card.querySelector('.activity-ahead')?.classList.add('is-warning');
+                            replyBtn.title = 'Replies may spoil episodes you have not seen. Tap again to show them';
+                            toast('Replies may spoil episodes you have not seen yet. Tap again to show them');
+                            return;
+                        }
                         toggleReplies(replyBtn, token);
+                        return;
+                    }
+                    const shield = e.target.closest('.activity-ahead');
+                    if (shield) {
+                        shield.closest('.activity-card')?.classList.add('is-revealed');
                         return;
                     }
                     const replyTo = e.target.closest('.activity-reply-to');
@@ -140,18 +156,40 @@ export async function render({ content }) {
         }
     }
 
-    async function loadFriendsList(container) {
+    async function loadFriendsList(container, page = 1) {
         try {
-            const result = await api.getFollowing(user.id, 1, token);
+            const result = await api.getFollowing(user.id, page, token);
             const friends = result.following;
+            if (page > 1) {
+                container.querySelector('.friends-more')?.remove();
+                container.querySelector('.friends-grid')?.insertAdjacentHTML('beforeend', friends.map(friendTile).join(''));
+                if (result.pageInfo?.hasNextPage) container.insertAdjacentHTML('beforeend', moreFriends(page + 1));
+                return;
+            }
 
             if (!friends?.length) {
                 container.innerHTML = '<div class="empty-state"><div class="empty-state-sub">You\'re not following anyone yet</div></div>';
                 return;
             }
 
-            container.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-md)">
-                ${friends.map(f => `
+            container.innerHTML = `<div class="friends-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-md)">
+                ${friends.map(friendTile).join('')}
+            </div>${result.pageInfo?.hasNextPage ? moreFriends(2) : ''}`;
+            if (!container.dataset.friendsMore) {
+                container.dataset.friendsMore = '1';
+                container.addEventListener('click', (ev) => {
+                    const btn = ev.target.closest('[data-friends-page]');
+                    if (!btn) return;
+                    btn.disabled = true;
+                    loadFriendsList(container, Number(btn.dataset.friendsPage));
+                });
+            }
+        } catch (err) {
+            container.innerHTML = `<div class="empty-state"><div class="empty-state-sub">${esc(err.message)}</div></div>`;
+        }
+    }
+    const moreFriends = (next) => `<div class="friends-more" style="text-align:center;margin-top:var(--space-lg)"><button class="glass-btn glass-btn-secondary" data-friends-page="${next}">Show more</button></div>`;
+    const friendTile = (f) => `
                     <div class="friend-tile" data-go="/user/${esc(f.name)}" role="link" tabindex="0">
                         <div style="display:flex;align-items:center;gap:var(--space-md)">
                             <img src="${f.avatar?.medium || ''}" alt="${esc(f.name)}" style="width:48px;height:48px;border-radius:var(--radius-full);object-fit:cover">
@@ -162,12 +200,7 @@ export async function render({ content }) {
                                 </div>
                             </div>
                         </div>
-                    </div>`).join('')}
-            </div>`;
-        } catch (err) {
-            container.innerHTML = `<div class="empty-state"><div class="empty-state-sub">${esc(err.message)}</div></div>`;
-        }
-    }
+                    </div>`;
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -368,7 +401,7 @@ async function toggleReplies(btn, token) {
     }
 }
 
-function renderReply(r) {
+export function renderReply(r) {
     return `<div class="activity-reply">
         <img class="activity-reply-avatar" src="${esc(r.user?.avatar?.medium || '')}" alt="" loading="lazy">
         <div class="activity-reply-body">
@@ -470,7 +503,8 @@ function renderActivity(activity) {
 
     if (activity.type === 'ANIME_LIST' || activity.type === 'MANGA_LIST') {
         const statusText = getActivityStatusText(activity);
-        return `<div class="activity-card">
+        const ahead = aheadOfYou(activity);
+        return `<div class="activity-card${ahead ? ' is-ahead' : ''}"${ahead ? ` data-ahead="${esc(ahead)}"` : ''}>
             <div class="activity-header">
                 <img class="activity-avatar" src="${activity.user?.avatar?.medium || ''}" alt="${esc(activity.user?.name)}" data-go="/user/${esc(activity.user?.name)}">
                 <div>
@@ -483,9 +517,10 @@ function renderActivity(activity) {
                 <img class="activity-media-img" src="${activity.media.coverImage?.large || ''}" alt="${esc(titlePref(activity.media.title))}" loading="lazy">
                 <div class="activity-media-info">
                     <div class="activity-media-title">${esc(titlePref(activity.media.title))}</div>
-                    ${activity.progress ? `<div class="activity-media-progress">${activity.type === 'ANIME_LIST' ? 'Episode' : 'Chapter'} ${esc(activity.progress)}</div>` : ''}
+                    ${activity.progress ? `<div class="activity-media-progress">${activity.type === 'ANIME_LIST' ? 'Episode' : 'Chapter'} ${esc(activity.progress)}${activity.collapsed ? ` <span class="activity-collapsed">· ${activity.collapsed} posts</span>` : ''}</div>` : ''}
                 </div>
             </div>` : ''}
+            ${ahead ? `<button type="button" class="activity-ahead" title="You have not got this far yet">${esc(ahead)}</button>` : ''}
             ${renderActivityActions(activity, 'ACTIVITY')}
         </div>`;
     }
@@ -507,6 +542,41 @@ function renderActivity(activity) {
     }
 
     return '';
+}
+
+// "3 - 5" -> [3, 5], "7" -> [7, 7]
+const progressRange = (p) => {
+    const n = String(p || '').match(/\d+/g)?.map(Number) || [];
+    return n.length ? [Math.min(...n), Math.max(...n)] : null;
+};
+
+// The post is about an episode past the one you are on (the feed carries your own entry for each show):
+// "Ep 9 · you're on Ep 7", else ''. Not on your list, or finished: nothing to spoil
+function aheadOfYou(a) {
+    const mine = a.media?.mediaListEntry;
+    const range = progressRange(a.progress);
+    if (!mine || !range || !['CURRENT', 'PAUSED', 'REPEATING', 'PLANNING'].includes(mine.status)) return '';
+    const unit = a.type === 'MANGA_LIST' ? 'Ch' : 'Ep';
+    return range[1] > (mine.progress || 0) ? `${unit} ${range[1]} · you're on ${unit} ${mine.progress || 0}` : '';
+}
+
+// A binge fills the feed with one post per episode: posts in a row by the same person on the same show,
+// each a plain "watched episode", become one card "Episode 3 - 7" (the newest post's likes and replies)
+function collapseRuns(activities) {
+    const out = [];
+    const plain = (a) => (a.type === 'ANIME_LIST' || a.type === 'MANGA_LIST') && /^(watched episode|read chapter)/i.test(a.status || '') && progressRange(a.progress);
+    for (const a of activities) {
+        const last = out.at(-1);
+        if (last && plain(a) && plain(last) && last.user?.id === a.user?.id && last.media?.id === a.media?.id) {
+            const [lo1, hi1] = progressRange(last.progress);
+            const [lo2, hi2] = progressRange(a.progress);
+            last.progress = `${Math.min(lo1, lo2)} - ${Math.max(hi1, hi2)}`;
+            last.collapsed = (last.collapsed || 1) + 1;
+            continue;
+        }
+        out.push(a);
+    }
+    return out;
 }
 
 // Rewatches, as AniRoll shows them (AniList itself only says "rewatched"): a post either finishes a

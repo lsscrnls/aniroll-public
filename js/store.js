@@ -1,3 +1,4 @@
+import { untilAiring } from './api.js?v=134';
 const ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export function esc(str) { return str ? String(str).replace(/[&<>"']/g, c => ESC_MAP[c]) : ''; }
 
@@ -52,21 +53,10 @@ let state = {
     genreCache: null,
 };
 
-const listeners = new Map();
-
 export function getState() { return state; }
 
 export function setState(partial) {
-    const prev = { ...state };
     state = { ...state, ...partial };
-    listeners.forEach((fn, key) => {
-        if (key === '*' || (key in partial)) fn(state, prev);
-    });
-}
-
-export function subscribe(key, fn) {
-    listeners.set(key, fn);
-    return () => listeners.delete(key);
 }
 
 export function getTheme() {
@@ -129,22 +119,33 @@ export function applyAccentColor(hex) {
     document.documentElement.style.setProperty('--user-accent-dim', `rgba(${r},${g},${b},0.12)`);
 }
 
-export function toast(message, type = 'info') {
+// action: { label, run } — a button in the toast (Undo); the toast then stays a little longer.
+// Screen readers hear every toast: errors at once (role="alert"), the rest when they are free.
+export function toast(message, type = 'info', { action = null } = {}) {
     const container = document.getElementById('toast-container');
+    if (!container) return;
     const el = document.createElement('div');
     el.className = `toast ${type}`;
-    el.textContent = message;
-    container.appendChild(el);
-    setTimeout(() => {
+    el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    const text = document.createElement('span');
+    text.textContent = message;
+    el.append(text);
+    const leave = () => {
         el.style.opacity = '0';
         el.style.transform = 'translateY(8px)';
         el.style.transition = '0.3s ease';
         setTimeout(() => el.remove(), 300);
-    }, 3000);
-}
-
-export function showLoader(container) {
-    container.innerHTML = '<div class="page-loader"><div class="loader-spinner"></div></div>';
+    };
+    if (action) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'toast-action';
+        btn.textContent = action.label;
+        btn.addEventListener('click', () => { action.run(); clearTimeout(timer); leave(); });
+        el.append(btn);
+    }
+    container.appendChild(el);
+    const timer = setTimeout(leave, action ? 6000 : 3000);
 }
 
 // `rec` ({ match, because }) turns the card into a recommendation card
@@ -163,11 +164,12 @@ export function renderMediaCard(media, showStatus = false, rec = null, note = nu
     const sub = media.format ? `<div class="media-card-sub">${formatShort(media.format)}${media.episodes ? ` · ${media.episodes} Ep` : ''}${media.chapters ? ` · ${media.chapters} Ch` : ''}</div>` : '';
 
     return `
-        <div class="media-card" data-id="${media.id}" data-type="${media.type || 'ANIME'}" data-open="${media.id}" role="button" tabindex="0">
-            <img class="media-card-img" src="${media.coverImage?.large || media.coverImage?.extraLarge || ''}" alt="${esc(titlePref(media.title))}" loading="lazy">
+        <div class="media-card" data-id="${media.id}" data-type="${media.type || 'ANIME'}" data-open="${media.id}"${rec?.dismissable ? '' : ' role="button" tabindex="0"'}>
+            <img class="media-card-img" src="${media.coverImage?.large || media.coverImage?.extraLarge || ''}" alt="" loading="lazy">
             ${score}${status}${match}
+            ${rec?.dismissable ? `<button type="button" class="media-card-dismiss" data-dismiss="${media.id}" title="Not interested" aria-label="Not interested in ${esc(titlePref(media.title))}"><svg data-icon="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button>` : ''}
             <div class="media-card-overlay">
-                <div class="media-card-title">${esc(titlePref(media.title))}</div>
+                <div class="media-card-title"${rec?.dismissable ? ` data-open="${media.id}" role="button" tabindex="0"` : ''}>${esc(titlePref(media.title))}</div>
                 ${note ? `<div class="media-card-sub">${esc(note)}</div>` : because || airing || sub}
             </div>
         </div>
@@ -201,11 +203,6 @@ function formatShort(f) {
 }
 
 // Absolute airing time beats the cached snapshot
-function untilAiring(next) {
-    if (!next) return null;
-    if (next.airingAt) return Math.max(0, next.airingAt - Math.floor(Date.now() / 1000));
-    return next.timeUntilAiring ?? null;
-}
 
 function timeUntilShort(sec) {
     if (sec < 3600) return `${Math.floor(sec / 60)}m`;
@@ -231,6 +228,27 @@ export function statusLabel(status, type = 'ANIME') {
 // AniRoll shows and takes every score out of 100, whatever format someone picked on AniList. List
 // scores are fetched as `score(format: POINT_100)` and saved as `scoreRaw`; the few statistics that
 // come in the owner's own format are converted in js/api.js (scoresTo100).
+
+// "You've seen 6 · your average 82 · 4 not on your list" for a studio's or a voice actor's shows,
+// from the list entries that came with them (pages loaded so far). '' when there is nothing to say
+export function historyLine(medias) {
+    const seen = medias.filter(m => ['COMPLETED', 'CURRENT', 'REPEATING', 'PAUSED'].includes(m.mediaListEntry?.status));
+    const scores = seen.map(m => m.mediaListEntry.score).filter(Boolean);
+    const unlisted = medias.filter(m => !m.mediaListEntry).length;
+    if (!seen.length && !unlisted) return '';
+    return [
+        seen.length ? `You've seen ${seen.length}` : 'You have not seen any yet',
+        scores.length ? `your average ${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)}` : '',
+        unlisted ? `${unlisted} not on your list` : '',
+    ].filter(Boolean).join(' · ');
+}
+
+// A page that needs an account, seen logged out: what it does, and the way in right there
+export function loginState(iconHtml, text, sub) {
+    return `<div class="empty-state"><div class="empty-state-icon">${iconHtml}</div><div class="empty-state-text">${esc(text)}</div>
+        ${sub ? `<div class="empty-state-sub">${esc(sub)}</div>` : ''}
+        <button class="glass-btn glass-btn-primary empty-state-action" data-login>Log in with AniList</button></div>`;
+}
 
 // Display text: "85"; '' when unscored
 export function fmtScore(raw) {

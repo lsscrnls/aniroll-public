@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=133';
-import { enhanceSelect } from '../select.js?v=133';
-import { tasteMatch } from '../taste.js?v=133';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=133';
-import { getToken, isLoggedIn } from '../auth.js?v=133';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=133';
-import { showConfirm } from '../a11y.js?v=133';
+import * as api from '../api.js?v=134';
+import { enhanceSelect } from '../select.js?v=134';
+import { tasteMatch } from '../taste.js?v=134';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=134';
+import { getToken, isLoggedIn } from '../auth.js?v=134';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=134';
+import { showConfirm } from '../a11y.js?v=134';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -16,6 +16,7 @@ export async function renderPanel(id, container) {
     setupListActions(media, token, container);
     setupShare(media, container);
     setupSpoilerTags(container);
+    setupRelatedPlan(container, token);
     loadPlayButton(media, container);
     loadFriendsStatus(media, token, container);
     loadTasteMatch(media, token, container);
@@ -32,6 +33,7 @@ export async function render({ params, content }) {
     setupListActions(media, token, content);
     setupShare(media, content);
     setupSpoilerTags(content);
+    setupRelatedPlan(content, token);
     loadPlayButton(media, content);
     loadFriendsStatus(media, token, content);
     loadTasteMatch(media, token, content);
@@ -51,13 +53,13 @@ async function loadPlayButton(media, root) {
     const slot = root.querySelector('#detail-play');
     if (!slot || media.type !== 'ANIME') return;
     try {
-        const { getConfig } = await import('../jellyfin.js?v=133');
+        const { getConfig } = await import('../jellyfin.js?v=134');
         if (!getConfig()) return;
-        const { availability } = await import('../player/availability.js?v=133');
+        const { availability } = await import('../player/availability.js?v=134');
         const avail = await availability();
         if (!avail) return;
         const episode = nextEpisode(media);
-        const { findEpisode } = await import('../player/library.js?v=133');
+        const { findEpisode } = await import('../player/library.js?v=134');
         const found = await findEpisode(avail.base, media, episode);
         if (!found || !slot.isConnected) return;
         const resume = found.positionTicks > 0 && !found.played;
@@ -66,7 +68,7 @@ async function loadPlayButton(media, root) {
             // Any other episode (a rewatch, one skipped) and the seasons around it
             + (media.format === 'MOVIE' ? '' : `<button class="glass-btn glass-btn-secondary detail-episodes" type="button">${ICON_EPISODES}Episodes</button>`);
         slot.querySelector('.detail-episodes')?.addEventListener('click', async () => {
-            const { openEpisodes } = await import('../player/episodes.js?v=133');
+            const { openEpisodes } = await import('../player/episodes.js?v=134');
             openEpisodes(media, avail.base);
         });
         slot.hidden = false;
@@ -167,7 +169,7 @@ function renderDetailHTML(media) {
         ${media.recommendations?.nodes?.length ? `<div style="margin-bottom:var(--space-xl)">
             <h3 class="section-title" style="margin-bottom:var(--space-md)">Recommendations</h3>
             <div class="scroll-row">${media.recommendations.nodes.filter(r => r.mediaRecommendation).map(r => `
-                <div style="flex:0 0 150px">${renderMediaCard(r.mediaRecommendation)}</div>`).join('')}</div>
+                <div style="flex:0 0 150px">${renderMediaCard(r.mediaRecommendation, true)}</div>`).join('')}</div>
         </div>` : ''}
 
         ${renderExternalLinks(media.externalLinks)}
@@ -179,7 +181,7 @@ function renderDetailHTML(media) {
                 ${spoilerCount(media) ? `<button class="genre-chip spoiler-toggle" aria-expanded="false">Show ${spoilerCount(media)} spoiler tag${spoilerCount(media) === 1 ? '' : 's'}</button>` : ''}</div>
         </div>` : ''}
 
-        ${media.stats ? renderDistribution(media.stats, media.type) : ''}
+        ${media.stats ? renderDistribution(media.stats, media.type, media.mediaListEntry?.score) : ''}
 
         ${media.reviews?.nodes?.length ? `<div style="margin-bottom:var(--space-xl)">
             <h3 class="section-title" style="margin-bottom:var(--space-md)">Reviews</h3>
@@ -228,6 +230,28 @@ const ICON_ARROW = '<svg data-icon="arrow_forward" class="detail-studio-arrow" v
 // Tags that give away the story stay hidden until someone asks for them
 const spoilerCount = media => (media.tags || []).filter(t => t.isMediaSpoiler).length;
 
+// "+ Plan" under a sequel in Related: one save, the label turns into the list it went to
+function setupRelatedPlan(root, token) {
+    root.querySelector('.detail-related-row')?.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('[data-plan-id]');
+        if (!btn) return;
+        ev.stopPropagation();
+        const mediaId = Number(btn.dataset.planId);
+        btn.disabled = true;
+        try {
+            const saved = await api.saveMediaListEntry({ mediaId, status: 'PLANNING' }, token, { mirror: false });
+            emitListChange({ mediaId, status: saved.status, progress: saved.progress });
+            const where = btn.parentElement.querySelector('.detail-related-where');
+            if (where) { where.textContent = 'Planning'; where.classList.add('is-listed'); }
+            btn.remove();
+            toast('Added to Planning', 'success');
+        } catch (err) {
+            btn.disabled = false;
+            toast(err.queued ? err.message : `AniList: ${err.message}`, 'error');
+        }
+    });
+}
+
 function setupSpoilerTags(root) {
     const btn = root.querySelector('.spoiler-toggle');
     btn?.addEventListener('click', () => {
@@ -261,17 +285,31 @@ function studiosHtml(media) {
 }
 
 // Sequels, prequels and the rest as a row of covers: what comes before and after at a glance
+// The next and the previous part come first, each saying where it stands on your list, and a sequel you
+// have not added yet gets a Plan button: finishing a show, you see what comes next and keep it with one tap
+const RELATION_ORDER = ['SEQUEL', 'PREQUEL', 'PARENT', 'SIDE_STORY', 'SPIN_OFF', 'ALTERNATIVE', 'ADAPTATION', 'SOURCE'];
 function relatedHtml(media) {
     const edges = (media.relations?.edges || []).filter(e => e.node);
     if (!edges.length) return '';
     const kind = (t) => { const s = String(t || '').replace(/_/g, ' ').toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };
+    const rank = (t) => (RELATION_ORDER.indexOf(t) + 1) || 99;
+    const sorted = [...edges].sort((a, b) => rank(a.relationType) - rank(b.relationType));
+    const where = (n) => (n.mediaListEntry?.status ? statusLabel(n.mediaListEntry.status, n.type)
+        : isLoggedIn() ? 'Not on your list' : '');
     return `<section class="detail-related" aria-label="Related">
         <h3 class="detail-related-title">Related</h3>
-        <div class="detail-related-row">${edges.map(e => `
-            <button type="button" class="detail-related-item" data-open="${e.node.id}" title="${esc(titlePref(e.node.title))}">
-                <img src="${esc(e.node.coverImage?.large || '')}" alt="${esc(titlePref(e.node.title))}" loading="lazy">
+        <div class="detail-related-row">${sorted.map(e => {
+            const n = e.node;
+            const plan = isLoggedIn() && !n.mediaListEntry && ['SEQUEL', 'PREQUEL'].includes(e.relationType) && n.type === media.type;
+            return `<div class="detail-related-cell">
+            <button type="button" class="detail-related-item" data-open="${n.id}" title="${esc(titlePref(n.title))}">
+                <img src="${esc(n.coverImage?.large || '')}" alt="${esc(titlePref(n.title))}" loading="lazy">
                 <span class="detail-related-kind">${esc(kind(e.relationType))}</span>
-            </button>`).join('')}</div>
+            </button>
+            ${where(n) ? `<span class="detail-related-where${n.mediaListEntry ? ' is-listed' : ''}">${esc(where(n))}</span>` : ''}
+            ${plan ? `<button type="button" class="detail-related-plan" data-plan-id="${n.id}" aria-label="Add ${esc(titlePref(n.title))} to Planning">+ Plan</button>` : ''}
+        </div>`;
+        }).join('')}</div>
     </section>`;
 }
 
@@ -385,6 +423,7 @@ function setupListActions(media, token, root = document) {
         try {
             const saved = await api.saveMediaListEntry({ mediaId: media.id, status: 'CURRENT' }, token);
             toast('Added to list', 'success');
+            emitListChange({ mediaId: media.id, status: saved.status, progress: saved.progress });
             refreshActions(saved);
         } catch (e) { toast(e.message, 'error'); }
     });
@@ -393,6 +432,7 @@ function setupListActions(media, token, root = document) {
         try {
             const saved = await api.saveMediaListEntry({ mediaId: media.id, status: 'PLANNING' }, token);
             toast('Added to planning', 'success');
+            emitListChange({ mediaId: media.id, status: saved.status, progress: saved.progress });
             refreshActions(saved);
         } catch (e) { toast(e.message, 'error'); }
     });
@@ -445,8 +485,9 @@ function setupListActions(media, token, root = document) {
     // Scores are out of 100 in AniRoll, whatever the AniList format (store.js)
     const saveScore = async (scoreRaw) => {
         try {
-            await api.saveMediaListEntry({ id: entry.id, scoreRaw }, token);
+            const saved = await api.saveMediaListEntry({ id: entry.id, scoreRaw }, token);
             entry.score = scoreRaw;
+            emitListChange({ mediaId: media.id, status: saved.status, progress: saved.progress, score: scoreRaw });
             toast(scoreRaw ? `Score saved: ${fmtScore(scoreRaw)}` : 'Score removed', 'success');
         } catch (err) { toast(err.message, 'error'); }
     };
@@ -579,8 +620,20 @@ async function loadFriendsStatus(media, token, root) {
         const maxEp = isAnime ? media.episodes : media.chapters;
         const unit = isAnime ? 'Ep' : 'Ch';
 
+        // Friends at about the same episode (one apart at most): start a Watch Party with them from here
+        const mine = media.mediaListEntry;
+        const near = isAnime && mine && ['CURRENT', 'REPEATING'].includes(mine.status)
+            ? friends.filter(f => ['CURRENT', 'REPEATING'].includes(f.status) && Math.abs((f.progress || 0) - (mine.progress || 0)) <= 1)
+            : [];
+        const together = near.length && root.querySelector('#start-watchparty')
+            ? `<div class="friends-together">
+                <span>${esc(near.slice(0, 2).map(f => f.user.name).join(' and '))}${near.length > 2 ? ` and ${near.length - 2} more` : ''} ${near.length > 1 ? 'are' : 'is'} where you are</span>
+                <button type="button" class="glass-btn glass-btn-sm glass-btn-primary" data-watch-together>Watch together</button>
+            </div>` : '';
+
         section.innerHTML = `<div class="friends-status" style="margin-bottom:var(--space-xl)">
             <h3 class="section-title" style="margin-bottom:var(--space-md)">Friends</h3>
+            ${together}
             <div class="friends-status-list">
                 ${friends.map(f => {
                     const status = statusLabel(f.status, media.type);
@@ -598,26 +651,37 @@ async function loadFriendsStatus(media, token, root) {
                 }).join('')}
             </div>
         </div>`;
+        section.querySelector('[data-watch-together]')?.addEventListener('click', () => root.querySelector('#start-watchparty')?.click());
     } catch (e) {
         console.error('Friends status load failed:', e);
     }
 }
 
-function renderDistribution(stats, type) {
+// yours: your own score (0-100), marked on its bar with where it stands among everyone's
+function renderDistribution(stats, type, yours = 0) {
     const scoreDist = stats.scoreDistribution || [];
     const statusDist = stats.statusDistribution || [];
     if (!scoreDist.length && !statusDist.length) return '';
 
     const maxScore = Math.max(...scoreDist.map(s => s.amount), 1);
     const maxStatus = Math.max(...statusDist.map(s => s.amount), 1);
-
-    const statusColors = { CURRENT: 'var(--user-accent)', PLANNING: 'var(--text-tertiary)', COMPLETED: 'var(--success)', DROPPED: 'var(--danger)', PAUSED: 'var(--warning)' };
+    // AniList buckets scores by ten: 85 sits in the 80 bar
+    const bucket = yours ? Math.max(10, Math.min(100, Math.floor(yours / 10) * 10)) : 0;
+    const raters = scoreDist.reduce((sum, s) => sum + s.amount, 0);
+    const above = scoreDist.filter(s => s.score > bucket).reduce((sum, s) => sum + s.amount, 0);
+    const below = scoreDist.filter(s => s.score < bucket).reduce((sum, s) => sum + s.amount, 0);
+    const standing = yours && raters
+        ? (above >= below
+            ? `Your ${Math.round(yours)} is harsher than ${Math.round(above / raters * 100)}% of raters`
+            : `Your ${Math.round(yours)} is kinder than ${Math.round(below / raters * 100)}% of raters`)
+        : '';
 
     return `<div class="stats-grid" style="margin-bottom:var(--space-xl)">
         <div class="box stat-chart" style="background:var(--bg-secondary)">
             <div class="stat-chart-title">Score Distribution</div>
+            ${standing ? `<div class="stat-chart-note">${standing}</div>` : ''}
             <div class="stat-bar-chart">
-                ${scoreDist.map(s => `<div class="stat-bar-row">
+                ${scoreDist.map(s => `<div class="stat-bar-row${s.score === bucket ? ' is-yours' : ''}"${s.score === bucket ? ' title="Your score is in this bar"' : ''}>
                     <span class="stat-bar-label">${s.score}</span>
                     <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${(s.amount / maxScore * 100)}%"></div></div>
                     <span class="stat-bar-value">${s.amount}</span>
@@ -629,7 +693,7 @@ function renderDistribution(stats, type) {
             <div class="stat-bar-chart">
                 ${statusDist.map(s => `<div class="stat-bar-row">
                     <span class="stat-bar-label">${statusLabel(s.status, type)}</span>
-                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${(s.amount / maxStatus * 100)}%;background:${statusColors[s.status] || 'var(--user-accent)'}"></div></div>
+                    <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${(s.amount / maxStatus * 100)}%;background:${STATUS_COLORS[s.status] || 'var(--user-accent)'}"></div></div>
                     <span class="stat-bar-value">${s.amount}</span>
                 </div>`).join('')}
             </div>

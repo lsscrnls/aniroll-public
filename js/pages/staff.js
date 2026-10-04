@@ -1,8 +1,8 @@
 // A voice actor's page (#/staff/<id>): photo, a few facts and every anime they voice, most popular
 // first, each with the character they play. Reached from the characters on a detail page.
-import * as api from '../api.js?v=133';
-import { renderMediaCard, esc, emptyIcon } from '../store.js?v=133';
-import { getToken } from '../auth.js?v=133';
+import * as api from '../api.js?v=134';
+import { renderMediaCard, esc, emptyIcon, historyLine } from '../store.js?v=134';
+import { getToken, isLoggedIn } from '../auth.js?v=134';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const fuzzyDate = d => d?.year ? [d.day, d.month ? MONTHS[d.month - 1] : null, d.year].filter(Boolean).join(' ') : null;
@@ -12,12 +12,14 @@ export async function render({ params, content }) {
     const id = parseInt(params.id);
     content.innerHTML = `<div class="page-enter studio-page">
         <div class="staff-head" id="staff-head"><div class="staff-photo skeleton"></div><div><div class="studio-kicker roll-result-kicker">Voice actor</div><h1 class="section-title studio-title">&nbsp;</h1></div></div>
+        <p class="studio-history" id="history-line" hidden></p>
         <div id="staff-grid" class="media-grid media-grid-lg">${Array(12).fill('<div class="skeleton skeleton-card"></div>').join('')}</div>
         <div class="studio-more" id="staff-more" hidden><button class="glass-btn glass-btn-secondary" id="staff-more-btn">Show more</button></div>
     </div>`;
     const grid = content.querySelector('#staff-grid');
     const more = content.querySelector('#staff-more');
     let page = 1;
+    const loaded = [];
 
     async function load() {
         try {
@@ -47,6 +49,11 @@ export async function render({ params, content }) {
                 return renderMediaCard(e.node, true, null, who ? `as ${who}` : null);
             }).join(''));
             if (page === 1 && !edges.length) grid.innerHTML = `<div class="empty-state">${emptyIcon('tv')}<p>No anime roles listed yet.</p></div>`;
+            loaded.push(...edges.map(e => e.node));
+            const line = isLoggedIn() ? historyLine(loaded) : '';
+            const lineEl = content.querySelector('#history-line');
+            lineEl.hidden = !line;
+            lineEl.textContent = line;
             more.hidden = !staff.characterMedia.pageInfo.hasNextPage;
         } catch (err) {
             grid.innerHTML = `<div class="empty-state">${emptyIcon('alert')}<p>${esc(err.message)}</p></div>`;
