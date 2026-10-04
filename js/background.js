@@ -1,4 +1,4 @@
-import { getToken } from './auth.js?v=134';
+import { getToken } from './auth.js?v=135';
 
 // Background sync: with the user's consent the AniRoll backend keeps the AniList token
 // (encrypted) and updates the list while no tab is open — Watch Party guests following the

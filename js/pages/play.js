@@ -1,14 +1,14 @@
-import * as api from '../api.js?v=134';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=134';
-import { getToken, isLoggedIn } from '../auth.js?v=134';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=134';
-import { availability } from '../player/availability.js?v=134';
-import { findEpisode, jfGet } from '../player/library.js?v=134';
-import { deviceProfile } from '../player/profile.js?v=134';
-import { HtmlVideoEngine } from '../player/engine.js?v=134';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=134';
-import { createSubtitles } from '../player/subtitles.js?v=134';
-import { neighbours } from '../player/episodes.js?v=134';
+import * as api from '../api.js?v=135';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=135';
+import { getToken, isLoggedIn } from '../auth.js?v=135';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=135';
+import { availability } from '../player/availability.js?v=135';
+import { findEpisode, jfGet } from '../player/library.js?v=135';
+import { deviceProfile } from '../player/profile.js?v=135';
+import { HtmlVideoEngine } from '../player/engine.js?v=135';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=135';
+import { createSubtitles } from '../player/subtitles.js?v=135';
+import { neighbours } from '../player/episodes.js?v=135';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -784,9 +784,13 @@ function scorePrompt(media, saved, token) {
 }
 
 // ===== Intros skipped by themselves, per show =====
+// Settings → Jellyfin → Player switches it on for every show; a choice made in the player for one show
+// (1 on, 0 off) wins over that
 const AUTOSKIP_KEY = 'aniroll_autoskip';
-const autoSkipFor = (mediaId) => !!showPref(AUTOSKIP_KEY, mediaId);
-const setAutoSkip = (mediaId, on) => setShowPref(AUTOSKIP_KEY, mediaId, on ? 1 : null);
+const AUTOSKIP_ALL_KEY = 'aniroll_autoskip_all';
+const autoSkipAll = () => { try { return localStorage.getItem(AUTOSKIP_ALL_KEY) === 'on'; } catch { return false; } };
+const autoSkipFor = (mediaId) => { const v = showPref(AUTOSKIP_KEY, mediaId); return v == null ? autoSkipAll() : !!v; };
+const setAutoSkip = (mediaId, on) => setShowPref(AUTOSKIP_KEY, mediaId, on === autoSkipAll() ? null : (on ? 1 : 0));
 
 // ===== Media keys, headset buttons, the lock screen and the browser's media hub =====
 // Each part is asked for on its own: some browsers lack the position or some of the actions
