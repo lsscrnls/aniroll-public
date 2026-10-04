@@ -184,6 +184,13 @@ function staticServer() {
     const hex = await page.evaluate(() => ({ saved: localStorage.getItem('aniroll_accent'), accent: getComputedStyle(document.documentElement).getPropertyValue('--user-accent').trim() }));
     check('accent: any colour by hex code', junk.invalid && junk.saved !== 'zz' && hex.saved === '#00ccff' && hex.accent === '#00ccff', { junk, hex });
     await page.evaluate(() => { localStorage.removeItem('aniroll_settings_tab'); localStorage.removeItem('aniroll_m3_variant'); });
+    // Skipping intros for every show: a switch under Jellyfin → Player
+    await page.click('[data-settings-tab="jellyfin"]').catch(() => {});
+    await settle(300);
+    await page.click('#toggle-autoskip').catch(() => {});
+    const autoskipAll = await page.evaluate(() => localStorage.getItem('aniroll_autoskip_all'));
+    await page.evaluate(() => { localStorage.removeItem('aniroll_autoskip_all'); localStorage.removeItem('aniroll_settings_tab'); });
+    check('settings: skip intros automatically, for every show', autoskipAll === 'on', autoskipAll);
 
     // My List → Planning offers Roll
     await go('#/list');
@@ -1063,8 +1070,10 @@ function staticServer() {
         await p.click('[data-act="settings"]');
         await p.waitForSelector('[data-autoskip]', { timeout: 3000 }).catch(() => {});
         await p.click('[data-autoskip]').catch(() => {});
+        await p.waitForFunction(() => JSON.parse(localStorage.getItem('aniroll_autoskip') || '{}').m101 === 1, null, { timeout: 3000 }).catch(() => {});
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 1.2; return v.play(); }).catch(() => {});
-        await p.waitForTimeout(2200);
+        // Waits for the jump itself: under load the video reaches the intro later
+        await p.waitForFunction(() => document.getElementById('player-video').currentTime >= 13.9, null, { timeout: 8000 }).catch(() => {});
         const auto = await p.evaluate(() => ({ t: document.getElementById('player-video').currentTime, osd: document.querySelector('.pl-osd')?.textContent || '',
             undo: !!document.querySelector('.pl-osd-act'), kept: JSON.parse(localStorage.getItem('aniroll_autoskip') || '{}') }));
         check('player: intros skip themselves for a show once asked, with Undo', auto.t >= 13.9 && /Skipped intro/.test(auto.osd) && auto.undo && auto.kept.m101 === 1, auto);

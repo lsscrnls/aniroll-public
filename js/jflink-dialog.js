@@ -1,9 +1,9 @@
-import * as api from './api.js?v=134';
-import { esc, titlePref, toast } from './store.js?v=134';
-import { getToken } from './auth.js?v=134';
-import { openDialog } from './a11y.js?v=134';
-import { getConfig, jfAuth } from './jellyfin.js?v=134';
-import { setLink } from './jflinks.js?v=134';
+import * as api from './api.js?v=135';
+import { esc, titlePref, toast } from './store.js?v=135';
+import { getToken } from './auth.js?v=135';
+import { openDialog } from './a11y.js?v=135';
+import { getConfig, jfAuth } from './jellyfin.js?v=135';
+import { setLink } from './jflinks.js?v=135';
 
 // "Link to AniList" for a Jellyfin series the title rules could not match: search AniList (on demand,
 // one request per search), pick the entry, say which Jellyfin episode is its first. session: a now
@@ -72,7 +72,7 @@ export async function openLinkDialog(session) {
         // The series' id in Jellyfin, so the player finds it without searching
         let seriesId = null;
         try {
-            const { availability } = await import('./player/availability.js?v=134');
+            const { availability } = await import('./player/availability.js?v=135');
             const avail = await availability();
             if (avail && session.itemId) {
                 const res = await fetch(`${avail.base}/Users/${encodeURIComponent(cfg.userId)}/Items/${encodeURIComponent(session.itemId)}`,

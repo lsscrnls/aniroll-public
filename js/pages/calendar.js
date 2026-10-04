@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=134';
-import { cachedQuery } from '../api.js?v=134';
-import { getState, esc, titlePref, renderPageSwitch, toast } from '../store.js?v=134';
-import { getToken, isLoggedIn } from '../auth.js?v=134';
+import * as api from '../api.js?v=135';
+import { cachedQuery } from '../api.js?v=135';
+import { getState, esc, titlePref, renderPageSwitch, toast } from '../store.js?v=135';
+import { getToken, isLoggedIn } from '../auth.js?v=135';
 
 const VIEW_KEY = 'aniroll_cal_view';
 const ANCHOR_KEY = 'aniroll_cal_anchor';
