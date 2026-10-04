@@ -43,7 +43,14 @@ js_versions=$(grep -rhoE "\.js\?v=[0-9]+" index.html js | sed 's/.*=//' | sort -
 app_version=$(grep -oE "APP_VERSION = '[0-9]+'" js/app.js | grep -oE "[0-9]+")
 [ "$js_versions" = "$app_version" ] || fail "APP_VERSION ($app_version) != import version ($js_versions)"
 css_version=$(grep -oE "style\.css\?v=[0-9]+" index.html | sed 's/.*=//')
-echo "JS v$js_versions, CSS v$css_version"
+# m3.css is linked in index.html and again by js/design.js: both must name the same version
+m3_index=$(grep -oE "m3\.css\?v=[0-9]+" index.html | sed 's/.*=//')
+m3_design=$(grep -oE "m3\.css\?v=[0-9]+" js/design.js | sed 's/.*=//')
+[ "$m3_index" = "$m3_design" ] || fail "m3.css v$m3_index in index.html but v$m3_design in js/design.js (scripts/release.sh --m3 bumps both)"
+# The browser checks import modules too: an old ?v= there would load a second copy of a module
+stale_tests=$(grep -rnoE "\.js\?v=[0-9]+" tools/e2e/*.js | grep -v "v=$js_versions" || true)
+[ -z "$stale_tests" ] || fail "tools/e2e imports another version: $stale_tests"
+echo "JS v$js_versions, CSS v$css_version, M3 v$m3_index"
 
 tmp_check="$(mktemp -d)"
 for f in js/*.js js/pages/*.js js/player/*.js; do
@@ -104,13 +111,41 @@ if [ "$WITH_API" -eq 1 ]; then
     # The container runs as uid 10001 (api/Dockerfile): data/ is handed to it after the old container
     # stopped, so nothing root-owned appears in between. Without it the server cannot read its 0600 files.
     # JF_SECRET must be passed, otherwise stored Jellyfin keys become unreadable.
-    ssh "$SERVER" "docker build -q -t aniroll-api '$API_DIR' >/dev/null \
-        && docker stop aniroll-api >/dev/null && docker rm aniroll-api >/dev/null \
-        && chown -R 10001:10001 '$API_DIR/data' \
-        && docker run -d --name aniroll-api --restart unless-stopped \
-             -e JF_SECRET=\"\$(cat /root/aniroll-jf.secret)\" \
-             -v '$API_DIR/data:/app/data' -p 127.0.0.1:3001:3001 aniroll-api >/dev/null \
-        && sleep 2 && docker exec aniroll-api sh -c 'echo \"node \$(node --version), uid \$(id -u)\"' && docker logs aniroll-api 2>&1 | tail -2"
+    # The running image is kept as aniroll-api:prev. If the new server does not answer /api/health
+    # (it reads and writes data/) within 20 s, the previous image is started again.
+    # --init: Node gets SIGTERM from docker stop and shuts down cleanly. Logs are capped at 3 x 10 MB.
+    ssh "$SERVER" "API_DIR='$API_DIR' bash -s" <<'REMOTE'
+set -e
+start() {
+    docker run -d --name aniroll-api --restart unless-stopped --init \
+        --log-opt max-size=10m --log-opt max-file=3 \
+        -e JF_SECRET="$(cat /root/aniroll-jf.secret)" \
+        -v "$API_DIR/data:/app/data" -p 127.0.0.1:3001:3001 "$1" >/dev/null
+}
+healthy() {
+    for _ in $(seq 20); do
+        curl -fsS -m 2 http://127.0.0.1:3001/api/health >/dev/null 2>&1 && return 0
+        sleep 1
+    done
+    return 1
+}
+docker image inspect aniroll-api >/dev/null 2>&1 && docker tag aniroll-api aniroll-api:prev
+docker build -q -t aniroll-api "$API_DIR" >/dev/null
+docker stop aniroll-api >/dev/null 2>&1 || true
+docker rm aniroll-api >/dev/null 2>&1 || true
+chown -R 10001:10001 "$API_DIR/data"
+start aniroll-api
+if ! healthy; then
+    echo "new API is not healthy - rolling back"
+    docker logs aniroll-api 2>&1 | tail -20
+    docker rm -f aniroll-api >/dev/null
+    start aniroll-api:prev
+    healthy && echo "previous API is back" || echo "previous API does not answer either!"
+    exit 1
+fi
+docker exec aniroll-api sh -c 'echo "node $(node --version), uid $(id -u)"'
+docker logs aniroll-api 2>&1 | tail -2
+REMOTE
 fi
 
 if [ "$WITH_NGINX" -eq 1 ]; then

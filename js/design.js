@@ -5,6 +5,7 @@
 // with Google's Material Color Utilities (2025 spec, the one M3 Expressive uses). The scheme is written as a
 // <style> with a light and a dark block, so System/Light/Dark keep working without recomputing; it is cached
 // in localStorage so a reload paints M3 colours before the colour library has even loaded.
+import { BASELINE_TONAL_CSS } from './m3-baseline.js?v=134';
 
 // 'aniroll' only when chosen as legacy. A new key: choices from the time AniRoll's design was the default
 // (and M3 the one to try) do not carry over, so everyone starts in Material 3 once
@@ -14,7 +15,9 @@ const VARIANT_KEY = 'aniroll_m3_variant';   // 'tonal' | 'vibrant' | 'expressive
 const SEED_KEY = 'aniroll_m3_seed';         // M3 has its own palette, unrelated to AniRoll's accent colour
 const CACHE_KEY = 'aniroll_m3_scheme3';     // { key, css } — new name when the generated CSS changes
 const SHOW_KEY = 'aniroll_m3_show';         // { color, cover } of the show you're on: the app's "wallpaper" 
-const CSS_HREF = 'css/m3.css?v=30';
+const CSS_HREF = 'css/m3.css?v=31';
+// m3.css used to @import these two; as links of their own they load in parallel instead of after it
+const EXTRA_CSS = [['m3-icons-css', 'css/m3-icons.css?v=2'], ['m3-shapes-css', 'css/m3-shapes.css?v=1']];
 
 // 'show' themes the whole app from the show you're watching, like a desktop themed from its wallpaper
 // (js/m3.js applies it); the others are seeds in the spirit of Google's own M3 palettes
@@ -129,6 +132,7 @@ export async function applyDesign(loggedIn) {
     if (!on) {
         root.removeAttribute('data-design');
         document.getElementById('m3-css')?.remove();
+        EXTRA_CSS.forEach(([id]) => document.getElementById(id)?.remove());
         document.getElementById('m3-scheme')?.remove();
         enhancer?.then(m => m.teardown());
         enhancer = null;
@@ -136,7 +140,7 @@ export async function applyDesign(loggedIn) {
     }
     // Page additions only M3 has (hero, search bar, rail FAB ...)
     if (enhancer) enhancer.then(m => m.refresh());
-    enhancer ??= import('./m3.js?v=133').then(m => { m.setup(); return m; });
+    enhancer ??= import('./m3.js?v=134').then(m => { m.setup(); return m; });
 
     // Stylesheet first; keep the page hidden until it's there, so AniRoll's look never flashes
     let sheet = null;
@@ -154,6 +158,14 @@ export async function applyDesign(loggedIn) {
         });
         document.head.appendChild(link);
     }
+    for (const [id, href] of EXTRA_CSS) {
+        if (document.getElementById(id)) continue;
+        const link = document.createElement('link');
+        link.id = id;
+        link.rel = 'stylesheet';
+        link.href = href;
+        document.head.appendChild(link);
+    }
     root.setAttribute('data-design', 'm3');
 
     const key = `${getSeed()}|${getVariant()}`;
@@ -164,8 +176,16 @@ export async function applyDesign(loggedIn) {
         await sheet;
         return;
     }
-    if (cached?.css) writeScheme(cached.css); // old colours until the new ones are ready
     const seed = getSeed();
+    // The default look (also "From your show" before a show gave its colour) ships ready-made: a first
+    // visit and the landing page paint at once, without the colour library
+    if (getVariant() === 'tonal' && (seed === SHOW_SEED || seed === BASELINE)) {
+        writeScheme(BASELINE_TONAL_CSS);
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ key, css: BASELINE_TONAL_CSS })); } catch { /* storage blocked */ }
+        await sheet;
+        return;
+    }
+    if (cached?.css) writeScheme(cached.css); // old colours until the new ones are ready
     const css = await buildSchemeCss(seed === SHOW_SEED ? BASELINE : seed, getVariant());
     writeScheme(css);
     try { localStorage.setItem(CACHE_KEY, JSON.stringify({ key, css })); } catch { /* storage blocked */ }

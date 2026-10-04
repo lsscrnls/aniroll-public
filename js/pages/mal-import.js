@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=133';
-import { esc, toast, getState, emptyIcon } from '../store.js?v=133';
-import { openDialog } from '../a11y.js?v=133';
-import { getToken, isLoggedIn } from '../auth.js?v=133';
+import * as api from '../api.js?v=134';
+import { esc, toast, getState, emptyIcon } from '../store.js?v=134';
+import { openDialog } from '../a11y.js?v=134';
+import { getToken, isLoggedIn } from '../auth.js?v=134';
 
 // MAL list import works via the official XML export only.
 // (Jikan's user-list endpoints are gone and MAL's own endpoints block CORS.)
@@ -70,17 +70,29 @@ export async function startXMLImport(file) {
     }
 }
 
+// MAL's own export names manga fields manga_…; older tools wrote series_… for both: either is read
 function xmlNodeToEntry(node, type) {
-    const tag = (name) => node.querySelector(name)?.textContent || '';
-    const num = (name) => parseInt(tag(name)) || 0;
+    const tag = (...names) => names.map(n => node.querySelector(n)?.textContent).find(v => v) || '';
+    const num = (...names) => parseInt(tag(...names)) || 0;
+    // "2024-03-05" -> { year, month, day }; MAL writes 0000-00-00 for none
+    const date = (name) => {
+        const m = tag(name).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m || m[1] === '0000') return null;
+        return { year: Number(m[1]), month: Number(m[2]) || null, day: Number(m[3]) || null };
+    };
     const isAnime = type === 'anime';
     return {
-        malId: num(isAnime ? 'series_animedb_id' : 'series_mangadb_id'),
-        title: tag('series_title'),
+        malId: num(isAnime ? 'series_animedb_id' : 'manga_mangadb_id', 'series_mangadb_id'),
+        title: tag(isAnime ? 'series_title' : 'manga_title', 'series_title'),
         status: XML_STATUS_MAP[tag('my_status')] || (isAnime ? 'plan_to_watch' : 'plan_to_read'),
         score: num('my_score'),
         progress: num(isAnime ? 'my_watched_episodes' : 'my_read_chapters'),
-        total: num(isAnime ? 'series_episodes' : 'series_chapters'),
+        volumes: isAnime ? 0 : num('my_read_volumes'),
+        total: num(isAnime ? 'series_episodes' : 'manga_chapters', 'series_chapters'),
+        startedAt: date('my_start_date'),
+        completedAt: date('my_finish_date'),
+        repeat: num(isAnime ? 'my_times_watched' : 'my_times_read'),
+        notes: tag('my_comments').trim(),
     };
 }
 
@@ -213,7 +225,7 @@ function renderMALList(container, username, animeList, mangaList) {
         const save = async (vars) => {
             for (let attempt = 1; ; attempt++) {
                 try {
-                    return await api.saveMediaListEntry(vars, token, { queue: false });
+                    return await api.saveMediaListEntry(vars, token, { queue: false, mirror: false });
                 } catch (err) {
                     if (!err.throttled || attempt >= 3) throw err;
                     setStatus('Waiting for a free AniList request…');
@@ -226,12 +238,13 @@ function renderMALList(container, username, animeList, mangaList) {
             setStatus('Matching titles on AniList…');
             const idMap = await api.resolveMalIds(entries.map(e => e.malId).filter(Boolean), type);
 
-            let existing = new Set();
-            if (mode === 'merge') {
+            let existing = new Map();
+            if (mode === 'merge' || mode === 'newer') {
                 setStatus('Checking your AniList list…');
                 const lists = await api.getMediaList(user.id, type, token);
-                existing = new Set(lists.flatMap(l => l.entries.map(e => e.mediaId)));
+                existing = new Map(lists.flatMap(l => l.entries.map(e => [e.mediaId, e])));
             }
+            const STATUS_RANK = { PLANNING: 0, CURRENT: 1, PAUSED: 1, DROPPED: 1, REPEATING: 2, COMPLETED: 3 };
 
             for (; next < entries.length; next++) {
                 const entry = entries[next];
@@ -239,12 +252,27 @@ function renderMALList(container, username, animeList, mangaList) {
                 if (!anilistId) {
                     failed++;
                     setBtn(entry.malId, 'Not found', 'var(--danger)');
-                } else if (existing.has(anilistId)) {
+                } else if (existing.has(anilistId) && (mode === 'merge'
+                    // "Only what is further on MAL": more episodes, or a status further along
+                    || (entry.progress <= (existing.get(anilistId).progress || 0)
+                        && (STATUS_RANK[MAL_STATUS_MAP[entry.status]] ?? 0) <= (STATUS_RANK[existing.get(anilistId).status] ?? 0)))) {
                     skipped++;
-                    setBtn(entry.malId, 'Exists', 'var(--text-secondary)');
+                    setBtn(entry.malId, mode === 'merge' ? 'Exists' : 'Up to date', 'var(--text-secondary)');
                 } else {
                     const vars = { mediaId: anilistId, status: MAL_STATUS_MAP[entry.status] || 'PLANNING', progress: entry.progress };
                     if (entry.score > 0) vars.scoreRaw = entry.score * 10;
+                    if (entry.volumes) vars.progressVolumes = entry.volumes;
+                    if (entry.startedAt) vars.startedAt = entry.startedAt;
+                    if (entry.completedAt) vars.completedAt = entry.completedAt;
+                    if (entry.repeat) vars.repeat = entry.repeat;
+                    if (entry.notes) vars.notes = entry.notes.slice(0, 2000);
+                    // Further along on MAL: only what moved; the score and notes kept on AniList stay
+                    if (mode === 'newer' && existing.has(anilistId)) {
+                        const had = existing.get(anilistId);
+                        if (had.score) delete vars.scoreRaw;
+                        if (had.notes) delete vars.notes;
+                        if (had.startedAt?.year) delete vars.startedAt;
+                    }
                     try {
                         await save(vars);
                         done++;
@@ -322,6 +350,10 @@ function showImportConfirm(count, onConfirm) {
                     Add new only
                     <span style="display:block;font-size:0.75rem;font-weight:400;opacity:0.7;margin-top:2px">Only add what is not on your list yet, keep existing entries</span>
                 </button>
+                <button class="glass-btn glass-btn-secondary" id="mal-confirm-newer">
+                    Only what is further on MAL
+                    <span style="display:block;font-size:0.75rem;font-weight:400;opacity:0.7;margin-top:2px">Add new entries, and move existing ones forward where MAL has more episodes or a later status</span>
+                </button>
                 <button class="glass-btn glass-btn-secondary" id="mal-confirm-overwrite">
                     Overwrite
                     <span style="display:block;font-size:0.75rem;font-weight:400;opacity:0.7;margin-top:2px">Import everything, replacing existing entries with the MAL data</span>
@@ -337,6 +369,7 @@ function showImportConfirm(count, onConfirm) {
 
     document.getElementById('mal-confirm-merge').addEventListener('click', () => { close(); onConfirm('merge'); });
     document.getElementById('mal-confirm-overwrite').addEventListener('click', () => { close(); onConfirm('overwrite'); });
+    document.getElementById('mal-confirm-newer').addEventListener('click', () => { close(); onConfirm('newer'); });
     document.getElementById('mal-confirm-cancel').addEventListener('click', close);
     container.querySelector('.modal-backdrop').addEventListener('click', (e) => { if (e.target === e.currentTarget) close(); });
 }

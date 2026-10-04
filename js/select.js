@@ -1,4 +1,4 @@
-import { esc } from './store.js?v=133';
+import { esc } from './store.js?v=134';
 
 // Styled replacement for <select class="glass-select">. The native select stays in the DOM,
 // hidden, as the source of truth — value, `selected` and existing `change` listeners keep
@@ -27,6 +27,9 @@ export function enhanceSelect(select, { colors = null } = {}) {
     trigger.setAttribute('aria-expanded', 'false');
     trigger.setAttribute('aria-controls', id);
     if (select.style.minWidth) trigger.style.minWidth = select.style.minWidth;
+    // The name the select had (aria-label or its <label>), so a screen reader says "Sort, Last updated"
+    const name = select.getAttribute('aria-label') || (select.id && document.querySelector(`label[for="${select.id}"]`)?.textContent.trim()) || '';
+    trigger.id = `${id}-trigger`;
     select.parentNode.insertBefore(wrap, select);
     wrap.append(trigger, select);
     select.hidden = true;
@@ -38,6 +41,9 @@ export function enhanceSelect(select, { colors = null } = {}) {
     function syncLabel() {
         const opt = select.options[select.selectedIndex];
         trigger.innerHTML = `${dot(opt?.value)}<span class="glass-menu-label">${esc(opt?.textContent || '')}</span>${CHEVRON}`;
+        if (name) trigger.setAttribute('aria-label', `${name}: ${opt?.textContent || ''}`);
+        // A disabled select is a disabled button
+        trigger.disabled = select.disabled;
     }
     syncLabel();
     // Options can be filled in later (e.g. genres) — keep the label in step
@@ -45,6 +51,8 @@ export function enhanceSelect(select, { colors = null } = {}) {
 
     let list = null;
     let active = -1;
+    let typed = '';
+    let typedAt = 0;
 
     function highlight() {
         if (!list) return;
@@ -72,6 +80,7 @@ export function enhanceSelect(select, { colors = null } = {}) {
     }
 
     function choose(index) {
+        if (select.options[index]?.disabled) return;
         if (index >= 0 && index !== select.selectedIndex) {
             select.selectedIndex = index;
             syncLabel();
@@ -95,9 +104,11 @@ export function enhanceSelect(select, { colors = null } = {}) {
         list.id = id;
         list.className = 'glass-menu-list';
         list.setAttribute('role', 'listbox');
+        if (name) list.setAttribute('aria-label', name);
+        else list.setAttribute('aria-labelledby', trigger.id);
         list.setAttribute('data-lenis-prevent', '');
         list.innerHTML = [...select.options].map((o, i) =>
-            `<div class="glass-menu-option${o.selected ? ' selected' : ''}" id="${id}-${i}" role="option" aria-selected="${o.selected}" data-index="${i}">
+            `<div class="glass-menu-option${o.selected ? ' selected' : ''}${o.disabled ? ' disabled' : ''}" id="${id}-${i}" role="option" aria-selected="${o.selected}"${o.disabled ? ' aria-disabled="true"' : ''} data-index="${i}">
                 ${dot(o.value)}<span class="glass-menu-option-label">${esc(o.textContent)}</span>${CHECK}
             </div>`).join('');
         document.body.appendChild(list);
@@ -149,6 +160,17 @@ export function enhanceSelect(select, { colors = null } = {}) {
                 e.preventDefault();
                 open();
             }
+            return;
+        }
+        // Type-ahead: letters jump to the next option starting with what was typed (long genre and year lists)
+        if (e.key.length === 1 && /\S/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            typed = Date.now() - typedAt < 700 ? typed + e.key.toLowerCase() : e.key.toLowerCase();
+            typedAt = Date.now();
+            const labels = [...select.options].map(o => o.textContent.trim().toLowerCase());
+            const start = typed.length > 1 ? active : active + 1;
+            const hit = [...labels.keys()].map(k => (start + k) % count).find(k => labels[k].startsWith(typed) && !select.options[k].disabled);
+            if (hit !== undefined) { active = hit; highlight(); }
+            e.preventDefault();
             return;
         }
         if (e.key === 'ArrowDown') active = Math.min(count - 1, active + 1);

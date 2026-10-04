@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=133';
-import { enhanceSelect } from '../select.js?v=133';
-import { renderMediaCard, getState, esc, emptyIcon, renderPageSwitch } from '../store.js?v=133';
-import { getToken } from '../auth.js?v=133';
+import * as api from '../api.js?v=134';
+import { enhanceSelect } from '../select.js?v=134';
+import { renderMediaCard, getState, esc, emptyIcon, renderPageSwitch } from '../store.js?v=134';
+import { getToken } from '../auth.js?v=134';
 
 export async function render({ content, query: params }) {
     const token = getToken();
@@ -38,6 +38,7 @@ export async function render({ content, query: params }) {
                 ${genres.filter(g => g !== 'Hentai').map(g => `<option value="${esc(g)}" ${genre === g ? 'selected' : ''}>${esc(g)}</option>`).join('')}
             </select>
         </div>
+        <div class="genre-chips taste-chips" id="taste-chips" hidden></div>
         ${tag ? `<div class="genre-chips" style="margin-bottom:var(--space-lg)">
             <button class="genre-chip active" id="browse-tag" title="Remove tag filter">Tag: ${esc(tag)}</button>
         </div>` : ''}
@@ -49,6 +50,28 @@ export async function render({ content, query: params }) {
 
     let currentPage = 1;
     let currentType = type;
+
+    // What your list says you like most: a few genres and tags to browse by, one tap each. The taste
+    // profile is the same as Home's recommendations, usually already read
+    const user = getState().user;
+    if (user?.id && token && type === 'ANIME' && !tag && !genre) {
+        api.getTasteProfile(user.id, token).then(profile => {
+            const box = document.getElementById('taste-chips');
+            if (!profile || !box) return;
+            const top = [...profile.affinity.entries()]
+                .map(([key, a]) => ({ key, score: a * (profile.idf.get(key) || 1) }))
+                .filter(x => x.score > 0)
+                .sort((a, b) => b.score - a.score);
+            const pick = [...top.filter(x => x.key.startsWith('g:')).slice(0, 2), ...top.filter(x => x.key.startsWith('t:')).slice(0, 3)];
+            if (!pick.length) return;
+            box.innerHTML = `<span class="taste-chips-label">Because you liked</span>` + pick.map(x => {
+                const name = x.key.slice(2);
+                const href = x.key.startsWith('g:') ? `#/search?type=ANIME&genre=${encodeURIComponent(name)}` : `#/search?type=ANIME&tag=${encodeURIComponent(name)}`;
+                return `<a class="genre-chip" href="${href}">${esc(name)}</a>`;
+            }).join('');
+            box.hidden = false;
+        }).catch(() => { /* no chips */ });
+    }
 
     async function loadResults(page = 1, append = false) {
         const vars = {

@@ -1,11 +1,12 @@
-import * as api from '../api.js?v=133';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=133';
-import { openDialog } from '../a11y.js?v=133';
-import { isLoggedIn, getToken } from '../auth.js?v=133';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=133';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=133';
-import { renderHeadline, renderStage, renderTour, renderColour, renderCollage, fillCollage, initLanding } from '../landing.js?v=133';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=133';
+import * as api from '../api.js?v=134';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=134';
+import { openDialog, showScorePrompt } from '../a11y.js?v=134';
+import { isLoggedIn, getToken } from '../auth.js?v=134';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=134';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=134';
+import { renderHeadline, renderStage, renderTour, renderColour, renderCollage, fillCollage, initLanding } from '../landing.js?v=134';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=134';
+import { setDismissed, syncDismissed } from '../dismissed.js?v=134';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
@@ -23,6 +24,7 @@ export async function render({ content }) {
                 <h2 class="section-title">Continue Watching</h2>
                 <a href="#/list" class="section-link">View All</a>
             </div>
+            <p class="home-catchup" id="home-catchup" hidden></p>
             <div id="continue-watching" class="scroll-row">${renderSkeletonCards(6)}</div>
         </section>
         <section class="home-section starting-soon" id="starting-soon" hidden>
@@ -83,7 +85,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=133'), import('../jellyfin.js?v=133')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=134'), import('../jellyfin.js?v=134')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
@@ -131,13 +133,77 @@ function showAnimePickerForParty() {
     });
 }
 
+const WEEK = 7 * 86400;
+const STALLED_AFTER = 4 * WEEK;
+// Aired but not watched yet
+const behindOf = (e) => (e.media.nextAiringEpisode ? Math.max(0, e.media.nextAiringEpisode.episode - 1 - (e.progress || 0)) : 0);
+// Untouched for four weeks while still on Watching
+const stalledWeeks = (e) => {
+    const idle = Date.now() / 1000 - (e.updatedAt || 0);
+    return e.updatedAt && idle > STALLED_AFTER && !behindOf(e) ? Math.floor(idle / WEEK) : 0;
+};
+
 function continueSub(e) {
     const m = e.media;
     const progress = m.episodes ? `${e.progress}/${m.episodes}` : `${e.progress}`;
+    const behind = behindOf(e);
+    if (behind) return `${progress} Ep · ${behind} behind`;
+    const stalled = stalledWeeks(e);
+    if (stalled) return `${progress} Ep · Untouched ${stalled} weeks`;
     const airing = m.nextAiringEpisode
         ? `Ep ${m.nextAiringEpisode.episode} in ${api.timeUntil(api.untilAiring(m.nextAiringEpisode))}`
         : '';
     return `${progress} Ep${airing ? ` · ${airing}` : ''}`;
+}
+
+// ===== One line above Continue Watching: what aired since the last visit, and what the week asks for =====
+const VISIT_KEY = 'aniroll_last_visit';
+const VISIT_FROM_KEY = 'aniroll_visit_from';
+// The last visit before this tab: kept for the whole tab, so coming back to Home keeps the same answer
+function lastVisit() {
+    let from = null;
+    try {
+        from = sessionStorage.getItem(VISIT_FROM_KEY);
+        if (from === null) {
+            from = localStorage.getItem(VISIT_KEY) || '0';
+            sessionStorage.setItem(VISIT_FROM_KEY, from);
+        }
+        localStorage.setItem(VISIT_KEY, String(Math.floor(Date.now() / 1000)));
+    } catch { /* no memory: no line */ }
+    return Number(from) || 0;
+}
+
+const fmtMinutes = (min) => (min >= 60 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}` : `${min} min`);
+
+function renderCatchup(entries) {
+    const el = document.getElementById('home-catchup');
+    if (!el) return;
+    const now = Date.now() / 1000;
+    const since = lastVisit();
+    // Weekly shows: the episodes before the next one aired a week apart each
+    const aired = [];
+    if (since) {
+        for (const e of entries) {
+            const next = e.media.nextAiringEpisode;
+            if (!next) continue;
+            for (let j = 1; next.episode - j >= 1 && next.airingAt - j * WEEK > since; j++) {
+                if (next.episode - j > (e.progress || 0)) aired.push({ title: titlePref(e.media.title), ep: next.episode - j });
+            }
+        }
+    }
+    const len = (e) => e.media.duration || 24;
+    const behindMin = entries.reduce((sum, e) => sum + behindOf(e) * len(e), 0);
+    const weekNew = entries.filter(e => e.media.nextAiringEpisode && e.media.nextAiringEpisode.airingAt - now < WEEK);
+    const weekMin = weekNew.reduce((sum, e) => sum + len(e), 0);
+    const parts = [];
+    if (aired.length) {
+        const names = [...new Set(aired.map(a => a.title))];
+        parts.push(`<strong>${aired.length} new episode${aired.length > 1 ? 's' : ''}</strong> since your last visit (${esc(names.slice(0, 3).join(', '))}${names.length > 3 ? ` and ${names.length - 3} more` : ''})`);
+    }
+    if (behindMin) parts.push(`${fmtMinutes(behindMin)} to catch up`);
+    if (weekMin) parts.push(`${weekNew.length} new this week ≈ ${fmtMinutes(weekMin)}`);
+    el.hidden = !parts.length;
+    el.innerHTML = parts.join(' · ');
 }
 
 function continuePct(e) {
@@ -182,7 +248,7 @@ function renderStartingSoon(planning) {
         const m = e.media;
         const next = m.nextAiringEpisode;
         return `<div class="media-card starting-soon-card" style="flex:0 0 150px" data-media-id="${m.id}" data-open="${m.id}" role="button" tabindex="0">
-            <img class="media-card-img" src="${esc(m.coverImage?.large || '')}" alt="${esc(titlePref(m.title))}" loading="lazy">
+            <img class="media-card-img" src="${esc(m.coverImage?.large || '')}" alt="" loading="lazy">
             <div class="media-card-overlay">
                 <div class="media-card-title">${esc(titlePref(m.title))}</div>
                 <div class="media-card-sub starting-soon-when">${ICON_EVENT}<span><strong>Episode ${next.episode}</strong> in ${api.timeUntil(api.untilAiring(next))}</span></div>
@@ -198,10 +264,12 @@ async function loadContinueWatching(token) {
         const lists = await api.getMediaList(user.id, 'ANIME', token);
         const planning = lists.find(l => l.status === 'PLANNING')?.entries || [];
         renderStartingSoon(planning);
-        const current = lists.find(l => l.status === 'CURRENT');
-        const entries = (current?.entries || [])
+        // Watching and rewatching both continue here
+        const entries = lists.filter(l => CONTINUE_STATUSES.includes(l.status) && !l.isCustomList)
+            .flatMap(l => l.entries)
             .sort((a, b) => b.updatedAt - a.updatedAt)
             .slice(0, 20);
+        renderCatchup(entries);
 
         const el = document.getElementById('continue-watching');
         if (!el) return;
@@ -232,11 +300,12 @@ async function loadContinueWatching(token) {
         el.innerHTML = entries.map((e, i) => {
             const m = e.media;
             return `
-                <div class="media-card" style="flex:0 0 150px" data-media-id="${m.id}" data-open="${m.id}" role="button" tabindex="0"${i ? '' : ' hidden'}>
-                    <img class="media-card-img" src="${m.coverImage?.large || ''}" alt="${esc(titlePref(m.title))}" loading="lazy">
+                <div class="media-card" style="flex:0 0 150px" data-media-id="${m.id}" data-open="${m.id}"${i ? '' : ' hidden'}>
+                    <img class="media-card-img" src="${m.coverImage?.large || ''}" alt="" loading="lazy">
                     ${!m.episodes || e.progress < m.episodes ? `<button class="cw-inc" data-entry-id="${e.id}" title="Mark next episode watched">+1</button>` : ''}
+                    ${stalledWeeks(e) ? `<button class="cw-pause" data-pause-id="${e.id}" title="Move to Paused">Pause</button>` : ''}
                     <div class="media-card-overlay">
-                        <div class="media-card-title">${esc(titlePref(m.title))}</div>
+                        <div class="media-card-title" data-open="${m.id}" role="button" tabindex="0">${esc(titlePref(m.title))}</div>
                         <div class="media-card-sub">${continueSub(e)}</div>
                     </div>
                     <div class="progress-bar" style="position:absolute;bottom:0;left:0;right:0;border-radius:0">
@@ -248,7 +317,19 @@ async function loadContinueWatching(token) {
         // "+1" on the card: capture phase so the card's own onclick (open detail) never fires
         const byId = new Map(entries.map(e => [e.id, e]));
         const chains = new Map();
-        el.addEventListener('click', (ev) => {
+        el.addEventListener('click', async (ev) => {
+            const pause = ev.target.closest('.cw-pause');
+            if (pause) {
+                ev.stopPropagation();
+                const entry = byId.get(Number(pause.dataset.pauseId));
+                if (!entry) return;
+                try {
+                    const saved = await api.saveMediaListEntry({ id: entry.id, status: 'PAUSED' }, token, { mirror: false });
+                    emitListChange({ mediaId: entry.media.id, status: saved.status, progress: saved.progress });
+                    toast(`${titlePref(entry.media.title)} moved to Paused`, 'success');
+                } catch (err) { toast(err.message, 'error'); }
+                return;
+            }
             const btn = ev.target.closest('.cw-inc');
             if (!btn) return;
             ev.stopPropagation();
@@ -271,7 +352,10 @@ async function loadContinueWatching(token) {
                 try {
                     const saved = await api.saveMediaListEntry(vars, token);
                     Object.assign(entry, { status: saved.status, startedAt: saved.startedAt, completedAt: saved.completedAt, repeat: saved.repeat });
-                    if (vars.status === 'COMPLETED') toast(`Completed ${titlePref(entry.media.title)}`, 'success');
+                    if (vars.status === 'COMPLETED') {
+                        toast(`Completed ${titlePref(entry.media.title)}`, 'success');
+                        if (!entry.score) askFinishScore(entry, token);
+                    }
                     if (!CONTINUE_STATUSES.includes(saved.status)) removeContinueCard(el, card);
                 } catch (err) { toast(err.message, 'error'); }
             }));
@@ -300,6 +384,18 @@ async function loadContinueWatching(token) {
     } catch (err) {
         console.error('Continue watching error:', err);
     }
+}
+
+// Finishing a show is the moment people rate it: one question, saved with one request
+async function askFinishScore(entry, token) {
+    const score = await showScorePrompt({ title: titlePref(entry.media.title), message: 'You finished it. How was it?' });
+    if (!score) return;
+    try {
+        const saved = await api.saveMediaListEntry({ id: entry.id, scoreRaw: score }, token, { mirror: false });
+        entry.score = saved.score;
+        emitListChange({ mediaId: entry.media.id, status: saved.status, progress: saved.progress, score: saved.score });
+        toast(`Score saved: ${score}`, 'success');
+    } catch (err) { toast(err.message, 'error'); }
 }
 
 // ===== Friends: "Right now" + "Popular this week" (one feed, grouped per show) =====
@@ -382,12 +478,13 @@ function renderFriendCard(g, tab) {
         ? `<span class="fr-line-icon">${FR_ICONS.people}</span><span class="fr-line-text">${g.friends.length} friend${g.friends.length > 1 ? 's' : ''}</span>`
         : `<span class="fr-line-icon fr-${kind}">${KIND_ICON[kind]}</span><span class="fr-line-text"><strong>${esc(lead.user.name)}</strong>${others ? ` +${others}` : ''} · ${esc(text)}</span>`;
 
-    return `<div class="media-card fr-card" style="flex:0 0 150px" data-media-id="${m.id}" data-open="${m.id}" role="button" tabindex="0">
-        <img class="media-card-img" src="${m.coverImage?.large || ''}" alt="${esc(titlePref(m.title))}" loading="lazy">
+    // Not a button itself: it holds one (Plan). Its title opens the show, from the keyboard too
+    return `<div class="media-card fr-card" style="flex:0 0 150px" data-media-id="${m.id}" data-open="${m.id}">
+        <img class="media-card-img" src="${m.coverImage?.large || ''}" alt="" loading="lazy">
         ${mine}
         <div class="media-card-overlay">
             <div class="fr-avatars">${avatars}</div>
-            <div class="media-card-title">${esc(titlePref(m.title))}</div>
+            <div class="media-card-title" data-open="${m.id}" role="button" tabindex="0">${esc(titlePref(m.title))}</div>
             <div class="fr-line">${line}</div>
             <div class="fr-time">${api.timeAgo(g.latest.createdAt)}</div>
         </div>
@@ -554,7 +651,21 @@ async function loadRecommendations(token) {
             return;
         }
 
-        el.innerHTML = recs.map(r => `<div style="flex:0 0 150px">${renderMediaCard(r.media, false, r)}</div>`).join('');
+        el.innerHTML = recs.map(r => `<div style="flex:0 0 150px">${renderMediaCard(r.media, false, { ...r, dismissable: true })}</div>`).join('');
+        // "Not interested": the card goes, with a moment to take it back
+        el.addEventListener('click', (ev) => {
+            const btn = ev.target.closest('[data-dismiss]');
+            if (!btn) return;
+            ev.stopPropagation();
+            const id = Number(btn.dataset.dismiss);
+            const cell = btn.closest('.media-card').parentElement;
+            const next = cell.nextSibling;
+            setDismissed(id, true);
+            cell.remove();
+            toast('Not shown again', 'success', { action: { label: 'Undo', run: () => { setDismissed(id, false); el.insertBefore(cell, next); } } });
+        }, true);
+        // Choices made on another device arrive a moment later
+        syncDismissed().then(ids => el.querySelectorAll('[data-dismiss]').forEach(b => { if (ids.has(Number(b.dataset.dismiss))) b.closest('.media-card').parentElement.remove(); }));
     } catch (err) {
         console.error('Recommendations error:', err);
         const el = document.getElementById('recommendations-row');
@@ -712,6 +823,17 @@ function renderLanding() {
             </div>
             <div id="landing-trending" class="scroll-row">${renderSkeletonCards(6)}</div>
         </div>
+        <section class="landing-try" id="landing-try" aria-label="Try a roll" hidden>
+            <div class="landing-try-machine">
+                <div class="roll-window landing-try-window" id="try-window"><div class="roll-reel" id="try-reel"></div></div>
+                <button class="glass-btn glass-btn-primary" id="try-roll">Roll a trending show</button>
+            </div>
+            <div class="landing-try-text">
+                <h2 class="section-title">Try it</h2>
+                <p class="landing-try-result" id="try-result" role="status">Logged in, Roll picks from your own Planning list. Here it picks from what is trending.</p>
+                <button class="glass-btn glass-btn-secondary" data-login id="try-login" hidden>Log in to roll your own list</button>
+            </div>
+        </section>
         <div class="landing-foot"><button type="button" class="whatsnew-link">What's new</button><a class="landing-foot-link" href="${GITHUB_URL}" target="_blank" rel="noopener">${GITHUB_ICON}Source on GitHub</a></div>
     </div>`;
 }
@@ -908,5 +1030,37 @@ export function loadLandingTrending() {
         if (hero) fillCollage(hero, media);
         const el = document.getElementById('landing-trending');
         if (el) el.innerHTML = media.map(m => `<div style="flex:0 0 150px">${renderMediaCard(m)}</div>`).join('');
+        setupTryRoll(media);
     }).catch(() => {});
+}
+
+// A roll to try before logging in, from the trending shows the page loaded anyway (no request)
+function setupTryRoll(media) {
+    const box = document.getElementById('landing-try');
+    const pool = media.filter(m => m.coverImage?.large);
+    if (!box || pool.length < 3) return;
+    box.hidden = false;
+    const btn = box.querySelector('#try-roll');
+    let rolling = false;
+    btn.addEventListener('click', async () => {
+        if (rolling) return;
+        rolling = true;
+        btn.disabled = true;
+        const winner = pool[Math.floor(Math.random() * pool.length)];
+        const strip = Array.from({ length: 21 }, () => pool[Math.floor(Math.random() * pool.length)]);
+        strip.push(winner);
+        const { playReel } = await import('../reel.js?v=134');
+        playReel({
+            windowEl: box.querySelector('#try-window'),
+            reelEl: box.querySelector('#try-reel'),
+            covers: strip.map(m => m.coverImage.large),
+            onDone: () => {
+                rolling = false;
+                btn.disabled = false;
+                btn.textContent = 'Roll again';
+                box.querySelector('#try-result').innerHTML = `Tonight: <strong>${esc(titlePref(winner.title))}</strong>. With your AniList, Roll picks from the shows you planned to watch.`;
+                box.querySelector('#try-login').hidden = false;
+            },
+        });
+    });
 }

@@ -1,4 +1,4 @@
-import { esc } from './store.js?v=133';
+import { esc } from './store.js?v=134';
 
 // What Jellyfin is playing right now (from the webhook state in js/jellyfin.js):
 // the chip in the navbar and the card on Home.
@@ -32,6 +32,9 @@ function trackingText(s, trackAt) {
     if (s.stopped) return 'Stopped before the end, not tracked';
     return `Counts toward AniList at ${Math.round(trackAt * 100)}%`;
 }
+
+// Not matched on AniList: a series can be linked by hand (movies cannot, they have no episodes to offset)
+const unmatched = (s) => s.type === 'Episode' && (s.tracked === 'unmatched' || s.unmatched === 'not-found');
 
 function minutesLeft(s) {
     if (!s.runtime || s.stopped) return '';
@@ -79,8 +82,14 @@ export function renderNowCard(section, state) {
             <div class="jf-now-sub">${esc(sessionEpisode(s) + epName)}</div>
             <div class="jf-now-bar" style="--p:${pct}%;--pn:${pct / 100}" title="${pct}%"><span></span><i style="left:${Math.round(trackAt * 100)}%"></i></div>
             <div class="jf-now-meta">${esc(meta)}</div>
+            ${unmatched(s) ? `<button type="button" class="glass-btn glass-btn-sm glass-btn-secondary jf-now-link">Link to AniList</button>` : ''}
         </div>
     </div>`;
+    section.querySelector('.jf-now-link')?.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const { openLinkDialog } = await import('./jflink-dialog.js?v=134');
+        openLinkDialog(s);
+    });
 
     const card = section.querySelector('[data-media-id]');
     const open = () => window.__openDetailPanel?.(Number(card.dataset.mediaId));

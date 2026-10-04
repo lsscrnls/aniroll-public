@@ -1,5 +1,5 @@
 // Keyboard and screen reader support that every page shares.
-import { esc } from './store.js?v=133';
+import { esc } from './store.js?v=134';
 
 // ===== Dialogs =====
 // An open overlay behaves as a dialog: announced as one, focus moves in and stays inside
@@ -147,6 +147,59 @@ export function showConfirm({ title, message, confirmText = 'Confirm', cancelTex
         container.querySelector('#modal-cancel').addEventListener('click', () => close(false));
         container.querySelector('.modal-backdrop').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) close(false);
+        });
+    });
+}
+
+// A score on the 100 scale, asked in a dialog (finishing a show, the score on a list row).
+// Resolves the number (0 = no score), or null when closed without saving.
+export function showScorePrompt({ title, value = 0, message = '' }) {
+    return new Promise(resolve => {
+        const container = document.getElementById('modal-container');
+        if (!container) return resolve(null);
+        container.hidden = false;
+        const start = Math.round(value || 0);
+        container.innerHTML = `<div class="modal-backdrop">
+            <div class="modal-content score-prompt" style="max-width:420px">
+                <h3 class="modal-title">${esc(title)}</h3>
+                ${message ? `<p class="score-prompt-text">${esc(message)}</p>` : ''}
+                <div class="score-prompt-row">
+                    <input type="range" class="score-prompt-range" min="0" max="100" step="1" value="${start}" aria-label="Score out of 100">
+                    <output class="score-prompt-value" aria-live="polite">${start || '–'}</output>
+                </div>
+                <div class="score-prompt-chips" role="group" aria-label="Quick scores">
+                    ${[50, 60, 70, 75, 80, 85, 90, 95, 100].map(n => `<button type="button" class="score-chip${n === start ? ' is-on' : ''}" data-score="${n}">${n}</button>`).join('')}
+                </div>
+                <div style="display:flex;gap:var(--space-sm);justify-content:flex-end">
+                    <button class="glass-btn glass-btn-secondary" id="modal-cancel">Not now</button>
+                    <button class="glass-btn glass-btn-primary" id="modal-confirm">Save score</button>
+                </div>
+            </div>
+        </div>`;
+        const range = container.querySelector('.score-prompt-range');
+        const out = container.querySelector('.score-prompt-value');
+        const paint = () => {
+            out.textContent = Number(range.value) || '–';
+            container.querySelectorAll('.score-chip').forEach(c => c.classList.toggle('is-on', Number(c.dataset.score) === Number(range.value)));
+        };
+        const release = openDialog(container.querySelector('.modal-content'), { label: title, onClose: () => close(null), focus: '.score-prompt-range' });
+        const close = (result) => {
+            release();
+            container.hidden = true;
+            container.innerHTML = '';
+            resolve(result);
+        };
+        range.addEventListener('input', paint);
+        container.querySelector('.score-prompt-chips').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-score]');
+            if (!chip) return;
+            range.value = chip.dataset.score;
+            paint();
+        });
+        container.querySelector('#modal-confirm').addEventListener('click', () => close(Number(range.value)));
+        container.querySelector('#modal-cancel').addEventListener('click', () => close(null));
+        container.querySelector('.modal-backdrop').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) close(null);
         });
     });
 }

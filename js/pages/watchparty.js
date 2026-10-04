@@ -49,4 +49,4 @@ export async function render({ query: q, content }) {
 }
 
 // The text of the AniList post that sums up a party: its shows and who watched.
-export function buildPartyPost({ shows, members = [] }) { return null; }
+export function buildPartyPost({ shows, members = [], best = '' }) { return null; }

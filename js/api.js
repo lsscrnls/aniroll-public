@@ -1,4 +1,6 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=133';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=134';
+import { dismissedIds } from './dismissed.js?v=134';
+import { statusLabel } from './store.js?v=134';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -40,11 +42,6 @@ function readTimes() {
 function writeTimes(times) {
     localTimes = times;
     try { localStorage.setItem(BUDGET_KEY, JSON.stringify(times)); } catch { /* storage blocked */ }
-}
-
-export function requestsLastMinute() {
-    const cutoff = Date.now() - 60000;
-    return readTimes().filter(t => t > cutoff).length;
 }
 
 // Read, check and write of the shared list in one step: without the lock two tabs could read the same
@@ -444,7 +441,7 @@ export async function getMedia(id, token = null) {
                 recommendations(page: 1, perPage: 10, sort: [RATING_DESC]) {
                     nodes {
                         rating
-                        mediaRecommendation { id title { userPreferred english romaji native } coverImage { large } meanScore format type }
+                        mediaRecommendation { id title { userPreferred english romaji native } coverImage { large } meanScore format type episodes mediaListEntry { status } }
                     }
                 }
                 # Every studio with its role, in one field: AniList answers a second studios(...) in the same
@@ -488,65 +485,18 @@ export async function getTrending(type = 'ANIME', page = 1, perPage = 20, token 
     return data.Page.media;
 }
 
-export async function getPopular(type = 'ANIME', page = 1, perPage = 20, token = null) {
+// 50 shows a page; a busy season has more, the page asks for the next ones on demand -> { media, hasNext }
+export async function getSeason(season, year, sort = 'POPULARITY_DESC', token = null, page = 1) {
     const data = await cachedQuery(`
         ${MEDIA_CARD_FRAGMENT}
-        query ($type: MediaType, $page: Int, $perPage: Int) {
-            Page(page: $page, perPage: $perPage) {
-                media(type: $type, sort: [POPULARITY_DESC], isAdult: false) { ...mediaCard }
-            }
-        }
-    `, { type, page, perPage }, token, TTL.discovery);
-    return data.Page.media;
-}
-
-export async function getTopRated(type = 'ANIME', page = 1, perPage = 20, token = null) {
-    const data = await cachedQuery(`
-        ${MEDIA_CARD_FRAGMENT}
-        query ($type: MediaType, $page: Int, $perPage: Int) {
-            Page(page: $page, perPage: $perPage) {
-                media(type: $type, sort: [SCORE_DESC], isAdult: false) { ...mediaCard }
-            }
-        }
-    `, { type, page, perPage }, token, TTL.discovery);
-    return data.Page.media;
-}
-
-export async function getSeason(season, year, sort = 'POPULARITY_DESC', token = null) {
-    const data = await cachedQuery(`
-        ${MEDIA_CARD_FRAGMENT}
-        query ($season: MediaSeason, $year: Int, $sort: [MediaSort]) {
-            Page(page: 1, perPage: 50) {
+        query ($season: MediaSeason, $year: Int, $sort: [MediaSort], $page: Int) {
+            Page(page: $page, perPage: 50) {
+                pageInfo { hasNextPage }
                 media(season: $season, seasonYear: $year, type: ANIME, sort: $sort, isAdult: false) { ...mediaCard }
             }
         }
-    `, { season, year, sort: [sort] }, token, TTL.discovery);
-    return data.Page.media;
-}
-
-export async function getAiringSchedule(page = 1, perPage = 50, token = null) {
-    const now = Math.floor(Date.now() / 1000);
-    const weekEnd = now + 7 * 24 * 60 * 60;
-    const data = await query(`
-        query ($page: Int, $perPage: Int, $start: Int, $end: Int) {
-            Page(page: $page, perPage: $perPage) {
-                airingSchedules(airingAt_greater: $start, airingAt_lesser: $end, sort: [TIME]) {
-                    id
-                    airingAt
-                    episode
-                    media {
-                        id
-                        title { userPreferred english romaji native }
-                        coverImage { large }
-                        format
-                        episodes
-                        mediaListEntry { id status progress }
-                    }
-                }
-            }
-        }
-    `, { page, perPage, start: now, end: weekEnd }, token, TTL.airing);
-    return data.Page.airingSchedules;
+    `, { season, year, sort: [sort], page }, token, TTL.discovery);
+    return { media: data.Page.media, hasNext: !!data.Page.pageInfo?.hasNextPage };
 }
 
 export async function browseMedia(variables, token = null) {
@@ -672,6 +622,7 @@ export async function getMediaList(userId, type = 'ANIME', token = null) {
                 lists {
                     name
                     status
+                    isCustomList
                     entries {
                         id
                         mediaId
@@ -686,7 +637,7 @@ export async function getMediaList(userId, type = 'ANIME', token = null) {
                         updatedAt
                         media {
                             id idMal title { userPreferred english romaji native } coverImage { large extraLarge color } bannerImage
-                            episodes chapters volumes format status
+                            episodes chapters volumes format status duration
                             startDate { year month day }
                             nextAiringEpisode { episode timeUntilAiring airingAt }
                             meanScore genres
@@ -696,7 +647,15 @@ export async function getMediaList(userId, type = 'ANIME', token = null) {
             }
         }
     `, { userId, type }, token, TTL.lists);
+    knownLists.set(`${userId}:${type}`, data.MediaListCollection.lists);
     return data.MediaListCollection.lists;
+}
+
+// The last list read in this tab, without asking AniList: for answers that must be instant (the search
+// overlay finds your own shows as you type). null until a page read the list once.
+const knownLists = new Map();
+export function knownMediaList(userId, type = 'ANIME') {
+    return knownLists.get(`${userId}:${type}`) || null;
 }
 
 // Scores: always pass `scoreRaw` (0-100). `score` would be read in the user's own AniList format.
@@ -720,7 +679,8 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
             }
         }
     `);
-    clearCache('MediaListCollection');
+    // The list in the cache is changed in place instead of read again: one full list less per save
+    if (!patchListCache(data.SaveMediaListEntry)) clearCache('MediaListCollection');
     clearCache('Media(id');
     // The feed carries the viewer's own list entry per show, so refresh it — but keep the old
     // copy: deleting it left the Friends section with nothing when the refetch was throttled
@@ -729,14 +689,54 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
 
     const saved = data.SaveMediaListEntry;
 
-    // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update
-    if (mirror && saved?.mediaId && saved.progress) {
-        import('./jellyfin.js?v=133').then(m =>
-            m.syncProgress(saved.mediaId, saved.progress, () => mediaTitlesForSync(saved.mediaId, token)));
+    // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update.
+    // Only when this save set the progress: a new score or status leaves Jellyfin alone.
+    if (mirror && saved?.mediaId && saved.progress && variables.progress !== undefined) {
+        import('./jellyfin.js?v=134').then(m =>
+            m.syncProgress(saved.progress, () => mediaForSync(saved.mediaId, token)));
     }
 
     return saved;
 }
+
+// A saved entry written into every cached MediaListCollection of this account that already holds it:
+// its fields, and its place among the status lists (custom lists keep it where it is). false when a
+// cached list lacks the entry (a new one): then the list has to be read again.
+function patchListCache(saved) {
+    if (!saved?.id) return false;
+    const scope = `"scope":"user:${accountId()}"`;
+    let ok = true;
+    for (const [key, entry] of _cache) {
+        if (!key.includes('MediaListCollection') || !key.includes(scope)) continue;
+        const lists = entry.data?.MediaListCollection?.lists;
+        const found = lists?.flatMap(l => l.entries).filter(e => e.id === saved.id) || [];
+        if (!found.length) { ok = false; continue; }
+        // A list of another type (manga vs anime) never holds this id: found is enough to know it is this one
+        for (const e of found) {
+            Object.assign(e, {
+                status: saved.status, score: saved.score, progress: saved.progress, progressVolumes: saved.progressVolumes,
+                repeat: saved.repeat, notes: saved.notes, startedAt: saved.startedAt, completedAt: saved.completedAt,
+                updatedAt: Math.floor(Date.now() / 1000),
+            });
+        }
+        const moving = found[0];
+        let target = lists.find(l => !l.isCustomList && l.status === saved.status);
+        for (const l of lists) {
+            if (l.isCustomList || !l.status || l === target) continue;
+            l.entries = l.entries.filter(e => e.id !== saved.id);
+        }
+        if (!target) {
+            // The first entry with this status: a list for it, as AniList would answer
+            target = { name: statusLabel(saved.status), status: saved.status, isCustomList: false, entries: [] };
+            lists.push(target);
+        }
+        if (!target.entries.some(e => e.id === saved.id)) target.entries.unshift(moving);
+        entry.ts = Date.now();
+        idbSet(key, entry);
+    }
+    return ok;
+}
+
 
 // Runs the mutation; if AniList is rate limiting, or the device is offline, the change is queued and
 // retried later (see setupPendingSaveRetry in js/app.js: every 5 minutes, and the moment it is back online)
@@ -764,15 +764,17 @@ async function queryOrQueue(variables, token, queue, mutation) {
     }
 }
 
-// Jellyfin matches by title when the library carries no AniList id
-async function mediaTitlesForSync(mediaId, token) {
+// What the Jellyfin matcher (js/player/library.js) needs to find the show and its season
+async function mediaForSync(mediaId, token) {
     const data = await cachedQuery(`
         query ($id: Int) {
-            Media(id: $id) { title { romaji english userPreferred } startDate { year } }
+            Media(id: $id) {
+                id format episodes seasonYear synonyms
+                title { romaji english userPreferred } startDate { year }
+            }
         }
     `, { id: mediaId }, token);
-    const t = data.Media?.title || {};
-    return { titles: [...new Set([t.romaji, t.english, t.userPreferred].filter(Boolean))], year: data.Media?.startDate?.year || null };
+    return data.Media || null;
 }
 
 export function fuzzyToday() {
@@ -986,7 +988,7 @@ export async function getFriendsMediaStatus(mediaId, userId, token) {
 }
 
 export async function getFollowing(userId, page = 1, token = null) {
-    const data = await query(`
+    const data = await cachedQuery(`
         query ($userId: Int!, $page: Int) {
             Page(page: $page, perPage: 25) {
                 pageInfo { total currentPage lastPage hasNextPage }
@@ -996,22 +998,7 @@ export async function getFollowing(userId, page = 1, token = null) {
                 }
             }
         }
-    `, { userId, page }, token);
-    return data.Page;
-}
-
-export async function getFollowers(userId, page = 1, token = null) {
-    const data = await query(`
-        query ($userId: Int!, $page: Int) {
-            Page(page: $page, perPage: 25) {
-                pageInfo { total currentPage lastPage hasNextPage }
-                followers(userId: $userId, sort: [USERNAME]) {
-                    id name avatar { medium }
-                    statistics { anime { count episodesWatched meanScore } }
-                }
-            }
-        }
-    `, { userId, page }, token);
+    `, { userId, page }, token, TTL.profile);
     return data.Page;
 }
 
@@ -1043,27 +1030,6 @@ export async function toggleLike(id, type, token) {
     return data.ToggleLikeV2;
 }
 
-export async function toggleFollow(userId, token) {
-    const data = await query(`
-        mutation ($userId: Int) {
-            ToggleFollow(userId: $userId) { id name isFollowing }
-        }
-    `, { userId }, token);
-    return data.ToggleFollow;
-}
-
-export async function toggleFavourite(variables, token) {
-    const data = await query(`
-        mutation ($animeId: Int, $mangaId: Int, $characterId: Int, $staffId: Int, $studioId: Int) {
-            ToggleFavourite(animeId: $animeId, mangaId: $mangaId, characterId: $characterId, staffId: $staffId, studioId: $studioId) {
-                anime { nodes { id } }
-                manga { nodes { id } }
-            }
-        }
-    `, variables, token);
-    return data.ToggleFavourite;
-}
-
 export async function getNotifications(page = 1, token) {
     const data = await query(`
         query ($page: Int) {
@@ -1086,6 +1052,26 @@ export async function getNotifications(page = 1, token) {
                         createdAt
                     }
                     ... on ActivityReplyNotification {
+                        id type userId activityId
+                        user { id name avatar { medium } }
+                        createdAt
+                    }
+                    ... on ActivityMentionNotification {
+                        id type userId activityId
+                        user { id name avatar { medium } }
+                        createdAt
+                    }
+                    ... on ActivityMessageNotification {
+                        id type userId activityId
+                        user { id name avatar { medium } }
+                        createdAt
+                    }
+                    ... on ActivityReplySubscribedNotification {
+                        id type userId activityId
+                        user { id name avatar { medium } }
+                        createdAt
+                    }
+                    ... on ActivityReplyLikeNotification {
                         id type userId activityId
                         user { id name avatar { medium } }
                         createdAt
@@ -1127,14 +1113,25 @@ export async function postTextActivity(text, token) {
 // other list caches, so the next match reflects the new score.
 const _tasteProfiles = new Map();
 
-export async function getTasteProfile(userId, token = null) {
-    const data = await cachedQuery(`
+function tasteData(userId, token) {
+    return cachedQuery(`
         query ($userId: Int) {
             MediaListCollection(userId: $userId, type: ANIME) {
                 lists { entries { score(format: POINT_100) status media { id genres tags { name rank } } } }
             }
         }
     `, { userId }, token, TTL.recommendations);
+}
+
+// The genres and tags of every show on the list (id -> { id, genres, tags }), from the same answer as the
+// taste profile: no request of its own
+export async function getListFeatures(userId, token = null) {
+    const data = await tasteData(userId, token);
+    return new Map((data.MediaListCollection?.lists || []).flatMap(l => l.entries).map(e => [e.media.id, e.media]));
+}
+
+export async function getTasteProfile(userId, token = null) {
+    const data = await tasteData(userId, token);
     const hit = _tasteProfiles.get(userId);
     if (hit?.data === data) return hit.profile;
     const profile = buildTasteProfile((data.MediaListCollection?.lists || []).flatMap(l => l.entries));
@@ -1219,7 +1216,10 @@ export async function getRecommendations(userId, token) {
     // shows two different percentages. Without a profile (tiny list) fall back to the ranking.
     const profile = await getTasteProfile(userId, token).catch(() => null);
 
+    // "Not interested" (js/dismissed.js) stays out, here and in Roll
+    const dismissed = dismissedIds();
     return list
+        .filter(c => !dismissed.has(c.media.id))
         .sort((a, b) => b.rank - a.rank || b.strength - a.strength)
         .slice(0, 20)
         .map(c => ({
@@ -1281,7 +1281,7 @@ export async function getKitsuEpisodes(malId) {
 const IDB_NAME = 'aniroll_cache';
 const IDB_STORE = 'entries';
 const IDB_VERSION = 2;
-const CACHE_VERSION = 7; // 7: keys carry the account (scope) instead of a logged-in flag
+const CACHE_VERSION = 8; // 8: lists carry isCustomList and the episode length
 
 let _idbReady = null;
 function openIdb() {
@@ -1335,21 +1335,35 @@ async function idbSet(key, value) {
     } catch { /* best effort */ }
 }
 
-async function idbDeleteMatching(pattern) {
-    try {
-        const db = await openIdb();
-        await new Promise((resolve) => {
-            const tx = db.transaction(IDB_STORE, 'readwrite');
-            const req = tx.objectStore(IDB_STORE).openCursor();
-            req.onsuccess = () => {
-                const cursor = req.result;
-                if (!cursor) return;
-                if (typeof cursor.key === 'string' && cursor.key.includes(pattern)) cursor.delete();
-                cursor.continue();
-            };
-            tx.oncomplete = tx.onerror = tx.onabort = () => resolve();
-        });
-    } catch { /* best effort */ }
+// Several invalidations in a row (a save clears three or four patterns) become one pass over the keys
+// only: a cursor over the values would read and decode every stored answer, up to 200 MB
+let idbPatterns = null;
+function idbDeleteMatching(pattern) {
+    if (!idbPatterns) {
+        idbPatterns = { list: [], done: null };
+        idbPatterns.done = new Promise(resolve => queueMicrotask(async () => {
+            const patterns = idbPatterns.list;
+            idbPatterns = null;
+            try {
+                const db = await openIdb();
+                await new Promise((done) => {
+                    const tx = db.transaction(IDB_STORE, 'readwrite');
+                    const store = tx.objectStore(IDB_STORE);
+                    const req = store.openKeyCursor();
+                    req.onsuccess = () => {
+                        const cursor = req.result;
+                        if (!cursor) return;
+                        if (typeof cursor.key === 'string' && patterns.some(p => cursor.key.includes(p))) store.delete(cursor.primaryKey);
+                        cursor.continue();
+                    };
+                    tx.oncomplete = tx.onerror = tx.onabort = () => done();
+                });
+            } catch { /* best effort */ }
+            resolve();
+        }));
+    }
+    idbPatterns.list.push(pattern);
+    return idbPatterns.done;
 }
 
 async function idbEvict() {
@@ -1403,14 +1417,6 @@ export function getPrevSeason(season, year) {
 export function getSeasonName(season) {
     const names = { WINTER: 'Winter', SPRING: 'Spring', SUMMER: 'Summer', FALL: 'Fall' };
     return names[season] || season;
-}
-
-export function formatStatus(status) {
-    const map = {
-        CURRENT: 'Watching', PLANNING: 'Planning', COMPLETED: 'Completed',
-        DROPPED: 'Dropped', PAUSED: 'Paused', REPEATING: 'Rewatching'
-    };
-    return map[status] || status;
 }
 
 export function formatMediaStatus(status) {

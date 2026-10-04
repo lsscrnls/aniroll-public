@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=133';
-import { cachedQuery } from '../api.js?v=133';
-import { getState, esc, titlePref, renderPageSwitch } from '../store.js?v=133';
-import { getToken, isLoggedIn } from '../auth.js?v=133';
+import * as api from '../api.js?v=134';
+import { cachedQuery } from '../api.js?v=134';
+import { getState, esc, titlePref, renderPageSwitch, toast } from '../store.js?v=134';
+import { getToken, isLoggedIn } from '../auth.js?v=134';
 
 const VIEW_KEY = 'aniroll_cal_view';
 const ANCHOR_KEY = 'aniroll_cal_anchor';
@@ -58,6 +58,7 @@ export async function render({ content, query: q }) {
                     <button class="list-tab${filter === 'mylist' ? ' active' : ''}" data-filter="mylist">My List</button>
                 ` : ''}
             </div>
+            <button class="glass-btn glass-btn-secondary glass-btn-sm" id="cal-ics" title="Download what is shown as a calendar file: your phone's calendar reminds you at air time">Add to my calendar</button>
             <div class="calendar-toggle">
                 <span class="dot-label">Images</span>
                 <button class="calendar-toggle-switch ${showImages ? 'on' : ''}" id="cal-img-toggle"></button>
@@ -67,6 +68,8 @@ export async function render({ content, query: q }) {
     </div>`;
 
     let airingData = [];
+    // What the grid shows right now, for the calendar file
+    let shownEpisodes = [];
     let userOnList = new Set();
     let userMediaMap = new Map();
     // Your status and progress per show, for "Next up" / "2 behind" in the week view
@@ -290,6 +293,7 @@ export async function render({ content, query: q }) {
             ...projectMissingEpisodes(startTs, endTs),
         ];
         const filtered = filter === 'mylist' ? allData.filter(a => userOnList.has(a.media?.id)) : allData;
+        shownEpisodes = filtered;
 
         const byDay = {};
         for (const item of filtered) {
@@ -482,6 +486,8 @@ export async function render({ content, query: q }) {
         });
     });
 
+    document.getElementById('cal-ics')?.addEventListener('click', () => downloadIcs(shownEpisodes));
+
     document.getElementById('cal-img-toggle')?.addEventListener('click', (e) => {
         showImages = !showImages;
         localStorage.setItem('aniroll_cal_images', showImages ? 'on' : 'off');
@@ -501,4 +507,40 @@ export async function render({ content, query: q }) {
         await loadKitsuFallbacks();
         renderCalendar();
     }
+}
+
+// The episodes on screen as an .ics file (no request; a live feed is not possible, the server may not ask
+// AniList). Each event links back to the show in AniRoll; estimated dates say so.
+function downloadIcs(items) {
+    const list = items.filter(a => a.media && a.airingAt);
+    if (!list.length) return toast('Nothing in this view to add', 'error');
+    const stamp = (sec) => new Date(sec * 1000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    const text = (v) => String(v || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+    // Lines longer than 75 octets are folded, as the format asks
+    const fold = (line) => line.length <= 74 ? line : line.match(/.{1,74}/g).join('\r\n ');
+    const now = stamp(Math.floor(Date.now() / 1000));
+    const events = list.map(a => {
+        const minutes = a.media.duration || 24;
+        const title = `${titlePref(a.media.title)} · Episode ${a.episode}${a._forecast ? ' (estimated)' : ''}`;
+        return ['BEGIN:VEVENT',
+            `UID:aniroll-${a.media.id}-${a.episode}@aniroll.app`,
+            `DTSTAMP:${now}`,
+            `DTSTART:${stamp(a.airingAt)}`,
+            `DTEND:${stamp(a.airingAt + minutes * 60)}`,
+            fold(`SUMMARY:${text(title)}`),
+            fold(`URL:${location.origin}/#/anime/${a.media.id}`),
+            fold(`DESCRIPTION:${text(`Open in AniRoll: ${location.origin}/#/anime/${a.media.id}`)}`),
+            'BEGIN:VALARM', 'ACTION:DISPLAY', fold(`DESCRIPTION:${text(title)}`), 'TRIGGER:PT0M', 'END:VALARM',
+            'END:VEVENT'].join('\r\n');
+    });
+    const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AniRoll//Airing//EN', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:AniRoll', ...events, 'END:VCALENDAR', ''].join('\r\n');
+    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'aniroll-airing.ics';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast(`${list.length} episode${list.length > 1 ? 's' : ''} in the calendar file`, 'success');
 }

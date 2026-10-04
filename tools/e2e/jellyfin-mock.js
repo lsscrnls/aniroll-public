@@ -24,12 +24,18 @@ const CORS = {
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
 };
 
+// Episode 10 is a double episode in one file ("E10-E11"), so there is no episode 11 of its own
 function episode(n) {
     return { Id: `ep${n}`, Name: `Episode ${n}`, SeriesName: 'Show 1', IndexNumber: n, ParentIndexNumber: 1,
+        ...(n === 10 ? { IndexNumberEnd: 11 } : {}),
         RunTimeTicks: RUNTIME, ImageTags: { Primary: `t${n}` },
         // Episode 1 watched, episode 3 half-way
         UserData: { Played: n === 1, PlaybackPositionTicks: n === 3 ? RUNTIME / 2 : 0 } };
 }
+const SEASON_1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12].map(episode);
+// A second season of the same series, none played: marking season 1 must never touch it
+const SEASON_2 = [1, 2, 3].map(n => ({ Id: `s2e${n}`, Name: `Episode ${n}`, SeriesName: 'Show 1', IndexNumber: n, ParentIndexNumber: 2,
+    RunTimeTicks: RUNTIME, UserData: { Played: false, PlaybackPositionTicks: 0 } }));
 
 function mediaSource(id) {
     if (id === 'ep5') {
@@ -90,7 +96,17 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
             const term = (url.searchParams.get('searchTerm') || '').toLowerCase();
             return json({ Items: term === 'show 1' || anyTitle ? [{ Id: 'series1', Name: anyTitle ? url.searchParams.get('searchTerm') : 'Show 1', ProductionYear: anyTitle ? null : 2026 }] : [] });
         }
-        if (p === '/Shows/series1/Episodes') return json({ Items: Array.from({ length: 12 }, (_, i) => episode(i + 1)) });
+        // Like Jellyfin: ?season= narrows to that season, without it every season comes back
+        if (p === '/Shows/series1/Episodes') {
+            const season = Number(url.searchParams.get('season'));
+            const all = [...SEASON_1, ...SEASON_2];
+            return json({ Items: season ? all.filter(e => e.ParentIndexNumber === season) : all });
+        }
+        // "Played" set by AniRoll (the AniList progress mirrored to Jellyfin)
+        if (new RegExp(`^/Users/${JF_USER}/PlayedItems/[^/]+$`).test(p) && req.method() === 'POST') {
+            calls.push({ type: 'played', item: p.split('/').pop() });
+            return json({ Played: true });
+        }
         // Auto quality measures the way to the server: 2 MB, answered at once (a fast line)
         if (p === '/Playback/BitrateTest') {
             calls.push({ type: 'bitrateTest', size: Number(url.searchParams.get('Size')) });

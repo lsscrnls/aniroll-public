@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=133';
-import { upNext, glance, DAYS, greeting } from './upnext.js?v=133';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=133';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=134';
+import { upNext, glance, DAYS, greeting } from './upnext.js?v=134';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=134';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -92,16 +92,94 @@ export function setup() {
 
     // Container transform: remember which cover was pressed, grow it into the panel
     let pressed = null;
+    // Every place with a cover that opens the panel: cards, list rows, related titles, posts, friends, notifications
+    const SOURCES = '.media-card, .search-result-item, .calendar-week-item, .schedule-item, .list-entry, .detail-related-item, '
+        + '.activity-media, .fr-card, .notif-item, .jf-now-card, .hot-take, .compare-row';
     const onDown = (e) => {
-        const cover = e.target.closest('.m3-hero-cover, .m3-widget img[data-open]');
-        pressed = { img: cover || e.target.closest('.media-card, .search-result-item, .calendar-week-item, .schedule-item')?.querySelector('img'), at: Date.now() };
+        const cover = e.target.closest('.m3-hero-cover, .m3-widget img[data-open], .list-entry-img');
+        const roll = e.target.closest('#roll-details') ? document.querySelector('#roll-window .roll-item:last-child img') : null;
+        pressed = { img: cover || roll || e.target.closest(SOURCES)?.querySelector('img'), at: Date.now() };
     };
     document.addEventListener('pointerdown', onDown, true);
+    // Closing: the panel's cover shrinks back into the card it came from, when that is still on screen
+    let openedFrom = null;
+    window.__m3MorphBack = (shut) => {
+        const from = openedFrom;
+        openedFrom = null;
+        const cover = document.querySelector('#detail-panel-body .detail-cover img');
+        const visible = from?.isConnected && from.getBoundingClientRect().bottom > 0 && from.getBoundingClientRect().top < innerHeight;
+        if (!cover || !visible || !document.startViewTransition || reduceMotion()) return shut();
+        const overlay = document.getElementById('detail-panel-overlay');
+        cover.style.viewTransitionName = 'm3-cover';
+        overlay?.classList.add('m3-vt');
+        const vt = document.startViewTransition(() => {
+            cover.style.viewTransitionName = '';
+            shut();
+            from.style.viewTransitionName = 'm3-cover';
+        });
+        vt.finished.catch(() => {}).finally(() => { from.style.viewTransitionName = ''; overlay?.classList.remove('m3-vt'); });
+    };
+    // The panel's full-screen button: its cover grows into the page's cover
+    window.__m3ToPage = (go) => {
+        const cover = document.querySelector('#detail-panel-body .detail-cover img');
+        if (!cover || !document.startViewTransition || reduceMotion()) return go();
+        cover.style.viewTransitionName = 'm3-cover';
+        let target = null;
+        const vt = document.startViewTransition(async () => {
+            cover.style.viewTransitionName = '';
+            go();
+            // The page renders a moment later (cached most of the time); never hold the screen long
+            for (let i = 0; i < 18 && !target; i++) {
+                await new Promise(r => setTimeout(r, 50));
+                target = document.querySelector('#content .detail-cover img');
+            }
+            if (target) target.style.viewTransitionName = 'm3-cover';
+        });
+        vt.finished.catch(() => {}).finally(() => { if (target) target.style.viewTransitionName = ''; });
+    };
+    cleanups.push(() => { delete window.__m3MorphBack; delete window.__m3ToPage; });
+
+    // Button groups: the filled pill slides from the old choice to the new one instead of jumping. The old
+    // place is measured before the page's own click handler runs (capture), the new one a frame later
+    // (some groups are drawn again on a click, so it is looked up again)
+    const GROUP = '.list-controls, .tab-group, .friends-tabs, .page-switch, .calendar-views, .roll-segment, .calendar-filters';
+    const OPTION = '.list-tab, .tab-btn, .friends-tab, .page-switch > a';
+    const ACTIVE = ':is(.list-tab, .tab-btn, .friends-tab).active, .page-switch > a[aria-current]';
+    const onPick = (e) => {
+        const option = e.target.closest(OPTION);
+        const group = option?.closest(GROUP);
+        if (!group || reduceMotion()) return;
+        const before = group.querySelector(ACTIVE);
+        if (!before || before === option) return;
+        const box = group.getBoundingClientRect();
+        const from = before.getBoundingClientRect();
+        requestAnimationFrame(() => {
+            const after = group.isConnected && group.querySelector(ACTIVE);
+            if (!after || after.getBoundingClientRect().left === from.left) return;
+            const to = after.getBoundingClientRect();
+            const now = group.getBoundingClientRect();
+            group.classList.add('m3-pill-slide');
+            const ghost = document.createElement('span');
+            ghost.className = 'm3-pill-ghost';
+            const place = (r, b) => Object.assign(ghost.style, { left: `${r.left - b.left + group.scrollLeft}px`, top: `${r.top - b.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+            place(from, box);
+            group.prepend(ghost);
+            after.classList.add('m3-pill-arriving');
+            requestAnimationFrame(() => place(to, now));
+            const done = () => { ghost.remove(); after.classList.remove('m3-pill-arriving'); };
+            ghost.addEventListener('transitionend', done, { once: true });
+            setTimeout(done, 600);
+        });
+    };
+    document.addEventListener('click', onPick, true);
+    cleanups.push(() => document.removeEventListener('click', onPick, true));
+
     const open = window.__openDetailPanel;
     if (open && !open.m3) {
         const wrapped = (id) => {
             const img = pressed && Date.now() - pressed.at < 1500 ? pressed.img : null;
             pressed = null;
+            openedFrom = img;
             if (!img || !document.startViewTransition || reduceMotion()) return open(id);
             return morphInto(img, () => open(id));
         };
