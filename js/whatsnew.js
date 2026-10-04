@@ -1,27 +1,29 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=135';
-import { openDialog } from './a11y.js?v=135';
-import { prefersReducedMotion } from './animations.js?v=135';
-import { accountState, saveAccountState } from './accountstate.js?v=135';
+import { esc } from './store.js?v=136';
+import { openDialog } from './a11y.js?v=136';
+import { prefersReducedMotion } from './animations.js?v=136';
+import { accountState, saveAccountState } from './accountstate.js?v=136';
 
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
 // Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More
 // changes on the same day go into that day's entry (one entry per day); if that entry was already
-// live, raise its id ('<date>.2', '.3', ...) so people who confirmed it get the pop-up again.
+// live, raise its id ('<date>.2', '.3', ...) and add the new items as { rev: N, text } with that N:
+// people who confirmed the earlier release of the day get a pop-up with only the new items.
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        // '.2': skipping intros for every show, in Settings
-        id: '2026-10-04.2',
+        id: '2026-10-04.3',
         title: 'A smarter player, your list at a glance, and a faster start',
         items: [
+            { rev: 3, text: 'Watch Parties are live: the host’s next episode, who joined, votes and “Roll together” reach everyone within a second instead of up to half a minute.' },
+            { rev: 3, text: '<strong>Play the next episode right from the Watch Party</strong>, from your own Jellyfin, with every other episode one tap away. The host’s counter follows what you play.' },
             'The player answers every key: volume, speed (<strong>[</strong> and <strong>]</strong>), subtitle timing (<strong>Z</strong> and <strong>X</strong>), <strong>0–9</strong> to jump, <strong>Shift+N</strong> for the episode before. Speed, subtitle timing and size are in the menus too.',
-            '<strong>Skip intros automatically</strong>, with Undo: for every show under Settings → Jellyfin → Player, or for one show in the player. Intro and credits show on the wave, and the label above it says when you are in one.',
+            { rev: 2, text: '<strong>Skip intros automatically</strong>, with Undo: for every show under Settings → Jellyfin → Player, or for one show in the player. Intro and credits show on the wave, and the label above it says when you are in one.' },
             'Up next shows the episode’s picture and length. After a few episodes in a row it asks whether you are still watching, and <strong>Stop after this episode</strong> waits for you.',
             'Finished a show? Rate it right there: on the player’s last card, or when +1 completes it on Home or My List.',
             'Media keys, headset buttons and the lock screen control the player; the tab shows the episode.',
@@ -255,9 +257,19 @@ export function noteVisitor() {
 // its changelog text.
 const noticeOn = (c) => !!c.notice && new Date() < c.notifyUntil;
 const headingOf = (c) => noticeOn(c) ? c.notice.heading : c.title;
-const itemsOf = (c) => noticeOn(c) ? c.notice.items : c.items;
+const itemText = (item) => typeof item === 'string' ? item : item.text;
+// The release of its day an id stands for: '2026-10-04' is 1, '2026-10-04.3' is 3
+const revOf = (id) => Number(String(id).split('.')[1]) || 1;
+// Of an entry confirmed earlier the same day, only the items added since
+function itemsOf(c) {
+    if (noticeOn(c)) return c.notice.items;
+    const confirmed = seen();
+    // Entries from before items carried their release show whole, as they always did
+    const sameDay = confirmed.slice(0, 10) === c.id.slice(0, 10) && c.items.some(item => item.rev);
+    return c.items.filter(item => !sameDay || (item.rev || 1) > revOf(confirmed)).map(itemText);
+}
 function pendingNotices() {
-    return CHANGES.filter(c => seen() < c.id).reverse();
+    return CHANGES.filter(c => seen() < c.id && itemsOf(c).length).reverse();
 }
 
 // The one-time notice: returning visitors, everything they have not confirmed with "Got it"
@@ -321,7 +333,7 @@ function showDialog(mode) {
                 <div class="whatsnew-date">${dateOf(c)} · ${esc(c.title)}</div>
                 ${c.tabs && CHANGES.findIndex(x => x.tabs) === i ? tabBar() : ''}
                 ${c.video ? videoTeaser(c.video) : ''}
-                <ul class="whatsnew-list">${c.items.map(item => `<li>${item}</li>`).join('')}</ul>
+                <ul class="whatsnew-list">${c.items.map(item => `<li>${itemText(item)}</li>`).join('')}</ul>
             </section>`).join('')}
             <div class="whatsnew-actions"><button type="button" class="glass-btn glass-btn-primary" data-close>Close</button></div>
         </div>`;

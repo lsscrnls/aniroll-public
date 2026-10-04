@@ -3595,6 +3595,14 @@ input, select, textarea { font: inherit; color: inherit; }
     color: var(--text-secondary);
 }
 
+/* "Play episode N" from the viewer's Jellyfin, right in the party */
+.wp-play-slot:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+}
+
 .wp-progress-section,
 .wp-invite-section,
 .wp-members-section,

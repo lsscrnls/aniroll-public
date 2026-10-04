@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=135';
-import { enhanceSelect } from '../select.js?v=135';
-import { renderMediaCard, esc, renderPageSwitch, toast } from '../store.js?v=135';
-import { getToken } from '../auth.js?v=135';
+import * as api from '../api.js?v=136';
+import { enhanceSelect } from '../select.js?v=136';
+import { renderMediaCard, esc, renderPageSwitch, toast } from '../store.js?v=136';
+import { getToken } from '../auth.js?v=136';
 
 // TV counts TV shorts too, as on My List
 const FORMATS = { TV: ['TV', 'TV_SHORT'], MOVIE: ['MOVIE'], OVA: ['OVA'], ONA: ['ONA'], SPECIAL: ['SPECIAL'] };
