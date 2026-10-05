@@ -23,14 +23,16 @@ export function glance(entries, now = Date.now() / 1000, planning = []) {
     const airing = entries.filter(e => e.media.nextAiringEpisode?.airingAt > now)
         .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt);
     const waiting = entries.map(e => ({ e, n: upNext(e).behind || 0 })).filter(x => x.n > 0);
-    const byDay = Array.from({ length: 7 }, () => []);
-    // A show airs weekly on the weekday of its next episode
-    airing.forEach(e => byDay[weekday(e.media.nextAiringEpisode.airingAt)].push(e.media));
-    const premiere = airing.length ? null : planning
+    const premieres = planning
         .filter(e => e.media.status === 'NOT_YET_RELEASED' && e.media.nextAiringEpisode?.airingAt > now)
-        .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt)[0];
+        .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt);
+    // The week: everything watched (weekly, on the weekday of its next episode) plus Planning premieres in the next 7 days
+    const week = [...airing, ...premieres.filter(e => e.media.nextAiringEpisode.airingAt < now + 7 * 86400)];
+    const byDay = Array.from({ length: 7 }, () => []);
+    week.forEach(e => byDay[weekday(e.media.nextAiringEpisode.airingAt)].push(e.media));
+    const premiere = airing.length ? null : premieres[0];
     const next = airing[0] || (premiere ? { ...premiere, premiere: true } : null);
-    return { next, airing, waiting, waitingTotal: waiting.reduce((s, x) => s + x.n, 0), byDay, today: weekday(now) };
+    return { next, airing, week, waiting, waitingTotal: waiting.reduce((s, x) => s + x.n, 0), byDay, today: weekday(now) };
 }
 
 export const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -54,5 +56,5 @@ export function playFromHero(root, entry, size = '') {
     const { m, next, canWatch } = upNext(entry);
     if (!canWatch) return;
     // List entries come without `type`: Home's hero is anime only
-    import('./player/playbutton.js?v=141').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
+    import('./player/playbutton.js?v=142').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
 }
