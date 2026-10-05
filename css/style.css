@@ -5976,3 +5976,13 @@ h1[tabindex="-1"]:focus { outline: none; }
 
 /* The public version next to the changelog's title */
 .whatsnew-release { margin-left: 8px; font-size: .8rem; font-weight: 600; color: var(--md-on-surface-variant, var(--text-secondary)); vertical-align: 2px; }
+
+/* Detail: the score sits next to the title; the long parts wait behind tabs */
+.detail-score { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 var(--space-sm); }
+.detail-score-value { font-size: 2rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; color: var(--user-accent); }
+.detail-score-label { font-size: 0.85rem; color: var(--text-secondary); }
+.detail-tag-next { color: var(--user-accent); border-color: currentColor; }
+.detail-tabs { margin: var(--space-xl) 0 var(--space-lg); display: inline-flex; }
+.detail-tabpanel[hidden] { display: none; }
+/* The score distribution as a plain histogram: bars without a track behind them */
+.detail-dist .stat-bar-track { background: transparent; }

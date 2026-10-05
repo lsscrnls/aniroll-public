@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=144';
-import { enhanceSelect } from '../select.js?v=144';
-import { tasteMatch } from '../taste.js?v=144';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=144';
-import { getToken, isLoggedIn } from '../auth.js?v=144';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=144';
-import { showConfirm } from '../a11y.js?v=144';
+import * as api from '../api.js?v=145';
+import { enhanceSelect } from '../select.js?v=145';
+import { tasteMatch } from '../taste.js?v=145';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=145';
+import { getToken, isLoggedIn } from '../auth.js?v=145';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=145';
+import { showConfirm } from '../a11y.js?v=145';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -16,6 +16,7 @@ export async function renderPanel(id, container) {
     setupListActions(media, token, container);
     setupShare(media, container);
     setupSpoilerTags(container);
+    setupDetailTabs(container);
     setupRelatedPlan(container, token);
     loadPlayButton(media, container);
     loadFriendsStatus(media, token, container);
@@ -33,6 +34,7 @@ export async function render({ params, content }) {
     setupListActions(media, token, content);
     setupShare(media, content);
     setupSpoilerTags(content);
+    setupDetailTabs(content);
     setupRelatedPlan(content, token);
     loadPlayButton(media, content);
     loadFriendsStatus(media, token, content);
@@ -52,7 +54,7 @@ async function loadPlayButton(media, root) {
     const slot = root.querySelector('#detail-play');
     if (!slot || media.type !== 'ANIME') return;
     try {
-        const { mountPlayButton } = await import('../player/playbutton.js?v=144');
+        const { mountPlayButton } = await import('../player/playbutton.js?v=145');
         await mountPlayButton(slot, media, nextEpisode(media));
     } catch (err) {
         console.warn('Jellyfin player unavailable:', err.message);
@@ -73,6 +75,39 @@ function fixBannerFit(container) {
     else img.addEventListener('load', check);
 }
 
+// Overview first; the long parts (cast, reviews, numbers) wait behind their own tab
+function detailTabsHtml(media) {
+    const tabs = [['overview', 'Overview', true], ['characters', 'Characters', media.characters?.edges?.length],
+        ['reviews', 'Reviews', media.reviews?.nodes?.length], ['stats', 'Stats', media.stats], ['trailer', 'Trailer', media.trailer?.site === 'youtube']].filter(t => t[2]);
+    if (tabs.length < 2) return '';
+    return `<div class="tab-group detail-tabs" role="tablist" aria-label="Sections">${tabs.map(([key, label], i) =>
+        `<button class="tab-btn${i ? '' : ' active'}" role="tab" id="detail-tabbtn-${key}" aria-controls="detail-tab-${key}" aria-selected="${!i}" data-detail-tab="${key}">${label}</button>`).join('')}</div>`;
+}
+
+function setupDetailTabs(root) {
+    const btns = [...root.querySelectorAll('[data-detail-tab]')];
+    const select = (btn) => btns.forEach(b => {
+        const on = b === btn;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', String(on));
+        b.tabIndex = on ? 0 : -1;
+        const panel = root.querySelector(`#detail-tab-${b.dataset.detailTab}`);
+        if (panel) panel.hidden = !on;
+    });
+    btns.forEach((b, i) => {
+        b.tabIndex = i ? -1 : 0;
+        b.addEventListener('click', () => select(b));
+        // Arrow keys move between tabs, as a tab list does
+        b.addEventListener('keydown', (e) => {
+            const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+            if (!step) return;
+            const to = btns[(i + step + btns.length) % btns.length];
+            select(to);
+            to.focus();
+        });
+    });
+}
+
 function renderDetailHTML(media) {
     const isAnime = media.type === 'ANIME';
     return `
@@ -89,9 +124,11 @@ function renderDetailHTML(media) {
                 <h1 class="detail-title">${esc(titlePref(media.title))}</h1>
                 ${media.title?.english && media.title.english !== titlePref(media.title) ? `<div class="detail-sub">${esc(media.title.english)}</div>` : ''}
                 ${media.title?.native ? `<div class="detail-sub" style="font-size:0.85rem">${esc(media.title.native)}</div>` : ''}
+                ${media.meanScore ? `<div class="detail-score" title="Average score on AniList"><span class="detail-score-value">${media.meanScore}%</span><span class="detail-score-label">score${media.popularity ? ` from ${(media.popularity / 1000).toFixed(1)}K members` : ''}</span></div>` : ''}
                 <div class="detail-meta">
                     ${media.format ? `<span class="detail-tag">${api.formatFormat(media.format)}</span>` : ''}
                     ${media.status ? `<span class="detail-tag">${api.formatMediaStatus(media.status)}</span>` : ''}
+                    ${media.nextAiringEpisode ? `<span class="detail-tag detail-tag-next">Ep ${media.nextAiringEpisode.episode} in ${api.timeUntil(api.untilAiring(media.nextAiringEpisode))}</span>` : ''}
                     ${isAnime && media.episodes ? `<span class="detail-tag">${media.episodes} Episodes</span>` : ''}
                     ${!isAnime && media.chapters ? `<span class="detail-tag">${media.chapters} Chapters</span>` : ''}
                     ${media.duration ? `<span class="detail-tag">${media.duration} min/ep</span>` : ''}
@@ -110,14 +147,9 @@ function renderDetailHTML(media) {
             </div>
         </div>
 
-        <div class="box detail-stats" style="margin:var(--space-xl) 0;padding:var(--space-lg);background:var(--bg-secondary)">
-            ${media.meanScore ? `<div class="detail-stat"><div class="detail-stat-value" style="color:var(--user-accent)">${media.meanScore}%</div><div class="detail-stat-label">Score</div></div>` : ''}
-            ${media.popularity ? `<div class="detail-stat"><div class="detail-stat-value">${(media.popularity / 1000).toFixed(1)}K</div><div class="detail-stat-label">Popularity</div></div>` : ''}
-            ${media.nextAiringEpisode ? `<div class="detail-stat"><div class="detail-stat-value">Ep ${media.nextAiringEpisode.episode}</div><div class="detail-stat-label">in ${api.timeUntil(api.untilAiring(media.nextAiringEpisode))}</div></div>` : ''}
-            ${isAnime && media.episodes ? `<div class="detail-stat"><div class="detail-stat-value">${media.episodes}</div><div class="detail-stat-label">Episodes</div></div>` : ''}
-            ${!isAnime && media.chapters ? `<div class="detail-stat"><div class="detail-stat-value">${media.chapters}</div><div class="detail-stat-label">Chapters</div></div>` : ''}
-        </div>
+        ${detailTabsHtml(media)}
 
+        <div class="detail-tabpanel" id="detail-tab-overview" role="tabpanel" aria-labelledby="detail-tabbtn-overview">
         <div id="friends-status-section"></div>
 
         ${media.description ? `<div class="box" style="padding:var(--space-lg);margin-bottom:var(--space-xl);">
@@ -130,22 +162,6 @@ function renderDetailHTML(media) {
 
         ${media.genres?.length ? `<div style="margin-bottom:var(--space-xl)">
             <div class="genre-chips">${media.genres.map(g => `<a href="#/search?genre=${encodeURIComponent(g)}" class="genre-chip">${esc(g)}</a>`).join('')}</div>
-        </div>` : ''}
-
-        ${media.characters?.edges?.length ? `<div style="margin-bottom:var(--space-xl)">
-            <h3 class="section-title" style="margin-bottom:var(--space-md)">Characters</h3>
-            <div class="char-grid">${media.characters.edges.map(e => `
-                <div class="char-card">
-                    <img class="char-img" src="${e.node?.image?.medium || ''}" alt="${esc(e.node?.name?.full)}" loading="lazy">
-                    <div class="char-info">
-                        <div class="char-name">${esc(e.node?.name?.full)}</div>
-                        <div class="char-role">${esc(e.role)}</div>
-                    </div>
-                    ${e.voiceActors?.[0] ? `<a class="char-va" href="#/staff/${e.voiceActors[0].id}" title="More roles of ${esc(e.voiceActors[0].name?.full)}">
-                        <span class="char-info"><span class="char-name">${esc(e.voiceActors[0].name?.full)}</span><span class="char-role">Voice</span></span>
-                        <img class="char-img" src="${e.voiceActors[0].image?.medium || ''}" alt="" loading="lazy">
-                    </a>` : ''}
-                </div>`).join('')}</div>
         </div>` : ''}
 
         ${media.recommendations?.nodes?.length ? `<div style="margin-bottom:var(--space-xl)">
@@ -163,10 +179,25 @@ function renderDetailHTML(media) {
                 ${spoilerCount(media) ? `<button class="genre-chip spoiler-toggle" aria-expanded="false">Show ${spoilerCount(media)} spoiler tag${spoilerCount(media) === 1 ? '' : 's'}</button>` : ''}</div>
         </div>` : ''}
 
-        ${media.stats ? renderDistribution(media.stats, media.type, media.mediaListEntry?.score) : ''}
-
+        </div>
+        ${media.characters?.edges?.length ? `<div class="detail-tabpanel" id="detail-tab-characters" role="tabpanel" aria-labelledby="detail-tabbtn-characters" hidden>
+        ${media.characters?.edges?.length ? `<div style="margin-bottom:var(--space-xl)">
+            <div class="char-grid">${media.characters.edges.map(e => `
+                <div class="char-card">
+                    <img class="char-img" src="${e.node?.image?.medium || ''}" alt="${esc(e.node?.name?.full)}" loading="lazy">
+                    <div class="char-info">
+                        <div class="char-name">${esc(e.node?.name?.full)}</div>
+                        <div class="char-role">${esc(e.role)}</div>
+                    </div>
+                    ${e.voiceActors?.[0] ? `<a class="char-va" href="#/staff/${e.voiceActors[0].id}" title="More roles of ${esc(e.voiceActors[0].name?.full)}">
+                        <span class="char-info"><span class="char-name">${esc(e.voiceActors[0].name?.full)}</span><span class="char-role">Voice</span></span>
+                        <img class="char-img" src="${e.voiceActors[0].image?.medium || ''}" alt="" loading="lazy">
+                    </a>` : ''}
+                </div>`).join('')}</div>
+        </div>` : ''}
+        </div>` : ''}
+        ${media.reviews?.nodes?.length ? `<div class="detail-tabpanel" id="detail-tab-reviews" role="tabpanel" aria-labelledby="detail-tabbtn-reviews" hidden>
         ${media.reviews?.nodes?.length ? `<div style="margin-bottom:var(--space-xl)">
-            <h3 class="section-title" style="margin-bottom:var(--space-md)">Reviews</h3>
             ${media.reviews.nodes.map(r => `
                 <div class="box" style="padding:var(--space-md);margin-bottom:var(--space-sm);">
                     <div class="activity-header" style="margin-bottom:var(--space-sm)">
@@ -179,12 +210,16 @@ function renderDetailHTML(media) {
                     <p style="font-size:0.85rem;color:var(--text-secondary)">${esc(r.summary)}</p>
                 </div>`).join('')}
         </div>` : ''}
-
+        </div>` : ''}
+        ${media.stats ? `<div class="detail-tabpanel" id="detail-tab-stats" role="tabpanel" aria-labelledby="detail-tabbtn-stats" hidden>
+        ${media.stats ? renderDistribution(media.stats, media.type, media.mediaListEntry?.score) : ''}
+        </div>` : ''}
+        ${media.trailer?.site === 'youtube' ? `<div class="detail-tabpanel" id="detail-tab-trailer" role="tabpanel" aria-labelledby="detail-tabbtn-trailer" hidden>
         ${media.trailer?.site === 'youtube' ? `<div style="margin-bottom:var(--space-xl)">
-            <h3 class="section-title" style="margin-bottom:var(--space-md)">Trailer</h3>
             <div class="box box-media" style="overflow:hidden;aspect-ratio:16/9">
-                <iframe width="100%" height="100%" src="https://www.youtube.com/embed/${media.trailer.id}" frameborder="0" allowfullscreen style="display:block"></iframe>
+                <iframe width="100%" height="100%" src="https://www.youtube.com/embed/${media.trailer.id}" frameborder="0" allowfullscreen loading="lazy" style="display:block"></iframe>
             </div>
+        </div>` : ''}
         </div>` : ''}
 
         <span class="detail-fullscreen-btn" data-type="${media.type === 'MANGA' ? 'manga' : 'anime'}" hidden></span>
@@ -654,7 +689,7 @@ function renderDistribution(stats, type, yours = 0) {
             : `Your ${Math.round(yours)} is kinder than ${Math.round(below / raters * 100)}% of raters`)
         : '';
 
-    return `<div class="stats-grid" style="margin-bottom:var(--space-xl)">
+    return `<div class="stats-grid detail-dist" style="margin-bottom:var(--space-xl)">
         <div class="box stat-chart" style="background:var(--bg-secondary)">
             <div class="stat-chart-title">Score Distribution</div>
             ${standing ? `<div class="stat-chart-note">${standing}</div>` : ''}

@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=144';
-import { upNext, glance, DAYS, greeting, playFromHero } from './upnext.js?v=144';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=144';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=145';
+import { upNext, glance, DAYS, greeting, playFromHero } from './upnext.js?v=145';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=145';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -526,7 +526,10 @@ function renderWidgets(hero, entries, planning) {
         box.setAttribute('aria-label', 'At a glance');
         hero.after(box);
     }
-    const { next, week, waiting, waitingTotal: total, byDay, today } = glance(entries, undefined, planning);
+    const { next: soonest, airing, week, waiting, waitingTotal: total, byDay, today } = glance(entries, undefined, planning);
+    // The hero already counts down to its own show's next episode: then the clock shows the one after it
+    const heroId = entries[0]?.media.id;
+    const next = soonest && !soonest.premiere && soonest.media.id === heroId && airing[1] ? { ...airing[1], later: true } : soonest;
 
     box.innerHTML = `
         ${next ? clockWidgetHtml(next) : ''}
@@ -562,7 +565,7 @@ function clockWidgetHtml(next) {
     return `<button class="m3-widget m3-widget-clock${premiere ? ' is-premiere' : ''}" data-open="${m.id}" data-m3-until="${m.nextAiringEpisode.airingAt}" data-m3-span="${premiere ? 30 * 86400 : 7 * 86400}">
             ${cover ? `<img class="m3-clock-cover" src="${esc(cover)}" alt="" aria-hidden="true">` : ''}
             <svg class="m3-clock-ring" viewBox="0 0 40 40" aria-hidden="true"><circle class="m3-clock-ring-track" cx="20" cy="20" r="${RING_R}"/><circle class="m3-clock-ring-fill" cx="20" cy="20" r="${RING_R}" stroke-dasharray="${RING_C.toFixed(2)}" stroke-dashoffset="${RING_C.toFixed(2)}"/></svg>
-            <span class="m3-widget-label">${next.premiere ? 'Starts in' : 'Next episode'}${premiere ? ' <span class="m3-clock-chip">Premiere</span>' : ''}</span>
+            <span class="m3-widget-label">${next.premiere ? 'Starts in' : next.later ? 'Then' : 'Next episode'}${premiere ? ' <span class="m3-clock-chip">Premiere</span>' : ''}</span>
             <span class="m3-widget-clock-num"></span>
             <span class="m3-clock-when"></span>
             <span class="m3-widget-sub">${esc(titlePref(m.title))} · Ep ${ep}</span>
