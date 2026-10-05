@@ -1,13 +1,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=141';
-import { openDialog } from './a11y.js?v=141';
-import { prefersReducedMotion } from './animations.js?v=141';
-import { accountState, saveAccountState } from './accountstate.js?v=141';
+import { esc } from './store.js?v=142';
+import { openDialog } from './a11y.js?v=142';
+import { prefersReducedMotion } from './animations.js?v=142';
+import { accountState, saveAccountState } from './accountstate.js?v=142';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.4.0';
+export const RELEASE = '1.4.1';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -18,6 +18,13 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
+    {
+        id: '2026-10-05',
+        title: 'Premieres in your week',
+        items: [
+            '<strong>Your week</strong> on Home now shows the premieres from your Planning list too, not just the shows you are watching.',
+        ],
+    },
     {
         id: '2026-10-04.6',
         title: 'A smarter player, your list at a glance, and a faster start',

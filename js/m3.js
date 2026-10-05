@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=141';
-import { upNext, glance, DAYS, greeting, playFromHero } from './upnext.js?v=141';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=141';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=142';
+import { upNext, glance, DAYS, greeting, playFromHero } from './upnext.js?v=142';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=142';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -526,7 +526,7 @@ function renderWidgets(hero, entries, planning) {
         box.setAttribute('aria-label', 'At a glance');
         hero.after(box);
     }
-    const { next, airing, waiting, waitingTotal: total, byDay, today } = glance(entries, undefined, planning);
+    const { next, week, waiting, waitingTotal: total, byDay, today } = glance(entries, undefined, planning);
 
     box.innerHTML = `
         ${next ? clockWidgetHtml(next) : ''}
@@ -542,7 +542,7 @@ function renderWidgets(hero, entries, planning) {
                 <span class="m3-day-name">${d.slice(0, 1)}</span>
                 <span class="m3-day-dots">${byDay[i].slice(0, 3).map(m => `<img src="${esc(m.coverImage?.large || '')}" alt="${esc(titlePref(m.title))}" title="${esc(titlePref(m.title))}" data-open="${m.id}" role="button" tabindex="0">`).join('')}</span>
             </span>`).join('')}</span>
-            <span class="m3-widget-sub">${airing.length ? `${airing.length} ${airing.length === 1 ? 'show airs' : 'shows air'} this week` : 'Nothing airing'}</span>
+            <span class="m3-widget-sub">${week.length ? `${week.length} ${week.length === 1 ? 'show airs' : 'shows air'} this week` : 'Nothing airing'}</span>
         </a>`;
     box.querySelectorAll('[data-m3-until]').forEach(renderCountdown);
     // A premiere takes the colours of its cover
