@@ -1,13 +1,14 @@
+// @ts-check
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=142';
-import { openDialog } from './a11y.js?v=142';
-import { prefersReducedMotion } from './animations.js?v=142';
-import { accountState, saveAccountState } from './accountstate.js?v=142';
+import { esc } from './store.js?v=144';
+import { openDialog } from './a11y.js?v=144';
+import { prefersReducedMotion } from './animations.js?v=144';
+import { accountState, saveAccountState } from './accountstate.js?v=144';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.4.1';
+export const RELEASE = '1.4.3';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -19,10 +20,14 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-05',
+        // '.2': running Planning shows in the week, the changelog as a page; '.3': profiles cached
+        id: '2026-10-05.3',
         title: 'Premieres in your week',
         items: [
             '<strong>Your week</strong> on Home now shows the premieres from your Planning list too, not just the shows you are watching.',
+            { rev: 2, text: 'Planned shows that already started count in <strong>Your week</strong> as well, on the day they air.' },
+            { rev: 2, text: '<strong>What’s new</strong> in the profile menu opens a page of its own now, with a button back to where you were. New features still greet you in a pop-up.' },
+            { rev: 3, text: 'Other people’s profiles open faster: AniRoll keeps them for a while instead of asking AniList every time.' },
         ],
     },
     {
@@ -296,12 +301,39 @@ export function maybeShowMoveNotice(returning) {
         if (!returning || !pendingNotices().length) return;
         // Not on top of something else (a dialog, the OAuth redirect, a page that failed)
         if (document.querySelector('[aria-modal="true"]')) return;
-        showDialog('notice');
+        showNotice();
     }, 1200);
 }
 
+// The changelog is a page of its own (#/whatsnew), with a way back to the page it was opened from
+let cameFrom = null;
 export function openChangelog() {
-    showDialog('changelog');
+    const hash = location.hash || '#/';
+    if (hash.startsWith('#/whatsnew')) return;
+    const name = document.title.replace(/ · AniRoll$/, '');
+    cameFrom = { hash, label: hash === '#/' ? 'Home' : name !== 'AniRoll' ? name : '' };
+    location.hash = '/whatsnew';
+}
+
+export function renderChangelog({ content }) {
+    const back = cameFrom || { hash: '#/', label: 'Home' };
+    content.innerHTML = `<div class="page-enter whatsnew-page">
+        <a class="glass-btn glass-btn-secondary whatsnew-back" href="${esc(back.hash)}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>${back.label ? `Back to ${esc(back.label)}` : 'Back'}</a>
+        <h1 class="section-title">What's new <span class="whatsnew-release">AniRoll ${RELEASE}</span></h1>
+        <div class="box whatsnew">
+            ${CHANGES.map((c, i) => `<section class="whatsnew-entry">
+                <header class="whatsnew-side"><div class="whatsnew-date">${dateOf(c)}</div><h2 class="whatsnew-title">${esc(c.title)}</h2></header>
+                <div class="whatsnew-body">
+                    ${c.tabs && CHANGES.findIndex(x => x.tabs) === i ? tabBar() : ''}
+                    ${c.video ? videoTeaser(c.video) : ''}
+                    <ul class="whatsnew-list">${c.items.map(item => `<li>${itemText(item)}</li>`).join('')}</ul>
+                </div>
+            </section>`).join('')}
+        </div>
+    </div>`;
+    markSeen();
+    wireMedia(content.querySelector('.whatsnew'));
+    return () => content.querySelectorAll('.whatsnew-demo').forEach(d => clearTimeout(d._timer));
 }
 
 function tabBar() {
@@ -321,17 +353,15 @@ function videoTeaser(v) {
     </button>`;
 }
 
-function showDialog(mode) {
-    const returning = mode === 'notice';
+function showNotice() {
     const overlay = document.createElement('div');
     overlay.className = 'modal-backdrop whatsnew-backdrop';
     const where = document.getElementById('login-btn')?.hidden === false
         ? 'at the bottom of the home page'
         : 'in the profile menu';
-    const pending = returning ? pendingNotices() : [];
+    const pending = pendingNotices();
     const single = pending.length === 1;
-    overlay.innerHTML = returning
-        ? `<div class="modal-content whatsnew">
+    overlay.innerHTML = `<div class="modal-content whatsnew">
             <div class="whatsnew-kicker">${single ? 'New in AniRoll' : 'Since your last visit'}</div>
             <h2 class="modal-title">${single ? headingOf(pending[0]) : 'A few things changed'}</h2>
             ${pending.map(c => `<section class="whatsnew-entry">
@@ -342,16 +372,6 @@ function showDialog(mode) {
             </section>`).join('')}
             <p class="whatsnew-note">Everything that changed: <em>What's new</em> ${esc(where)}.</p>
             <div class="whatsnew-actions"><button type="button" class="glass-btn glass-btn-primary" data-close>Got it</button></div>
-        </div>`
-        : `<div class="modal-content whatsnew">
-            <h2 class="modal-title">What's new <span class="whatsnew-release">AniRoll ${RELEASE}</span></h2>
-            ${CHANGES.map((c, i) => `<section class="whatsnew-entry">
-                <div class="whatsnew-date">${dateOf(c)} · ${esc(c.title)}</div>
-                ${c.tabs && CHANGES.findIndex(x => x.tabs) === i ? tabBar() : ''}
-                ${c.video ? videoTeaser(c.video) : ''}
-                <ul class="whatsnew-list">${c.items.map(item => `<li>${itemText(item)}</li>`).join('')}</ul>
-            </section>`).join('')}
-            <div class="whatsnew-actions"><button type="button" class="glass-btn glass-btn-primary" data-close>Close</button></div>
         </div>`;
     document.body.appendChild(overlay);
 
@@ -360,15 +380,19 @@ function showDialog(mode) {
         release();
         overlay.remove();
         markSeen();
-        // Only the one-time notice points at the real tabs; the changelog doesn't need to any more
-        if (returning && overlay.querySelector('.whatsnew-demo')) pointAtTabs();
+        // The notice points at the real tabs; the changelog page doesn't need to any more
+        if (overlay.querySelector('.whatsnew-demo')) pointAtTabs();
     };
     const release = openDialog(box, { label: box.querySelector('.modal-title').textContent, onClose: close, focus: '[data-close]' });
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     overlay.querySelector('[data-close]').addEventListener('click', close);
 
-    // "See it in action": the dialog grows wide and the clip plays where the teaser was
-    overlay.querySelectorAll('.whatsnew-watch').forEach(btn => btn.addEventListener('click', () => {
+    wireMedia(box);
+}
+
+function wireMedia(box) {
+    // "See it in action": the box grows wide and the clip plays where the teaser was
+    box.querySelectorAll('.whatsnew-watch').forEach(btn => btn.addEventListener('click', () => {
         const video = document.createElement('video');
         Object.assign(video, { src: btn.dataset.src, poster: btn.dataset.poster, muted: true, loop: true, playsInline: true });
         video.className = 'whatsnew-video';
@@ -380,13 +404,14 @@ function showDialog(mode) {
         video.play?.().catch(() => { video.controls = true; });
     }));
 
-    const demo = overlay.querySelector('.whatsnew-demo');
+    const demo = box.querySelector('.whatsnew-demo');
     if (demo) {
         demo.querySelector('.whatsnew-replay').addEventListener('click', () => playTabs(demo));
         playTabs(demo);
     }
 }
 
+/** @param {string[]} tab [key, label] */
 const chip = ([key, label], extra = '') => `<span class="whatsnew-tab${extra}" data-k="${key}">${label}</span>`;
 
 // Old bar → new bar. FLIP: measure where every tab was, lay out the new order, then let each

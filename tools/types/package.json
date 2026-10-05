@@ -1,0 +1,8 @@
+{
+  "name": "aniroll-types",
+  "private": true,
+  "description": "Type checks of the browser modules marked // @ts-check (see check.sh); the app itself has no build",
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

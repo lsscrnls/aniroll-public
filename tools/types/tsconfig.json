@@ -1,0 +1,19 @@
+{
+  // Used by check.sh on a copy of js/: every module is read for its types, only the ones
+  // starting with // @ts-check report errors
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "strict": false,
+    "noImplicitThis": true,
+    "types": []
+  },
+  "include": ["js/**/*.js", "globals.d.ts"],
+  "exclude": ["js/vendor/**"]
+}

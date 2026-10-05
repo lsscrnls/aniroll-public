@@ -1,0 +1,10 @@
+# Fetches the server's new nightly backups onto this machine (scripts/pull-backups.sh).
+# Install: cp deploy/systemd/aniroll-backup-pull.* ~/.config/systemd/user/ && systemctl --user enable --now aniroll-backup-pull.timer
+[Unit]
+Description=AniRoll: fetch new server backups
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/aniroll/scripts/pull-backups.sh

@@ -1,0 +1,11 @@
+# Daily; a day the machine was off is caught up at the next start (Persistent)
+[Unit]
+Description=AniRoll: fetch new server backups daily
+
+[Timer]
+OnCalendar=*-*-* 12:00
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

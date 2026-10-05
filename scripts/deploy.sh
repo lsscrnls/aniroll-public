@@ -63,6 +63,13 @@ fi
 rm -rf "$tmp_check"
 echo "all modules parse"
 
+# The pure logic (Home's week, scores, escaping) in milliseconds, before the slower browser checks
+unit_out=$(sh tools/unit/run.sh 2>&1) || { echo "$unit_out" | grep -E "^not ok|expected|actual|Error" | head -20; fail "unit tests failed"; }
+echo "unit tests: $(echo "$unit_out" | grep -oE "^ℹ pass [0-9]+" | grep -oE "[0-9]+") pass"
+# JSDoc types of the modules marked // @ts-check (TypeScript only checks, nothing is built)
+types_out=$(bash tools/types/check.sh 2>&1) || { echo "$types_out" | grep "error TS" | head -20; fail "type check failed"; }
+echo "$types_out"
+
 if [ -n "$(git status --porcelain -- index.html css js api icons manifest.webmanifest favicon.svg 2>/dev/null)" ]; then
     echo "note: uncommitted changes are being deployed"
 fi

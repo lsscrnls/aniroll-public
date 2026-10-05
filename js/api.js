@@ -1,6 +1,7 @@
-import { buildTasteProfile, tasteMatch } from './taste.js?v=142';
-import { dismissedIds } from './dismissed.js?v=142';
-import { statusLabel } from './store.js?v=142';
+// @ts-check
+import { buildTasteProfile, tasteMatch } from './taste.js?v=144';
+import { dismissedIds } from './dismissed.js?v=144';
+import { statusLabel } from './store.js?v=144';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -64,9 +65,7 @@ async function takeRequestSlot(maxWaitMs = 15000) {
         if (!times) return;
         const waitFor = Math.min(Math.max(times[0] + 60000 - Date.now() + 50, 200), 2000);
         if (Date.now() - started + waitFor > maxWaitMs) {
-            const err = new Error('Too many AniList requests just now — AniRoll is holding back, try again in a moment');
-            err.throttled = true;
-            throw err;
+            throw Object.assign(new Error('Too many AniList requests just now — AniRoll is holding back, try again in a moment'), { throttled: true });
         }
         await new Promise(r => setTimeout(r, waitFor));
     }
@@ -82,9 +81,7 @@ export function shouldHoldBackground() { return backgroundPaused || isRateLimite
 export function rateLimitWaitMs() { return Math.max(0, rateLimitedUntil - Date.now()); }
 
 function rateLimitError() {
-    const err = new Error(`AniList is rate limiting — paused for ${Math.ceil(rateLimitWaitMs() / 60000)} min`);
-    err.rateLimited = true;
-    return err;
+    return Object.assign(new Error(`AniList is rate limiting — paused for ${Math.ceil(rateLimitWaitMs() / 60000)} min`), { rateLimited: true });
 }
 
 function markRateLimited(retryAfterSec) {
@@ -583,7 +580,7 @@ export async function getViewer(token) {
 }
 
 export async function getUserProfile(name, token = null) {
-    const data = await query(`
+    const data = await cachedQuery(`
         query ($name: String) {
             User(name: $name) {
                 id name avatar { large medium } bannerImage
@@ -692,7 +689,7 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update.
     // Only when this save set the progress: a new score or status leaves Jellyfin alone.
     if (mirror && saved?.mediaId && saved.progress && variables.progress !== undefined) {
-        import('./jellyfin.js?v=142').then(m =>
+        import('./jellyfin.js?v=144').then(m =>
             m.syncProgress(saved.progress, () => mediaForSync(saved.mediaId, token)));
     }
 
@@ -747,18 +744,12 @@ async function queryOrQueue(variables, token, queue, mutation) {
         // fetch fails with a TypeError when no answer came at all (Wi-Fi gone, a tunnel): kept, not lost
         if ((err instanceof TypeError || navigator.onLine === false) && queue) {
             queuePendingSave(variables);
-            const queued = new Error('You are offline — change saved, AniRoll sends it once you are back');
-            queued.offline = true;
-            queued.queued = true;
-            throw queued;
+            throw Object.assign(new Error('You are offline — change saved, AniRoll sends it once you are back'), { offline: true, queued: true });
         }
         // Throttled by our own budget counts too, or the change would be lost
         if ((err.rateLimited || err.throttled) && queue) {
             queuePendingSave(variables);
-            const queued = new Error('AniList is rate limiting — change saved, AniRoll retries it automatically');
-            queued.rateLimited = true;
-            queued.queued = true;
-            throw queued;
+            throw Object.assign(new Error('AniList is rate limiting — change saved, AniRoll retries it automatically'), { rateLimited: true, queued: true });
         }
         throw err;
     }
