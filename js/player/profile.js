@@ -1,3 +1,4 @@
+// @ts-check
 // The DeviceProfile sent with PlaybackInfo: what THIS browser can play, measured, not assumed.
 // Jellyfin plays a file as it is when everything fits, copies what fits into HLS (remux) and only
 // converts the rest — usually just the audio (E-AC3, TrueHD), sometimes the video (HEVC on Linux).
