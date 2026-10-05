@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=145';
-import { enhanceSelect } from '../select.js?v=145';
-import { tasteMatch } from '../taste.js?v=145';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=145';
-import { getToken, isLoggedIn } from '../auth.js?v=145';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=145';
-import { showConfirm } from '../a11y.js?v=145';
+import * as api from '../api.js?v=146';
+import { enhanceSelect } from '../select.js?v=146';
+import { tasteMatch } from '../taste.js?v=146';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=146';
+import { getToken, isLoggedIn } from '../auth.js?v=146';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=146';
+import { showConfirm } from '../a11y.js?v=146';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -54,7 +54,7 @@ async function loadPlayButton(media, root) {
     const slot = root.querySelector('#detail-play');
     if (!slot || media.type !== 'ANIME') return;
     try {
-        const { mountPlayButton } = await import('../player/playbutton.js?v=145');
+        const { mountPlayButton } = await import('../player/playbutton.js?v=146');
         await mountPlayButton(slot, media, nextEpisode(media));
     } catch (err) {
         console.warn('Jellyfin player unavailable:', err.message);
@@ -108,8 +108,27 @@ function setupDetailTabs(root) {
     });
 }
 
-function renderDetailHTML(media) {
+// The plain facts under the score as one line of text: they are information, not something to press, so they
+// aren't chips (M3 keeps chips for actions, filters and choices). The next episode stands out in the accent
+function detailFactsHtml(media) {
     const isAnime = media.type === 'ANIME';
+    const facts = [
+        media.format && api.formatFormat(media.format),
+        media.status && api.formatMediaStatus(media.status),
+        isAnime && media.episodes && `${media.episodes} episodes`,
+        !isAnime && media.chapters && `${media.chapters} chapters`,
+        media.duration && `${media.duration} min`,
+        media.season && `${api.getSeasonName(media.season)} ${media.seasonYear}`,
+        mainStudio(media),
+        media.source && `From ${media.source.replace(/_/g, ' ').toLowerCase()}`,
+    ].filter(Boolean);
+    const next = media.nextAiringEpisode
+        ? `<span class="detail-fact-next">Ep ${media.nextAiringEpisode.episode} in ${api.timeUntil(api.untilAiring(media.nextAiringEpisode))}</span>` : '';
+    if (!facts.length && !next) return '';
+    return `<p class="detail-facts">${next}${facts.map(f => `<span>${esc(f)}</span>`).join('')}</p>`;
+}
+
+function renderDetailHTML(media) {
     return `
         ${media.bannerImage ? `<div class="detail-banner">
             <img class="detail-banner-img" src="${media.bannerImage}" alt="">
@@ -125,17 +144,7 @@ function renderDetailHTML(media) {
                 ${media.title?.english && media.title.english !== titlePref(media.title) ? `<div class="detail-sub">${esc(media.title.english)}</div>` : ''}
                 ${media.title?.native ? `<div class="detail-sub" style="font-size:0.85rem">${esc(media.title.native)}</div>` : ''}
                 ${media.meanScore ? `<div class="detail-score" title="Average score on AniList"><span class="detail-score-value">${media.meanScore}%</span><span class="detail-score-label">score${media.popularity ? ` from ${(media.popularity / 1000).toFixed(1)}K members` : ''}</span></div>` : ''}
-                <div class="detail-meta">
-                    ${media.format ? `<span class="detail-tag">${api.formatFormat(media.format)}</span>` : ''}
-                    ${media.status ? `<span class="detail-tag">${api.formatMediaStatus(media.status)}</span>` : ''}
-                    ${media.nextAiringEpisode ? `<span class="detail-tag detail-tag-next">Ep ${media.nextAiringEpisode.episode} in ${api.timeUntil(api.untilAiring(media.nextAiringEpisode))}</span>` : ''}
-                    ${isAnime && media.episodes ? `<span class="detail-tag">${media.episodes} Episodes</span>` : ''}
-                    ${!isAnime && media.chapters ? `<span class="detail-tag">${media.chapters} Chapters</span>` : ''}
-                    ${media.duration ? `<span class="detail-tag">${media.duration} min/ep</span>` : ''}
-                    ${media.season ? `<span class="detail-tag">${api.getSeasonName(media.season)} ${media.seasonYear}</span>` : ''}
-                    ${mainStudio(media) ? `<span class="detail-tag">${esc(mainStudio(media))}</span>` : ''}
-                    ${media.source ? `<span class="detail-tag">Source: ${media.source.replace(/_/g, ' ')}</span>` : ''}
-                </div>
+                ${detailFactsHtml(media)}
                 <div class="taste-match" id="taste-match" hidden></div>
                 <div class="detail-actions">
                     <span class="detail-play-slot" id="detail-play" hidden></span>
@@ -172,12 +181,7 @@ function renderDetailHTML(media) {
 
         ${renderExternalLinks(media.externalLinks)}
 
-        ${media.tags?.length ? `<div style="margin-bottom:var(--space-xl)">
-            <h3 class="section-title" style="margin-bottom:var(--space-md)">Tags</h3>
-            <div class="genre-chips">${media.tags
-                .map(t => `<a href="#/search?type=${media.type}&tag=${encodeURIComponent(t.name)}" class="genre-chip${t.isMediaSpoiler ? ' spoiler-tag' : ''}" title="Browse by this tag"${t.isMediaSpoiler ? ' hidden' : ''}>${esc(t.name)} <small style="opacity:0.6">${t.rank}%</small></a>`).join('')}
-                ${spoilerCount(media) ? `<button class="genre-chip spoiler-toggle" aria-expanded="false">Show ${spoilerCount(media)} spoiler tag${spoilerCount(media) === 1 ? '' : 's'}</button>` : ''}</div>
-        </div>` : ''}
+        ${tagsHtml(media)}
 
         </div>
         ${media.characters?.edges?.length ? `<div class="detail-tabpanel" id="detail-tab-characters" role="tabpanel" aria-labelledby="detail-tabbtn-characters" hidden>
@@ -267,7 +271,30 @@ function setupRelatedPlan(root, token) {
     });
 }
 
+// The tags that say most about a show come first (AniList ranks them); the rest wait behind "Show all"
+const TAGS_SHOWN = 8;
+function tagsHtml(media) {
+    if (!media.tags?.length) return '';
+    let shown = 0;
+    const chips = media.tags.map(t => {
+        const extra = !t.isMediaSpoiler && ++shown > TAGS_SHOWN;
+        return `<a href="#/search?type=${media.type}&tag=${encodeURIComponent(t.name)}" class="genre-chip${t.isMediaSpoiler ? ' spoiler-tag' : ''}${extra ? ' tag-extra' : ''}" title="Browse by this tag"${t.isMediaSpoiler || extra ? ' hidden' : ''}>${esc(t.name)} <small style="opacity:0.6">${t.rank}%</small></a>`;
+    }).join('');
+    const more = shown - TAGS_SHOWN;
+    return `<div style="margin-bottom:var(--space-xl)">
+            <h3 class="section-title" style="margin-bottom:var(--space-md)">Tags</h3>
+            <div class="genre-chips">${chips}
+                ${more > 0 ? `<button class="genre-chip tags-more-toggle">Show all ${shown} tags</button>` : ''}
+                ${spoilerCount(media) ? `<button class="genre-chip spoiler-toggle" aria-expanded="false">Show ${spoilerCount(media)} spoiler tag${spoilerCount(media) === 1 ? '' : 's'}</button>` : ''}</div>
+        </div>`;
+}
+
 function setupSpoilerTags(root) {
+    const more = root.querySelector('.tags-more-toggle');
+    more?.addEventListener('click', () => {
+        root.querySelectorAll('.tag-extra').forEach(t => { t.hidden = false; });
+        more.remove();
+    });
     const btn = root.querySelector('.spoiler-toggle');
     btn?.addEventListener('click', () => {
         const show = btn.getAttribute('aria-expanded') !== 'true';
@@ -309,8 +336,8 @@ function relatedHtml(media) {
     const kind = (t) => { const s = String(t || '').replace(/_/g, ' ').toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };
     const rank = (t) => (RELATION_ORDER.indexOf(t) + 1) || 99;
     const sorted = [...edges].sort((a, b) => rank(a.relationType) - rank(b.relationType));
-    const where = (n) => (n.mediaListEntry?.status ? statusLabel(n.mediaListEntry.status, n.type)
-        : isLoggedIn() ? 'Not on your list' : '');
+    // Only what is on your list gets a line: "Not on your list" under every other cover said nothing new
+    const where = (n) => (n.mediaListEntry?.status ? statusLabel(n.mediaListEntry.status, n.type) : '');
     return `<section class="detail-related" aria-label="Related">
         <h3 class="detail-related-title">Related</h3>
         <div class="detail-related-row">${sorted.map(e => {
@@ -328,6 +355,9 @@ function relatedHtml(media) {
     </section>`;
 }
 
+// "Remove from list" sits at the end of the status menu instead of as its own red button next to it
+const REMOVE = 'REMOVE';
+
 function renderListButton(media) {
     if (!isLoggedIn()) {
         return `<button class="glass-btn glass-btn-primary" data-login>Log in to track</button>`;
@@ -336,21 +366,20 @@ function renderListButton(media) {
     const entry = media.mediaListEntry;
     if (entry) {
         return `
-            <select class="glass-select" id="status-select" style="min-width:150px">
+            <select class="glass-select" id="status-select" style="min-width:150px" aria-label="Status on your list">
                 ${['CURRENT', 'PLANNING', 'COMPLETED', 'DROPPED', 'PAUSED', 'REPEATING'].map(s =>
                     `<option value="${s}" ${entry.status === s ? 'selected' : ''}>${statusLabel(s, media.type)}</option>`).join('')}
+                <option value="${REMOVE}">Remove from list</option>
             </select>
-            <div class="list-entry-progress">
-                <button class="progress-btn" id="dec-progress">−</button>
-                <span class="progress-text" id="progress-display">${entry.progress}/${media.episodes || media.chapters || '?'}</span>
-                <button class="progress-btn" id="inc-progress">+</button>
+            <div class="detail-entry">
+                <div class="list-entry-progress">
+                    <button class="progress-btn" id="dec-progress" aria-label="One ${media.type === 'MANGA' ? 'chapter' : 'episode'} less">−</button>
+                    <span class="progress-text" id="progress-display">${entry.progress}/${media.episodes || media.chapters || '?'}</span>
+                    <button class="progress-btn" id="inc-progress" aria-label="One ${media.type === 'MANGA' ? 'chapter' : 'episode'} more">+</button>
+                </div>
+                <label class="detail-entry-score"><span>Score</span>${scoreInputHtml(entry.score)}</label>
             </div>
-            <div style="display:flex;align-items:center;gap:var(--space-sm)">
-                <span style="font-size:0.85rem;color:var(--text-secondary)">Score:</span>
-                ${scoreInputHtml(entry.score)}
-            </div>
-            <button class="glass-btn glass-btn-sm glass-btn-secondary" id="remove-entry" style="color:var(--danger);padding:6px 10px" title="Remove from list"><svg data-icon="delete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>
-            ${media.type === 'ANIME' && ['CURRENT', 'REPEATING', 'COMPLETED'].includes(entry.status) ? `<button class="glass-btn glass-btn-sm glass-btn-secondary" id="start-watchparty" style="border-color:var(--user-accent);color:var(--user-accent);display:inline-flex;align-items:center;gap:4px;padding:6px 10px"><svg data-icon="live_tv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>Watch Party</button>` : ''}`;
+            ${media.type === 'ANIME' && ['CURRENT', 'REPEATING', 'COMPLETED'].includes(entry.status) ? `<button class="glass-btn glass-btn-secondary" id="start-watchparty"><svg data-icon="group" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 4 6"/></svg>Watch Party</button>` : ''}`;
     }
 
     return `
@@ -453,6 +482,7 @@ function setupListActions(media, token, root = document) {
     });
 
     q('#status-select')?.addEventListener('change', async (e) => {
+        if (e.target.value === REMOVE) return removeEntry();
         try {
             const saved = await api.saveMediaListEntry({ id: entry.id, status: e.target.value }, token);
             toast('Status updated', 'success');
@@ -512,21 +542,22 @@ function setupListActions(media, token, root = document) {
         saveScore(scoreRaw);
     });
 
-    q('#remove-entry')?.addEventListener('click', async () => {
+    async function removeEntry() {
         const ok = await showConfirm({
             title: 'Remove from List',
             message: `Remove "${titlePref(media.title)}" from your list?`,
             confirmText: 'Remove',
             danger: true
         });
-        if (!ok) return;
+        // Cancelled: the row is drawn again, so the menu shows the real status instead of "Remove from list"
+        if (!ok) return refreshActions(entry);
         try {
             await api.deleteMediaListEntry(entry.id, token);
             toast('Removed from list', 'success');
             emitListChange({ mediaId: media.id, removed: true });
             refreshActions(null);
-        } catch (e) { toast(e.message, 'error'); }
-    });
+        } catch (e) { toast(e.message, 'error'); refreshActions(entry); }
+    }
 
     q('#start-watchparty')?.addEventListener('click', async () => {
         const { user } = getState();
@@ -588,9 +619,9 @@ function renderExternalLinks(links) {
         <div style="display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-bottom:var(--space-md)">
             ${streaming.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="glass-btn glass-btn-secondary" style="font-size:0.8rem">${esc(l.site)}</a>`).join('')}
         </div>` : ''}
-        ${info.length ? `<div style="display:flex;flex-wrap:wrap;gap:var(--space-sm)">
-            ${info.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="glass-btn glass-btn-secondary glass-btn-sm">${esc(l.site)}</a>`).join('')}
-        </div>` : ''}
+        ${info.length ? `<p class="detail-ext-info">
+            ${info.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.site)}</a>`).join('')}
+        </p>` : ''}
     </div>`;
 }
 

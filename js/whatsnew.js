@@ -2,13 +2,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=145';
-import { openDialog } from './a11y.js?v=145';
-import { prefersReducedMotion } from './animations.js?v=145';
-import { accountState, saveAccountState } from './accountstate.js?v=145';
+import { esc } from './store.js?v=146';
+import { openDialog } from './a11y.js?v=146';
+import { prefersReducedMotion } from './animations.js?v=146';
+import { accountState, saveAccountState } from './accountstate.js?v=146';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.5.0';
+export const RELEASE = '1.5.1';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -20,9 +20,13 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-06',
+        // '.2': Home's hero picks a show you can watch, show page actions and facts tidied
+        id: '2026-10-06.2',
         title: 'A tidier show page and a new front page',
         items: [
+            { rev: 2, text: 'The big card on Home is about a show with an episode <strong>ready to watch</strong>, instead of one that is still waiting for its next episode.' },
+            { rev: 2, text: 'Show pages are calmer: the facts under the score are one line of text, the eight most fitting tags come first, and <strong>Remove from list</strong> moved into the status menu.' },
+            { rev: 2, text: 'Profiles without a banner of their own use the avatar instead of an empty grey block.' },
             'Show pages are much shorter: the <strong>score</strong> sits right under the title, and Characters, Reviews, Stats and the Trailer each have their own <strong>tab</strong>.',
             'When the countdown on Home is already about the show you are on, the clock next to it shows the episode after that.',
             'The tools on <strong>My List</strong> no longer get cut off when they wrap onto a second row, and the post you write after a Watch Party has room for its text.',

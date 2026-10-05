@@ -1,12 +1,12 @@
-import * as api from '../api.js?v=145';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=145';
-import { openDialog, showScorePrompt } from '../a11y.js?v=145';
-import { isLoggedIn, getToken } from '../auth.js?v=145';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=145';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=145';
-import { renderHeadline, renderTour, renderColour, renderMachine, renderParty, fillInvite, initLanding } from '../landing.js?v=145';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=145';
-import { setDismissed, syncDismissed } from '../dismissed.js?v=145';
+import * as api from '../api.js?v=146';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=146';
+import { openDialog, showScorePrompt } from '../a11y.js?v=146';
+import { isLoggedIn, getToken } from '../auth.js?v=146';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=146';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=146';
+import { renderHeadline, renderTour, renderColour, renderMachine, renderParty, fillInvite, initLanding } from '../landing.js?v=146';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=146';
+import { setDismissed, syncDismissed } from '../dismissed.js?v=146';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
@@ -84,7 +84,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=145'), import('../jellyfin.js?v=145')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=146'), import('../jellyfin.js?v=146')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
@@ -835,7 +835,7 @@ function setupTryRoll(media) {
         const winner = pool[Math.floor(Math.random() * pool.length)];
         // The reel starts on the cover it shows now, so nothing jumps
         const strip = [shown, ...Array.from({ length: 20 }, () => pool[Math.floor(Math.random() * pool.length)]), winner];
-        const { playReel } = await import('../reel.js?v=145');
+        const { playReel } = await import('../reel.js?v=146');
         playReel({
             windowEl: box.querySelector('#try-window'),
             reelEl: reel,
