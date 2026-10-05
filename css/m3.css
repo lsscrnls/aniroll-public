@@ -327,6 +327,8 @@
     border: 0;
 }
 :root[data-design="m3"] .glass-input:focus, :root[data-design="m3"] .glass-select:focus { box-shadow: inset 0 0 0 2px var(--md-primary); }
+/* Text that runs over several lines gets a card's corners, not a pill's: a pill cuts off the corners of the text */
+:root[data-design="m3"] textarea.glass-input { border-radius: var(--radius-lg); padding: 14px 16px; line-height: 1.5; }
 :root[data-design="m3"] .search-container {
     background: var(--md-surface-container-high);
     border-radius: var(--radius-2xl);
@@ -428,7 +430,7 @@
 :root[data-design="m3"] .accent-swatch { border-radius: var(--radius-md); transition: border-radius .4s var(--ease), transform .4s var(--ease); }
 :root[data-design="m3"] .accent-swatch.active { border-radius: var(--radius-full); box-shadow: 0 0 0 3px var(--md-surface), 0 0 0 5px var(--md-on-surface); }
 :root[data-design="m3"] .roll-window { border-radius: var(--radius-xl); }
-:root[data-design="m3"] .roll-result-kicker { color: var(--md-primary); letter-spacing: .1em; }
+:root[data-design="m3"] .roll-result-kicker { color: var(--md-primary); }
 :root[data-design="m3"] .compare-fab, :root[data-design="m3"] .wp-fab {
     background: var(--md-primary-container);
     color: var(--md-on-primary-container);
@@ -1121,7 +1123,9 @@
     border-radius: var(--radius-full);
     background: var(--md-tertiary);
     color: var(--md-on-tertiary);
-    letter-spacing: .04em;
+    font-size: .85rem;
+    text-transform: none;
+    letter-spacing: 0;
 }
 :root[data-design="m3"] .roll-result-title { font-size: clamp(2.25rem, 4vw, 3.5rem); line-height: 1.05; font-weight: 800; letter-spacing: -0.03em; margin: 12px 0; }
 :root[data-design="m3"] .roll-result-meta, :root[data-design="m3"] .roll-result-because { color: inherit; opacity: .85; }
@@ -1135,11 +1139,13 @@
     top: calc(var(--nav-height) + 8px);
     z-index: 20;
     padding: 8px;
-    border-radius: var(--radius-full);
+    /* It wraps onto a second row on narrower screens: a pill's round ends would cut into that row */
+    border-radius: var(--radius-xl);
     background: var(--md-surface-container-high);
     box-shadow: var(--md-elev-2);
 }
 :root[data-design="m3"] .list-toolbar .glass-input { background: var(--md-surface-container-highest); }
+:root[data-design="m3"] .list-toolbar .list-view-toggle { margin-left: auto; }
 
 @media (prefers-reduced-motion: reduce) {
     :root[data-design="m3"] .m3-hero-cover { transition: none; }
@@ -1980,22 +1986,86 @@
 :root[data-design="m3"] .lp-btn-filled { background: var(--md-primary); color: var(--md-on-primary); }
 :root[data-design="m3"] .lp-btn-tonal { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
 
-/* The collage: six shaped tiles, turned a little, trending covers inside once they have loaded */
-:root[data-design="m3"] .lp-collage { position: relative; aspect-ratio: 1; width: 100%; max-width: 560px; justify-self: end; }
-:root[data-design="m3"] .lp-tile {
-    position: absolute;
-    background: var(--md-primary-container) center / cover no-repeat;
-    transition: transform .6s var(--m3-bouncy), background-color .3s var(--md-standard);
+/* The roll to try: a tall reel window in front of two colour shapes, the button and the result under it */
+:root[data-design="m3"] .lp-machine {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: var(--space-md);
+    justify-self: center;
+    width: min(100%, 420px);
+    padding: var(--space-lg) 0;
 }
-:root[data-design="m3"] .lp-tile-img { background-color: var(--md-surface-container-high); background-position: center 22%; }
-:root[data-design="m3"] .lp-tile:hover { transform: rotate(var(--turn-hover, 6deg)) scale(1.03); }
-/* Three posters, portrait like the covers; the colour shapes sit between them */
-:root[data-design="m3"] .lp-tile-1 { left: 4%; top: 2%; width: 46%; aspect-ratio: 3 / 4; transform: rotate(-4deg); }
-:root[data-design="m3"] .lp-tile-2 { right: 2%; top: 12%; width: 40%; aspect-ratio: 3 / 4; transform: rotate(5deg); }
-:root[data-design="m3"] .lp-tile-3 { left: 30%; bottom: 0; width: 38%; aspect-ratio: 1; transform: rotate(-3deg); }
-:root[data-design="m3"] .lp-tile-4 { left: 2%; bottom: 8%; width: 24%; aspect-ratio: 1; background-color: var(--md-primary-container); transform: rotate(12deg); }
-:root[data-design="m3"] .lp-tile-5 { right: 8%; bottom: 4%; width: 20%; aspect-ratio: 1; background-color: var(--md-tertiary-container); }
-:root[data-design="m3"] .lp-tile-6 { left: 46%; top: 0; width: 12%; aspect-ratio: 1; background-color: var(--md-primary); transform: rotate(20deg); }
+:root[data-design="m3"] .lp-tile { position: absolute; z-index: 0; pointer-events: none; }
+:root[data-design="m3"] .lp-tile-a { left: 0; top: 4%; width: 34%; aspect-ratio: 1; background: var(--md-primary-container); transform: rotate(12deg); }
+:root[data-design="m3"] .lp-tile-b { right: 2%; top: 38%; width: 26%; aspect-ratio: 1; background: var(--md-tertiary-container); }
+:root[data-design="m3"] .lp-machine-window {
+    position: relative;
+    z-index: 1;
+    width: clamp(200px, 22vw, 260px);
+    height: auto;
+    aspect-ratio: 2 / 3;
+    border: 0;
+    border-radius: var(--md-shape-xl-plus, 32px);
+    background: var(--md-surface-container-high);
+    box-shadow: var(--md-elev-3, 0 16px 40px rgb(0 0 0 / .25));
+}
+:root[data-design="m3"] .lp-machine-window .roll-item { height: 100%; }
+:root[data-design="m3"] .lp-machine-window .roll-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+:root[data-design="m3"] .lp-machine-btn { position: relative; z-index: 1; }
+:root[data-design="m3"] .lp-machine-btn:disabled { opacity: .6; cursor: default; }
+:root[data-design="m3"] .lp-machine-result { position: relative; z-index: 1; max-width: 34ch; margin: 0; text-align: center; color: var(--md-on-surface-variant); line-height: 1.5; min-height: 3em; }
+:root[data-design="m3"] .lp-machine-result a { color: var(--md-on-surface); font-weight: 700; }
+
+/* Watch Party: the invite as a chat shows it, next to what it does */
+:root[data-design="m3"] .lp-party {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(24px, 5vw, 72px);
+    margin: var(--space-3xl, 64px) 0 var(--space-xl);
+}
+:root[data-design="m3"] .lp-party-points { margin: var(--space-md) 0 0; padding-left: 1.2em; color: var(--md-on-surface-variant); line-height: 1.9; }
+:root[data-design="m3"] .lp-invite { margin: 0; padding: var(--space-lg); border-radius: var(--md-shape-xl-plus, 32px); background: var(--md-surface-container); }
+:root[data-design="m3"] .lp-invite-msg { display: flex; gap: 14px; align-items: flex-start; }
+:root[data-design="m3"] .lp-invite-avatar {
+    flex: 0 0 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 700;
+    background: var(--md-tertiary-container); color: var(--md-on-tertiary-container);
+}
+:root[data-design="m3"] .lp-invite-body { min-width: 0; flex: 1; }
+:root[data-design="m3"] .lp-invite-name { font-weight: 700; color: var(--md-on-surface); }
+:root[data-design="m3"] .lp-invite-text { margin: 2px 0 10px; color: var(--md-on-surface); }
+:root[data-design="m3"] .lp-invite-link { color: var(--md-primary); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+:root[data-design="m3"] .lp-invite-embed {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 72px;
+    column-gap: 14px;
+    padding: 12px 14px;
+    border-left: 4px solid var(--md-primary);
+    border-radius: var(--radius-lg);
+    background: var(--md-surface-container-high);
+}
+:root[data-design="m3"] .lp-invite-site { grid-column: 1; font-size: .78rem; color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .lp-invite-title { grid-column: 1; margin: 4px 0; font-weight: 700; color: var(--md-primary); }
+:root[data-design="m3"] .lp-invite-desc { grid-column: 1; margin: 0; font-size: .9rem; line-height: 1.45; color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .lp-invite-cover {
+    grid-column: 2; grid-row: 1 / span 3; align-self: start;
+    width: 72px; aspect-ratio: 2 / 3; border-radius: 8px;
+    background: var(--md-surface-container-highest) center / cover no-repeat;
+}
+/* The two features without a clip of their own: two lines, no cards */
+:root[data-design="m3"] .lp-also {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-xl);
+    margin: 0 0 var(--space-3xl, 64px);
+}
+:root[data-design="m3"] .lp-also p { margin: 0; max-width: 46ch; color: var(--md-on-surface-variant); line-height: 1.6; }
+:root[data-design="m3"] .lp-also strong { display: block; margin-bottom: 4px; color: var(--md-on-surface); font-size: 1.05rem; }
+/* A clip that cannot play (yet) shows its still instead of an empty frame */
+:root[data-design="m3"] .lp :is(.landing-tour-frame, .lp-colour-frame) { background-position: center; background-size: cover; background-repeat: no-repeat; }
+:root[data-design="m3"] #trending-preview { margin-top: var(--space-2xl); }
 :root[data-design="m3"] .lp-shape-squircle { clip-path: var(--m3-shape-squircle); }
 :root[data-design="m3"] .lp-shape-flower { clip-path: var(--m3-shape-flower); }
 :root[data-design="m3"] .lp-shape-cookie9 { clip-path: var(--m3-shape-cookie9); }
@@ -2063,17 +2133,17 @@
 :root[data-design="m3"] .lp-swatch-reset[aria-pressed="true"] { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
 
 /* And there's more: tonal cards, the icon in a cookie */
-:root[data-design="m3"] .lp .landing-more-title { font-weight: 800; letter-spacing: -0.03em; }
-:root[data-design="m3"] .lp .landing-feature { border: 0; border-radius: var(--md-shape-xl-plus); background: var(--md-surface-container); }
-:root[data-design="m3"] .lp .landing-feature-icon { background: var(--md-primary-container); color: var(--md-on-primary-container); clip-path: var(--m3-shape-cookie9); border-radius: 0; }
 
 @media (max-width: 899px) {
     :root[data-design="m3"] .lp-hero { grid-template-columns: 1fr; min-height: auto; padding-top: var(--space-xl); }
-    :root[data-design="m3"] .lp-collage { max-width: 420px; justify-self: center; order: -1; width: 86%; }
+    /* Phones: the headline and its button first, the roll right under them */
+    :root[data-design="m3"] .lp-machine { padding-top: 0; }
+    :root[data-design="m3"] .lp-machine-window { width: min(46vw, 200px); }
+    :root[data-design="m3"] :is(.lp-party, .lp-also) { grid-template-columns: 1fr; }
     :root[data-design="m3"] .lp-colour { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
-    :root[data-design="m3"] :is(.lp-tile, .lp-btn, .lp-swatch) { transition: none; }
+    :root[data-design="m3"] :is(.lp-btn, .lp-swatch) { transition: none; }
 }
 
 /* Filled buttons that keep their colour on hover still answer it: the M3 state layer (8 %, 10 % pressed) */
@@ -2156,3 +2226,9 @@
 }
 :root[data-design="m3"] .m3-pill-slide > :not(.m3-pill-ghost) { position: relative; z-index: 1; }
 :root[data-design="m3"] .m3-pill-arriving { background: transparent !important; transition: none !important; }
+
+/* Detail page: the score in the show's own primary, tabs as M3's connected segmented row */
+:root[data-design="m3"] .detail-score-value { color: var(--md-primary); font-size: 2.4rem; }
+:root[data-design="m3"] .detail-score-label { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .detail-tag-next { background: var(--md-primary-container); color: var(--md-on-primary-container); border-color: transparent; }
+:root[data-design="m3"] .detail-dist .stat-bar-track { background: transparent; }

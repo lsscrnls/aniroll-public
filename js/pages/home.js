@@ -1,17 +1,16 @@
-import * as api from '../api.js?v=144';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=144';
-import { openDialog, showScorePrompt } from '../a11y.js?v=144';
-import { isLoggedIn, getToken } from '../auth.js?v=144';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=144';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=144';
-import { renderHeadline, renderStage, renderTour, renderColour, renderCollage, fillCollage, initLanding } from '../landing.js?v=144';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=144';
-import { setDismissed, syncDismissed } from '../dismissed.js?v=144';
+import * as api from '../api.js?v=145';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=145';
+import { openDialog, showScorePrompt } from '../a11y.js?v=145';
+import { isLoggedIn, getToken } from '../auth.js?v=145';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=145';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=145';
+import { renderHeadline, renderTour, renderColour, renderMachine, renderParty, fillInvite, initLanding } from '../landing.js?v=145';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=145';
+import { setDismissed, syncDismissed } from '../dismissed.js?v=145';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
         content.innerHTML = renderLanding();
-        initFeatureCards();
         return initLanding(content);
     }
 
@@ -85,7 +84,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=144'), import('../jellyfin.js?v=144')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=145'), import('../jellyfin.js?v=145')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
@@ -792,275 +791,61 @@ function renderLanding() {
                     <button class="lp-btn lp-btn-tonal" type="button" data-scroll-to="lp-tour">See what’s inside</button>
                 </div>
             </div>
-            ${renderCollage()}
+            ${renderMachine()}
         </section>
-        ${renderStage()}
         ${renderTour()}
+        ${renderParty()}
         ${renderColour()}
-        <h2 class="landing-more-title">And there's more</h2>
-        <div class="landing-features stagger-in">
-            <div class="landing-feature landing-feature-highlight landing-feature-clickable" role="button" tabindex="0" data-feature="watchparty">
-                <div class="landing-feature-icon">${FEATURE_ICONS.watchparty}</div>
-                <div class="landing-feature-title">Watch Party</div>
-                <div class="landing-feature-text">Share a link, the host counts episodes and everyone's AniList follows — even with the tab closed.</div>
-                <div class="landing-feature-cta">Learn more <svg data-icon="arrow_forward" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg></div>
-            </div>
-            <div class="landing-feature landing-feature-highlight landing-feature-clickable" role="button" tabindex="0" data-feature="jellyfin">
-                <div class="landing-feature-icon">${FEATURE_ICONS.jellyfin}</div>
-                <div class="landing-feature-title">Jellyfin Live Tracking</div>
-                <div class="landing-feature-text">Watch on your own Jellyfin server and the episode lands on your AniList by itself.</div>
-                <div class="landing-feature-cta">Learn more <svg data-icon="arrow_forward" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg></div>
-            </div>
-            <div class="landing-feature landing-feature-highlight landing-feature-clickable" role="button" tabindex="0" data-feature="social">
-                <div class="landing-feature-icon">${FEATURE_ICONS.social}</div>
-                <div class="landing-feature-title">Social Feed</div>
-                <div class="landing-feature-text">See what the people you follow are watching, reply, like and compare lists.</div>
-                <div class="landing-feature-cta">Learn more <svg data-icon="arrow_forward" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg></div>
-            </div>
-        </div>
-        <div id="trending-preview" style="margin-top:var(--space-2xl)">
+        <div id="trending-preview">
             <div class="section-header">
-                <h2 class="section-title">Trending Now</h2>
+                <h2 class="section-title">Trending now</h2>
             </div>
             <div id="landing-trending" class="scroll-row">${renderSkeletonCards(6)}</div>
         </div>
-        <section class="landing-try" id="landing-try" aria-label="Try a roll" hidden>
-            <div class="landing-try-machine">
-                <div class="roll-window landing-try-window" id="try-window"><div class="roll-reel" id="try-reel"></div></div>
-                <button class="glass-btn glass-btn-primary" id="try-roll">Roll a trending show</button>
-            </div>
-            <div class="landing-try-text">
-                <h2 class="section-title">Try it</h2>
-                <p class="landing-try-result" id="try-result" role="status">Logged in, Roll picks from your own Planning list. Here it picks from what is trending.</p>
-                <button class="glass-btn glass-btn-secondary" data-login id="try-login" hidden>Log in to roll your own list</button>
-            </div>
-        </section>
         <div class="landing-foot"><button type="button" class="whatsnew-link">What's new</button><a class="landing-foot-link" href="${GITHUB_URL}" target="_blank" rel="noopener">${GITHUB_ICON}Source on GitHub</a></div>
     </div>`;
 }
 
-const MOCK_COVERS = {
-    jjk: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx145064-5fa4ZBbW4dqA.jpg',
-    op: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/nx21-tXMN3Y20PIL9.jpg',
-    rezero: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx108632-lQWnmw7XaNOK.jpg',
-    mushoku: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx146065-IjirxRK26O03.png',
-    frieren: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx154587-gHSraOSa0nBG.jpg',
-    dandadan: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx171018-60q1B6GK2Ghb.jpg',
-    csm: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx127230-DdP4vAdssLoz.png',
-    vinland: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx101348-2fhDFPCuMNiz.jpg',
-    spy: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx140960-vN39AmOWrVB5.jpg',
-    bocchi: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx130003-HTDmeL4RGeJ4.png',
-    oshi: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx150672-WqmmwZ4nMzAy.png',
-    aot: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx16498-C6FPmWm59CyP.jpg',
-};
-
-function buildMockWatchParty() {
-    return `<div class="fm-wp">
-        <div class="fm-wp-header">
-            <div class="fm-wp-badge">● LIVE</div>
-            <div class="fm-wp-title-row">
-                <img class="fm-cover-img" src="${MOCK_COVERS.jjk}" alt="">
-                <div><div class="fm-wp-name">Jujutsu Kaisen S2</div><div class="fm-wp-ep">Episode 14 / 23</div></div>
-            </div>
-        </div>
-        <div class="fm-wp-progress">
-            <div class="fm-wp-bar"><div class="fm-wp-fill"></div></div>
-        </div>
-        <div class="fm-wp-members">
-            <div class="fm-wp-member"><div class="fm-avatar fm-a1"></div><span>Gojo</span><span class="fm-wp-ep-tag">Ep 14</span></div>
-            <div class="fm-wp-member"><div class="fm-avatar fm-a2"></div><span>Anya</span><span class="fm-wp-ep-tag">Ep 14</span></div>
-            <div class="fm-wp-member"><div class="fm-avatar fm-a3"></div><span>Eren</span><span class="fm-wp-ep-tag fm-behind">Ep 13</span></div>
-        </div>
-        <div class="fm-wp-link">
-            <div class="fm-wp-link-url">aniroll.app/party/a3f8k2</div>
-            <div class="fm-wp-copy">Copy</div>
-        </div>
-    </div>`;
-}
-
-function buildMockSocial() {
-    return `<div class="fm-social">
-        <div class="fm-social-item fm-si-anim1">
-            <div class="fm-avatar fm-a1"></div>
-            <div class="fm-social-body">
-                <span class="fm-social-user">Anya</span>
-                <span class="fm-social-text">completed <strong>Frieren</strong></span>
-            </div>
-            <img class="fm-social-cover" src="${MOCK_COVERS.frieren}" alt="">
-        </div>
-        <div class="fm-social-item fm-si-anim2">
-            <div class="fm-avatar fm-a2"></div>
-            <div class="fm-social-body">
-                <span class="fm-social-user">Eren</span>
-                <span class="fm-social-text">watched episode 8 of <strong>Dandadan</strong></span>
-            </div>
-            <img class="fm-social-cover" src="${MOCK_COVERS.dandadan}" alt="">
-        </div>
-        <div class="fm-social-item fm-si-anim3">
-            <div class="fm-avatar fm-a3"></div>
-            <div class="fm-social-body">
-                <span class="fm-social-user">Gojo</span>
-                <span class="fm-social-text">plans to watch <strong>Chainsaw Man S2</strong></span>
-            </div>
-            <img class="fm-social-cover" src="${MOCK_COVERS.csm}" alt="">
-        </div>
-        <div class="fm-social-actions">
-            <div class="fm-like-btn">♡ Like</div>
-            <div class="fm-compare-btn">⇄ Compare</div>
-        </div>
-    </div>`;
-}
-
-function buildMockJellyfin() {
-    return `<div class="fm-jf">
-        <div class="jf-now-card">
-            <img class="jf-now-cover" src="${MOCK_COVERS.frieren}" alt="">
-            <div class="jf-now-body">
-                <div class="jf-now-kicker"><span class="jf-now-dot"></span>Now watching on Jellyfin</div>
-                <div class="jf-now-title">Frieren: Beyond Journey's End</div>
-                <div class="jf-now-sub">Episode 7</div>
-                <div class="jf-now-bar"><span></span><i style="left:90%"></i></div>
-                <div class="jf-now-meta"><span class="fm-jf-state"><span class="fm-jf-wait">Counts toward AniList at 90%</span><span class="fm-jf-saved">Saved to AniList</span></span> · Living Room TV</div>
-            </div>
-        </div>
-    </div>`;
-}
-
-const FEATURE_ICONS = {
-    watchparty: `<svg data-icon="live_tv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>`,
-    jellyfin: `<svg data-icon="play_circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l6-3.5-6-3.5z"/></svg>`,
-    social: `<svg data-icon="group" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="4"/><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="18" cy="9" r="3"/><path d="M22 20c0-2.8-2.2-5-5-5"/></svg>`,
-};
-
-const featureDetails = {
-    watchparty: {
-        title: 'Watch Party',
-        icon: FEATURE_ICONS.watchparty,
-        headline: 'Watch anime together, no matter where you are.',
-        description: 'Start a Watch Party and invite your friends with a single link. The host counts the episodes, and every guest\'s AniList follows along — forward only, so nobody loses progress. With “Keep syncing” it even works while a guest\'s tab is closed. When the party is over, post it straight to your AniList feed.',
-        features: [
-            'One link to join, guests log in with their own AniList',
-            'Host counts episodes, guests follow live (also with the tab closed)',
-            'Roll together from everyone\'s Planning lists, switch shows without a new party',
-            'Rewatches count as rewatches; End & Post shares the session on AniList',
-        ],
-        mockup: buildMockWatchParty
-    },
-    jellyfin: {
-        title: 'Jellyfin Live Tracking',
-        icon: FEATURE_ICONS.jellyfin,
-        headline: 'Press play on Jellyfin. AniRoll does the bookkeeping.',
-        description: 'Connect your own Jellyfin server once. When an episode passes 90%, AniRoll writes it to your AniList within seconds — also when AniRoll isn\'t open. The show you\'re watching appears as “Now watching” in AniRoll, and a Watch Party host\'s counter jumps along.',
-        features: [
-            'Counts an episode at 90%, within seconds, without AniRoll open',
-            '“Now watching” in the nav and on Home',
-            'Finds the right show even when two share a title (episode and year decide)',
-            'Starting episode 1 again tracks a rewatch; specials are never counted',
-        ],
-        mockup: buildMockJellyfin
-    },
-    social: {
-        title: 'Social Feed',
-        icon: FEATURE_ICONS.social,
-        headline: 'Stay connected with what your friends are watching.',
-        description: 'Your feed pulls activity from everyone you follow on AniList: who started a series, finished a binge or posted something. Posts show the way they do on AniList — formatting, spoilers, images and cards for linked shows — and you can reply right there.',
-        features: [
-            'Activity from everyone you follow on AniList',
-            'Like and reply; Reply puts the @name in for you',
-            'Spoilers, images, formatting and cards for linked shows',
-            'Compare your list side by side with a friend',
-        ],
-        mockup: buildMockSocial
-    },
-};
-
-export function initFeatureCards() {
-    document.querySelectorAll('.landing-feature-clickable').forEach(card => {
-        const show = () => {
-            const detail = featureDetails[card.dataset.feature];
-            if (detail) showFeatureDetail(detail);
-        };
-        card.addEventListener('click', show);
-        card.addEventListener('keydown', (e) => {
-            if (e.key !== 'Enter' && e.key !== ' ') return;
-            e.preventDefault();
-            show();
-        });
-    });
-}
-
-function showFeatureDetail(detail) {
-    const overlay = document.createElement('div');
-    overlay.className = 'feature-detail-overlay';
-    overlay.innerHTML = `
-        <div class="feature-detail-backdrop"></div>
-        <div class="feature-detail-panel">
-            <button class="feature-detail-close glass-icon-btn" aria-label="Close">
-                <svg data-icon="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            </button>
-            <div class="feature-detail-mockup" aria-hidden="true">${detail.mockup()}</div>
-            <div class="feature-detail-content">
-                <div class="feature-detail-icon">${detail.icon}</div>
-                <h2 class="feature-detail-title">${detail.title}</h2>
-                <p class="feature-detail-headline">${detail.headline}</p>
-                <p class="feature-detail-desc">${detail.description}</p>
-                <ul class="feature-detail-list">
-                    ${detail.features.map(f => `<li>${f}</li>`).join('')}
-                </ul>
-                <button class="glass-btn glass-btn-primary" style="margin-top:var(--space-xl)" data-login>
-                    Get Started
-                </button>
-            </div>
-        </div>`;
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('open'));
-
-    const release = openDialog(overlay.querySelector('.feature-detail-panel'), { label: detail.title, onClose: () => close() });
-    const close = () => {
-        release();
-        overlay.classList.remove('open');
-        setTimeout(() => overlay.remove(), 300);
-    };
-    overlay.querySelector('.feature-detail-backdrop').addEventListener('click', close);
-    overlay.querySelector('.feature-detail-close').addEventListener('click', close);
-}
-
 export function loadLandingTrending() {
     api.getTrending('ANIME', 1, 15).then(media => {
-        const hero = document.querySelector('.lp-hero');
-        if (hero) fillCollage(hero, media);
+        const page = document.querySelector('.lp');
+        if (page) fillInvite(page, media);
         const el = document.getElementById('landing-trending');
         if (el) el.innerHTML = media.map(m => `<div style="flex:0 0 150px">${renderMediaCard(m)}</div>`).join('');
         setupTryRoll(media);
     }).catch(() => {});
 }
 
-// A roll to try before logging in, from the trending shows the page loaded anyway (no request)
+// The hero's roll, from the trending shows the page loaded anyway (no request of its own)
 function setupTryRoll(media) {
     const box = document.getElementById('landing-try');
     const pool = media.filter(m => m.coverImage?.large);
     if (!box || pool.length < 3) return;
-    box.hidden = false;
+    const reel = box.querySelector('#try-reel');
     const btn = box.querySelector('#try-roll');
+    // Before the first roll the window shows a cover, not an empty frame
+    let shown = pool[0];
+    reel.innerHTML = `<div class="roll-item"><img src="${esc(shown.coverImage.large)}" alt=""></div>`;
+    btn.disabled = false;
     let rolling = false;
     btn.addEventListener('click', async () => {
         if (rolling) return;
         rolling = true;
         btn.disabled = true;
         const winner = pool[Math.floor(Math.random() * pool.length)];
-        const strip = Array.from({ length: 21 }, () => pool[Math.floor(Math.random() * pool.length)]);
-        strip.push(winner);
-        const { playReel } = await import('../reel.js?v=144');
+        // The reel starts on the cover it shows now, so nothing jumps
+        const strip = [shown, ...Array.from({ length: 20 }, () => pool[Math.floor(Math.random() * pool.length)]), winner];
+        const { playReel } = await import('../reel.js?v=145');
         playReel({
             windowEl: box.querySelector('#try-window'),
-            reelEl: box.querySelector('#try-reel'),
+            reelEl: reel,
             covers: strip.map(m => m.coverImage.large),
             onDone: () => {
+                shown = winner;
                 rolling = false;
                 btn.disabled = false;
                 btn.textContent = 'Roll again';
-                box.querySelector('#try-result').innerHTML = `Tonight: <strong>${esc(titlePref(winner.title))}</strong>. With your AniList, Roll picks from the shows you planned to watch.`;
-                box.querySelector('#try-login').hidden = false;
+                box.querySelector('#try-result').innerHTML = `Tonight: <a href="#/anime/${winner.id}">${esc(titlePref(winner.title))}</a>. Logged in, Roll picks from your own Planning list.`;
             },
         });
     });
