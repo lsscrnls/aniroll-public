@@ -92,6 +92,7 @@
 :root[data-design="m3"] .cursor { display: none; }
 :root[data-design="m3"] ::selection { background: var(--md-primary-container); color: var(--md-on-primary-container); }
 :root[data-design="m3"] :focus-visible { outline: 3px solid var(--md-secondary); outline-offset: 2px; }
+:root[data-design="m3"] h1[tabindex="-1"]:focus-visible { outline: none; }    /* the router moves focus to the heading; it is no control */
 
 /* ===== Type scale (M3 Expressive: emphasized headlines, calm body) ===== */
 :root[data-design="m3"] .section-title,
@@ -866,20 +867,6 @@
 :root[data-design="m3"] .wp-fab-icon { width: 24px; height: 24px; }
 @media (max-width: 768px) { :root[data-design="m3"] .wp-fab { bottom: 96px; right: 16px; } }
 
-/* Detail actions that carry their own inline colours */
-:root[data-design="m3"] #remove-entry {
-    color: var(--md-on-error-container) !important;
-    background: var(--md-error-container);
-    width: 40px;
-    min-height: 40px;
-    padding: 0 !important;
-}
-:root[data-design="m3"] #start-watchparty {
-    color: var(--md-on-tertiary-container) !important;
-    background: var(--md-tertiary-container);
-    border: 0 !important;
-}
-:root[data-design="m3"] :is(#remove-entry, #start-watchparty) svg { width: 18px; height: 18px; }
 
 /* =====================================================================================================
    Expressive identity: what makes this design its own and not AniRoll in other colours.
@@ -1035,14 +1022,6 @@
 :root[data-design="m3"] .m3-btn-lg { min-height: 56px; padding: 16px 28px; font-size: 1rem; }
 :root[data-design="m3"] .m3-btn-lg:active { border-radius: var(--radius-lg); }
 :root[data-design="m3"] .m3-hero .glass-btn-secondary { background: var(--md-surface-container-lowest); color: var(--md-on-surface); }
-/* ----- Containment: recommendations sit in their own tonal block ----- */
-:root[data-design="m3"] .home-section:has(#recommendations-row) {
-    padding: 28px 28px 32px;
-    border-radius: var(--md-shape-xxl);
-    background: var(--md-surface-container);
-}
-:root[data-design="m3"] .home-section:has(#recommendations-row) .media-card { background: var(--md-surface-container-high); }
-
 /* ----- Progress: M3 wavy indicator, like Android's media player ----- */
 /* The wave runs up to where you are, a round dot marks the spot, and only after it the flat track goes
    on: nothing straight runs behind the wave. The fill starts 6px in and stops 6px early, so the dot
@@ -1400,13 +1379,18 @@
 @keyframes m3Float { to { transform: translateY(-10px) rotate(-6deg); } }
 /* The number: counts up when the hero appears, pops when an episode is marked */
 :root[data-design="m3"] .m3-hero-ep-num { display: inline-block; transform-origin: 30% 80%; }
+/* Long-running shows (episode 1214): four digits at full size would push the title off the card */
+:root[data-design="m3"] .m3-hero-ep-num.is-long { font-size: clamp(4.5rem, 7vw, 6.5rem); }
 :root[data-design="m3"] .m3-hero-ep-num.is-pop { animation: m3NumPop .7s var(--m3-bouncy); }
 @keyframes m3NumPop { 30% { transform: scale(1.18) rotate(-4deg); } }
 :root[data-design="m3"] .m3-hero .glass-btn-primary { box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--md-primary) 70%, transparent); }
 @media (max-width: 768px) {
-    :root[data-design="m3"] .m3-hero { grid-template-columns: 1fr; padding: 24px; border-radius: 32px; min-height: 0; }
-    :root[data-design="m3"] .m3-hero-art { order: -1; min-height: 250px; }
-    :root[data-design="m3"] .m3-hero-deck { width: 148px; }
+    /* About 60 % of a phone's screen, so the tiles under it peek in */
+    :root[data-design="m3"] .m3-hero { grid-template-columns: 1fr; gap: 8px; padding: 20px 22px 22px; border-radius: 32px; min-height: 0; }
+    :root[data-design="m3"] .m3-hero-art { order: -1; min-height: 168px; }
+    :root[data-design="m3"] .m3-hero-deck { width: 108px; }
+    :root[data-design="m3"] .m3-hero-ep-num { font-size: 4.75rem; }
+    :root[data-design="m3"] .m3-hero-actions .m3-btn-lg { min-height: 48px; padding: 12px 22px; }
     :root[data-design="m3"] .m3-hero-badge { width: 58px; height: 58px; font-size: 1.25rem; }
     :root[data-design="m3"] .m3-hero > .m3-hero-glow { -webkit-mask: radial-gradient(closest-side at 50% 30%, #000 25%, transparent 100%); mask: radial-gradient(closest-side at 50% 30%, #000 25%, transparent 100%); }
 }
@@ -1596,7 +1580,7 @@
 }
 
 /* Containers over the wallpaper: a touch translucent, so the show shines through the edges */
-:root[data-design="m3"] :is(.roll-filters, .settings-card, .stat-chart, .activity-card, .home-section:has(#recommendations-row)) {
+:root[data-design="m3"] :is(.roll-filters, .settings-card, .stat-chart, .activity-card) {
     background: color-mix(in srgb, var(--md-surface-container-low) 86%, transparent) !important;
 }
 
@@ -1636,10 +1620,10 @@
 :root[data-design="m3"] .m3-widget:active { transform: scale(.96); }
 :root[data-design="m3"] .m3-widget-label { font-size: .8125rem; font-weight: 600; color: var(--md-on-surface-variant); }
 :root[data-design="m3"] .m3-widget-sub { margin-top: auto; font-size: .8125rem; color: var(--md-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Clock: two big stacked lines in the primary colour */
+/* Clock: two stacked lines in the primary colour */
 :root[data-design="m3"] .m3-widget-clock { background: color-mix(in srgb, var(--md-primary-container) 88%, transparent); color: var(--md-on-primary-container); }
 :root[data-design="m3"] .m3-widget-clock :is(.m3-widget-label, .m3-widget-sub) { color: inherit; opacity: .8; }
-:root[data-design="m3"] .m3-widget-clock-num { display: flex; flex-direction: column; font-size: 2.6rem; line-height: .95; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin: 4px 0 8px; }
+:root[data-design="m3"] .m3-widget-clock-num { display: flex; flex-direction: column; font-size: 2rem; line-height: 1; font-weight: 750; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin: 4px 0 8px; }
 :root[data-design="m3"] .m3-widget-clock-num small { font-size: .45em; font-weight: 700; margin-left: 3px; opacity: .7; }
 :root[data-design="m3"] .m3-widget-clock > :not(.m3-clock-cover, .m3-clock-ring) { position: relative; z-index: 1; }
 /* The show's cover, peeking in tilted from the right edge like the hero's deck */
@@ -1659,8 +1643,8 @@
 :root[data-design="m3"] .m3-widget-clock.is-now .m3-clock-now { animation: m3ClockBreathe2 1.6s ease-in-out infinite; }
 @keyframes m3ClockBreathe2 { 50% { opacity: .6; } }
 @media (prefers-reduced-motion: reduce) { :root[data-design="m3"] .m3-widget-clock :is(.m3-clock-ring, .m3-clock-now) { animation: none; } }
-/* Queue: a huge count, the shows as overlapping round faces */
-:root[data-design="m3"] .m3-widget-big { font-size: 4.25rem; line-height: 1; font-weight: 850; letter-spacing: -0.04em; color: var(--md-tertiary); }
+/* Queue: the count, the shows as overlapping round faces. The hero's number stays the one big figure on Home */
+:root[data-design="m3"] .m3-widget-big { font-size: 2.75rem; line-height: 1; font-weight: 750; letter-spacing: -0.03em; color: var(--md-tertiary); margin-top: 6px; }
 :root[data-design="m3"] .m3-widget-faces { position: absolute; right: 18px; top: 18px; display: flex; }
 :root[data-design="m3"] .m3-widget-faces img {
     width: 34px; height: 34px; border-radius: 50%; object-fit: cover; margin-left: -10px;
@@ -1689,8 +1673,8 @@
 @media (max-width: 1100px) { :root[data-design="m3"] .m3-widgets { grid-template-columns: 1fr 1fr; } :root[data-design="m3"] .m3-widget-week { grid-column: 1 / -1; } }
 @media (max-width: 768px) {
     :root[data-design="m3"] .m3-widget { min-height: 150px; padding: 16px 18px; border-radius: 28px; }
-    :root[data-design="m3"] .m3-widget-clock-num { font-size: 2.1rem; }
-    :root[data-design="m3"] .m3-widget-big { font-size: 3.25rem; }
+    :root[data-design="m3"] .m3-widget-clock-num { font-size: 1.75rem; }
+    :root[data-design="m3"] .m3-widget-big { font-size: 2.25rem; }
     :root[data-design="m3"] .m3-widget-faces img { width: 28px; height: 28px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2230,5 +2214,9 @@
 /* Detail page: the score in the show's own primary, tabs as M3's connected segmented row */
 :root[data-design="m3"] .detail-score-value { color: var(--md-primary); font-size: 2.4rem; }
 :root[data-design="m3"] .detail-score-label { color: var(--md-on-surface-variant); }
-:root[data-design="m3"] .detail-tag-next { background: var(--md-primary-container); color: var(--md-on-primary-container); border-color: transparent; }
+:root[data-design="m3"] .detail-facts > .detail-fact-next { color: var(--md-primary); }
+:root[data-design="m3"] .detail-entry { background: var(--md-surface-container-high); }
+:root[data-design="m3"] .detail-entry-score { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .detail-ext-info a { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .detail-ext-info a:hover { color: var(--md-on-surface); }
 :root[data-design="m3"] .detail-dist .stat-bar-track { background: transparent; }

@@ -1,8 +1,8 @@
-import * as api from '../api.js?v=145';
-import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched, emitListChange, LIST_EVENT, loginState } from '../store.js?v=145';
-import { getToken, isLoggedIn } from '../auth.js?v=145';
-import { enhanceSelect } from '../select.js?v=145';
-import { showScorePrompt } from '../a11y.js?v=145';
+import * as api from '../api.js?v=146';
+import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched, emitListChange, LIST_EVENT, loginState } from '../store.js?v=146';
+import { getToken, isLoggedIn } from '../auth.js?v=146';
+import { enhanceSelect } from '../select.js?v=146';
+import { showScorePrompt } from '../a11y.js?v=146';
 
 // View, sort and the airing filter are remembered per browser; the search text is not
 const VIEW_KEY = 'aniroll_list_view';
@@ -98,11 +98,11 @@ export async function render({ params, content }) {
             <button class="list-chip${behindOnly ? ' active' : ''}" id="list-behind" aria-pressed="${behindOnly}" title="Only shows with aired episodes you have not watched">Behind</button>
             <div class="list-formats" id="list-formats" role="group" aria-label="Format">${Object.keys(FORMATS).map(f =>
                 `<button class="list-chip${format === f ? ' active' : ''}" data-format="${f}" aria-pressed="${format === f}">${FORMAT_LABELS[f]}</button>`).join('')}</div>
-            ${isOwn ? `<button class="list-chip" id="list-export" title="Download this list as a MyAnimeList XML file (for MAL or a backup)">Export</button>` : ''}
             <div class="list-view-toggle" role="group" aria-label="View">
                 <button class="list-view-btn${view === 'list' ? ' active' : ''}" data-view="list" aria-pressed="${view === 'list'}" title="List">${ICON_LIST}</button>
                 <button class="list-view-btn${view === 'grid' ? ' active' : ''}" data-view="grid" aria-pressed="${view === 'grid'}" title="Covers">${ICON_GRID}</button>
             </div>
+            ${isOwn ? `<button class="glass-btn glass-btn-secondary glass-btn-sm list-export" id="list-export" title="Download this list as a MyAnimeList XML file (for MAL or a backup)">Export</button>` : ''}
         </div>
         <div id="list-content" class="list-content"></div>
         <div id="compare-view" hidden></div>

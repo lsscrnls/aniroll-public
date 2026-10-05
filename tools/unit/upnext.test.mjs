@@ -2,7 +2,7 @@
 import './setup.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { upNext, glance, until } from '../../js/upnext.js';
+import { upNext, glance, until, heroEntry } from '../../js/upnext.js';
 
 const at = (s) => new Date(s).getTime() / 1000;
 const NOW = at('2026-10-05T10:00:00');            // a Monday morning
@@ -26,6 +26,14 @@ test('upNext: caught up on an airing show says when the next one comes', () => {
     assert.equal(u.behind, 0);
     assert.equal(u.status, 'Episode 8 airs in 2d');
     assert.equal(u.canWatch, false);
+});
+
+test('heroEntry: the most recent show with an episode to watch, else the most recent', () => {
+    const waiting = show(1, { next: [8, '2026-10-07T16:00:00'], progress: 7 });    // caught up, next one airs Wednesday
+    const ready = show(2, { next: [5, '2026-10-08T16:00:00'], progress: 2 });
+    assert.equal(heroEntry([waiting, ready]), ready);
+    assert.equal(heroEntry([waiting]), waiting);
+    assert.equal(heroEntry([]), undefined);
 });
 
 test('upNext: finished and unknown lengths', () => {
