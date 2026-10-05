@@ -1,10 +1,10 @@
 // Home in AniRoll's own design: the show you're on, then a stats box. Same idea as Material 3's hero and widgets
 // (js/m3.js), built from AniRoll's own pieces so it reads like the rest of the app: the detail page's banner,
 // cover and stats box, Roll's red kicker, the usual pill buttons. Material 3 hides this section.
-import * as api from './api.js?v=141';
-import { esc, titlePref } from './store.js?v=141';
-import { prefersReducedMotion } from './animations.js?v=141';
-import { upNext, glance, greeting, playFromHero } from './upnext.js?v=141';
+import * as api from './api.js?v=142';
+import { esc, titlePref } from './store.js?v=142';
+import { prefersReducedMotion } from './animations.js?v=142';
+import { upNext, glance, greeting, playFromHero } from './upnext.js?v=142';
 
 const imgOf = (m) => m?.coverImage?.extraLarge || m?.coverImage?.large || '';
 
@@ -71,7 +71,7 @@ function emptyHtml(name) {
 
 // The detail page's stats box: values centred, the countdown is the one in the accent colour
 function stripHtml(entries, planning) {
-    const { next, airing, waitingTotal } = glance(entries, undefined, planning);
+    const { next, week, waitingTotal } = glance(entries, undefined, planning);
     untilAt = next ? next.media.nextAiringEpisode.airingAt : 0;
     const stat = (value, label, attrs = '') => `<div class="detail-stat"${attrs}><div class="detail-stat-value">${value}</div><div class="detail-stat-label">${label}</div></div>`;
     return `<div class="box detail-stats ar-home-stats">
@@ -81,7 +81,7 @@ function stripHtml(entries, planning) {
             <div class="ar-home-stat-title">${esc(titlePref(next.media.title))}</div>
         </button>` : stat('—', 'Nothing airing')}
         <a class="detail-stat ar-home-stat" href="#/list"><div class="detail-stat-value">${waitingTotal}</div><div class="detail-stat-label">Ready to watch</div></a>
-        <a class="detail-stat ar-home-stat" href="#/calendar"><div class="detail-stat-value">${airing.length}</div><div class="detail-stat-label">Airing this week</div></a>
+        <a class="detail-stat ar-home-stat" href="#/calendar"><div class="detail-stat-value">${week.length}</div><div class="detail-stat-label">Airing this week</div></a>
         <a class="detail-stat ar-home-stat" href="#/list"><div class="detail-stat-value">${entries.length}</div><div class="detail-stat-label">Watching</div></a>
     </div>`;
 }
