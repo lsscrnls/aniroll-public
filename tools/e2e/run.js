@@ -1323,24 +1323,28 @@ function staticServer() {
 
     const fresh = await visitor({});
     check('new visitor: no notice', (await dialogTitle(fresh)) === null);
-    // Landing: headline in words, the big clip, a tour whose tabs switch the clip
+    // Landing: headline in words, a roll to try in the hero, a tour whose tabs switch the clip, Watch Party as an invite
     const landing = await fresh.evaluate(async () => {
         const words = document.querySelectorAll('.landing-title .lw').length;
-        const stage = document.querySelector('.landing-stage video')?.getAttribute('src');
+        // The hero's roll gets its covers from the trending shows the page loads anyway
+        for (let i = 0; i < 40 && document.getElementById('try-roll')?.disabled; i++) await new Promise(r => setTimeout(r, 100));
+        const machine = { window: !!document.querySelector('.lp-hero #try-window .roll-item img'), ready: document.getElementById('try-roll')?.disabled === false };
         const items = [...document.querySelectorAll('.landing-tour-item')];
         items[1]?.click();
         const navTop = document.getElementById('navbar').classList.contains('is-scrolled');
         window.scrollTo(0, 400);
         await new Promise(r => setTimeout(r, 300));
         const navScrolled = document.getElementById('navbar').classList.contains('is-scrolled') && !navTop;
-        const cards = [...document.querySelectorAll('.landing-feature-title')].map(e => e.textContent).join(',');
-        return { words, stage, items: items.length, active: document.querySelector('.landing-tour-frame video.active')?.dataset.tour,
-            selected: items[1]?.getAttribute('aria-selected'), navScrolled, cards };
+        const invite = document.querySelector('.lp-invite-title')?.textContent;
+        const also = document.querySelectorAll('.lp-also p').length;
+        const oldCards = document.querySelectorAll('.landing-feature, .landing-stage, .landing-try').length;
+        return { words, machine, invite, also, oldCards, items: items.length, active: document.querySelector('.landing-tour-frame video.active')?.dataset.tour,
+            selected: items[1]?.getAttribute('aria-selected'), navScrolled };
     });
-    check('landing: headline words, stage clip, tour switches clips (the player included)',
-        landing.words === 6 && landing.stage === 'media/roll.mp4' && landing.items === 4 && landing.active === 'calendar' && landing.selected === 'true', landing);
-    check('landing: nav frosted once scrolled; more-cards only for what the clips do not show',
-        landing.navScrolled && landing.cards === 'Watch Party,Jellyfin Live Tracking,Social Feed', landing);
+    check('landing: headline words, a roll ready in the hero with a cover showing, tour switches clips (the player included)',
+        landing.words === 6 && landing.machine.window && landing.machine.ready && landing.items === 4 && landing.active === 'calendar' && landing.selected === 'true', landing);
+    check('landing: nav frosted once scrolled; Watch Party as an invite, two plain lines for the rest, no old cards',
+        landing.navScrolled && landing.invite === 'Mika is hosting a Watch Party' && landing.also === 2 && landing.oldCards === 0, landing);
     // Material 3 only: shaped tiles with trending covers, the colour section with its clip, no design switch
     const m3landing = await fresh.evaluate(() => ({ design: document.documentElement.dataset.design, tiles: document.querySelectorAll('.lp-tile').length,
         colour: document.querySelector('.lp-colour video')?.getAttribute('src'), tryDesign: !!document.querySelector('[data-try-design], .landing-designs') }));
@@ -1359,8 +1363,8 @@ function staticServer() {
     });
     check('landing: a colour shape turns the page into its palette, keeps nothing, and goes back',
         palette.picked !== palette.before && palette.pressed === 'true' && palette.stored === null && palette.after === palette.before, palette);
-    check('landing: Material 3 only, shaped cover tiles, the colours section, no design switch',
-        m3landing.design === 'm3' && m3landing.tiles === 6 && m3landing.colour === 'media/m3.mp4' && !m3landing.tryDesign, m3landing);
+    check('landing: Material 3 only, shapes behind the roll, the colours section, no design switch',
+        m3landing.design === 'm3' && m3landing.tiles === 2 && m3landing.colour === 'media/m3.mp4' && !m3landing.tryDesign, m3landing);
     await fresh.close();
 
     // Confirmed today's entry before it grew: its new id brings it back, on its own

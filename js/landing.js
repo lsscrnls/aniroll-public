@@ -1,9 +1,9 @@
-import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=144';
-import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=144';
+import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=145';
+import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=145';
 
 // The landing page, in Material 3 Expressive (the only design logged out): the headline arrives word by word,
-// covers of what's trending pop into shaped tiles, the big clip tilts upright while it scrolls in, and the
-// feature tour plays one clip after another. Clips (media/*.mp4) are recorded with tools/showcase.
+// a roll to try sits next to it, the feature tour plays one clip after another, and Watch Party shows up as the
+// invite people actually get. Clips (media/*.mp4) are recorded with tools/showcase.
 // "Reduce motion": everything is shown at once, clips don't autoplay (posters + controls instead).
 
 export const TOUR = [
@@ -13,25 +13,60 @@ export const TOUR = [
     { key: 'player', title: 'Play from your Jellyfin', text: 'Your own server, right here: subtitles as the release styled them, Skip intro, and your list moves on by itself.' },
 ];
 
-// Shaped tiles for the hero, as Material 3 does it: pictures in calm shapes that suit a portrait poster
-// (arch, squircle, a soft 12-scallop), the playful shapes only as colour; covers from what's trending
-const TILES = [
-    { shape: 'arch', img: true }, { shape: 'squircle', img: true }, { shape: 'cookie12', img: true },
-    { shape: 'flower' }, { shape: 'sunny' }, { shape: 'clover4' },
-];
-export function renderCollage() {
-    return `<div class="lp-collage" aria-hidden="true">
-        ${TILES.map((t, i) => `<span class="lp-tile lp-tile-${i + 1} lp-shape-${t.shape}${t.img ? ' lp-tile-img' : ''}"></span>`).join('')}
+// The hero's right half is the thing itself: a roll to try, over this week's trending shows (logged in it rolls
+// the Planning list). Two colour shapes sit behind the reel; the window shows a cover before the first roll
+export function renderMachine() {
+    return `<div class="lp-machine" id="landing-try">
+        <span class="lp-tile lp-tile-a lp-shape-flower" aria-hidden="true"></span>
+        <span class="lp-tile lp-tile-b lp-shape-sunny" aria-hidden="true"></span>
+        <div class="roll-window lp-machine-window" id="try-window"><div class="roll-reel" id="try-reel"></div></div>
+        <button class="lp-btn lp-btn-filled lp-machine-btn" id="try-roll" type="button" disabled>Roll a show</button>
+        <p class="lp-machine-result" id="try-result" role="status">Can’t decide? Roll one of this week’s trending shows.</p>
     </div>`;
 }
-export function fillCollage(root, media) {
-    const tiles = [...root.querySelectorAll('.lp-tile-img')];
-    media.filter(m => m.coverImage?.extraLarge || m.coverImage?.large).slice(0, tiles.length).forEach((m, i) => {
-        const url = m.coverImage.extraLarge || m.coverImage.large;
-        const img = new Image();
-        img.onload = () => { tiles[i].style.backgroundImage = `url("${url.replace(/"/g, '')}")`; tiles[i].classList.add('has-cover'); };
-        img.src = url;
-    });
+
+// Watch Party, shown the way people meet it: an invite pasted in a chat, with the preview AniRoll's link
+// unfurls into (same wording as the server's /w/ preview)
+export function renderParty() {
+    return `<section class="lp-party" aria-labelledby="lp-party-title">
+        <div class="lp-party-text">
+            <h2 class="landing-tour-title" id="lp-party-title">Watch together, wherever your friends are</h2>
+            <p class="landing-tour-sub">Start a Watch Party and paste the link. The host counts the episodes, and everyone’s AniList follows, even with the tab closed.</p>
+            <ul class="lp-party-points">
+                <li>Join from the invite or right from the player</li>
+                <li>Vote on what to watch next</li>
+                <li>Write a post about it when the party ends</li>
+            </ul>
+        </div>
+        <figure class="lp-invite" aria-label="A Watch Party invite as it looks in a chat">
+            <div class="lp-invite-msg">
+                <span class="lp-invite-avatar" aria-hidden="true">M</span>
+                <div class="lp-invite-body">
+                    <div class="lp-invite-name">Mika</div>
+                    <p class="lp-invite-text">Episode 5 tonight? <span class="lp-invite-link">aniroll.app/w/mika</span></p>
+                    <div class="lp-invite-embed">
+                        <div class="lp-invite-site">AniRoll</div>
+                        <div class="lp-invite-title">Mika is hosting a Watch Party</div>
+                        <p class="lp-invite-desc"><span class="lp-invite-show">Frieren</span> · at episode 5 · 3 watching. Join and your episode counter follows along.</p>
+                        <span class="lp-invite-cover" aria-hidden="true"></span>
+                    </div>
+                </div>
+            </div>
+        </figure>
+    </section>
+    <section class="lp-also">
+        <p><strong>Tracked from your own Jellyfin.</strong> Watch on your server, in any app, and the episode lands on your AniList by itself.</p>
+        <p><strong>Friends in the loop.</strong> See what the people you follow are watching, reply, like and compare lists.</p>
+    </section>`;
+}
+// The invite shows a real cover: the first trending show the page loaded anyway
+export function fillInvite(root, media) {
+    const m = media.find(x => x.coverImage?.large);
+    const cover = root.querySelector('.lp-invite-cover');
+    if (!m || !cover) return;
+    cover.style.backgroundImage = `url("${m.coverImage.large.replace(/"/g, '')}")`;
+    const title = m.title?.english || m.title?.romaji;
+    if (title) root.querySelector('.lp-invite-show').textContent = title;
 }
 
 // Material 3 takes its colours from the show you watched last: the clip shows it, and each shape below it
@@ -47,7 +82,7 @@ export function renderColour() {
                 ${SEEDS.filter(x => x.hex !== SHOW_SEED).map((x, i) => `<button type="button" class="lp-swatch lp-shape-${SWATCH_SHAPES[i % SWATCH_SHAPES.length]}" style="--c:${x.hex}" data-preview-seed="${x.hex}" aria-pressed="false" aria-label="${x.name}" title="${x.name}"></button>`).join('')}
             </div>
         </div>
-        <div class="lp-colour-frame">
+        <div class="lp-colour-frame" style="background-image:url(media/m3.jpg)">
             <video class="landing-video" src="media/m3.mp4" poster="media/m3.jpg" muted loop playsinline preload="none" aria-label="AniRoll taking on the colours of a show"></video>
         </div>
     </section>`;
@@ -58,15 +93,6 @@ export function renderHeadline(lines, accentLast = true) {
     const last = words.length - 1;
     return words.map((ws, li) => ws.map((w, wi) =>
         `<span class="lw${accentLast && li === last && wi === ws.length - 1 ? ' lw-accent' : ''}"><span>${w}</span></span>`).join(' ')).join('<br>');
-}
-
-export function renderStage() {
-    return `<div class="landing-stage" aria-label="AniRoll rolling a show from a Planning list">
-        <div class="landing-stage-glow" aria-hidden="true"></div>
-        <div class="landing-stage-frame">
-            <video class="landing-video" src="media/roll.mp4" poster="media/roll.jpg" muted loop playsinline preload="metadata"></video>
-        </div>
-    </div>`;
 }
 
 export function renderTour() {
@@ -83,7 +109,7 @@ export function renderTour() {
                     <span class="landing-tour-bar" aria-hidden="true"><span></span></span>
                 </button>`).join('')}
             </div>
-            <div class="landing-tour-frame">
+            <div class="landing-tour-frame" style="background-image:url(media/${TOUR[0].key}.jpg)">
                 ${TOUR.map((t, i) => `<video class="landing-video${i ? '' : ' active'}" data-tour="${t.key}" src="media/${t.key}.mp4" poster="media/${t.key}.jpg" muted playsinline preload="${i ? 'none' : 'metadata'}"></video>`).join('')}
             </div>
         </div>
@@ -105,18 +131,8 @@ export function initLanding(root) {
             // The shaped tiles pop in one after another, a little turned, and spring into place
             // (only its own properties are cleared: the cover is an inline background image)
             .from(root.querySelectorAll('.lp-tile'), { scale: 0.4, rotate: -25, opacity: 0, duration: 0.9, stagger: 0.07, ease: 'back.out(1.8)', clearProps: 'transform,opacity' }, '-=0.9')
-            .from(root.querySelector('.landing-stage'), { y: 60, opacity: 0, duration: 1, clearProps: 'opacity' }, '-=0.5');
+            .from(root.querySelectorAll('.lp-machine-window, .lp-machine-btn'), { y: 30, opacity: 0, duration: 0.8, stagger: 0.08, clearProps: 'transform,opacity' }, '-=0.8');
         cleanups.push(() => tl.kill());
-
-        // The big frame lies tilted back and straightens up while it scrolls into view
-        const frame = root.querySelector('.landing-stage-frame');
-        if (window.ScrollTrigger && frame) {
-            const tilt = gsap.fromTo(frame, { rotateX: 18, scale: 0.9 }, {
-                rotateX: 0, scale: 1, ease: 'none',
-                scrollTrigger: { trigger: root.querySelector('.landing-stage'), start: 'top 95%', end: 'top 25%', scrub: 0.6 },
-            });
-            cleanups.push(() => { tilt.scrollTrigger?.kill(); tilt.kill(); });
-        }
     }
 
     // Videos only run while they are on screen

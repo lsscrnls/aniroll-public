@@ -1,4 +1,4 @@
-import { esc } from './store.js?v=144';
+import { esc } from './store.js?v=145';
 
 // What Jellyfin is playing right now (from the webhook state in js/jellyfin.js):
 // the chip in the navbar and the card on Home.
@@ -87,7 +87,7 @@ export function renderNowCard(section, state) {
     </div>`;
     section.querySelector('.jf-now-link')?.addEventListener('click', async (ev) => {
         ev.stopPropagation();
-        const { openLinkDialog } = await import('./jflink-dialog.js?v=144');
+        const { openLinkDialog } = await import('./jflink-dialog.js?v=145');
         openLinkDialog(s);
     });
 
