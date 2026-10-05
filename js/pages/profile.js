@@ -1,7 +1,7 @@
 // @ts-check
-import * as api from '../api.js?v=145';
-import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref } from '../store.js?v=145';
-import { getToken, isLoggedIn } from '../auth.js?v=145';
+import * as api from '../api.js?v=146';
+import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref } from '../store.js?v=146';
+import { getToken, isLoggedIn } from '../auth.js?v=146';
 
 export async function render({ params, content }) {
     const token = getToken();
@@ -27,10 +27,13 @@ export async function render({ params, content }) {
     const watchHours = animeStats ? Math.floor((animeStats.minutesWatched / 60) % 24) : 0;
 
     const favourites = user.favourites;
+    const own = currentUser?.name === user.name;
 
     content.innerHTML = `<div class="page-enter">
         <div class="profile-header">
-            ${user.bannerImage ? `<div class="profile-banner"><img src="${user.bannerImage}" alt=""></div>` : '<div class="profile-banner" style="height:150px;background:var(--bg-secondary)"></div>'}
+            ${user.bannerImage ? `<div class="profile-banner"><img src="${user.bannerImage}" alt=""></div>`
+                // No banner on AniList: the avatar, blurred wide, instead of an empty grey block
+                : `<div class="profile-banner is-avatar">${user.avatar?.large ? `<img src="${esc(user.avatar.large)}" alt="">` : ''}</div>`}
             <div class="profile-info">
                 <img class="profile-avatar" src="${user.avatar?.large || user.avatar?.medium || ''}" alt="${esc(user.name)}">
                 <div>
@@ -56,6 +59,11 @@ export async function render({ params, content }) {
             <a href="${esc(user.siteUrl || `https://anilist.co/user/${user.name}`)}" target="_blank" rel="noopener" class="glass-btn glass-btn-secondary">AniList Profile</a>
         </div>
 
+        ${!animeStats?.count && !mangaStats?.count ? `<div class="empty-state">
+            <div class="empty-state-text">${own ? 'Your list is empty' : `${esc(user.name)}'s list is empty`}</div>
+            <div class="empty-state-sub">${own ? 'Stats, favourite genres and studios show up here once you add shows.' : 'Stats show up here once there is something on it.'}</div>
+            ${own ? '<a href="#/roll" class="glass-btn glass-btn-primary" style="margin-top:var(--space-md)">Roll something</a>' : ''}
+        </div>` : ''}
         ${animeStats ? renderAnimeStats(animeStats) : ''}
         <div id="hot-takes"></div>
         ${mangaStats ? renderMangaStats(mangaStats) : ''}

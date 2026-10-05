@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=145';
-import { upNext, glance, DAYS, greeting, playFromHero } from './upnext.js?v=145';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=145';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=146';
+import { upNext, glance, DAYS, greeting, playFromHero, heroEntry } from './upnext.js?v=146';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=146';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -438,7 +438,7 @@ function heroHtml(entry, name, others = []) {
     return `<div class="m3-hero-glow" data-cover="${esc(coverOf(m))}" aria-hidden="true"></div>
         <div class="m3-hero-body">
             <p class="m3-hero-greet">${greeting()}${name ? `, ${esc(name)}` : ''}</p>
-            <div class="m3-hero-ep"><span class="m3-hero-ep-label">${done ? 'Finished' : 'Up next'}</span><span class="m3-hero-ep-num">${done ? total : next}</span>${total ? `<span class="m3-hero-ep-of">/ ${total}</span>` : ''}</div>
+            <div class="m3-hero-ep"><span class="m3-hero-ep-label">${done ? 'Finished' : 'Up next'}</span><span class="m3-hero-ep-num${String(done ? total : next).length > 2 ? ' is-long' : ''}">${done ? total : next}</span>${total ? `<span class="m3-hero-ep-of">/ ${total}</span>` : ''}</div>
             <h2 class="m3-hero-title">${esc(titlePref(m.title))}</h2>
             ${status ? `<p class="m3-hero-meta"><span class="m3-hero-chip">${esc(status)}</span></p>` : ''}
             <div class="m3-hero-actions">
@@ -477,7 +477,8 @@ function onContinue(e) {
             setTimeout(() => onContinue(e), 60);
         });
     }
-    const first = entries?.[0]?.media;
+    const lead = heroEntry(entries || []);
+    const first = lead?.media;
     if (first) {
         const theme = { color: first.coverImage?.color || null, cover: coverOf(first) };
         const old = getShowTheme();
@@ -486,12 +487,12 @@ function onContinue(e) {
             if (document.body.dataset.m3Page === 'home') applyAppTheme();
         }
     }
-    renderWidgets(hero, entries || [], planning || []);
+    renderWidgets(hero, entries || [], planning || [], lead);
 
     const before = hero.querySelector('.m3-hero-ep-num')?.textContent;
-    hero.innerHTML = heroHtml(entries?.[0], name, entries?.slice(1, 3) || []);
-    playFromHero(hero, entries?.[0], 'm3-btn-lg');
-    setScope(hero, entries?.[0]?.media?.coverImage?.color || null);
+    hero.innerHTML = heroHtml(lead, name, (entries || []).filter(x => x !== lead).slice(0, 2));
+    playFromHero(hero, lead, 'm3-btn-lg');
+    setScope(hero, first?.coverImage?.color || null);
     const glow = hero.querySelector('.m3-hero-glow[data-cover]');
     if (glow) glow.appendChild(tinyCover(glow.dataset.cover, (c) => c.classList.add('on')));
     const num = hero.querySelector('.m3-hero-ep-num');
@@ -517,7 +518,7 @@ function countUp(el) {
 
 // ===== Widgets: small live tiles under the hero, like a desktop's clock and calendar =====
 
-function renderWidgets(hero, entries, planning) {
+function renderWidgets(hero, entries, planning, lead) {
     let box = document.querySelector('.m3-widgets');
     if (!entries.length) { box?.remove(); return; }
     if (!box) {
@@ -528,7 +529,7 @@ function renderWidgets(hero, entries, planning) {
     }
     const { next: soonest, airing, week, waiting, waitingTotal: total, byDay, today } = glance(entries, undefined, planning);
     // The hero already counts down to its own show's next episode: then the clock shows the one after it
-    const heroId = entries[0]?.media.id;
+    const heroId = lead?.media.id;
     const next = soonest && !soonest.premiere && soonest.media.id === heroId && airing[1] ? { ...airing[1], later: true } : soonest;
 
     box.innerHTML = `

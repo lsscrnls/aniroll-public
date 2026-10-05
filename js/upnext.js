@@ -18,6 +18,12 @@ export function upNext(entry) {
     return { m, progress, next: progress + 1, total, airing, out, behind, done, status, canWatch: !done && (behind == null || behind > 0) };
 }
 
+// The show Home's hero is about: the most recent one with an episode out to watch, so a show that is waiting
+// for its next airing doesn't take the spot from one you can play right now. Nothing to watch: the most recent
+export function heroEntry(entries) {
+    return entries.find(e => upNext(e).canWatch) || entries[0];
+}
+
 // All of Continue Watching: the soonest airing episode, what's waiting, which weekday each show airs (Monday first).
 // Nothing on it airing? Then `next` is the next premiere from Planning (`premiere: true`), so the countdown stays
 export function glance(entries, now = Date.now() / 1000, planning = []) {
@@ -62,5 +68,5 @@ export function playFromHero(root, entry, size = '') {
     const { m, next, canWatch } = upNext(entry);
     if (!canWatch) return;
     // List entries come without `type`: Home's hero is anime only
-    import('./player/playbutton.js?v=145').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
+    import('./player/playbutton.js?v=146').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
 }

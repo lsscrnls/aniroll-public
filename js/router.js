@@ -1,5 +1,5 @@
 // @ts-check
-import { esc, emptyIcon } from './store.js?v=145';
+import { esc, emptyIcon } from './store.js?v=146';
 
 const routes = [];
 let currentCleanup = null;
