@@ -1389,8 +1389,14 @@ function staticServer() {
     await late.clock.runFor(300);
     await late.click('.landing-foot .whatsnew-link');
     await late.clock.runFor(500);
-    const log = await late.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, entries: document.querySelectorAll('.whatsnew-entry').length }));
-    check('changelog: still there, marked unread, opens with all entries and the version', unread && /^What's new AniRoll \d+\.\d+\.\d+$/.test(log.title || '') && log.entries === CHANGE_COUNT, { unread, ...log });
+    const log = await late.evaluate(() => ({ hash: location.hash, title: document.querySelector('.whatsnew-page h1')?.textContent, entries: document.querySelectorAll('.whatsnew-page .whatsnew-entry').length,
+        back: document.querySelector('.whatsnew-back')?.textContent.trim(), dialog: !!document.querySelector('[aria-modal="true"]'), unread: document.documentElement.classList.contains('whatsnew-unread') }));
+    check('changelog: still there, marked unread, opens as its own page with all entries and the version',
+        unread && log.hash === '#/whatsnew' && /^What's new AniRoll \d+\.\d+\.\d+$/.test(log.title || '') && log.entries === CHANGE_COUNT && !log.dialog && !log.unread, { unread, ...log });
+    await late.click('.whatsnew-back');
+    await late.clock.runFor(500);
+    const backTo = await late.evaluate(() => ({ hash: location.hash || '#/', landing: !!document.querySelector('.landing-foot') }));
+    check("changelog: 'Back' returns to the page it was opened from", backTo.hash === '#/' && backTo.landing && log.back === 'Back to Home', { back: log.back, ...backTo });
 
     // An entry with a clip: it sits behind "See it in action"; opening it widens the dialog
     const clipped = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-26' });

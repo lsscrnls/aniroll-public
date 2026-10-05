@@ -4725,6 +4725,23 @@ html.m3-loading body { visibility: hidden; }
 .whatsnew-date { font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); margin-bottom: var(--space-sm); }
 .whatsnew-note { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: var(--space-lg); }
 .whatsnew-actions { display: flex; justify-content: flex-end; }
+/* The changelog as a page: a way back to where it was opened, then every entry in one box */
+/* Wide: the day and its headline on the left, what changed on the right; stacked on phones */
+.whatsnew-page .whatsnew, .whatsnew-page .whatsnew.is-wide { max-width: none; padding: var(--space-xl); }
+.whatsnew-page .whatsnew-entry { display: grid; grid-template-columns: minmax(180px, 260px) 1fr; gap: var(--space-xl); }
+.whatsnew-page .whatsnew-side { position: sticky; top: calc(var(--space-xl) + 64px); align-self: start; }
+.whatsnew-page .whatsnew-date { margin-bottom: 4px; }
+.whatsnew-title { margin: 0; font-size: 1.05rem; font-weight: 600; line-height: 1.35; color: var(--text); }
+.whatsnew-page .whatsnew-list { font-size: 0.95rem; margin-bottom: 0; }
+.whatsnew-page .whatsnew-watch, .whatsnew-page .whatsnew-video { max-width: 640px; }
+@media (max-width: 760px) {
+    .whatsnew-page .whatsnew { padding: var(--space-lg); }
+    .whatsnew-page .whatsnew-entry { grid-template-columns: 1fr; gap: var(--space-sm); }
+    .whatsnew-page .whatsnew-side { position: static; }
+}
+.whatsnew-page .section-title { margin: var(--space-lg) 0; }
+.whatsnew-back { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.whatsnew-back svg { width: 18px; height: 18px; }
 
 /* The entry points: quiet, with a small dot while something is unread */
 .whatsnew-unread .whatsnew-link::after {

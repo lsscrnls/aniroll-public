@@ -1,3 +1,4 @@
+// @ts-check
 // What Home says about your list, the same in both designs (Home in js/pages/home.js, M3's hero in js/m3.js):
 // the next episode of the show you're on, what is waiting, and the week ahead.
 
@@ -26,8 +27,13 @@ export function glance(entries, now = Date.now() / 1000, planning = []) {
     const premieres = planning
         .filter(e => e.media.status === 'NOT_YET_RELEASED' && e.media.nextAiringEpisode?.airingAt > now)
         .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt);
-    // The week: everything watched (weekly, on the weekday of its next episode) plus Planning premieres in the next 7 days
-    const week = [...airing, ...premieres.filter(e => e.media.nextAiringEpisode.airingAt < now + 7 * 86400)];
+    // The week, Monday to Sunday: what airs weekly (watched, or planned and already running) on the weekday of its
+    // next episode, plus Planning premieres before Sunday ends
+    const sunday = new Date(now * 1000);
+    sunday.setHours(24, 0, 0, 0);
+    sunday.setDate(sunday.getDate() + 6 - weekday(now));
+    const running = planning.filter(e => e.media.status === 'RELEASING' && e.media.nextAiringEpisode?.airingAt > now);
+    const week = [...airing, ...running, ...premieres.filter(e => e.media.nextAiringEpisode.airingAt < sunday.getTime() / 1000)];
     const byDay = Array.from({ length: 7 }, () => []);
     week.forEach(e => byDay[weekday(e.media.nextAiringEpisode.airingAt)].push(e.media));
     const premiere = airing.length ? null : premieres[0];
@@ -56,5 +62,5 @@ export function playFromHero(root, entry, size = '') {
     const { m, next, canWatch } = upNext(entry);
     if (!canWatch) return;
     // List entries come without `type`: Home's hero is anime only
-    import('./player/playbutton.js?v=142').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
+    import('./player/playbutton.js?v=144').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
 }

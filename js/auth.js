@@ -1,3 +1,4 @@
+// @ts-check
 const TOKEN_KEY = 'aniroll_token';
 const USER_KEY = 'aniroll_user';
 

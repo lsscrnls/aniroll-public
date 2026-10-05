@@ -1,4 +1,5 @@
-import { esc, emptyIcon } from './store.js?v=142';
+// @ts-check
+import { esc, emptyIcon } from './store.js?v=144';
 
 const routes = [];
 let currentCleanup = null;
@@ -99,7 +100,7 @@ function updateActiveNav(path) {
     const page = path === '/' ? 'home' : path.split('/')[1];
     // A studio page is reached from a detail page, but belongs with discovering shows
     const group = DISCOVER_PAGES.includes(page) || page === 'studio' ? 'discover' : null;
-    document.querySelectorAll('[data-page]').forEach(el => {
+    document.querySelectorAll('[data-page]').forEach((/** @type {HTMLElement} */ el) => {
         const on = el.dataset.page === page || el.dataset.page === group;
         el.classList.toggle('active', on);
         if (on) el.setAttribute('aria-current', 'page');
@@ -111,7 +112,7 @@ function updateActiveNav(path) {
     }
     let last = 'search';
     try { last = DISCOVER_PAGES.includes(localStorage.getItem(DISCOVER_KEY)) ? localStorage.getItem(DISCOVER_KEY) : 'search'; } catch { /* default */ }
-    document.querySelectorAll('[data-page="discover"]').forEach(el => { el.href = `#/${last}`; });
+    document.querySelectorAll('[data-page="discover"]').forEach((/** @type {HTMLAnchorElement} */ el) => { el.href = `#/${last}`; });
 }
 
 export function startRouter() {
