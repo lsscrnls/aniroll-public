@@ -1,5 +1,5 @@
 // @ts-check
-import { accountState, saveAccountState } from './accountstate.js?v=149';
+import { accountState, saveAccountState } from './accountstate.js?v=151';
 
 // Jellyfin series linked to an AniList entry by hand, for shows the title rules cannot match (another
 // name, a second part filed as episodes 13–24 of season 1). Kept with the account (key "jflinks"),
