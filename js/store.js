@@ -1,5 +1,5 @@
 // @ts-check
-import { untilAiring } from './api.js?v=149';
+import { untilAiring } from './api.js?v=151';
 const ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export function esc(str) { return str ? String(str).replace(/[&<>"']/g, c => ESC_MAP[c]) : ''; }
 
@@ -42,8 +42,9 @@ export function emitListChange(detail) {
 }
 // "You just watched this": the M3 design takes its colours from the show you watched last (js/m3.js)
 export const WATCHED_EVENT = 'aniroll:watched';
-export function emitWatched(media) {
-    if (media) document.dispatchEvent(new CustomEvent(WATCHED_EVENT, { detail: { media } }));
+// `progress`: the episode counter after it, when an episode was counted (not for "Start watching")
+export function emitWatched(media, progress) {
+    if (media) document.dispatchEvent(new CustomEvent(WATCHED_EVENT, { detail: { media, ...(typeof progress === 'number' ? { progress } : {}) } }));
 }
 
 let state = {
@@ -180,6 +181,15 @@ export function renderMediaCard(media, showStatus = false, rec = null, note = nu
 export function renderSkeletonCards(count = 6) {
     return Array(count).fill('<div class="skeleton skeleton-card"></div>').join('');
 }
+
+// Loading in the shape of what comes: a heading and a block (any page), a grid of covers, or rows of text,
+// so nothing jumps when the content arrives. M3 draws them still; the other design shimmers.
+export const SKELETON = {
+    page: '<div class="skeleton-page" aria-busy="true" aria-label="Loading"><div class="skeleton skeleton-heading"></div><div class="skeleton skeleton-block"></div></div>',
+    grid: (n = 12) => `<div class="skeleton-grid" aria-busy="true" aria-label="Loading">${renderSkeletonCards(n)}</div>`,
+    stage: '<div class="skeleton skeleton-block skeleton-stage" aria-busy="true" aria-label="Loading"></div>',
+    rows: (n = 6) => `<div class="skeleton-rows" aria-busy="true" aria-label="Loading">${'<div class="skeleton skeleton-row"></div>'.repeat(n)}</div>`,
+};
 
 const STATUS_ICONS = {
     CURRENT: ['Watching', '<path d="M7 4.5v15l12-7.5z"/>'],

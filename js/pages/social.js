@@ -1,6 +1,6 @@
-import * as api from '../api.js?v=149';
-import { getState, toast, esc, titlePref, emptyIcon, loginState } from '../store.js?v=149';
-import { getToken, isLoggedIn } from '../auth.js?v=149';
+import * as api from '../api.js?v=151';
+import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=151';
+import { getToken, isLoggedIn } from '../auth.js?v=151';
 
 export async function render({ content }) {
     const token = getToken();
@@ -33,7 +33,7 @@ export async function render({ content }) {
         const socialContent = document.getElementById('social-content');
         if (!socialContent) return;
 
-        if (!append) socialContent.innerHTML = '<div class="page-loader"><div class="loader-spinner"></div></div>';
+        if (!append) socialContent.innerHTML = SKELETON.rows();
 
         try {
             if (currentTab === 'friends') {

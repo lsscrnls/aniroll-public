@@ -3,6 +3,7 @@
 //   tools/showcase/run.sh roll calendar
 const http = require('http');
 const fs = require('fs');
+const { spawn } = require('child_process');
 const path = require('path');
 const { chromium } = require('playwright');
 const demo = require('./demo');
@@ -16,9 +17,52 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const only = process.argv.slice(2);
 const want = n => !only.length || only.includes(n);
+// The promo video's scenes (promo.sh) only run when named
+const promo = n => only.includes(n);
 
-function staticServer() {
+// A second made-up account, the friend who joins the demo's Watch Party
+const GUEST = { id: 5551234, name: 'Mika',
+    avatar: { large: 'https://s4.anilist.co/file/anilistcdn/user/avatar/large/default.png', medium: 'https://s4.anilist.co/file/anilistcdn/user/avatar/medium/default.png' } };
+
+// The real API server (api/server.js with party.js) for the Watch Party scene: AniList's Viewer lookup answered
+// here by token ("demo", "guest"), its data in a throwaway folder
+async function partyBackend() {
+    const viewers = { demo: demo.VIEWER, guest: GUEST };
+    const anilist = http.createServer((req, res) => {
+        const v = viewers[String(req.headers.authorization || '').slice(7)];
+        let body = '';
+        req.on('data', c => { body += c; });
+        req.on('end', () => {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(!v ? { errors: [{ message: 'Invalid token', status: 401 }] }
+                : /Viewer/.test(body) ? { data: { Viewer: { id: v.id, name: v.name, avatar: { medium: v.avatar.medium } } } } : { data: {} }));
+        });
+    });
+    await new Promise(r => anilist.listen(3099, '127.0.0.1', r));
+    const dir = fs.mkdtempSync('/tmp/aniroll-api-');
+    for (const f of ['server.js', 'party.js']) fs.copyFileSync(path.join(ROOT, 'api', f), path.join(dir, f));
+    const proc = spawn('node', ['server.js'], { cwd: dir, stdio: ['ignore', 'ignore', 'inherit'],
+        env: { ...process.env, ANILIST_URL: 'http://127.0.0.1:3099', JF_SECRET: 'showcase-secret-0123456789abcdef', ANILIST_BUDGET_PER_MIN: '200', MAX_SEATS: '50' } });
+    for (let i = 0; i < 50; i++) {
+        const up = await new Promise(r => http.get('http://127.0.0.1:3001/api/maintenance', res => { res.resume(); r(true); }).on('error', () => r(false)));
+        if (up) break;
+        await wait(200);
+    }
+    return () => { proc.kill(); anilist.close(); };
+}
+
+function staticServer(apiPort) {
     const server = http.createServer((req, res) => {
+        // /api/ goes through to the API server when one runs (streamed, so the party's live events arrive)
+        if (apiPort && req.url.startsWith('/api/')) {
+            const up = http.request({ host: '127.0.0.1', port: apiPort, path: req.url, method: req.method, headers: req.headers }, r => {
+                res.writeHead(r.statusCode, r.headers);
+                r.pipe(res);
+            });
+            up.on('error', () => { res.writeHead(502); res.end(); });
+            req.pipe(up);
+            return;
+        }
         const url = decodeURIComponent(req.url.split('?')[0]);
         const file = path.join(ROOT, url === '/' ? 'index.html' : url);
         if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end(); }
@@ -30,7 +74,8 @@ function staticServer() {
 
 (async () => {
     await demo.init();
-    const server = await staticServer();
+    const stopApi = promo('party') ? await partyBackend() : null;
+    const server = await staticServer(stopApi ? 3001 : null);
     const base = `http://127.0.0.1:${server.address().port}`;
     // GPU=1 (run.sh, when Docker has the NVIDIA runtime): render through the real GPU via ANGLE/EGL
     const browser = await chromium.launch(process.env.GPU
@@ -38,11 +83,12 @@ function staticServer() {
     console.log('rendering on', process.env.GPU ? 'the GPU' : 'the CPU (software)');
     fs.mkdirSync(path.join(OUT, 'stills'), { recursive: true });
 
-    async function context({ loggedIn = true, mobile = false, size = { width: 1440, height: 900 }, design = 'm3' } = {}) {
+    async function context({ loggedIn = true, mobile = false, size = { width: 1440, height: 900 }, scale = 1, design = 'm3',
+        api = false, as = demo.VIEWER, token = 'demo', seed = null } = {}) {
         const ctx = await browser.newContext(mobile
             ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, colorScheme: 'dark' }
-            : { viewport: size, colorScheme: 'dark' });
-        await ctx.addInitScript(([user, li, design]) => {
+            : { viewport: size, deviceScaleFactor: scale, colorScheme: 'dark' });
+        await ctx.addInitScript(([user, li, design, token]) => {
             localStorage.setItem('aniroll_theme', 'dark');
             // Material 3 unless a clip wants the legacy design
             if (design === 'aniroll') localStorage.setItem('aniroll_design_v2', 'aniroll');
@@ -57,17 +103,27 @@ function staticServer() {
             if (!localStorage.getItem('aniroll_roll_filters')) localStorage.setItem('aniroll_roll_filters', JSON.stringify({ withRecs: true }));
             localStorage.removeItem('aniroll_req_times');
             if (li) {
-                localStorage.setItem('aniroll_token', 'demo');
+                localStorage.setItem('aniroll_token', token);
                 localStorage.setItem('aniroll_user', JSON.stringify(user));
                 localStorage.setItem('aniroll_user_ts', String(Date.now()));
             }
-        }, [{ ...demo.VIEWER, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }, loggedIn, design]);
+        }, [{ ...as, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }, loggedIn, design, token]);
+        // A fixed seed makes Roll land on the same show in every scene that rolls (mulberry32)
+        if (seed != null) await ctx.addInitScript(seed => {
+            let a = seed;
+            Math.random = () => {
+                a = (a + 0x6D2B79F5) | 0;
+                let t = Math.imul(a ^ (a >>> 15), 1 | a);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }, seed);
         await ctx.route('https://graphql.anilist.co/**', async route => {
             let body;
             try { body = await demo.respond(route.request().postDataJSON()); } catch (e) { body = { errors: [{ message: e.message }] }; console.log('demo:', e.message); }
             route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
         });
-        await ctx.route(`${base}/api/**`, r => r.fulfill({ status: 404, contentType: 'application/json', body: '{}' }));
+        if (!api) await ctx.route(`${base}/api/**`, r => r.fulfill({ status: 404, contentType: 'application/json', body: '{}' }));
         await ctx.route(/kitsu\.io/, r => r.abort());
         return ctx;
     }
@@ -93,8 +149,8 @@ function staticServer() {
     }
 
     // Records the page while `act` runs: every painted frame with its timestamp, for ffmpeg's concat demuxer
-    async function clip(page, name, act) {
-        const dir = path.join(OUT, 'clips', name);
+    async function clip(page, name, act, { folder = 'clips', max = { w: 1280, h: 720 } } = {}) {
+        const dir = path.join(OUT, folder, name);
         fs.rmSync(dir, { recursive: true, force: true });
         fs.mkdirSync(dir, { recursive: true });
         const cdp = await page.context().newCDPSession(page);
@@ -108,7 +164,7 @@ function staticServer() {
             frames.push({ ts: f.metadata.timestamp, file });
             writes.push(fs.promises.writeFile(path.join(dir, file), Buffer.from(f.data, 'base64')));
         });
-        await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 92, everyNthFrame: 1, maxWidth: 1280, maxHeight: 720 });
+        await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 92, everyNthFrame: 1, maxWidth: max.w, maxHeight: max.h });
         await act();
         await cdp.send('Page.stopScreencast');
         await wait(200);
@@ -129,8 +185,12 @@ function staticServer() {
         .every(img => img.complete && img.naturalWidth > 0), null, { timeout }).catch(() => console.log('images still loading'));
 
     // Moves the (custom) cursor to an element in a smooth line, like a person would
+    // One pointer per page: the Watch Party scene records two pages at once
+    // (`mouse` is where the next page without its own pointer starts)
     let mouse = { x: 700, y: 500 };
+    const mice = new WeakMap();
     async function glide(page, selector, { steps = 30, click = false } = {}) {
+        const from = mice.get(page) || mouse;
         // The first visible match: some pages keep a hidden copy (a skeleton, the other layout) in the DOM
         const box = await page.locator(`${selector} >> visible=true`).first().boundingBox({ timeout: 8000 }).catch(() => null);
         if (!box) {
@@ -140,10 +200,11 @@ function staticServer() {
         const x = box.x + box.width / 2, y = box.y + box.height / 2;
         for (let i = 1; i <= steps; i++) {
             const t = i / steps, e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-            await page.mouse.move(mouse.x + (x - mouse.x) * e, mouse.y + (y - mouse.y) * e);
+            await page.mouse.move(from.x + (x - from.x) * e, from.y + (y - from.y) * e);
             await wait(12);
         }
         mouse = { x, y };
+        mice.set(page, mouse);
         if (click) {
             await imagesReady(page);
             await page.evaluate(() => localStorage.removeItem('aniroll_req_times'));
@@ -472,6 +533,146 @@ function staticServer() {
         await chrome.close();
     }
 
+    // ===== Promo video (promo.sh): title cards, Roll in full HD, and a Watch Party seen from both sides =====
+    const PROMO = { folder: 'promo', max: { w: 1920, h: 1080 } };
+    const PROMO_SEED = Number(process.env.SEED) || 7;
+    if (promo('cards')) {
+        const cp = await (await browser.newContext({ viewport: { width: 1920, height: 1080 } })).newPage();
+        const cards = {
+            'card-roll': ['Can’t decide what to watch?', 'AniRoll picks tonight’s show from your AniList Planning list.'],
+            'card-party': ['Watch it together.', 'Start a Watch Party, send the link, and your friends follow along live.'],
+            'card-player': ['Play it from your own Jellyfin.', 'Right in the browser, with intro skip and subtitles. AniList keeps up by itself.'],
+            'card-end': ['AniRoll', 'Roll, watch parties and your own Jellyfin, on top of the AniList you already have.', 'aniroll.app'],
+        };
+        fs.mkdirSync(path.join(OUT, 'promo', 'cards'), { recursive: true });
+        for (const [name, [head, sub, url]] of Object.entries(cards)) {
+            const end = name === 'card-end';
+            await cp.setContent(`<!doctype html><html><head><base href="${base}/"><style>
+                @font-face { font-family: Flex; src: url(fonts/google-sans-flex-latin-wght-5.3.1.woff2) format('woff2'); font-weight: 100 1000; }
+                html, body { margin: 0; height: 100%; }
+                body { background: radial-gradient(120% 90% at 85% 10%, #4a2b4f 0%, #1d1820 55%, #141218 100%); color: #ece0ee;
+                    font-family: Flex, system-ui, sans-serif; display: grid; align-content: center; padding: 0 180px; box-sizing: border-box; }
+                img { width: ${end ? 140 : 72}px; height: auto; margin-bottom: ${end ? 40 : 56}px; }
+                h1 { margin: 0; font-size: ${end ? 176 : 112}px; line-height: 1.02; font-weight: 750; letter-spacing: -0.035em; max-width: 1400px; }
+                p { margin: 36px 0 0; font-size: 44px; line-height: 1.3; font-weight: 450; color: #cdbfd2; max-width: 1300px; }
+                .url { margin-top: 64px; font-size: 56px; font-weight: 650; color: #f2b8d6; }
+            </style></head><body><img src="favicon.svg" alt=""><h1>${head}</h1><p>${sub}</p>${url ? `<p class="url">${url}</p>` : ''}</body></html>`);
+            await cp.evaluate(() => document.fonts.ready);
+            await wait(400);
+            await cp.screenshot({ path: path.join(OUT, 'promo', 'cards', `${name}.png`) });
+            console.log('card', name);
+        }
+        await cp.context().close();
+    }
+
+    if (promo('promo-roll')) {
+        const rp = await (await context({ size: { width: 1440, height: 810 }, scale: 4 / 3, seed: PROMO_SEED })).newPage();
+        await rp.goto(base + '/#/roll');
+        await wait(7000);
+        await settle(rp, false);
+        await clip(rp, 'roll', async () => {
+            await wait(600);
+            await glide(rp, '#roll-btn', { click: true });
+            await wait(5200);
+            await glide(rp, '#roll-result .glass-btn-primary', { steps: 40 });
+            await wait(1500);
+        }, PROMO);
+        await rp.context().close();
+    }
+
+    // Two windows side by side: the demo account rolls and starts a party, Mika opens the link and joins,
+    // then every episode the host marks arrives on Mika's side live (the real party code, server-sent events)
+    if (promo('party')) {
+        const size = { width: 960, height: 1080 };
+        const host = await (await context({ size, api: true, seed: PROMO_SEED })).newPage();
+        const guest = await (await context({ size, api: true, as: GUEST, token: 'guest' })).newPage();
+        [host, guest].forEach(p => p.on('pageerror', e => console.log('pageerror', e.message)));
+        const tag = (page, text) => page.evaluate(t => {
+            let el = document.getElementById('promo-tag');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'promo-tag';
+                el.style.cssText = 'position:fixed;right:28px;bottom:28px;z-index:2147483647;padding:12px 26px;'
+                    + 'border-radius:999px;background:rgba(20,18,24,.88);color:#fff;font:650 24px system-ui,sans-serif;pointer-events:none;'
+                    + 'box-shadow:0 8px 30px rgba(0,0,0,.4)';
+                document.body.appendChild(el);
+            }
+            el.textContent = t;
+        }, text);
+        // Before the link arrives, Mika's window is a chat (a plain made-up one, no real app's look)
+        const chat = (page, msgs) => page.evaluate(msgs => {
+            let box = document.getElementById('promo-chat');
+            if (!box) {
+                box = document.createElement('div');
+                box.id = 'promo-chat';
+                box.style.cssText = 'position:fixed;inset:0;z-index:2147483600;background:#17141b;display:flex;flex-direction:column;'
+                    + 'justify-content:flex-end;gap:18px;padding:0 56px 140px;font:400 28px system-ui,sans-serif;color:#ece0ee';
+                document.body.appendChild(box);
+            }
+            box.innerHTML = '<div style="position:absolute;top:44px;left:56px;font-weight:700;font-size:30px">Mika and demo</div>' + msgs.map(([who, text, link]) => {
+                const me = who === 'Mika';
+                return `<div style="align-self:${me ? 'flex-end' : 'flex-start'};max-width:78%;padding:18px 24px;border-radius:26px;`
+                    + `background:${me ? '#4a3a63' : '#2b2530'}"><div style="font-size:20px;opacity:.65;margin-bottom:6px">${who}</div>${text}`
+                    + `${link ? `<div id="promo-invite" style="margin-top:10px;color:#f2b8d6;text-decoration:underline;font-weight:600">${link}</div>` : ''}</div>`;
+            }).join('');
+        }, msgs);
+        await host.goto(base + '/#/roll');
+        await guest.goto(base + '/#/');
+        await chat(guest, [['Mika', 'anything tonight?'], ['demo', 'no idea, letting AniRoll pick']]);
+        await wait(7000);
+        await host.locator('#roll-btn').click();
+        await wait(6500);
+        await settle(host, false); await settle(guest, false);
+        await tag(host, 'You'); await tag(guest, 'Your friend');
+
+        let started, joined;
+        const partyUp = new Promise(r => { started = r; });
+        const guestIn = new Promise(r => { joined = r; });
+        await Promise.all([
+            clip(host, 'party-host', async () => {
+                await wait(800);
+                await glide(host, '#roll-party', { click: true });
+                await host.waitForFunction(() => location.hash.startsWith('#/watchparty') && document.getElementById('wp-inc'), null, { timeout: 15000 });
+                await tag(host, 'You');
+                await wait(1500);
+                started();
+                await guestIn;
+                await wait(1200);
+                for (let i = 0; i < 2; i++) {
+                    await glide(host, '#wp-inc', { click: true });
+                    console.log('host +1:', await host.evaluate(() => {
+                        const b = document.querySelector('#wp-inc').getBoundingClientRect();
+                        const at = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+                        return `${document.getElementById('wp-progress')?.textContent} | at ${at?.id || at?.className} | disabled ${document.querySelector('#wp-inc').disabled}`;
+                    }));
+                    await wait(2600);
+                }
+            }, PROMO),
+            clip(guest, 'party-guest', async () => {
+                await wait(1200);
+                await partyUp;
+                await chat(guest, [['Mika', 'anything tonight?'], ['demo', 'no idea, letting AniRoll pick'],
+                    ['demo', 'got one, come watch', 'aniroll.app/w/demo']]);
+                await wait(1600);
+                await glide(guest, '#promo-invite', { click: false });
+                await wait(300);
+                await guest.evaluate(() => { document.getElementById('promo-chat')?.remove(); location.hash = '/watchparty?host=demo'; });
+                await guest.waitForSelector('#wp-join', { timeout: 15000 });
+                await tag(guest, 'Your friend');
+                await wait(1200);
+                await glide(guest, '#wp-join', { click: true });
+                const ok = await guest.waitForSelector('#wp-bg-keep, #wp-join-ok', { timeout: 4000 }).catch(() => null);
+                if (ok) { await wait(600); await glide(guest, '#wp-bg-keep, #wp-join-ok', { click: true }); }
+                await wait(1500);
+                joined();
+                await wait(8000);
+            }, PROMO),
+        ]);
+        await host.context().close();
+        await guest.context().close();
+    }
+
     await browser.close();
     server.close();
+    stopApi?.();
 })().catch(e => { console.error(e); process.exit(1); });

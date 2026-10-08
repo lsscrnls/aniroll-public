@@ -1,12 +1,12 @@
-import * as api from '../api.js?v=149';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=149';
-import { openDialog, showScorePrompt } from '../a11y.js?v=149';
-import { isLoggedIn, getToken } from '../auth.js?v=149';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=149';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=149';
-import { renderHeadline, renderTour, renderColour, renderMachine, renderParty, fillInvite, initLanding } from '../landing.js?v=149';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=149';
-import { setDismissed, syncDismissed } from '../dismissed.js?v=149';
+import * as api from '../api.js?v=151';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=151';
+import { openDialog, showScorePrompt } from '../a11y.js?v=151';
+import { isLoggedIn, getToken } from '../auth.js?v=151';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=151';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=151';
+import { renderHeadline, renderTour, renderColour, renderMachine, renderParty, fillInvite, initLanding } from '../landing.js?v=151';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=151';
+import { setDismissed, syncDismissed } from '../dismissed.js?v=151';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
@@ -86,7 +86,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=149'), import('../jellyfin.js?v=149')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=151'), import('../jellyfin.js?v=151')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
@@ -145,17 +145,16 @@ const stalledWeeks = (e) => {
     return e.updatedAt && idle > STALLED_AFTER && !behindOf(e) ? Math.floor(idle / WEEK) : 0;
 };
 
+// One fact per card, the one that asks for something: what's waiting, else when the next one airs, else
+// how far you are (the bar under the card shows the progress anyway)
 function continueSub(e) {
     const m = e.media;
-    const progress = m.episodes ? `${e.progress}/${m.episodes}` : `${e.progress}`;
     const behind = behindOf(e);
-    if (behind) return `${progress} Ep · ${behind} behind`;
+    if (behind) return `${behind} behind`;
     const stalled = stalledWeeks(e);
-    if (stalled) return `${progress} Ep · Untouched ${stalled} weeks`;
-    const airing = m.nextAiringEpisode
-        ? `Ep ${m.nextAiringEpisode.episode} in ${api.timeUntil(api.untilAiring(m.nextAiringEpisode))}`
-        : '';
-    return `${progress} Ep${airing ? ` · ${airing}` : ''}`;
+    if (stalled) return `Untouched ${stalled} weeks`;
+    if (m.nextAiringEpisode) return `Ep ${m.nextAiringEpisode.episode} in ${api.timeUntil(api.untilAiring(m.nextAiringEpisode))}`;
+    return m.episodes ? `${e.progress}/${m.episodes} Ep` : `${e.progress} Ep`;
 }
 
 // ===== One line above Continue Watching: what aired since the last visit, and what the week asks for =====
@@ -340,7 +339,7 @@ async function loadContinueWatching(token) {
             if (!entry || (max && entry.progress >= max)) return;
 
             entry.progress++;
-            emitWatched(entry.media);
+            emitWatched(entry.media, entry.progress);
             const card = btn.closest('.media-card');
             card.querySelector('.media-card-sub').textContent = continueSub(entry);
             card.querySelector('.progress-bar-fill').style.width = `${continuePct(entry)}%`;
@@ -840,7 +839,7 @@ function setupTryRoll(media) {
         // The reel starts on the cover it shows now, so nothing jumps
         const strip = [shown, ...Array.from({ length: 20 }, () => pool[Math.floor(Math.random() * pool.length)]), winner];
         const [{ playReel }] = await Promise.all([
-            import('../reel.js?v=149'),
+            import('../reel.js?v=151'),
             // A slow connection waits a moment for the covers, but never long
             Promise.race([Promise.all(loaded), new Promise(r => setTimeout(r, 800))]),
         ]);

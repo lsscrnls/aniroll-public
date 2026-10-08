@@ -2,13 +2,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=149';
-import { openDialog } from './a11y.js?v=149';
-import { prefersReducedMotion } from './animations.js?v=149';
-import { accountState, saveAccountState } from './accountstate.js?v=149';
+import { esc } from './store.js?v=151';
+import { openDialog } from './a11y.js?v=151';
+import { prefersReducedMotion } from './animations.js?v=151';
+import { accountState, saveAccountState } from './accountstate.js?v=151';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.5.2';
+export const RELEASE = '1.5.3';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -21,9 +21,14 @@ const AUTO_KEY = 'aniroll_seen_auto';
 const CHANGES = [
     {
         // '.2': the move to aniroll.app
-        id: '2026-10-08.2',
-        title: 'AniRoll moved to aniroll.app',
+        // '.3': calmer Home, show pages, lists and Roll
+        id: '2026-10-08.3',
+        title: 'AniRoll moved to aniroll.app, and a calmer look',
         items: [
+            { rev: 3, text: 'When none of your shows has a new episode yet, the big card on Home says when the next one airs and offers a <strong>Roll</strong> instead of a big number. With nothing left to watch, the small card next to it says you are caught up.' },
+            { rev: 3, text: 'Show cards say one thing at a glance: how many episodes are waiting, or when the next one airs. Rows that go on to the side fade out at the edge.' },
+            { rev: 3, text: 'Show pages are quieter: the facts read as two short phrases, tags and recommendations drop their extra percentages, and where to watch it sits with the other links at the end.' },
+            { rev: 3, text: 'Pages show their outline while they load instead of a spinner.' },
             { rev: 2, text: 'AniRoll now lives at <strong>aniroll.app</strong>. Old links still work and bring you here, and you stay logged in with your Jellyfin and settings.' },
             'The roll on the front page stops exactly on one cover, without an edge of the next one showing, and every cover is there while it spins.',
             'AniRoll can now be found through Google and other search engines.',

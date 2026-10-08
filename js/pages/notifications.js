@@ -1,6 +1,6 @@
-import * as api from '../api.js?v=149';
-import { esc, titlePref, emptyIcon, loginState } from '../store.js?v=149';
-import { getToken, isLoggedIn } from '../auth.js?v=149';
+import * as api from '../api.js?v=151';
+import { esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=151';
+import { getToken, isLoggedIn } from '../auth.js?v=151';
 
 export async function render({ content }) {
     const token = getToken();
@@ -24,7 +24,7 @@ export async function render({ content }) {
         const list = document.getElementById('notif-list');
         if (!list) return;
 
-        if (!append) list.innerHTML = '<div class="page-loader"><div class="loader-spinner"></div></div>';
+        if (!append) list.innerHTML = SKELETON.rows();
 
         try {
             const result = await api.getNotifications(p, token);
@@ -57,7 +57,7 @@ export async function render({ content }) {
         if (!open || box.dataset.loaded) return;
         box.innerHTML = '<div class="activity-replies-status">Loading…</div>';
         try {
-            const [replies, { renderReply }] = await Promise.all([api.getActivityReplies(id, token), import('./social.js?v=149')]);
+            const [replies, { renderReply }] = await Promise.all([api.getActivityReplies(id, token), import('./social.js?v=151')]);
             box.dataset.loaded = '1';
             box.innerHTML = (replies.length ? replies.slice(-5).map(renderReply).join('') : '<div class="activity-replies-status">No replies yet</div>')
                 + `<a class="notif-thread-link" href="https://anilist.co/activity/${id}" target="_blank" rel="noopener">Open on AniList</a>`;
