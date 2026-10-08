@@ -4,18 +4,22 @@
 #   bash scripts/release.sh --css      also style.css?v=
 #   bash scripts/release.sh --m3       also m3.css?v= (index.html and CSS_HREF in js/design.js together)
 #   bash scripts/release.sh 140 ...    a version of your own instead of the next one
-#   bash scripts/release.sh --minor    also the public version (RELEASE in js/whatsnew.js): 1.4.2 -> 1.5.0
-#   bash scripts/release.sh --major    1.5.0 -> 2.0.0; without either, every release counts the patch: 1.4.0 -> 1.4.1
+#   (RELEASE in js/whatsnew.js) without a flag counts an internal fix: 1.5.1 -> 1.5.1.1 -> 1.5.1.2
+#   bash scripts/release.sh --patch    the next public version: 1.5.1.2 -> 1.5.2 (the mirror only takes these)
+#   bash scripts/release.sh --minor    1.5.2 -> 1.6.0
+#   bash scripts/release.sh --major    1.6.0 -> 2.0.0
+# Fixes are collected under four numbers and reach the mirror together, so its versions run on without gaps.
 # The ?v= number only busts caches; people see RELEASE (What's new, the mirror's commits and tags).
 # The changelog (js/whatsnew.js) stays by hand; the browser checks read its entries themselves.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-target=""; css=0; m3=0; bump=patch
+target=""; css=0; m3=0; bump=fix
 for a in "$@"; do
     case "$a" in
         --css) css=1 ;;
+        --patch) bump=patch ;;
         --minor) bump=minor ;;
         --major) bump=major ;;
         --m3) m3=1 ;;
@@ -45,12 +49,13 @@ if [ "$m3" = 1 ]; then
     echo "m3.css v$c -> v$((c + 1)) (index.html and js/design.js)"
 fi
 
-rel=$(grep -oE "RELEASE = '[0-9]+\.[0-9]+\.[0-9]+'" js/whatsnew.js | grep -oE "[0-9.]+[0-9]")
-IFS=. read -r ma mi pa <<< "$rel"
+rel=$(grep -oE "RELEASE = '[0-9]+(\.[0-9]+){2,3}'" js/whatsnew.js | grep -oE "[0-9.]+[0-9]")
+IFS=. read -r ma mi pa fx <<< "$rel"
 case "$bump" in
     major) newrel="$((ma + 1)).0.0" ;;
     minor) newrel="$ma.$((mi + 1)).0" ;;
-    *) newrel="$ma.$mi.$((pa + 1))" ;;
+    patch) newrel="$ma.$mi.$((pa + 1))" ;;
+    *) newrel="$ma.$mi.$pa.$((${fx:-0} + 1))" ;;
 esac
 sed -i -E "s/RELEASE = '$rel'/RELEASE = '$newrel'/" js/whatsnew.js
 echo "AniRoll $rel -> $newrel"

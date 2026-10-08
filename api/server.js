@@ -129,7 +129,7 @@ function sharePage(entry, id) {
         ? entry.description
         : 'Your AniList with watch parties, a random pick for what to watch next, recommendations and an airing calendar.';
     // Portrait covers look better as a thumbnail than as a stretched banner
-    const image = entry && entry.cover ? entry.cover : `${SITE}/og-image-v3.jpg`;
+    const image = entry && entry.cover ? entry.cover : `${SITE}/og-image-v4.jpg`;
     const card = entry && entry.cover ? 'summary' : 'summary_large_image';
 
     return `<!DOCTYPE html>
@@ -148,6 +148,7 @@ function sharePage(entry, id) {
 <meta name="twitter:description" content="${escapeHtml(description)}">
 <meta name="twitter:image" content="${escapeHtml(image)}">
 <meta name="theme-color" content="#d13438">
+<meta name="robots" content="noindex">
 <meta http-equiv="refresh" content="0; url=${target}">
 <style>body{background:#0a0a0a;color:#fff;font-family:system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0}a{color:#d13438}</style>
 </head>
@@ -165,7 +166,7 @@ function partyPage(host, info, stamp = '') {
     const description = info
         ? `${info.title}${info.episode ? ` · at episode ${info.episode}` : ''}${info.members ? ` · ${info.members} watching` : ''}. Join and your episode counter follows along.`
         : 'Watch anime together: join and your AniList follows the host episode by episode.';
-    const image = info && /^https:\/\/s4\.anilist\.co\//.test(info.cover) ? info.cover : `${SITE}/og-image-v3.jpg`;
+    const image = info && /^https:\/\/s4\.anilist\.co\//.test(info.cover) ? info.cover : `${SITE}/og-image-v4.jpg`;
     const card = info && info.cover ? 'summary' : 'summary_large_image';
     return `<!DOCTYPE html>
 <html lang="en">
@@ -183,6 +184,7 @@ function partyPage(host, info, stamp = '') {
 <meta name="twitter:description" content="${escapeHtml(description)}">
 <meta name="twitter:image" content="${escapeHtml(image)}">
 <meta name="theme-color" content="#d13438">
+<meta name="robots" content="noindex">
 <meta http-equiv="refresh" content="0; url=${escapeHtml(target)}">
 <style>body{background:#0a0a0a;color:#fff;font-family:system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0}a{color:#d13438}</style>
 </head>

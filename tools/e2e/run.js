@@ -1345,6 +1345,19 @@ function staticServer() {
         landing.words === 6 && landing.machine.window && landing.machine.ready && landing.items === 4 && landing.active === 'calendar' && landing.selected === 'true', landing);
     check('landing: nav frosted once scrolled; Watch Party as an invite, two plain lines for the rest, no old cards',
         landing.navScrolled && landing.invite === 'Mika is hosting a Watch Party' && landing.also === 2 && landing.oldCards === 0, landing);
+    // The roll stops exactly on the winner: every cover is the window's size, none of the next one shows
+    const tryRoll = await fresh.evaluate(async () => {
+        const btn = document.getElementById('try-roll');
+        btn.click();
+        for (let i = 0; i < 80 && btn.textContent !== 'Roll again'; i++) await new Promise(r => setTimeout(r, 100));
+        const win = document.getElementById('try-window').getBoundingClientRect();
+        const items = [...document.querySelectorAll('#try-reel .roll-item')].map(el => el.getBoundingClientRect());
+        const last = items[items.length - 1];
+        return { done: btn.textContent === 'Roll again', items: items.length, offset: Math.abs(last.top - win.top),
+            sizes: items.every(r => Math.abs(r.height - win.height) < 0.5) };
+    });
+    check('landing: the roll stops on one whole cover, each cover the window’s size',
+        tryRoll.done && tryRoll.items > 3 && tryRoll.offset < 0.5 && tryRoll.sizes, tryRoll);
     // Material 3 only: shaped tiles with trending covers, the colour section with its clip, no design switch
     const m3landing = await fresh.evaluate(() => ({ design: document.documentElement.dataset.design, tiles: document.querySelectorAll('.lp-tile').length,
         colour: document.querySelector('.lp-colour video')?.getAttribute('src'), tryDesign: !!document.querySelector('[data-try-design], .landing-designs') }));
@@ -1396,7 +1409,7 @@ function staticServer() {
     const log = await late.evaluate(() => ({ hash: location.hash, title: document.querySelector('.whatsnew-page h1')?.textContent, entries: document.querySelectorAll('.whatsnew-page .whatsnew-entry').length,
         back: document.querySelector('.whatsnew-back')?.textContent.trim(), dialog: !!document.querySelector('[aria-modal="true"]'), unread: document.documentElement.classList.contains('whatsnew-unread') }));
     check('changelog: still there, marked unread, opens as its own page with all entries and the version',
-        unread && log.hash === '#/whatsnew' && /^What's new AniRoll \d+\.\d+\.\d+$/.test(log.title || '') && log.entries === CHANGE_COUNT && !log.dialog && !log.unread, { unread, ...log });
+        unread && log.hash === '#/whatsnew' && /^What's new AniRoll \d+(\.\d+){2,3}$/.test(log.title || '') && log.entries === CHANGE_COUNT && !log.dialog && !log.unread, { unread, ...log });
     await late.click('.whatsnew-back');
     await late.clock.runFor(500);
     const backTo = await late.evaluate(() => ({ hash: location.hash || '#/', landing: !!document.querySelector('.landing-foot') }));
