@@ -79,7 +79,7 @@ if [ "$DRY" -eq 1 ]; then echo; echo "dry run: nothing uploaded"; exit 0; fi
 step "Frontend"
 # One tar stream over one SSH connection — the many single scp calls used to time out
 files=(index.html css js)
-for extra in favicon.svg manifest.webmanifest icons fonts media og-image-v3.jpg; do
+for extra in favicon.svg manifest.webmanifest robots.txt sitemap.xml move icons fonts media og-image-v4.jpg; do
     [ -e "$extra" ] && files+=("$extra")
 done
 # Uploaded from a copy, so the protected modules can be obfuscated without touching the repo

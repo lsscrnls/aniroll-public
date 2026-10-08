@@ -3,13 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>AniRoll</title>
+    <title>AniRoll · Anime tracker for AniList: roll, track, watch together</title>
+    <!-- Search engines: one canonical address (the app lives behind "#", which they don't index) and a description -->
+    <meta name="description" content="AniRoll is a free anime tracker for your AniList: roll tonight&#39;s show from your Planning list, follow every airing in a weekly calendar, start watch parties with friends and play episodes from your own Jellyfin.">
+    <link rel="canonical" href="https://aniroll.app/">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"AniRoll","url":"https://aniroll.app/","applicationCategory":"EntertainmentApplication","operatingSystem":"Any (web browser)","description":"Anime tracker for AniList: a random pick from your Planning list, an airing calendar, watch parties, recommendations and a player for your own Jellyfin.","image":"https://aniroll.app/og-image-v4.jpg","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}}</script>
     <meta property="og:title" content="AniRoll">
     <meta property="og:description" content="Your AniList with watch parties, a random pick for what to watch next, recommendations and an airing calendar.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://aniroll.app/">
     <!-- New file name on purpose: Discord caches preview images for a long time -->
-    <meta property="og:image" content="https://aniroll.app/og-image-v3.jpg">
+    <meta property="og:image" content="https://aniroll.app/og-image-v4.jpg">
     <meta property="og:image:type" content="image/jpeg">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
@@ -19,9 +23,9 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="AniRoll">
     <meta name="twitter:description" content="Your AniList with watch parties, a random pick for what to watch next, recommendations and an airing calendar.">
-    <meta name="twitter:image" content="https://aniroll.app/og-image-v3.jpg">
+    <meta name="twitter:image" content="https://aniroll.app/og-image-v4.jpg">
     <link rel="stylesheet" href="css/style.css?v=101">
-    <link rel="stylesheet" href="css/m3.css?v=34" id="m3-css">
+    <link rel="stylesheet" href="css/m3.css?v=35" id="m3-css">
     <link rel="stylesheet" href="css/m3-icons.css?v=2" id="m3-icons-css">
     <link rel="stylesheet" href="css/m3-shapes.css?v=1" id="m3-shapes-css">
     <!-- Material 3 is the design for everyone logged out and the default after: its font, not Inter -->
@@ -39,6 +43,10 @@
 <body>
     <a class="skip-link" href="#content" id="skip-link">Skip to content</a>
     <div id="cursor" class="cursor" aria-hidden="true"></div>
+    <noscript>
+        <h1>AniRoll · Anime tracker for AniList</h1>
+        <p>Roll tonight's show from your Planning list, follow every airing in a weekly calendar, watch together in Watch Parties and play episodes from your own Jellyfin. Your AniList keeps up by itself. AniRoll needs JavaScript.</p>
+    </noscript>
 
     <div id="app">
         <nav id="navbar" class="glass-nav">
@@ -157,24 +165,26 @@
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <!-- Hosted here, unmodified from the npm packages: a compromised CDN could otherwise read the AniList token -->
+    <!-- Before the modules: takes over what the old address (old.example.com) kept in this browser -->
+    <script src="js/carry.js?v=149"></script>
     <script src="js/vendor/gsap-3.12.5.min.js"></script>
     <script src="js/vendor/ScrollTrigger-3.12.5.min.js"></script>
     <script src="js/vendor/lenis-1.1.13.min.js"></script>
     <!-- The modules app.js imports, asked for at once instead of one level after the other -->
-    <link rel="modulepreload" href="js/store.js?v=146">
-    <link rel="modulepreload" href="js/router.js?v=146">
-    <link rel="modulepreload" href="js/auth.js?v=146">
-    <link rel="modulepreload" href="js/seat.js?v=146">
-    <link rel="modulepreload" href="js/taste.js?v=146">
-    <link rel="modulepreload" href="js/accountstate.js?v=146">
-    <link rel="modulepreload" href="js/dismissed.js?v=146">
-    <link rel="modulepreload" href="js/api.js?v=146">
-    <link rel="modulepreload" href="js/animations.js?v=146">
-    <link rel="modulepreload" href="js/a11y.js?v=146">
-    <link rel="modulepreload" href="js/whatsnew.js?v=146">
-    <link rel="modulepreload" href="js/m3-baseline.js?v=146">
-    <link rel="modulepreload" href="js/design.js?v=146">
-    <link rel="modulepreload" href="js/status.js?v=146">
-    <script type="module" src="js/app.js?v=146"></script>
+    <link rel="modulepreload" href="js/store.js?v=149">
+    <link rel="modulepreload" href="js/router.js?v=149">
+    <link rel="modulepreload" href="js/auth.js?v=149">
+    <link rel="modulepreload" href="js/seat.js?v=149">
+    <link rel="modulepreload" href="js/taste.js?v=149">
+    <link rel="modulepreload" href="js/accountstate.js?v=149">
+    <link rel="modulepreload" href="js/dismissed.js?v=149">
+    <link rel="modulepreload" href="js/api.js?v=149">
+    <link rel="modulepreload" href="js/animations.js?v=149">
+    <link rel="modulepreload" href="js/a11y.js?v=149">
+    <link rel="modulepreload" href="js/whatsnew.js?v=149">
+    <link rel="modulepreload" href="js/m3-baseline.js?v=149">
+    <link rel="modulepreload" href="js/design.js?v=149">
+    <link rel="modulepreload" href="js/status.js?v=149">
+    <script type="module" src="js/app.js?v=149"></script>
 </body>
 </html>

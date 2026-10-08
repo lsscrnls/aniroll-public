@@ -1,8 +1,8 @@
 // @ts-check
 // A studio's page (#/studio/<id>): its anime, most popular first, from the studio cards on a detail page.
-import * as api from '../api.js?v=146';
-import { renderMediaCard, esc, emptyIcon, historyLine } from '../store.js?v=146';
-import { getToken, isLoggedIn } from '../auth.js?v=146';
+import * as api from '../api.js?v=149';
+import { renderMediaCard, esc, emptyIcon, historyLine } from '../store.js?v=149';
+import { getToken, isLoggedIn } from '../auth.js?v=149';
 
 export async function render({ params, content }) {
     const token = getToken();
