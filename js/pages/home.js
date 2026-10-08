@@ -1,16 +1,18 @@
-import * as api from '../api.js?v=146';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=146';
-import { openDialog, showScorePrompt } from '../a11y.js?v=146';
-import { isLoggedIn, getToken } from '../auth.js?v=146';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=146';
-import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=146';
-import { renderHeadline, renderTour, renderColour, renderMachine, renderParty, fillInvite, initLanding } from '../landing.js?v=146';
-import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=146';
-import { setDismissed, syncDismissed } from '../dismissed.js?v=146';
+import * as api from '../api.js?v=149';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js?v=149';
+import { openDialog, showScorePrompt } from '../a11y.js?v=149';
+import { isLoggedIn, getToken } from '../auth.js?v=149';
+import { getActiveParty, startParty, openPartyPicker } from './watchparty.js?v=149';
+import { lenisScrollTo, stopLenis, startLenis } from '../animations.js?v=149';
+import { renderHeadline, renderTour, renderColour, renderMachine, renderParty, fillInvite, initLanding } from '../landing.js?v=149';
+import { renderCinema, stop as stopCinema } from '../home-cinema.js?v=149';
+import { setDismissed, syncDismissed } from '../dismissed.js?v=149';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
         content.innerHTML = renderLanding();
+        // What search engines show for the front page (the same as index.html's), not the headline
+        document.title = 'AniRoll · Anime tracker for AniList: roll, track, watch together';
         return initLanding(content);
     }
 
@@ -84,7 +86,7 @@ function mountNowPlaying() {
     let render = null;
     const onNow = (e) => render?.(e.detail);
     window.addEventListener('aniroll:jf-now', onNow);
-    Promise.all([import('../nowplaying.js?v=146'), import('../jellyfin.js?v=146')]).then(([np, jf]) => {
+    Promise.all([import('../nowplaying.js?v=149'), import('../jellyfin.js?v=149')]).then(([np, jf]) => {
         render = (state) => np.renderNowCard(document.getElementById('jf-now-section'), state);
         render(jf.getNowState());
     });
@@ -826,6 +828,8 @@ function setupTryRoll(media) {
     // Before the first roll the window shows a cover, not an empty frame
     let shown = pool[0];
     reel.innerHTML = `<div class="roll-item"><img src="${esc(shown.coverImage.large)}" alt=""></div>`;
+    // Every cover the reel can show is loaded now, not while it spins past (they flew by as empty frames)
+    const loaded = pool.map(m => { const img = new Image(); img.src = m.coverImage.large; return img.decode().catch(() => {}); });
     btn.disabled = false;
     let rolling = false;
     btn.addEventListener('click', async () => {
@@ -835,7 +839,11 @@ function setupTryRoll(media) {
         const winner = pool[Math.floor(Math.random() * pool.length)];
         // The reel starts on the cover it shows now, so nothing jumps
         const strip = [shown, ...Array.from({ length: 20 }, () => pool[Math.floor(Math.random() * pool.length)]), winner];
-        const { playReel } = await import('../reel.js?v=146');
+        const [{ playReel }] = await Promise.all([
+            import('../reel.js?v=149'),
+            // A slow connection waits a moment for the covers, but never long
+            Promise.race([Promise.all(loaded), new Promise(r => setTimeout(r, 800))]),
+        ]);
         playReel({
             windowEl: box.querySelector('#try-window'),
             reelEl: reel,

@@ -15,7 +15,7 @@ const ROOT = path.join(__dirname, '..', '..');
 // Any font does for the embedded-font path: JASSUB's own default face
 const FONT = fs.readFileSync(path.join(ROOT, 'js', 'vendor', 'jassub-2.5.16', 'default.woff2'));
 // Any picture does for the episode thumbnails
-const THUMB = fs.readFileSync(path.join(ROOT, 'og-image-v3.jpg'));
+const THUMB = fs.readFileSync(path.join(ROOT, 'og-image-v4.jpg'));
 const ASS_SCRIPT = `[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Liberation Sans,36,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,20,20,20,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:19.00,Default,,0,0,0,,{\\an8\\pos(320,60)}A styled sign\n`;
 const RUNTIME = 20 * 10_000_000;
 const CORS = {

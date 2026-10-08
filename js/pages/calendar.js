@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=146';
-import { cachedQuery } from '../api.js?v=146';
-import { getState, esc, titlePref, renderPageSwitch, toast } from '../store.js?v=146';
-import { getToken, isLoggedIn } from '../auth.js?v=146';
+import * as api from '../api.js?v=149';
+import { cachedQuery } from '../api.js?v=149';
+import { getState, esc, titlePref, renderPageSwitch, toast } from '../store.js?v=149';
+import { getToken, isLoggedIn } from '../auth.js?v=149';
 
 const VIEW_KEY = 'aniroll_cal_view';
 const ANCHOR_KEY = 'aniroll_cal_anchor';
@@ -522,6 +522,7 @@ function downloadIcs(items) {
     const events = list.map(a => {
         const minutes = a.media.duration || 24;
         const title = `${titlePref(a.media.title)} · Episode ${a.episode}${a._forecast ? ' (estimated)' : ''}`;
+        // The UID keeps the old address: a calendar that imported the file before the move sees the same events, not doubles
         return ['BEGIN:VEVENT',
             `UID:aniroll-${a.media.id}-${a.episode}@aniroll.app`,
             `DTSTAMP:${now}`,

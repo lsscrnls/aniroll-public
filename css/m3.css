@@ -1994,7 +1994,8 @@
     background: var(--md-surface-container-high);
     box-shadow: var(--md-elev-3, 0 16px 40px rgb(0 0 0 / .25));
 }
-:root[data-design="m3"] .lp-machine-window .roll-item { height: 100%; }
+/* Each cover exactly the window's size (2:3 of its width), so a stopped reel shows no edge of its neighbours */
+:root[data-design="m3"] .lp-machine-window .roll-item { height: auto; aspect-ratio: 2 / 3; }
 :root[data-design="m3"] .lp-machine-window .roll-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 :root[data-design="m3"] .lp-machine-btn { position: relative; z-index: 1; }
 :root[data-design="m3"] .lp-machine-btn:disabled { opacity: .6; cursor: default; }
