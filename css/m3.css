@@ -1008,6 +1008,9 @@
     overflow: hidden;
 }
 :root[data-design="m3"] .m3-hero-headline { font-size: clamp(2.5rem, 5vw, 4rem); }
+/* No episode out yet: the title leads instead of a number, the air date right under it */
+:root[data-design="m3"] .m3-hero-title.is-lead { margin-top: 4px; font-size: clamp(1.875rem, 3vw, 2.625rem); line-height: 1.1; letter-spacing: -0.02em; }
+:root[data-design="m3"] .m3-hero-airs { margin-bottom: 28px; font-size: 1.125rem; font-weight: 500; opacity: .85; }
 :root[data-design="m3"] .m3-hero-meta { margin-bottom: 24px; }
 :root[data-design="m3"] .m3-hero-chip {
     display: inline-flex;
@@ -1645,6 +1648,8 @@
 @media (prefers-reduced-motion: reduce) { :root[data-design="m3"] .m3-widget-clock :is(.m3-clock-ring, .m3-clock-now) { animation: none; } }
 /* Queue: the count, the shows as overlapping round faces. The hero's number stays the one big figure on Home */
 :root[data-design="m3"] .m3-widget-big { font-size: 2.75rem; line-height: 1; font-weight: 750; letter-spacing: -0.03em; color: var(--md-tertiary); margin-top: 6px; }
+:root[data-design="m3"] .m3-widget-empty { margin-top: 10px; font-size: 1.375rem; line-height: 1.2; font-weight: 650; letter-spacing: -0.01em; }
+:root[data-design="m3"] .m3-widget-go { color: var(--md-primary); font-weight: 600; }
 :root[data-design="m3"] .m3-widget-faces { position: absolute; right: 18px; top: 18px; display: flex; }
 :root[data-design="m3"] .m3-widget-faces img {
     width: 34px; height: 34px; border-radius: 50%; object-fit: cover; margin-left: -10px;
@@ -2221,3 +2226,20 @@
 :root[data-design="m3"] .detail-ext-info a { color: var(--md-on-surface-variant); }
 :root[data-design="m3"] .detail-ext-info a:hover { color: var(--md-on-surface); }
 :root[data-design="m3"] .detail-dist .stat-bar-track { background: transparent; }
+
+/* ----- Side-scrolling rows fade out at an edge with more behind it (classes from m3.js setupRowEdges) ----- */
+:root[data-design="m3"] :is(.scroll-row, .detail-studios).has-more-end {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 96px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 96px), transparent);
+}
+:root[data-design="m3"] :is(.scroll-row, .detail-studios).has-more-start {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 96px);
+    mask-image: linear-gradient(to right, transparent, #000 96px);
+}
+:root[data-design="m3"] :is(.scroll-row, .detail-studios).has-more-start.has-more-end {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 96px, #000 calc(100% - 96px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 96px, #000 calc(100% - 96px), transparent);
+}
+
+/* Detail recommendations: the AniList score is the one number on this page already (top), not again on every card */
+:root[data-design="m3"] .detail-recs .media-card-score { display: none; }

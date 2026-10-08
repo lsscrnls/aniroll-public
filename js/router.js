@@ -1,5 +1,5 @@
 // @ts-check
-import { esc, emptyIcon } from './store.js?v=149';
+import { esc, emptyIcon, SKELETON } from './store.js?v=151';
 
 const routes = [];
 let currentCleanup = null;
@@ -46,7 +46,7 @@ export async function resolve() {
             const params = {};
             r.paramNames.forEach((name, i) => { params[name] = decodeURIComponent(match[i + 1]); });
 
-            content.innerHTML = '<div class="page-loader"><div class="loader-spinner"></div></div>';
+            content.innerHTML = SKELETON.page;
             // Right away, not after loading: the calendar waits for its schedule first
             updateActiveNav(path);
             // A page may name itself (a studio, the player); otherwise its heading does, below

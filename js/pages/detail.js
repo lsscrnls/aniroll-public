@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=149';
-import { enhanceSelect } from '../select.js?v=149';
-import { tasteMatch } from '../taste.js?v=149';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=149';
-import { getToken, isLoggedIn } from '../auth.js?v=149';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=149';
-import { showConfirm } from '../a11y.js?v=149';
+import * as api from '../api.js?v=151';
+import { enhanceSelect } from '../select.js?v=151';
+import { tasteMatch } from '../taste.js?v=151';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=151';
+import { getToken, isLoggedIn } from '../auth.js?v=151';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=151';
+import { showConfirm } from '../a11y.js?v=151';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -54,7 +54,7 @@ async function loadPlayButton(media, root) {
     const slot = root.querySelector('#detail-play');
     if (!slot || media.type !== 'ANIME') return;
     try {
-        const { mountPlayButton } = await import('../player/playbutton.js?v=149');
+        const { mountPlayButton } = await import('../player/playbutton.js?v=151');
         await mountPlayButton(slot, media, nextEpisode(media));
     } catch (err) {
         console.warn('Jellyfin player unavailable:', err.message);
@@ -110,22 +110,26 @@ function setupDetailTabs(root) {
 
 // The plain facts under the score as one line of text: they are information, not something to press, so they
 // aren't chips (M3 keeps chips for actions, filters and choices). The next episode stands out in the accent
+// The facts as two short phrases instead of a dotted row: what it is, then when, who made it and from what
 function detailFactsHtml(media) {
     const isAnime = media.type === 'ANIME';
-    const facts = [
+    const length = isAnime
+        ? media.episodes && `${media.episodes} ${media.episodes === 1 ? 'episode' : 'episodes'}${media.duration ? ` of ${media.duration} min` : ''}`
+        : media.chapters && `${media.chapters} chapters`;
+    const what = [
         media.format && api.formatFormat(media.format),
-        media.status && api.formatMediaStatus(media.status),
-        isAnime && media.episodes && `${media.episodes} episodes`,
-        !isAnime && media.chapters && `${media.chapters} chapters`,
-        media.duration && `${media.duration} min`,
+        media.status && api.formatMediaStatus(media.status).toLowerCase(),
+        length || (media.duration && `${media.duration} min`),
+    ].filter(Boolean);
+    const origin = [
         media.season && `${api.getSeasonName(media.season)} ${media.seasonYear}`,
         mainStudio(media),
-        media.source && `From ${media.source.replace(/_/g, ' ').toLowerCase()}`,
+        media.source && `from ${media.source.replace(/_/g, ' ').toLowerCase()}`,
     ].filter(Boolean);
     const next = media.nextAiringEpisode
         ? `<span class="detail-fact-next">Ep ${media.nextAiringEpisode.episode} in ${api.timeUntil(api.untilAiring(media.nextAiringEpisode))}</span>` : '';
-    if (!facts.length && !next) return '';
-    return `<p class="detail-facts">${next}${facts.map(f => `<span>${esc(f)}</span>`).join('')}</p>`;
+    if (!what.length && !origin.length && !next) return '';
+    return `<p class="detail-facts">${next}${[what, origin].filter(g => g.length).map(g => `<span>${esc(g.join(', '))}</span>`).join('')}</p>`;
 }
 
 function renderDetailHTML(media) {
@@ -173,15 +177,15 @@ function renderDetailHTML(media) {
             <div class="genre-chips">${media.genres.map(g => `<a href="#/search?genre=${encodeURIComponent(g)}" class="genre-chip">${esc(g)}</a>`).join('')}</div>
         </div>` : ''}
 
-        ${media.recommendations?.nodes?.length ? `<div style="margin-bottom:var(--space-xl)">
+        ${media.recommendations?.nodes?.length ? `<div class="detail-recs" style="margin-bottom:var(--space-xl)">
             <h3 class="section-title" style="margin-bottom:var(--space-md)">Recommendations</h3>
             <div class="scroll-row">${media.recommendations.nodes.filter(r => r.mediaRecommendation).map(r => `
                 <div style="flex:0 0 150px">${renderMediaCard(r.mediaRecommendation, true)}</div>`).join('')}</div>
         </div>` : ''}
 
-        ${renderExternalLinks(media.externalLinks)}
-
         ${tagsHtml(media)}
+
+        ${renderExternalLinks(media.externalLinks, media)}
 
         </div>
         ${media.characters?.edges?.length ? `<div class="detail-tabpanel" id="detail-tab-characters" role="tabpanel" aria-labelledby="detail-tabbtn-characters" hidden>
@@ -226,10 +230,7 @@ function renderDetailHTML(media) {
         </div>` : ''}
         </div>` : ''}
 
-        <span class="detail-fullscreen-btn" data-type="${media.type === 'MANGA' ? 'manga' : 'anime'}" hidden></span>
-        <div style="text-align:center;padding:var(--space-lg)">
-            <a href="https://anilist.co/${media.type === 'MANGA' ? 'manga' : 'anime'}/${media.id}" target="_blank" rel="noopener" class="glass-btn glass-btn-secondary">View on AniList</a>
-        </div>`;
+        <span class="detail-fullscreen-btn" data-type="${media.type === 'MANGA' ? 'manga' : 'anime'}" hidden></span>`;
 }
 
 // Same colors as the status distribution chart further down the panel
@@ -278,7 +279,7 @@ function tagsHtml(media) {
     let shown = 0;
     const chips = media.tags.map(t => {
         const extra = !t.isMediaSpoiler && ++shown > TAGS_SHOWN;
-        return `<a href="#/search?type=${media.type}&tag=${encodeURIComponent(t.name)}" class="genre-chip${t.isMediaSpoiler ? ' spoiler-tag' : ''}${extra ? ' tag-extra' : ''}" title="Browse by this tag"${t.isMediaSpoiler || extra ? ' hidden' : ''}>${esc(t.name)} <small style="opacity:0.6">${t.rank}%</small></a>`;
+        return `<a href="#/search?type=${media.type}&tag=${encodeURIComponent(t.name)}" class="genre-chip${t.isMediaSpoiler ? ' spoiler-tag' : ''}${extra ? ' tag-extra' : ''}" title="${t.rank}% relevant. Browse by this tag"${t.isMediaSpoiler || extra ? ' hidden' : ''}>${esc(t.name)}</a>`;
     }).join('');
     const more = shown - TAGS_SHOWN;
     return `<div style="margin-bottom:var(--space-xl)">
@@ -504,7 +505,7 @@ function setupListActions(media, token, root = document) {
             try {
                 const saved = await api.saveMediaListEntry(vars, token);
                 emitListChange({ mediaId: media.id, status: saved.status, progress: saved.progress });
-                emitWatched(media);
+                emitWatched(media, saved.progress);
                 const statusChanged = saved.status !== entry.status;
                 Object.assign(entry, saved);
                 if (vars.status === 'COMPLETED') toast('Completed!', 'success');
@@ -608,20 +609,15 @@ function cleanDescription(desc) {
         .split('\n').filter(l => l.trim()).map(l => `<p style="margin-bottom:0.5em">${l.trim()}</p>`).join('');
 }
 
-function renderExternalLinks(links) {
-    if (!links?.length) return '';
-    const streaming = links.filter(l => l.type === 'STREAMING');
-    const info = links.filter(l => l.type !== 'STREAMING');
-    if (!streaming.length && !info.length) return '';
-
-    return `<div style="margin-bottom:var(--space-xl)">
-        ${streaming.length ? `<h3 class="section-title" style="margin-bottom:var(--space-md)">Streaming</h3>
-        <div style="display:flex;flex-wrap:wrap;gap:var(--space-sm);margin-bottom:var(--space-md)">
-            ${streaming.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener" class="glass-btn glass-btn-secondary" style="font-size:0.8rem">${esc(l.site)}</a>`).join('')}
-        </div>` : ''}
-        ${info.length ? `<p class="detail-ext-info">
-            ${info.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.site)}</a>`).join('')}
-        </p>` : ''}
+// Where to watch and where to read more, as plain links: they leave the app, nothing here to toggle or pick
+function renderExternalLinks(links = [], media) {
+    const link = (l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.site)}</a>`;
+    const streaming = (links || []).filter(l => l.type === 'STREAMING');
+    const info = (links || []).filter(l => l.type !== 'STREAMING');
+    const anilist = { url: `https://anilist.co/${media.type === 'MANGA' ? 'manga' : 'anime'}/${media.id}`, site: 'AniList' };
+    return `<div class="detail-links">
+        ${streaming.length ? `<p class="detail-ext-info"><span class="detail-links-label">Watch on</span>${streaming.map(link).join('')}</p>` : ''}
+        <p class="detail-ext-info"><span class="detail-links-label">More on</span>${[anilist, ...info].map(link).join('')}</p>
     </div>`;
 }
 

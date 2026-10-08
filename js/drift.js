@@ -4,7 +4,7 @@
 
 // Small touches that come and go in Material 3.
 //
-// Used by: js/app.js, js/pages/shelf.js
+// Used by: js/app.js, js/pages/shelf.js, js/touches.js
 
 // Returns { found: { id: time }, last: time }.
 export function driftState() { return null; }

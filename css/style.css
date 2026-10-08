@@ -1322,12 +1322,11 @@ input, select, textarea { font: inherit; color: inherit; }
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 0;
+    gap: 4px 20px;
     margin-bottom: var(--space-md);
     font-size: 0.875rem;
     color: var(--text-secondary);
 }
-.detail-facts > span:not(:last-child)::after { content: ''; display: inline-block; width: 3px; height: 3px; margin: 0 10px; border-radius: 50%; background: currentColor; opacity: .5; vertical-align: middle; }
 .detail-facts > .detail-fact-next { color: var(--user-accent); font-weight: 600; }
 /* Progress and score as one group: both are what you track for this show */
 .detail-entry { display: inline-flex; align-items: center; gap: var(--space-md); padding: 4px 6px 4px 4px; border-radius: var(--radius-full); background: var(--bg-secondary); }
@@ -1335,6 +1334,8 @@ input, select, textarea { font: inherit; color: inherit; }
 .detail-ext-info { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); font-size: 0.85rem; }
 .detail-ext-info a { color: var(--text-secondary); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); }
 .detail-ext-info a:hover { color: var(--text); }
+.detail-links { display: grid; gap: var(--space-sm); margin: var(--space-lg) 0 var(--space-xl); }
+.detail-links-label { color: var(--text-secondary); opacity: .75; }
 
 .detail-actions {
     display: flex;
@@ -5869,10 +5870,11 @@ button.list-entry-score:hover, button.list-entry-score:focus-visible { backgroun
 .detail-related-cell .detail-related-item { flex: none; }
 .detail-related-where { font-size: 0.7rem; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .detail-related-where.is-listed { color: var(--md-primary, var(--user-accent)); font-weight: 600; }
+/* As wide as the cover above it, so it reads as that show's button and not as one for the whole row */
 .detail-related-plan {
-    align-self: flex-start;
+    align-self: stretch;
     min-height: 32px;
-    padding: 0 10px;
+    padding: 0 8px;
     border: 1px solid var(--md-outline, var(--border));
     border-radius: 16px;
     background: none;
@@ -6006,3 +6008,14 @@ h1[tabindex="-1"]:focus { outline: none; }
 .detail-tabpanel[hidden] { display: none; }
 /* The score distribution as a plain histogram: bars without a track behind them */
 .detail-dist .stat-bar-track { background: transparent; }
+.detail-recs .media-card-score { display: none; }
+/* Export is rare: a quiet text action at the end of the toolbar, not a filled button among the filters */
+.list-export { background: none; border: 0; padding: 6px 4px; font: inherit; font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); }
+.list-export:hover { color: var(--text); }
+/* Loading shapes (SKELETON in js/store.js) */
+.skeleton-heading { height: 44px; width: min(280px, 60%); margin-bottom: var(--space-xl); }
+.skeleton-block { height: 320px; border-radius: var(--radius-xl); }
+.skeleton-stage { height: 440px; }
+.skeleton-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-md); }
+.skeleton-rows { display: grid; gap: var(--space-sm); }
+.skeleton-row { height: 72px; }

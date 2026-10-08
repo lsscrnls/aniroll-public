@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=149';
-import { upNext, glance, DAYS, greeting, playFromHero, heroEntry } from './upnext.js?v=149';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=149';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=151';
+import { upNext, glance, DAYS, greeting, playFromHero, heroEntry } from './upnext.js?v=151';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=151';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -223,12 +223,46 @@ export function setup() {
     document.addEventListener('click', onWidgetCover, true);
     cleanups.push(() => document.removeEventListener('click', onWidgetCover, true));
 
+    cleanups.push(setupRowEdges());
+
     // Widgets tick along with the clock
     const tick = setInterval(() => document.querySelectorAll('[data-m3-until]').forEach(renderCountdown), 30000);
     cleanups.push(() => clearInterval(tick));
 
     // Home may have rendered before this module arrived
     if (window.__anirollContinue) onContinue({ detail: window.__anirollContinue });
+}
+
+// Side-scrolling rows fade out at an edge with more behind it, so a cut-off card reads as "scroll on"
+const ROWS = '.scroll-row, .detail-studios';
+function markEdges(row) {
+    const max = row.scrollWidth - row.clientWidth;
+    row.classList.toggle('has-more-start', max > 1 && row.scrollLeft > 1);
+    row.classList.toggle('has-more-end', max > 1 && row.scrollLeft < max - 1);
+}
+function setupRowEdges() {
+    const content = document.getElementById('content');
+    if (!content) return () => {};
+    let queued = false;
+    const all = () => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; content.querySelectorAll(ROWS).forEach(markEdges); });
+    };
+    const onScroll = (e) => { if (e.target instanceof Element && e.target.matches(ROWS)) markEdges(e.target); };
+    const mo = new MutationObserver(all);
+    mo.observe(content, { childList: true, subtree: true });
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    window.addEventListener('resize', all);
+    // Covers load after the row is built and widen it
+    content.addEventListener('load', all, true);
+    all();
+    return () => {
+        mo.disconnect();
+        document.removeEventListener('scroll', onScroll, { capture: true });
+        window.removeEventListener('resize', all);
+        content.removeEventListener('load', all, true);
+    };
 }
 
 // Settings changed the palette: re-apply the show's colours (or drop them)
@@ -431,19 +465,26 @@ function heroHtml(entry, name, others = []) {
         </div>
         <div class="m3-hero-art m3-hero-art-empty" aria-hidden="true">${ROLL_SVG}</div>`;
     }
-    const { m, next, total, behind, done, status, canWatch } = upNext(entry);
+    const { m, next, total, airing, behind, done, status, canWatch } = upNext(entry);
     const [left, right] = others.map(o => o.media).filter(x => coverOf(x));
     // Every cover in the fan opens its show (keyboard too: role=button + Enter via a11y.js)
     const cover = (media, cls) => `<img class="m3-hero-cover ${cls}" src="${esc(coverOf(media))}" alt="${esc(titlePref(media.title))}" data-open="${media.id}" role="button" tabindex="0">`;
+    // Nothing out yet (the hero only picks such a show when no other one has an episode waiting): the big
+    // number would count something you can't watch, so the date it airs leads and Roll offers something else
+    const waitsFor = !canWatch && !done && airing?.airingAt ? airing : null;
+    const when = waitsFor && airsWhen(waitsFor.airingAt).replace(/^(Today|Tomorrow)/, s => s.toLowerCase());
     return `<div class="m3-hero-glow" data-cover="${esc(coverOf(m))}" aria-hidden="true"></div>
         <div class="m3-hero-body">
             <p class="m3-hero-greet">${greeting()}${name ? `, ${esc(name)}` : ''}</p>
+            ${waitsFor ? `<h2 class="m3-hero-title is-lead">${esc(titlePref(m.title))}</h2>
+            <p class="m3-hero-airs">Episode ${waitsFor.episode} airs ${esc(when)}</p>` : `
             <div class="m3-hero-ep"><span class="m3-hero-ep-label">${done ? 'Finished' : 'Up next'}</span><span class="m3-hero-ep-num${String(done ? total : next).length > 2 ? ' is-long' : ''}">${done ? total : next}</span>${total ? `<span class="m3-hero-ep-of">/ ${total}</span>` : ''}</div>
             <h2 class="m3-hero-title">${esc(titlePref(m.title))}</h2>
-            ${status ? `<p class="m3-hero-meta"><span class="m3-hero-chip">${esc(status)}</span></p>` : ''}
+            ${status ? `<p class="m3-hero-meta"><span class="m3-hero-chip">${esc(status)}</span></p>` : ''}`}
             <div class="m3-hero-actions">
                 ${canWatch ? `<span class="hero-play-slot" data-hero-play hidden></span>
                 <button class="glass-btn glass-btn-primary m3-btn-lg" data-hero-inc="${entry.id}">Watched episode ${next}</button>` : ''}
+                ${waitsFor ? '<a class="glass-btn glass-btn-primary m3-btn-lg" href="#/roll">Roll something</a>' : ''}
                 <button class="glass-btn glass-btn-secondary m3-btn-lg" data-open="${m.id}">Details</button>
             </div>
         </div>
@@ -534,12 +575,16 @@ function renderWidgets(hero, entries, planning, lead) {
 
     box.innerHTML = `
         ${next ? clockWidgetHtml(next) : ''}
-        <a class="m3-widget m3-widget-queue" href="#/list">
+        ${!total ? `<a class="m3-widget m3-widget-queue is-empty" href="#/roll">
+            <span class="m3-widget-label">Ready to watch</span>
+            <span class="m3-widget-empty">You're caught up.</span>
+            <span class="m3-widget-sub m3-widget-go">Roll something new</span>
+        </a>` : `<a class="m3-widget m3-widget-queue" href="#/list">
             <span class="m3-widget-label">Ready to watch</span>
             <span class="m3-widget-big">${total}</span>
             <span class="m3-widget-sub">${total === 1 ? 'episode' : 'episodes'} waiting${waiting.length ? ` in ${waiting.length} ${waiting.length === 1 ? 'show' : 'shows'}` : ''}</span>
             <span class="m3-widget-faces">${waiting.slice(0, 5).map(x => `<img src="${esc(x.e.media.coverImage?.large || '')}" alt="${esc(titlePref(x.e.media.title))}" title="${esc(titlePref(x.e.media.title))}" data-open="${x.e.media.id}" role="button" tabindex="0">`).join('')}</span>
-        </a>
+        </a>`}
         <a class="m3-widget m3-widget-week" href="#/calendar">
             <span class="m3-widget-label">Your week</span>
             <span class="m3-widget-days">${DAYS.map((d, i) => `<span class="m3-day${i === today ? ' is-today' : ''}${byDay[i].length ? ' has' : ''}">

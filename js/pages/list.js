@@ -1,8 +1,8 @@
-import * as api from '../api.js?v=149';
-import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched, emitListChange, LIST_EVENT, loginState } from '../store.js?v=149';
-import { getToken, isLoggedIn } from '../auth.js?v=149';
-import { enhanceSelect } from '../select.js?v=149';
-import { showScorePrompt } from '../a11y.js?v=149';
+import * as api from '../api.js?v=151';
+import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched, emitListChange, LIST_EVENT, loginState, SKELETON } from '../store.js?v=151';
+import { getToken, isLoggedIn } from '../auth.js?v=151';
+import { enhanceSelect } from '../select.js?v=151';
+import { showScorePrompt } from '../a11y.js?v=151';
 
 // View, sort and the airing filter are remembered per browser; the search text is not
 const VIEW_KEY = 'aniroll_list_view';
@@ -76,7 +76,7 @@ export async function render({ params, content }) {
     let search = '';
 
     content.innerHTML = `<div class="page-enter">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-lg);flex-wrap:wrap;gap:var(--space-md)">
+        <div style="display:flex;align-items:center;margin-bottom:var(--space-lg);flex-wrap:wrap;gap:var(--space-md) var(--space-lg)">
             <h1 class="section-title">${isOwn ? 'My List' : `${esc(username)}'s List`}</h1>
             <div class="tab-group">
                 <button class="tab-btn active" id="tab-anime">Anime</button>
@@ -102,7 +102,7 @@ export async function render({ params, content }) {
                 <button class="list-view-btn${view === 'list' ? ' active' : ''}" data-view="list" aria-pressed="${view === 'list'}" title="List">${ICON_LIST}</button>
                 <button class="list-view-btn${view === 'grid' ? ' active' : ''}" data-view="grid" aria-pressed="${view === 'grid'}" title="Covers">${ICON_GRID}</button>
             </div>
-            ${isOwn ? `<button class="glass-btn glass-btn-secondary glass-btn-sm list-export" id="list-export" title="Download this list as a MyAnimeList XML file (for MAL or a backup)">Export</button>` : ''}
+            ${isOwn ? `<button class="list-export" id="list-export" title="Download this list as a MyAnimeList XML file (for MAL or a backup)">Export</button>` : ''}
         </div>
         <div id="list-content" class="list-content"></div>
         <div id="compare-view" hidden></div>
@@ -133,7 +133,7 @@ export async function render({ params, content }) {
         formatChips.hidden = type !== 'ANIME';
 
         listContent.classList.remove('is-grid');
-        listContent.innerHTML = '<div class="page-loader"><div class="loader-spinner"></div></div>';
+        listContent.innerHTML = view === 'grid' ? SKELETON.grid() : SKELETON.rows(8);
 
         try {
             // A copy of the outer array: the "All" tab added below must not end up in the cached answer
@@ -209,10 +209,9 @@ export async function render({ params, content }) {
         ? `Ep ${m.nextAiringEpisode.episode} in ${api.timeUntil(api.untilAiring(m.nextAiringEpisode))}`
         : '');
     const behindText = (e) => (behindOf(e) ? `${behindOf(e)} behind` : '');
-    const cardSub = (e) => [
-        `${e.progress}${totalOf(e) ? `/${totalOf(e)}` : ''} ${unitOf()}`,
-        behindText(e) || airingText(e.media),
-    ].filter(Boolean).join(' · ');
+    // One fact per card: what's waiting or when the next one airs, else how far you are
+    const cardSub = (e) => behindText(e) || airingText(e.media)
+        || `${e.progress}${totalOf(e) ? `/${totalOf(e)}` : ''} ${unitOf()}`;
 
     function listRow(e) {
         const m = e.media;
@@ -339,7 +338,7 @@ export async function render({ params, content }) {
 
         entry.progress = next;
         updateEntryViews(entry);
-        if (btn.dataset.action === 'inc') emitWatched(entry.media);
+        if (btn.dataset.action === 'inc') emitWatched(entry.media, next);
 
         const target = next;
         chains.set(entry.id, (chains.get(entry.id) || Promise.resolve()).then(async () => {
