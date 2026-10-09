@@ -11,8 +11,9 @@ Live at **[aniroll.app](https://aniroll.app)**. Log in with AniList; your list s
 ## Read this first
 
 This repository is a **showcase, not a kit**. It shows how AniRoll is built. It is not meant to be
-cloned and run as your own copy: the code is **all rights reserved** ([LICENSE](LICENSE)). Reading it and
-learning from it is welcome; copying, redistributing or hosting it needs my written permission.
+cloned and run as your own copy. The code is source-available under the
+[PolyForm Noncommercial License 1.0.0](LICENSE): you may read, change and share it for any noncommercial
+purpose; commercial use is not allowed.
 
 **Everything AniRoll stands on is here**: talking to a rate-limited API with no backend of its own
 in between, caching that keeps working offline, keeping two accounts in one browser apart, writing to
@@ -208,8 +209,9 @@ library's licence text lies next to it in `js/vendor/`.
 
 ## License
 
-AniRoll's code is **all rights reserved**, see [LICENSE](LICENSE): you're welcome to read it and learn from it,
-but copying, redistributing or hosting it needs my written permission.
+AniRoll's code is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). You may use, change
+and share it for any noncommercial purpose, as long as the licence and its copyright notice travel with it.
+Commercial use is not allowed. This makes AniRoll source-available, not Open Source in the OSI sense.
 
 The design follows [Material 3 Expressive](https://m3.material.io/), Google's design system. AniRoll is not
 affiliated with or endorsed by Google. Its colour schemes are generated with
