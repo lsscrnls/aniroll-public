@@ -8,8 +8,8 @@ how this repository works, where to start reading, and what helps.
 This repository holds **published snapshots** of AniRoll's source, one commit per release. AniRoll is
 developed elsewhere, and every change arrives here with the next release. That means a pull request
 can't be merged as it is. It is still read, and a good idea finds its way into a later release.
-The code is all rights reserved ([LICENSE](LICENSE)): by opening a pull request you agree that its
-content may be used in AniRoll under those terms.
+The code is under the PolyForm Noncommercial License 1.0.0 ([LICENSE](LICENSE)): by opening a pull
+request you agree that its content may be used in AniRoll and released under that licence.
 
 Roll, the Watch Party and the taste match are stubs here, on purpose (see the README,
 [The deliberate cut](README.md#the-deliberate-cut)). Each stub says what the module is for and what
