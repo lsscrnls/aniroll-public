@@ -317,6 +317,35 @@ class SyncError extends Error {
 let serverCalls = [];
 let anilistPausedUntil = 0;
 
+// ===== AniList rate limits, for the admin page =====
+// AniList limits per IP: the server's own calls (background sync, sign-in checks) have their own limit, and
+// every browser its own. Browsers report when they get paused (POST /api/ratelimit). Kept for a day, in memory.
+const LIMIT_KEEP_MS = 24 * 60 * 60 * 1000;
+let limitEvents = [];             // { at, kind: 'sync' | 'verify' | 'browser', status }
+const browserLimits = new Map();  // hashed IP -> paused until
+function noteLimit(kind, status) {
+    const now = Date.now();
+    limitEvents = limitEvents.filter(e => now - e.at < LIMIT_KEEP_MS).slice(-300);
+    limitEvents.push({ at: now, kind, status: Number(status) || 0 });
+}
+function rateLimitStats(now = Date.now()) {
+    for (const [ip, until] of browserLimits) if (until <= now) browserLimits.delete(ip);
+    const day = limitEvents.filter(e => now - e.at < LIMIT_KEEP_MS);
+    const last = (kind) => day.filter(e => e.kind === kind).at(-1)?.at || 0;
+    const count = (kind, ms = LIMIT_KEEP_MS) => day.filter(e => e.kind === kind && now - e.at < ms).length;
+    return {
+        syncPausedFor: Math.max(0, anilistPausedUntil - now),
+        verifyPausedFor: Math.max(0, verifyPausedUntil - now),
+        browsersPausedNow: browserLimits.size,
+        serverCallsLastMin: serverCalls.filter(t => now - t < 60000).length,
+        serverBudget: SERVER_BUDGET_PER_MIN,
+        hour: { sync: count('sync', 3600000), verify: count('verify', 3600000), browser: count('browser', 3600000) },
+        day: { sync: count('sync'), verify: count('verify'), browser: count('browser') },
+        last: { sync: last('sync'), verify: last('verify'), browser: last('browser') },
+        recent: day.slice(-8).reverse(),
+    };
+}
+
 // userId: act as that user (needs their stored token); null: anonymous read
 async function anilist(query, variables, userId = null) {
     const token = userId ? storedToken(userId) : null;
@@ -350,6 +379,7 @@ async function anilist(query, variables, userId = null) {
     }
     if (res.status === 403 || res.status === 429 || res.status >= 500 || !body) {
         anilistPausedUntil = Date.now() + ANILIST_PAUSE_MS;
+        noteLimit('sync', res.status);
         throw new SyncError('unreachable');
     }
     return body; // { data, errors } — a 404 error just means "no list entry"
@@ -893,6 +923,7 @@ function tokenHash(token) {
     return token ? crypto.createHash('sha256').update(token).digest('hex') : '';
 }
 
+let verifyStatus = 0; // the last answer's HTTP status, for the rate-limit log
 async function verifyViewer(req) {
     const auth = String(req.headers['authorization'] || '');
     const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
@@ -919,6 +950,7 @@ async function verifyViewer(req) {
             signal: AbortSignal.timeout(4000)
         });
         const body = await res.json().catch(() => null);
+        verifyStatus = res.status;
         const viewer = body && body.data && body.data.Viewer;
         if (viewer) {
             // Drop the oldest answers only: clearing all would send everyone back to AniList at once
@@ -934,8 +966,9 @@ async function verifyViewer(req) {
             rejectedTokens.set(hash, Date.now());
             return { status: 'invalid' };
         }
-    } catch { /* unreachable below */ }
+    } catch { verifyStatus = 0; /* unreachable below */ }
     verifyPausedUntil = Date.now() + VERIFY_PAUSE_MS;
+    noteLimit('verify', verifyStatus);
     return { status: 'unreachable' };
 }
 
@@ -1092,7 +1125,7 @@ function adminStats() {
         accounts: { backgroundSync: countEntries(TOKEN_FILE), jellyfin: countEntries(JF_FILE), webhooks: countEntries(HOOK_FILE) },
         parties,
         partyStreams: party.liveCount(),
-        anilist: { verifyPausedFor: Math.max(0, verifyPausedUntil - now) },
+        anilist: rateLimitStats(now),
         errors: recentClientErrors(now),
         server: {
             uptime: now - startedAt, rss: process.memoryUsage().rss, node: process.version,
@@ -1336,6 +1369,21 @@ async function handle(req, res) {
 
     const pathname = req.url.split('?')[0];
     requestsThisMinute++;
+
+    // A browser was paused by AniList (js/api.js markRateLimited): counted for the admin page, nothing else kept
+    if (pathname === '/api/ratelimit' && req.method === 'POST') {
+        const body = await readBody(req);
+        if (!overLimit('ratelimit-ip', clientIp(req), 6, 60000)) {
+            const now = Date.now();
+            const until = Math.min(Number(body.until) || now + 60000, now + 60 * 60000);
+            const ip = crypto.createHash('sha256').update(clientIp(req)).digest('hex').slice(0, 16);
+            if (until > now) browserLimits.set(ip, until);
+            noteLimit('browser', 429);
+        }
+        res.writeHead(204);
+        res.end();
+        return;
+    }
 
     if (pathname === '/api/log' && req.method === 'POST') {
         const body = await readBody(req);

@@ -185,7 +185,7 @@ input, select, textarea { font: inherit; color: inherit; }
 /* ===== Navigation (Minimal) ===== */
 .glass-nav {
     position: fixed;
-    top: 0;
+    top: env(safe-area-inset-top, 0px); /* installed on an iPhone the page runs under the status bar */
     left: 0;
     right: 0;
     height: var(--nav-height);
@@ -434,7 +434,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .main-content {
     max-width: var(--content-max);
     margin: 0 auto;
-    padding: calc(var(--nav-height) + var(--space-xl)) var(--space-xl) var(--space-4xl);
+    padding: calc(var(--nav-height) + var(--space-xl) + env(safe-area-inset-top, 0px)) var(--space-xl) var(--space-4xl);
     min-height: 100dvh;
 }
 
@@ -446,7 +446,7 @@ input, select, textarea { font: inherit; color: inherit; }
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding-top: 100px;
+    padding-top: calc(100px + env(safe-area-inset-top, 0px));
     animation: fadeIn 0.2s ease;
 }
 
@@ -3159,6 +3159,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .detail-panel {
     position: absolute;
     top: 0;
+    padding-top: env(safe-area-inset-top, 0px);
     right: 0;
     bottom: 0;
     width: min(560px, 100%);

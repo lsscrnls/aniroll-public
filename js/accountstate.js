@@ -1,5 +1,5 @@
 // @ts-check
-import { getToken } from './auth.js?v=151';
+import { getToken } from './auth.js?v=157';
 
 // Small values that belong to the AniList account, not to one browser (api/server.js "/api/me/state"),
 // so a second device knows them too. Each feature merges its own value with the local one (newest

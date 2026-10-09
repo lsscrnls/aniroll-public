@@ -1,8 +1,8 @@
 // @ts-check
-import { getToken, isLoggedIn } from '../auth.js?v=151';
-import { getState, esc, toast } from '../store.js?v=151';
-import { showConfirm } from '../a11y.js?v=151';
-import * as api from '../api.js?v=151';
+import { getToken, isLoggedIn } from '../auth.js?v=157';
+import { getState, esc, toast } from '../store.js?v=157';
+import { showConfirm } from '../a11y.js?v=157';
+import * as api from '../api.js?v=157';
 
 // #/admin: how busy AniRoll is — seats, the line, requests, Jellyfin playback, errors — for its owner,
 // and what they can change: the limit, the VIPs, letting someone in, freeing a seat, maintenance mode,
@@ -24,6 +24,7 @@ const fmtAgo = (t, now) => {
     return s < 60 ? `${s} s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`;
 };
 const fmtDuration = (ms) => {
+    if (ms > 0 && ms < 60000) return `${Math.ceil(ms / 1000)} s`;
     const m = Math.floor(ms / 60000);
     const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
     return d ? `${d} d ${h} h` : h ? `${h} h ${m % 60} min` : `${m} min`;
@@ -103,6 +104,17 @@ function lineChart(host, points, { from, to, height = 220, limit = null, unit = 
     svg.addEventListener('pointerleave', hide);
 }
 
+// Is AniRoll being rate limited right now: the server paused, or browsers paused by AniList
+function limitState(a) {
+    const server = Math.max(a.syncPausedFor, a.verifyPausedFor);
+    if (server > 0) return { label: 'Limited', note: `Server paused, ${fmtDuration(server)} left`,
+        html: `<span class="adm-status is-warn">Server rate limited</span>` };
+    if (a.browsersPausedNow) return { label: 'Limited', note: `${a.browsersPausedNow} ${a.browsersPausedNow === 1 ? 'browser' : 'browsers'} paused`,
+        html: `<span class="adm-status is-warn">${a.browsersPausedNow} ${a.browsersPausedNow === 1 ? 'browser' : 'browsers'} rate limited</span>` };
+    return { label: 'OK', note: a.hour.browser + a.hour.sync + a.hour.verify ? 'Limited earlier this hour' : 'Not rate limited',
+        html: '<span class="adm-status is-ok">Not rate limited</span>' };
+}
+
 function tile(label, value, note = '', gauge = null) {
     return `<div class="adm-tile">
         <div class="adm-tile-value">${value}</div>
@@ -173,6 +185,11 @@ export async function render({ content }) {
                 <button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" id="adm-clear-errors">Clear the error log</button></section>
             <section class="adm-card"><h2 class="adm-card-title">Accounts & server</h2><div id="adm-server"></div></section>
         </div>
+        <section class="adm-card">
+            <h2 class="adm-card-title">AniList rate limits</h2>
+            <p class="adm-card-sub">AniList limits per IP address: the server has its own limit (background sync, sign-in checks), and every browser has its own. Browsers report here when AniList pauses them.</p>
+            <div id="adm-anilist"></div>
+        </section>
     </div>`;
 
     const $ = (id) => content.querySelector(`#${id}`);
@@ -207,6 +224,7 @@ export async function render({ content }) {
             tile('Peak, 24 h', String(peak.seats), peak.t ? `at ${fmtClock(peak.t)}` : ''),
             tile('Watching', String(d.watching), 'On Jellyfin, right now'),
             tile('Watch parties', String(d.parties), 'Running'),
+            tile('AniList', limitState(d.anilist).label, limitState(d.anilist).note),
         ].join('');
 
         const series = (key) => samples.map(s => ({ t: s.t, v: s[key] || 0 }));
@@ -251,12 +269,27 @@ export async function render({ content }) {
         $('adm-maint-note').closest('.adm-field').hidden = !!maint;
         $('adm-clear-errors').hidden = !d.errors.count;
 
-        const blocked = d.anilist.verifyPausedFor > 0;
+        const a = d.anilist;
+        const paused = (ms) => ms > 0 ? `<span class="adm-status is-warn">Paused, ${fmtDuration(ms)} left</span>` : '<span class="adm-status is-ok">Working</span>';
+        const lastOf = (t) => t ? fmtAgo(t, now) : 'never';
+        const KIND = { sync: 'Server, background sync', verify: 'Server, sign-in check', browser: 'A browser' };
+        $('adm-anilist').innerHTML = `<table class="adm-table"><tbody>
+            <tr><td>Right now</td><td class="adm-num">${limitState(a).html}</td></tr>
+            <tr><td>Background sync</td><td class="adm-num">${paused(a.syncPausedFor)}</td></tr>
+            <tr><td>Sign-in checks</td><td class="adm-num">${paused(a.verifyPausedFor)}</td></tr>
+            <tr><td>Server requests, last minute</td><td class="adm-num">${a.serverCallsLastMin} / ${a.serverBudget}</td></tr>
+            <tr><td>Browsers paused right now</td><td class="adm-num">${a.browsersPausedNow}</td></tr>
+            <tr><td>Limits, last hour</td><td class="adm-num">server ${a.hour.sync + a.hour.verify}, browsers ${a.hour.browser}</td></tr>
+            <tr><td>Limits, 24 h</td><td class="adm-num">server ${a.day.sync + a.day.verify}, browsers ${a.day.browser}</td></tr>
+            <tr><td>Last limit</td><td class="adm-num">server ${lastOf(Math.max(a.last.sync, a.last.verify))}, browser ${lastOf(a.last.browser)}</td></tr>
+        </tbody></table>
+        ${a.recent.length ? `<table class="adm-table"><tbody>${a.recent.map(e => `<tr><td>${esc(KIND[e.kind] || e.kind)}</td>
+            <td class="adm-num adm-muted">${e.status ? `HTTP ${e.status}` : 'no answer'}, ${fmtClock(e.at)}</td></tr>`).join('')}</tbody></table>` : ''}`;
+
         $('adm-server').innerHTML = `<table class="adm-table"><tbody>
             <tr><td>Background sync</td><td class="adm-num">${d.accounts.backgroundSync} accounts</td></tr>
             <tr><td>Jellyfin connected</td><td class="adm-num">${d.accounts.jellyfin} accounts</td></tr>
             <tr><td>Jellyfin webhooks</td><td class="adm-num">${d.accounts.webhooks}</td></tr>
-            <tr><td>AniList sign-in checks</td><td class="adm-num">${blocked ? `<span class="adm-status is-warn">Paused, AniList refused (${Math.ceil(d.anilist.verifyPausedFor / 1000)} s)</span>` : '<span class="adm-status is-ok">Working</span>'}</td></tr>
             <tr><td>Server up</td><td class="adm-num">${fmtDuration(d.server.uptime)}</td></tr>
             <tr><td>Memory</td><td class="adm-num">${fmtBytes(d.server.rss)}</td></tr>
             <tr><td>Node</td><td class="adm-num">${esc(d.server.node)}</td></tr>

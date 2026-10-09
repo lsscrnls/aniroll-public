@@ -91,7 +91,7 @@ function staticServer() {
         if (p === '/api/maintenance') return route.fulfill({ contentType: 'application/json', body: '{"maintenance":false}' });
         route.fulfill({ status: 404, contentType: 'application/json', body: '{"configured":false,"active":false}' });
     });
-    await page.route(/cdn|googleapis|gstatic/, route => route.abort());
+    await page.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
     await page.addInitScript(({ id, name }) => {
         localStorage.setItem('aniroll_token', 'e2e-token');
         localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
@@ -479,7 +479,7 @@ function staticServer() {
         if (p.startsWith('/api/party/')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify(party) });
         route.fulfill({ status: p === '/api/maintenance' ? 200 : 404, contentType: 'application/json', body: '{"maintenance":false}' });
     });
-    await wp.route(/cdn|googleapis|gstatic/, route => route.abort());
+    await wp.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
     await wp.addInitScript(({ id, name }) => {
         localStorage.setItem('aniroll_token', 'e2e-token');
         localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
@@ -536,7 +536,7 @@ function staticServer() {
         route.fulfill({ contentType: 'application/json', body: JSON.stringify(answer) });
     });
     await nx.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false}' }));
-    await nx.route(/cdn|googleapis|gstatic/, route => route.abort());
+    await nx.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
     await nx.addInitScript(({ id, name }) => {
         localStorage.setItem('aniroll_token', 'e2e-token');
         localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
@@ -571,7 +571,7 @@ function staticServer() {
         route.fulfill({ contentType: 'application/json', body: JSON.stringify(answer) });
     });
     await quiet.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false}' }));
-    await quiet.route(/cdn|googleapis|gstatic/, route => route.abort());
+    await quiet.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
     await quiet.addInitScript(({ id, name }) => {
         localStorage.setItem('aniroll_token', 'e2e-token');
         localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
@@ -635,7 +635,7 @@ function staticServer() {
             route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(body)) });
         });
         await p.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false,"configured":false}' }));
-        await p.route(/cdn|googleapis|gstatic/, route => route.abort());
+        await p.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
         // The stack switched off: every request to Jellyfin fails the way a dead host does
         const calls = jellyfinUp ? await mockJellyfin(p) : [];
         if (!jellyfinUp) await p.route(`${JF_URL}/**`, route => route.abort('connectionrefused'));
@@ -1193,7 +1193,9 @@ function staticServer() {
                     samples: Array.from({ length: 90 }, (_, i) => ({ t: now - (90 - i) * 60000, seats: i % 7, vip: 1, queue: 0, req: 20 + i, watching: 0 })),
                     vips: [{ id: 6649000, name: 'tester' }], maintenance: null, online: [{ key: 'vip:6649000', name: 'tester', vip: true, seen: now }],
                     waiting: [{ key: 'u:5', name: 'someone', since: now }], accounts: { backgroundSync: 1, jellyfin: 1, webhooks: 0 },
-                    anilist: { verifyPausedFor: 0 }, errors: { count: 0, latest: [] }, server: { uptime: 60000, rss: 1e8, node: 'v24' } }) });
+                    anilist: { syncPausedFor: 0, verifyPausedFor: 0, browsersPausedNow: 1, serverCallsLastMin: 4, serverBudget: 30,
+                        hour: { sync: 0, verify: 0, browser: 1 }, day: { sync: 0, verify: 0, browser: 2 }, last: { sync: 0, verify: 0, browser: now - 60000 },
+                        recent: [{ at: now - 60000, kind: 'browser', status: 429 }] }, errors: { count: 0, latest: [] }, server: { uptime: 60000, rss: 1e8, node: 'v24' } }) });
             }
             if (p !== '/api/seat') return route.fulfill({ contentType: 'application/json', body: '{"maintenance":false}' });
             seatCalls.push({ method: route.request().method(), auth: route.request().headers().authorization || '' });
@@ -1201,7 +1203,7 @@ function staticServer() {
             const body = posts <= 2 ? { seat: false, position: posts === 1 ? 3 : 1, waiting: 3, max: 100 } : { seat: true, vip: false, max: 100 };
             return route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
         });
-        await sq.route(/cdn|googleapis|gstatic/, route => route.abort());
+        await sq.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
         await sq.addInitScript(({ id, name }) => {
             localStorage.setItem('aniroll_token', 'e2e-token');
             localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
@@ -1232,9 +1234,11 @@ function staticServer() {
         await sq.clock.runFor(2000);
         await sq.waitForTimeout(1200);
         const adminPage = await sq.evaluate(() => ({ tiles: document.querySelectorAll('.adm-tile').length, charts: document.querySelectorAll('.adm-chart svg').length,
-            online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]') }));
-        check('admin: the owner sees tiles, four charts, who is online and who waits',
-            adminView && adminPage.tiles === 6 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn, { adminView, ...adminPage });
+            online: document.querySelector('#adm-online')?.textContent || '', letIn: !!document.querySelector('[data-let-in]'),
+            anilist: document.querySelector('#adm-anilist')?.textContent.replace(/\s+/g, ' ') || '' }));
+        check('admin: the owner sees tiles, four charts, who is online and who waits, and whether AniList limits AniRoll',
+            adminView && adminPage.tiles === 7 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn
+            && /1 browser rate limited/.test(adminPage.anilist) && /A browser/.test(adminPage.anilist), { adminView, ...adminPage });
         await sq.evaluate((v) => import(`/js/auth.js?v=${v}`).then(m => m.logout()), APP_VERSION);
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
@@ -1247,7 +1251,7 @@ function staticServer() {
         na.on('pageerror', e => errors.push(`admin, not owner: ${e.message}`));
         await na.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
         await na.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false}' }));
-        await na.route(/cdn|googleapis|gstatic/, route => route.abort());
+        await na.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
         await na.addInitScript(() => {
             localStorage.setItem('aniroll_token', 'e2e-token');
             localStorage.setItem('aniroll_user', JSON.stringify({ id: 1, name: 'someone', avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
@@ -1269,7 +1273,7 @@ function staticServer() {
     const calm = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
     await calm.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
     await calm.route(`${base}/api/**`, route => route.fulfill({ contentType: 'application/json', body: '{"maintenance":false}' }));
-    await calm.route(/cdn|googleapis|gstatic/, route => route.abort());
+    await calm.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
     await calm.goto(base + '/#/');
     await idle(calm, 1500);
     const motion = await calm.evaluate(() => ({
@@ -1288,7 +1292,7 @@ function staticServer() {
         if (time) await p.clock.install({ time });
         await p.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
         await p.route(`${base}/api/**`, route => route.fulfill({ contentType: 'application/json', body: '{"maintenance":false}' }));
-        await p.route(/cdn|googleapis|gstatic/, route => route.abort());
+        await p.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
         await p.addInitScript(entries => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); for (const [k, v] of entries) localStorage.setItem(k, v); } }, Object.entries(storage));
         p.on('pageerror', e => errors.push(`whatsnew: ${e.message}`));
         await p.goto(base + '/#/');

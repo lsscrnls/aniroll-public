@@ -1,5 +1,5 @@
-import { getConfig, jfAuth, normTitle, splitYear, splitSeason, nearYear, hasAniListId } from '../jellyfin.js?v=151';
-import { linkForMedia } from '../jflinks.js?v=151';
+import { getConfig, jfAuth, normTitle, splitYear, splitSeason, nearYear, hasAniListId } from '../jellyfin.js?v=157';
+import { linkForMedia } from '../jflinks.js?v=157';
 
 // AniList show + episode -> the Jellyfin item to play. The same title rules as the Jellyfin sync
 // (js/jellyfin.js, api/server.js) in the other direction: Jellyfin keeps one series with seasons,
