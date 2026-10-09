@@ -1,6 +1,6 @@
 // @ts-check
-import { toast } from './store.js?v=157';
-import { getToken } from './auth.js?v=157';
+import { toast } from './store.js?v=160';
+import { getToken } from './auth.js?v=160';
 
 // Jellyfin integration: when AniList progress moves forward, mark the matching
 // episodes watched on the user's own Jellyfin server.
@@ -50,8 +50,8 @@ export function getScope() {
 // The player keeps "is Jellyfin reachable" for five minutes and the found shows per tab. Another
 // server or user makes both wrong at once, so they are dropped right away.
 function forgetPlayerCaches() {
-    import('./player/availability.js?v=157').then(m => m.forgetAvailability()).catch(() => {});
-    import('./player/library.js?v=157').then(m => m.forgetMatches()).catch(() => {});
+    import('./player/availability.js?v=160').then(m => m.forgetAvailability()).catch(() => {});
+    import('./player/library.js?v=160').then(m => m.forgetMatches()).catch(() => {});
 }
 
 function writeLocal(cfg, scope) {
@@ -328,6 +328,8 @@ export async function getStatus(force = false) {
         value = { state: 'error', error: 'Server not reachable' };
     }
     statusCache = { ts: Date.now(), value };
+    // Back online after being off: the player's library check runs (js/player/animemap.js)
+    import('./player/animemap.js?v=160').then(m => m.noteStatus(value.state === 'connected')).catch(() => {});
     return value;
 }
 
@@ -356,8 +358,8 @@ export async function markWatched(media, episode) {
     const cfg = getConfig();
     if (!cfg || !episode || !media?.id) return null;
     const [{ availability }, { markPlayedUpTo }] = await Promise.all([
-        import('./player/availability.js?v=157'),
-        import('./player/library.js?v=157'),
+        import('./player/availability.js?v=160'),
+        import('./player/library.js?v=160'),
     ]);
     const avail = await availability();
     if (!avail) return { marked: 0, reason: 'unreachable' };
@@ -425,7 +427,7 @@ export async function playedProgress() {
         const prev = groups.get(key);
         if (!prev || ep.IndexNumber > prev.maxEpisode) {
             const playedAt = Date.parse(ep.UserData?.LastPlayedDate || '') || 0;
-            groups.set(key, { seriesName: ep.SeriesName, season, maxEpisode: ep.IndexNumber, year: ep.ProductionYear || null, playedAt });
+            groups.set(key, { seriesName: ep.SeriesName, seriesId: ep.SeriesId || null, season, maxEpisode: ep.IndexNumber, year: ep.ProductionYear || null, playedAt });
         }
     }
     return [...groups.values()];
@@ -560,7 +562,7 @@ function matchFit(media, group) {
 // Pushes AniList forward where Jellyfin is further along; returns what it changed
 export async function pullFromJellyfin(user, token) {
     if (!getConfig() || !isPullEnabled() || !user?.id || !token) return { updated: 0, changes: [] };
-    const api = await import('./api.js?v=157');
+    const api = await import('./api.js?v=160');
     if (api.isBackgroundPaused()) return { updated: 0, changes: [], skipped: 'maintenance' };
     if (api.isRateLimited()) return { updated: 0, changes: [], skipped: 'rate-limited' };
 
@@ -575,7 +577,7 @@ export async function pullFromJellyfin(user, token) {
     // Which played Jellyfin series each list entry stands for. Series linked by hand (js/jflinks.js) first,
     // with their episode numbers moved by the link's offset
     const claims = [];
-    const { linkForSeries } = await import('./jflinks.js?v=157');
+    const { linkForSeries } = await import('./jflinks.js?v=160');
     const linked = new Set();
     for (const p of played) {
         const link = linkForSeries(p.seriesName, p.season);
@@ -585,6 +587,20 @@ export async function pullFromJellyfin(user, token) {
         claims.push({ entry, hit: { ...p, maxEpisode: p.maxEpisode - link.offset }, titles: [m.title?.userPreferred, m.title?.romaji].filter(Boolean).map(splitYear), fit: 100 });
         linked.add(entry.id);
     }
+    // Then the player's library check (js/player/animemap.js): the series by TVDB id, a later part from its offset on
+    const { mappedShow } = await import('./player/animemap.js?v=160');
+    const mappedSeasons = new Set();
+    for (const entry of entries) {
+        const map = !linked.has(entry.id) && mappedShow(entry.media.id);
+        if (!map || map.kind !== 'series') continue;
+        mappedSeasons.add(`${map.id}|${map.season}`);
+        const p = played.find(x => x.seriesId === map.id && x.season === map.season);
+        const episode = p && Math.min(p.maxEpisode - map.offset, entry.media.episodes || Infinity);
+        if (!p || episode < 1) continue;
+        const m = entry.media;
+        claims.push({ entry, hit: { ...p, maxEpisode: episode }, titles: [m.title?.userPreferred, m.title?.romaji].filter(Boolean).map(splitYear), fit: 100, byId: true });
+        linked.add(entry.id);
+    }
     for (const entry of entries) {
         if (linked.has(entry.id)) continue;
         const m = entry.media;
@@ -592,6 +608,8 @@ export async function pullFromJellyfin(user, token) {
         const wanted = splitSeason(titles[0]?.title);
 
         const hit = played.find(p => {
+            // A season the library check gave to other entries is not guessed by title
+            if (mappedSeasons.has(`${p.seriesId}|${p.season}`)) return false;
             const show = splitYear(p.seriesName);
             const exact = titles.some(t => nearYear(t.year, show.year || p.year) && normTitle(t.title) === normTitle(show.title));
             if (exact) return p.season === 1 || p.season === wanted.season;
@@ -605,7 +623,8 @@ export async function pullFromJellyfin(user, token) {
     // Two entries sharing a name ("False Memory" 2020 and 2026) claim the same series: the better fit wins
     const best = new Map();
     for (const c of claims) {
-        const key = `${c.hit.seriesName}|${c.hit.season}`;
+        // Parts that share a season (each from its own offset) all count, they are not rivals
+        const key = c.byId ? `id|${c.entry.id}` : `${c.hit.seriesName}|${c.hit.season}`;
         if (!best.has(key) || c.fit > best.get(key).fit) best.set(key, c);
     }
 

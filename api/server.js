@@ -628,7 +628,8 @@ function linkFor(userId, info) {
 // episode or year — is looked up (exact title only)
 async function matchItem(userId, info) {
     const entries = await listEntries(userId);
-    const link = linkFor(userId, info);
+    // A hand link first, then the browser's library check (TVDB ids, api/animemap.js), then titles
+    const link = linkFor(userId, info) || animeMap.libraryMatch(userId, info);
     if (link) {
         const entry = entries.find(e => e.media && e.media.id === link.mediaId) || null;
         let media = entry && entry.media;
@@ -1359,6 +1360,10 @@ const party = require('./party')({
     json, readBody, str, tokenHash, bearerToken, clientIp,
 });
 
+// AniList id <-> TVDB/TMDB for the player's library check (api/animemap.js)
+const animeMap = require('./animemap')({ dataDir: DATA_DIR, writeJson, readJson, json, readBody, overLimit, clientIp,
+    verifyViewer, refuseAuth, normTitle, splitYear });
+
 async function handle(req, res) {
     setCors(req, res);
     if (req.method === 'OPTIONS') {
@@ -1384,6 +1389,9 @@ async function handle(req, res) {
         res.end();
         return;
     }
+
+    if (pathname === '/api/animemap' && req.method === 'POST') return animeMap.handle(req, res);
+    if (pathname === '/api/me/jflibrary') return animeMap.handleLibrary(req, res);
 
     if (pathname === '/api/log' && req.method === 'POST') {
         const body = await readBody(req);
@@ -1551,6 +1559,11 @@ async function handle(req, res) {
         for (const secret of Object.keys(all)) if (all[secret].userId === userId) delete all[secret];
         if (req.method === 'POST') all[crypto.randomBytes(24).toString('hex')] = { userId, createdAt: Date.now() };
         savePrivate(HOOK_FILE, all);
+        if (req.method === 'DELETE') {
+            animeMap.forgetLibrary(userId);
+            const pending = loadPrivate(JF_PENDING_FILE);
+            if (pending[String(userId)]) { delete pending[String(userId)]; savePrivate(JF_PENDING_FILE, pending); }
+        }
         return json(res, 200, hookInfo(userId));
     }
 

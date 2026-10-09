@@ -1,5 +1,6 @@
-import { getConfig, jfAuth, normTitle, splitYear, splitSeason, nearYear, hasAniListId } from '../jellyfin.js?v=157';
-import { linkForMedia } from '../jflinks.js?v=157';
+import { getConfig, jfAuth, normTitle, splitYear, splitSeason, nearYear, hasAniListId } from '../jellyfin.js?v=160';
+import { linkForMedia } from '../jflinks.js?v=160';
+import { mappedShow, checkAfterMiss } from './animemap.js?v=160';
 
 // AniList show + episode -> the Jellyfin item to play. The same title rules as the Jellyfin sync
 // (js/jellyfin.js, api/server.js) in the other direction: Jellyfin keeps one series with seasons,
@@ -101,6 +102,10 @@ async function findShow(base, cfg, media) {
     const tagged = await byProviderId(base, cfg, media.id, type);
     if (tagged) return movie ? { kind: 'movie', id: tagged.Id } : { kind: 'series', id: tagged.Id, season: splitSeason(titlesOf(media)[0]).season };
 
+    // The library check (js/player/animemap.js): by TVDB/TMDB id, with the season and where this part starts
+    const mapped = mappedShow(media.id);
+    if (mapped && (mapped.kind === 'movie') === movie) return mapped;
+
     for (const raw of titlesOf(media)) {
         const { title, year: titleYear } = splitYear(raw);
         const items = (await search(base, cfg, title, type)).filter(i =>
@@ -134,11 +139,16 @@ async function showFor(base, cfg, media) {
     if (link?.seriesId) return { kind: 'series', id: link.seriesId, season: link.season, offset: link.offset };
     const cache = readCache(cfg);
     let show = cache.map[media.id];
-    const stale = show === undefined || show === null
+    let stale = show === undefined || show === null
         || (show.missing && Date.now() - show.missing > MISSING_MS)
         || (!show.missing && Date.now() - (show.at || 0) > FOUND_MS);
+    // Missing a moment ago, but a library check has run (or is running) since: look again
+    if (!stale && show.missing && await checkAfterMiss(show.missing).catch(() => false)) stale = true;
     if (stale) {
+        const started = Date.now();
         show = await findShow(base, cfg, media);
+        // Not there by id or title: the library may have changed since the last check
+        if (!show && await checkAfterMiss(started).catch(() => false)) show = await findShow(base, cfg, media);
         cache.map[media.id] = show ? { ...show, at: Date.now() } : { missing: Date.now() };
         writeCache(cache);
     }
@@ -238,6 +248,16 @@ export async function markPlayedUpTo(base, media, upTo) {
         if (res?.ok) marked++;
     }
     return { marked, reason: pending.length ? null : 'already-played' };
+}
+
+// After a library check: shows not found before, and the ones it knows, are looked up again
+export function refreshMatches(mediaIds) {
+    const cfg = getConfig();
+    if (!cfg) return;
+    const cache = readCache(cfg);
+    const known = new Set(mediaIds.map(String));
+    for (const id of Object.keys(cache.map)) if (cache.map[id]?.missing || known.has(id)) delete cache.map[id];
+    writeCache(cache);
 }
 
 export function forgetMatches() {

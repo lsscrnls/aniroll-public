@@ -18,7 +18,7 @@ export async function startParty(mediaId, mediaTitle, hostName, startEp, coverIm
 
 export async function copyPartyLink(link) { return null; }
 
-export async function partyFromPlayer(media, episode) { return null; }
+export async function partyFromPlayer(media, episode, player = null) { return null; }
 
 // Moves the running party to another show; members and the invite link stay.
 export async function switchPartyTo(target, fromProgress) { return null; }

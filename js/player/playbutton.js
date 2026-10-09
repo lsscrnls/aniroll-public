@@ -1,8 +1,8 @@
 // @ts-check
-import { esc } from '../store.js?v=157';
-import { getConfig } from '../jellyfin.js?v=157';
-import { availability } from './availability.js?v=157';
-import { findEpisode } from './library.js?v=157';
+import { esc } from '../store.js?v=160';
+import { getConfig } from '../jellyfin.js?v=160';
+import { availability } from './availability.js?v=160';
+import { findEpisode } from './library.js?v=160';
 
 const ICON_EPISODES = '<svg data-icon="list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>';
 const ICON_PLAY = '<svg data-icon="play_arrow" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:18px;height:18px;vertical-align:-4px;margin-right:6px"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
@@ -25,7 +25,7 @@ export async function mountPlayButton(slot, media, episode, { prefix = 'detail',
         slot.innerHTML = `<a class="glass-btn glass-btn-primary ${size} ${prefix}-play" href="#/play/${media.id}/${episode}">${ICON_PLAY}${esc(label)}</a>`
             + (movie || !episodes ? '' : `<button class="glass-btn glass-btn-secondary ${size} ${prefix}-episodes" type="button">${ICON_EPISODES}Episodes</button>`);
         slot.querySelector(`.${prefix}-episodes`)?.addEventListener('click', async () => {
-            const { openEpisodes } = await import('./episodes.js?v=157');
+            const { openEpisodes } = await import('./episodes.js?v=160');
             openEpisodes(media, avail.base);
         });
         slot.hidden = false;

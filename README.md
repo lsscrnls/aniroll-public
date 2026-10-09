@@ -15,8 +15,7 @@ cloned and run as your own copy. The code is source-available under the
 [PolyForm Noncommercial License 1.0.0](LICENSE): you may read, change and share it for any noncommercial
 purpose; commercial use is not allowed.
 
-**Everything AniRoll stands on is here**: talking to a rate-limited API with no backend of its own
-in between, caching that keeps working offline, keeping two accounts in one browser apart, writing to
+**Everything AniRoll stands on is here**: talking to a rate-limited API straight from the browser, caching that keeps working offline, keeping two accounts in one browser apart, writing to
 someone's list only when that is safe, a small server that holds secrets, a Material 3 Expressive design of its own, and
 no bundler anywhere.
 
@@ -68,9 +67,10 @@ Screenshots and clips show a made-up demo account; the shows are real, from AniL
 
 Each section below is a problem AniRoll has to solve, how it solves it, and where to read the code.
 
-### A rate-limited API as the only backend
+### A rate-limited API, straight from the browser
 
-The browser talks straight to the [AniList GraphQL API](https://docs.anilist.co). AniList allows about
+The browser reads and writes your list straight through the [AniList GraphQL API](https://docs.anilist.co);
+the server only steps in for the few things listed under [What the server keeps](#what-the-server-keeps-about-you). AniList allows about
 30 requests a minute when it is under load, and every open tab counts against that. So `js/api.js`
 does not just send queries:
 
@@ -114,6 +114,26 @@ sync, share pages and an error log. Jellyfin keys and AniList tokens are encrypt
 and the key comes from outside the data volume (the server refuses to start without it). Data files
 are written atomically. The relay forwards only the few Jellyfin endpoints AniRoll uses, and it refuses
 private addresses at connect time, so DNS tricks can't point it at localhost.
+
+What the encryption does and does not do: it protects a leaked backup or data volume, because the key
+is not in it. It does not protect against someone who takes over the running server, because key and
+data are both there while it runs. That is why the server keeps an AniList token only when you ask it to.
+
+### What the server keeps about you
+
+| What | When | Why | How to remove it |
+|------|------|-----|------------------|
+| Your AniList token, encrypted | Only after you turn on **background sync** (Settings, or when joining a Watch Party) | Moves your list forward while AniRoll is closed: Watch Party guests following the host, episodes finished in Jellyfin | Turn background sync off; a token AniList rejects is deleted too. AniList tokens from this login last about a year, revoking AniRoll on AniList ends it at once |
+| Your Jellyfin address, user name and API key or sign-in token (encrypted) | When you link Jellyfin to AniRoll | The relay and the Play button | Unlink Jellyfin |
+| A webhook secret, the shows in your Jellyfin library (ids only), episodes waiting to be saved | When you set up live tracking | Live tracking from Jellyfin | Turn live tracking off, which deletes all three; a waiting episode is dropped after 7 days anyway |
+| A few small settings per AniList account | When you change them | The same settings on every device | — |
+| Watch Party members (AniList name, avatar, episode) | While a party runs | The party itself | Leave or end the party |
+| Shared pages (title, cover, description of a show) | When you share one | The share link preview | — |
+| Error reports (message, page, version, browser) | When something breaks in the app | Fixing it | The file is rotated at 1 MB, one older file is kept |
+| Web server logs (IP address, page) | Every request | Running the server | Deleted after 14 days |
+
+The server never sees your AniList password. Without background sync it never writes your token to disk:
+the browser sends it with a request, and the server keeps it in memory for up to 10 minutes, to know who you are.
 
 ### No bundler
 

@@ -5025,6 +5025,9 @@ html.m3-loading body { visibility: hidden; }
    A video is always dark: the player takes the scheme's fixed roles (the same in light and dark mode),
    with AniRoll's accent where no M3 scheme is loaded. */
 body.player-open { overflow: hidden; }
+/* Dialogs and toasts opened from the player (Watch Party) above it, not behind it */
+body.player-open .modal-backdrop { z-index: 800; }
+body.player-open .toast-container { z-index: 800; }
 /* The pointer in the player: Material 3 keeps its own cursor (js/m3.js moves it into the player in full
    screen; its rule on :root outranks the ones below). AniRoll's trailing cursor would sit on the picture,
    so there the system pointer comes back — AniRoll hides it everywhere else (cursor: none) */
@@ -5090,6 +5093,61 @@ body.player-open .cursor { display: none !important; }
     padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
 }
 .player-back, .player-party { background: rgba(255,255,255,0.12); }
+/* Watch Party in the player: a note at the top centre, the panel under the party button (js/pages/watchparty.js) */
+.pl-party-note {
+    position: absolute;
+    top: max(20px, env(safe-area-inset-top));
+    left: 50%;
+    z-index: 5;
+    max-width: calc(100% - 160px);
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: var(--pl-surface);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transform: translateX(-50%);
+    animation: plNoteIn .35s var(--pl-bounce);
+    pointer-events: none;
+}
+.pl-party-note.is-leaving { opacity: 0; transform: translate(-50%, -8px); transition: opacity .3s, transform .3s; }
+@keyframes plNoteIn { from { opacity: 0; transform: translate(-50%, -12px); } }
+.pl-party-panel {
+    position: absolute;
+    top: calc(max(16px, env(safe-area-inset-top)) + 56px);
+    right: max(16px, env(safe-area-inset-right));
+    z-index: 5;
+    width: min(320px, calc(100% - 32px));
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 8px 0;
+    border-radius: 16px;
+    background: var(--pl-surface);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    color: #fff;
+    transform-origin: top right;
+    animation: plPanelIn .3s var(--pl-bounce);
+}
+@keyframes plPanelIn { from { opacity: 0; transform: scale(.9) translateY(-8px); } }
+.pl-party-members { list-style: none; margin: 0; padding: 0 8px; }
+.pl-party-member { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 4px 8px; border-radius: 12px; }
+.pl-party-avatar { flex: none; width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.12); }
+.pl-party-name { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pl-party-ep { flex: none; font-size: 0.85rem; color: rgba(255,255,255,0.7); font-variant-numeric: tabular-nums; }
+.pl-party-member.is-behind { background: color-mix(in srgb, var(--warning) 16%, transparent); }
+.pl-party-member.is-behind .pl-party-avatar { box-shadow: 0 0 0 2px var(--warning); }
+.pl-party-member.is-behind .pl-party-ep { color: var(--warning); }
+.pl-party-member.is-off { background: color-mix(in srgb, var(--danger) 18%, transparent); }
+.pl-party-member.is-off .pl-party-avatar { box-shadow: 0 0 0 2px var(--danger); }
+.pl-party-member.is-off .pl-party-ep { color: var(--danger); }
+.pl-party-why { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.pl-party-empty { padding: 8px 16px; font-size: 0.9rem; color: rgba(255,255,255,0.7); }
+.pl-party-end { color: var(--danger); }
+@media (prefers-reduced-motion: reduce) { .pl-party-note, .pl-party-panel { animation: none; } }
 .player-title { min-width: 0; flex: 1; }
 .player-show { font-weight: 700; font-size: 1.15rem; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .player-episode { font-size: 0.875rem; color: rgba(255,255,255,0.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
