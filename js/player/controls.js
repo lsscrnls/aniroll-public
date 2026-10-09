@@ -4,7 +4,8 @@
 // flat track after it. The dot on the track marks 90%, where AniList counts the episode.
 //   mountControls(root, video, { watchedAt, runtime, autoSkip }) -> { set...(), act(name), destroy() }
 // Icons: Material Symbols Rounded 400 (Apache-2.0), inline so both designs show them.
-import { esc } from '../store.js?v=151';
+import { esc } from '../store.js?v=157';
+import { endingInfo, upNextAt } from './ending.js?v=157';
 
 
 const ICON = {
@@ -427,14 +428,16 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
         $('.pl-seek-segments').innerHTML = d ? segments.map(g => `<span class="pl-seek-seg" data-type="${esc(g.type)}"
             style="left:${(g.start / d) * 100}%;width:${((g.end - g.start) / d) * 100}%"></span>`).join('') : '';
     }
+    // Credits with story in them (AniSkip says "mixed" ending): never skipped, by hand or by itself
+    const skippable = (g) => !(g.type === 'Outro' && endingNow().story);
     function paintSegment() {
         const t = video.currentTime;
-        const inSeg = segments.find(g => t >= g.start && t < g.end - 1);
+        const inSeg = segments.find(g => t >= g.start && t < g.end - 1 && skippable(g));
         if (inSeg && autoSkipCheck(inSeg, t)) { segLastT = video.currentTime; return; }
         segLastT = t;
         // Shown from the segment's start until a second before it ends. Not for the credits while Up next
         // shows, nor once "Watch credits" said they are wanted
-        const seg = segments.find(g => t >= g.start && t < g.end - 1 && !(g.type === 'Outro' && nextState !== 'off'));
+        const seg = segments.find(g => t >= g.start && t < g.end - 1 && skippable(g) && !(g.type === 'Outro' && nextState !== 'off'));
         // After a few seconds it goes, so the intro or the credits play on their own, controls or not.
         // Seeking back before where it came up shows it again.
         if (seg !== skipSeg || t < skipFrom) { skipSeg = seg; skipFrom = t; }
@@ -461,13 +464,10 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
     let nextLeft = COUNTDOWN;
     let nextTimer = 0;
     const nextBox = $('.pl-next');
-    // Credits that end near the end of the file; a preview after them may follow
-    const nextFrom = () => {
-        const d = duration();
-        if (!d) return Infinity;
-        const outro = segments.find(g => g.type === 'Outro' && g.end >= d - 120);
-        return outro ? outro.start : d - Math.min(30, d * 0.1);
-    };
+    // Where Up next may come in: js/player/ending.js (credits, story in them or after them)
+    let ending = []; // AniSkip's endings: [{ type: 'ed' | 'mixed-ed', start, end, length }] in seconds
+    const endingNow = () => endingInfo(duration(), segments, ending);
+    const nextFrom = () => upNextAt(duration(), segments, ending);
     function paintNextCount() {
         const left = Math.max(0, Math.ceil(nextLeft));
         $('.pl-next-label').textContent = `Play now · ${left}`;
@@ -809,6 +809,12 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
         setSegments(list) {
             segments = (list || []).filter(g => g.end - g.start >= 3);
             paintSegmentBar();
+            paintSegment();
+        },
+        // AniSkip's endings for this episode (see setSegments): [{ type, start, end, length }] in seconds
+        setEnding(list) {
+            ending = (list || []).filter(r => r && r.end > r.start);
+            paintNext();
             paintSegment();
         },
         // [{ name, start }] in seconds, in order; name '' when the file only numbers them

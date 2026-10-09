@@ -70,7 +70,7 @@ echo "unit tests: $(echo "$unit_out" | grep -oE "^ℹ pass [0-9]+" | grep -oE "[
 types_out=$(bash tools/types/check.sh 2>&1) || { echo "$types_out" | grep "error TS" | head -20; fail "type check failed"; }
 echo "$types_out"
 
-if [ -n "$(git status --porcelain -- index.html css js api icons manifest.webmanifest favicon.svg 2>/dev/null)" ]; then
+if [ -n "$(git status --porcelain -- index.html css js api icons manifest.webmanifest favicon.svg favicon.ico 2>/dev/null)" ]; then
     echo "note: uncommitted changes are being deployed"
 fi
 
@@ -79,7 +79,7 @@ if [ "$DRY" -eq 1 ]; then echo; echo "dry run: nothing uploaded"; exit 0; fi
 step "Frontend"
 # One tar stream over one SSH connection — the many single scp calls used to time out
 files=(index.html css js)
-for extra in favicon.svg manifest.webmanifest robots.txt sitemap.xml move icons fonts media og-image-v4.jpg; do
+for extra in favicon.svg favicon.ico manifest.webmanifest robots.txt sitemap.xml move icons fonts media og-image-v4.jpg; do
     [ -e "$extra" ] && files+=("$extra")
 done
 # Uploaded from a copy, so the protected modules can be obfuscated without touching the repo

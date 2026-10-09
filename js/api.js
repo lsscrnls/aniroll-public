@@ -1,7 +1,7 @@
 // @ts-check
-import { buildTasteProfile, tasteMatch } from './taste.js?v=151';
-import { dismissedIds } from './dismissed.js?v=151';
-import { statusLabel } from './store.js?v=151';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=157';
+import { dismissedIds } from './dismissed.js?v=157';
+import { statusLabel } from './store.js?v=157';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -86,7 +86,12 @@ function rateLimitError() {
 
 function markRateLimited(retryAfterSec) {
     const wait = Math.max(RATE_LIMIT_PAUSE, Math.min(Number(retryAfterSec) || 0, 3600) * 1000);
+    const fresh = !isRateLimited();
     rateLimitedUntil = Math.max(rateLimitedUntil, Date.now() + wait);
+    // Tell our server once per pause, so the admin page sees when browsers get limited (no account, no URL)
+    if (fresh) {
+        try { navigator.sendBeacon('/api/ratelimit', new Blob([JSON.stringify({ until: rateLimitedUntil })], { type: 'application/json' })); } catch { /* not essential */ }
+    }
     window.dispatchEvent(new CustomEvent(RATE_LIMIT_EVENT, { detail: { until: rateLimitedUntil } }));
 }
 
@@ -329,6 +334,7 @@ async function query(q, variables = {}, token = null) {
 const MEDIA_FRAGMENT = `
 fragment mediaFields on Media {
     id
+    idMal
     title { romaji english native userPreferred }
     coverImage { large extraLarge color }
     bannerImage
@@ -689,7 +695,7 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update.
     // Only when this save set the progress: a new score or status leaves Jellyfin alone.
     if (mirror && saved?.mediaId && saved.progress && variables.progress !== undefined) {
-        import('./jellyfin.js?v=151').then(m =>
+        import('./jellyfin.js?v=157').then(m =>
             m.syncProgress(saved.progress, () => mediaForSync(saved.mediaId, token)));
     }
 

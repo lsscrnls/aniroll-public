@@ -1,14 +1,14 @@
-import * as api from '../api.js?v=151';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=151';
-import { getToken, isLoggedIn } from '../auth.js?v=151';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=151';
-import { availability } from '../player/availability.js?v=151';
-import { findEpisode, jfGet } from '../player/library.js?v=151';
-import { deviceProfile } from '../player/profile.js?v=151';
-import { HtmlVideoEngine } from '../player/engine.js?v=151';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=151';
-import { createSubtitles } from '../player/subtitles.js?v=151';
-import { neighbours } from '../player/episodes.js?v=151';
+import * as api from '../api.js?v=157';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=157';
+import { getToken, isLoggedIn } from '../auth.js?v=157';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=157';
+import { availability } from '../player/availability.js?v=157';
+import { findEpisode, jfGet } from '../player/library.js?v=157';
+import { deviceProfile } from '../player/profile.js?v=157';
+import { HtmlVideoEngine } from '../player/engine.js?v=157';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=157';
+import { createSubtitles } from '../player/subtitles.js?v=157';
+import { neighbours } from '../player/episodes.js?v=157';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -113,7 +113,7 @@ export async function render({ params, content }) {
         if (closed) return cleanup;
         $('player-show').textContent = titlePref(media.title);
         $('player-party')?.addEventListener('click', async () => {
-            const { partyFromPlayer } = await import('./watchparty.js?v=151');
+            const { partyFromPlayer } = await import('./watchparty.js?v=157');
             partyFromPlayer(media, episode);
         });
         if (!avail) throw new Error('Your Jellyfin server cannot be reached right now');
@@ -324,6 +324,7 @@ export async function render({ params, content }) {
         video.addEventListener('seeked', report);
 
         loadSegments(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setSegments(list); });
+        if (media.idMal) loadEnding(media.idMal, episode).then(list => { if (!closed && list.length) controls.setEnding(list); });
         loadChapters(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setChapters(list); });
         await reportStart(session, engine);
         reportTimer = setInterval(report, REPORT_EVERY);
@@ -377,6 +378,35 @@ async function loadSegments(base, cfg, itemId) {
     } catch {
         return [];
     }
+}
+
+// Where the ending is, from AniSkip (api.aniskip.com: community-voted times by MyAnimeList id and episode):
+// whether story runs on during the ending ("mixed-ed") or after it. Times count from its file's start, so the
+// player only uses them for a file of the same length. Kept a week per episode; nothing found: Jellyfin's
+// segments alone. [{ type: 'ed' | 'mixed-ed', start, end, length }] in seconds
+const ENDING_KEY = 'aniroll_endings';
+const ENDING_TTL = 7 * 24 * 60 * 60 * 1000;
+async function loadEnding(malId, episode) {
+    const key = `${malId}/${episode}`;
+    let kept = {};
+    try { kept = JSON.parse(localStorage.getItem(ENDING_KEY) || '{}') || {}; } catch { /* none */ }
+    if (kept[key] && Date.now() - kept[key].at < ENDING_TTL) return kept[key].list;
+    let list = [];
+    try {
+        const res = await fetch(`https://api.aniskip.com/v2/skip-times/${encodeURIComponent(malId)}/${encodeURIComponent(episode)}`
+            + '?types[]=ed&types[]=mixed-ed&episodeLength=0', { signal: AbortSignal.timeout(6000) });
+        // 404 means nobody submitted this episode: kept as "nothing", like an answer
+        if (!res.ok && res.status !== 404) return [];
+        const data = await res.json();
+        list = (data?.results || []).map(r => ({ type: r.skipType, start: Number(r.interval?.startTime) || 0,
+            end: Number(r.interval?.endTime) || 0, length: Number(r.episodeLength) || 0 }))
+            .filter(r => (r.type === 'ed' || r.type === 'mixed-ed') && r.end > r.start);
+    } catch { return []; }
+    const now = Date.now();
+    for (const k of Object.keys(kept)) if (now - kept[k].at >= ENDING_TTL) delete kept[k];
+    kept[key] = { at: now, list };
+    try { localStorage.setItem(ENDING_KEY, JSON.stringify(kept)); } catch { /* not kept */ }
+    return list;
 }
 
 // Chapters as the file has them (an MKV's chapter list, read by Jellyfin): [{ name, start }] in seconds.
