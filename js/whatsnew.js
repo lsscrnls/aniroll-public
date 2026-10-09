@@ -2,13 +2,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=151';
-import { openDialog } from './a11y.js?v=151';
-import { prefersReducedMotion } from './animations.js?v=151';
-import { accountState, saveAccountState } from './accountstate.js?v=151';
+import { esc } from './store.js?v=157';
+import { openDialog } from './a11y.js?v=157';
+import { prefersReducedMotion } from './animations.js?v=157';
+import { accountState, saveAccountState } from './accountstate.js?v=157';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.5.3';
+export const RELEASE = '1.5.4';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -19,6 +19,15 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
+    {
+        id: '2026-10-09',
+        title: 'Up next waits for the story',
+        items: [
+            'In the player, <strong>Up next</strong> now knows where an episode really ends: a scene after the credits plays before it shows up, and credits with story in them can no longer be skipped by accident.',
+            'Installed on an iPhone, AniRoll no longer hides its top bar under the status bar.',
+            'Search results can now show the AniRoll logo.',
+        ],
+    },
     {
         // '.2': the move to aniroll.app
         // '.3': calmer Home, show pages, lists and Roll
