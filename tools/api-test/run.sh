@@ -23,11 +23,14 @@ for port in 3001 3099; do
     fi
 done
 
-cp "$root/api/server.js" "$root/api/party.js" "$work/"
+cp "$root/api/server.js" "$root/api/party.js" "$root/api/animemap.js" "$work/"
+# A tiny anime map instead of the real download: two parts of one TVDB season, a movie
+mkdir -p "$work/data"
+echo '{"at":'"$(date +%s)000"',"entries":[{"a":101,"tvdb":5001,"ts":1,"to":0,"tmdb":7001,"ms":1,"mo":0,"movie":[]},{"a":102,"tvdb":5001,"ts":1,"to":12,"tmdb":7001,"ms":1,"mo":12,"movie":[]},{"a":103,"tvdb":null,"ts":null,"to":0,"tmdb":null,"ms":null,"mo":0,"movie":[9001]}]}' > "$work/data/animemap.json"
 node "$here/mockanilist.js" > "$work/mock.log" 2>&1 &
 pids+=($!)
 (cd "$work" && exec env ANILIST_URL=http://127.0.0.1:3099 JF_SECRET=local-test-secret-0123456789abcdef \
-    ANILIST_BUDGET_PER_MIN=200 VERIFY_PAUSE_MS=1000 MAX_SEATS=2 node server.js > "$work/server.log" 2>&1) &
+    ANILIST_BUDGET_PER_MIN=200 VERIFY_PAUSE_MS=1000 MAX_SEATS=2 ANIME_MAP_URL= node server.js > "$work/server.log" 2>&1) &
 pids+=($!)
 
 for _ in $(seq 50); do
@@ -35,7 +38,7 @@ for _ in $(seq 50); do
     sleep 0.1
 done
 
-if ! node "$here/apitest.js"; then
+if ! API_DATA="$work/data" node "$here/apitest.js"; then
     echo "--- server log ---" >&2
     tail -n 40 "$work/server.log" >&2
     exit 1

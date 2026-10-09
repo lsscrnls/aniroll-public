@@ -1,6 +1,6 @@
 FROM node:24-alpine
 WORKDIR /app
-COPY server.js party.js .
+COPY server.js party.js animemap.js .
 # Runs without root. A uid of its own, not the image's "node" (1000): on the host the mounted
 # data/ gets chowned to this uid, and 1000 is often a real login account there.
 # scripts/deploy.sh --api chowns data/ before starting the container.

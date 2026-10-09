@@ -2,13 +2,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=157';
-import { openDialog } from './a11y.js?v=157';
-import { prefersReducedMotion } from './animations.js?v=157';
-import { accountState, saveAccountState } from './accountstate.js?v=157';
+import { esc } from './store.js?v=160';
+import { openDialog } from './a11y.js?v=160';
+import { prefersReducedMotion } from './animations.js?v=160';
+import { accountState, saveAccountState } from './accountstate.js?v=160';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.5.4';
+export const RELEASE = '1.5.5';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -20,9 +20,20 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-09',
+        id: '2026-10-10',
+        title: 'Less kept on the server',
+        items: [
+            'With live tracking off, the AniRoll server no longer keeps the list of shows in your <strong>Jellyfin</strong> library; turning live tracking off now deletes it, along with episodes still waiting to be saved.',
+        ],
+    },
+    {
+        // '.2': the Watch Party in the player
+        // '.3': Jellyfin shows found by their TVDB/TMDB id
+        id: '2026-10-09.3',
         title: 'Up next waits for the story',
         items: [
+            { rev: 3, text: 'AniRoll now finds shows in your <strong>Jellyfin</strong> that Jellyfin names differently from AniList, and later parts that share a season, the moment your server is back online. Watching them in Jellyfin itself counts the right entry too.' },
+            { rev: 2, text: 'Your <strong>Watch Party</strong> in the player: starting one says so right there, and the party button then shows who is in and how far, marked when someone\'s sync fell behind. End the party from there too, with or without a post.' },
             'In the player, <strong>Up next</strong> now knows where an episode really ends: a scene after the credits plays before it shows up, and credits with story in them can no longer be skipped by accident.',
             'Installed on an iPhone, AniRoll no longer hides its top bar under the status bar.',
             'Search results can now show the AniRoll logo.',

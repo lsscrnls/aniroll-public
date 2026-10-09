@@ -1,5 +1,6 @@
 // @ts-check
-import { getConfig, normalizeUrl } from '../jellyfin.js?v=157';
+import { getConfig, normalizeUrl } from '../jellyfin.js?v=160';
+import { noteStatus } from './animemap.js?v=160';
 
 // Is the user's Jellyfin reachable from this browser right now? AniRoll has to work the same
 // with the whole stack switched off, so this never blocks anything: a short timeout, the answer
@@ -50,6 +51,9 @@ export function availability(force = false) {
         else if (await ping(cfg.url, 3000)) value = { base: cfg.url, local: false };
         cached = { at: Date.now(), value };
         running = null;
+        // Reachable again after being off: the library check runs (js/player/animemap.js)
+        // Started before anyone waits on this answer, so a lookup right after it finds the check running
+        noteStatus(!!value);
         return value;
     })();
     return running;
