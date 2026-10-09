@@ -623,7 +623,7 @@ function staticServer() {
 
     groups.player = async () => {
     // Jellyfin player. A page logged in to AniList and to Jellyfin (a friend's sign-in, not an API key)
-    async function playerPage(jellyfinUp, signedIn = true) {
+    async function playerPage(jellyfinUp, signedIn = true, jfMock = {}) {
         const p = await browser.newPage({ viewport: { width: 1280, height: 800 } });
         const pageErrors = [];
         p.on('pageerror', e => pageErrors.push(e.message));
@@ -637,7 +637,7 @@ function staticServer() {
         await p.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false,"configured":false}' }));
         await p.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
         // The stack switched off: every request to Jellyfin fails the way a dead host does
-        const calls = jellyfinUp ? await mockJellyfin(p) : [];
+        const calls = jellyfinUp ? await mockJellyfin(p, jfMock) : [];
         if (!jellyfinUp) await p.route(`${JF_URL}/**`, route => route.abort('connectionrefused'));
         await p.addInitScript(({ id, name, jf }) => {
             localStorage.setItem('aniroll_token', 'e2e-token');
@@ -675,8 +675,14 @@ function staticServer() {
         await p.route(`${base}/api/party/**`, route => {
             const req = route.request();
             if (req.method() === 'PUT' && /\/api\/party\/[^/]+\/\d+$/.test(new URL(req.url()).pathname)) created = req.postDataJSON();
-            route.fulfill({ contentType: 'application/json', body: JSON.stringify({ hostKey: 'k', active: true, members: [] }) });
+            if (req.method() === 'DELETE') ended = true;
+            // Three members: in step with the host, one episode behind, two behind
+            const state = { hostKey: 'k', active: true, hostProgress: 3, members: [
+                { name: 'inStep', avatar: '', progress: 3 }, { name: 'oneBehind', avatar: '', progress: 2 }, { name: 'twoBehind', avatar: '', progress: 1 }] };
+            if (req.url().endsWith('/events')) return route.fulfill({ contentType: 'text/event-stream', body: `retry: 60000\ndata: ${JSON.stringify(state)}\n\n` });
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify(state) });
         });
+        let ended = false;
         await p.goto(base + '/#/play/101/3');
         await p.waitForSelector('#player-party', { timeout: 8000 }).catch(() => {});
         // Clicked once the episode plays
@@ -690,6 +696,24 @@ function staticServer() {
         check('player: Watch Party button starts a party for this show, link in the clipboard, playback stays',
             created?.startEp === 2 && res.stored?.startEp === 2 && /#\/watchparty\?host=/.test(res.clip) && res.hash === '#/play/101/3' && !pageErrors.length,
             { created, res, pageErrors });
+        const note = await p.evaluate(() => document.querySelector('.pl-party-note')?.textContent);
+        check('player: starting the party says so at the top of the player', /Watch Party started/.test(note || ''), { note });
+
+        // Clicked again: who is in (orange one behind, red two behind), End stops playback and asks End or End & Post
+        await p.evaluate(() => document.getElementById('player-party')?.click());
+        await p.waitForSelector('.pl-party-member', { timeout: 5000 }).catch(() => {});
+        const panel = await p.evaluate(() => [...document.querySelectorAll('.pl-party-member')].map(li => li.querySelector('.pl-party-name').textContent + ':' + li.className.replace('pl-party-member', '').trim()));
+        await p.evaluate(() => document.querySelector('[data-party="end"]')?.click());
+        await p.waitForSelector('[data-end="post"]', { timeout: 3000 }).catch(() => {});
+        const asked = await p.evaluate(() => ({ paused: document.getElementById('player-video').paused, panel: !!document.querySelector('.pl-party-panel'),
+            buttons: [...document.querySelectorAll('[data-end]')].map(b => b.textContent.trim()) }));
+        await p.evaluate(() => document.querySelector('[data-end="end"]')?.click());
+        await p.waitForFunction(() => !localStorage.getItem('aniroll_watchparty'), null, { timeout: 5000 }).catch(() => {});
+        const after = await p.evaluate(() => ({ note: document.querySelector('.pl-party-note')?.textContent, hash: location.hash }));
+        check('player: party panel lists members, marks who is behind, End pauses and offers End Party or End Party & Post',
+            panel.join() === 'inStep:,oneBehind:is-behind,twoBehind:is-off' && asked.paused && !asked.panel
+            && asked.buttons.join() === 'End Party,End Party & Post' && ended && after.note === 'Watch Party ended' && after.hash === '#/play/101/3' && !pageErrors.length,
+            { panel, asked, ended, after, pageErrors });
         await p.close();
     }
 
@@ -732,6 +756,36 @@ function staticServer() {
         await idle(p, 2500);
         const msg = await p.evaluate(() => document.getElementById('player-status')?.textContent.trim());
         check('player, Jellyfin off: #/play says the server cannot be reached', /cannot be reached/.test(msg || ''), msg);
+        await p.close();
+    }
+
+    // Library check: Jellyfin names the show differently, the TVDB id from our server's anime map finds it.
+    // The mock's detail id comes from a hash: a first look without a map tells which id the page asks for.
+    {
+        const { p, pageErrors, calls } = await playerPage(true, true, { library: [{ Id: 'series1', Name: 'Other Name', Type: 'Series', ProviderIds: { Tvdb: '4242' } }] });
+        const asked = [];
+        let mapFor = null;
+        await p.route(`${base}/api/animemap`, route => {
+            asked.push(route.request().postDataJSON());
+            const entries = mapFor ? [{ a: mapFor, tvdb: 4242, ts: 1, to: 0, tmdb: null, ms: null, mo: 0, movie: [] }] : [];
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify({ at: Date.now(), entries }) });
+        });
+        await p.goto(base + '/#/anime/101/full');
+        await p.waitForFunction(() => /missing/.test(localStorage.aniroll_jf_match3 || ''), null, { timeout: 8000 }).catch(() => {});
+        mapFor = Number(await p.evaluate(() => Object.keys(JSON.parse(localStorage.aniroll_jf_match3 || '{}').map || {})[0]));
+        const before = await p.evaluate(() => !!document.querySelector('.detail-play'));
+        // Jellyfin was off and is back: the profile menu's status check runs the library check again
+        await p.evaluate(() => {
+            const s = JSON.parse(localStorage.aniroll_jf_animemap);
+            localStorage.aniroll_jf_animemap = JSON.stringify({ ...s, online: false });
+        });
+        await p.reload();
+        await p.waitForSelector('.detail-play', { timeout: 8000 }).catch(() => {});
+        const button = await p.evaluate(() => document.querySelector('.detail-play')?.getAttribute('href') || null);
+        check('player: a show Jellyfin names differently is found by its TVDB id, checked again once Jellyfin is back',
+            !before && new RegExp(`^#/play/${mapFor}/2$`).test(button || '')
+            && asked.length >= 2 && asked.every(b => b.tvdb?.includes(4242)) && calls.some(c => c.type === 'libraryList')
+            && !pageErrors.length, { before, mapFor, button, asked, pageErrors });
         await p.close();
     }
 

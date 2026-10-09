@@ -1,7 +1,7 @@
 // @ts-check
-import * as api from '../api.js?v=157';
-import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref } from '../store.js?v=157';
-import { getToken, isLoggedIn } from '../auth.js?v=157';
+import * as api from '../api.js?v=160';
+import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref } from '../store.js?v=160';
+import { getToken, isLoggedIn } from '../auth.js?v=160';
 
 export async function render({ params, content }) {
     const token = getToken();

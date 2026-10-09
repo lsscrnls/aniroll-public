@@ -64,7 +64,8 @@ function mediaSource(id) {
 
 // Installs the mock on a Playwright page. Returns what the app sent, to check against.
 // anyTitle: every search finds the series (screenshots with real show names)
-async function mockJellyfin(page, { anyTitle = false } = {}) {
+// library: what a listing of the whole library answers; searches then find nothing (a title Jellyfin names differently)
+async function mockJellyfin(page, { anyTitle = false, library = null } = {}) {
     const calls = [];
     let lastAudio = null; // the track Jellyfin "remembers" from the reports
     await page.route(`${JF_URL}/**`, async route => {
@@ -93,6 +94,10 @@ async function mockJellyfin(page, { anyTitle = false } = {}) {
         if (p === `/Users/${JF_USER}/Items`) {
             // Like Jellyfin 12: an unknown provider filter is ignored and the whole library comes back
             if (url.searchParams.get('AnyProviderIdEquals')) return json({ Items: [{ Id: 'wrong-series', Name: 'Black Torch', ProviderIds: {} }, { Id: 'series1', Name: 'Show 1', ProviderIds: {} }] });
+            if (library) {
+                if (!url.searchParams.get('searchTerm')) calls.push({ type: 'libraryList', types: url.searchParams.get('IncludeItemTypes') });
+                return json({ Items: url.searchParams.get('searchTerm') ? [] : library });
+            }
             const term = (url.searchParams.get('searchTerm') || '').toLowerCase();
             return json({ Items: term === 'show 1' || anyTitle ? [{ Id: 'series1', Name: anyTitle ? url.searchParams.get('searchTerm') : 'Show 1', ProductionYear: anyTitle ? null : 2026 }] : [] });
         }
