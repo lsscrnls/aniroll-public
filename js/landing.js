@@ -1,5 +1,5 @@
-import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=160';
-import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=160';
+import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=161';
+import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=161';
 
 // The landing page, in Material 3 Expressive (the only design logged out): the headline arrives word by word,
 // a roll to try sits next to it, the feature tour plays one clip after another, and Watch Party shows up as the

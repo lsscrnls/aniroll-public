@@ -6,3 +6,5 @@ api/data/
 .env
 .env.*
 *.log
+downloads/
+dist/

@@ -2,13 +2,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=160';
-import { openDialog } from './a11y.js?v=160';
-import { prefersReducedMotion } from './animations.js?v=160';
-import { accountState, saveAccountState } from './accountstate.js?v=160';
+import { esc } from './store.js?v=161';
+import { openDialog } from './a11y.js?v=161';
+import { prefersReducedMotion } from './animations.js?v=161';
+import { accountState, saveAccountState } from './accountstate.js?v=161';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.5.5';
+export const RELEASE = '1.6.0';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -20,9 +20,12 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-10',
-        title: 'Less kept on the server',
+        // '.2': episodes in the player, AniRoll for Discord
+        id: '2026-10-10.2',
+        title: 'AniRoll in your Discord status',
         items: [
+            { rev: 2, text: 'Your <strong>Discord status</strong> can now show what you watch in AniRoll: the episode with the time left, the show you look at, your Watch Party with a button to join. Set it up under Settings → Discord.' },
+            { rev: 2, text: 'Pick any episode right in the <strong>player</strong>: the new Episodes button (or E) lists every episode in your Jellyfin, the one playing marked, with the seasons before and after one click away.' },
             'With live tracking off, the AniRoll server no longer keeps the list of shows in your <strong>Jellyfin</strong> library; turning live tracking off now deletes it, along with episodes still waiting to be saved.',
         ],
     },

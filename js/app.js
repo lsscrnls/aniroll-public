@@ -1,16 +1,17 @@
-import { route, startRouter, navigate } from './router.js?v=160';
-import { takeSeat } from './seat.js?v=160';
-import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl, rememberReturn } from './auth.js?v=160';
-import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, esc, titlePref, statusLabel } from './store.js?v=160';
-import * as api from './api.js?v=160';
-import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js?v=160';
-import { openDialog, initActivation } from './a11y.js?v=160';
-import { noteVisitor, maybeShowMoveNotice, openChangelog, renderChangelog, hasUnread } from './whatsnew.js?v=160';
-import { refreshPendingStatus, refreshJellyfinStatus } from './status.js?v=160';
-import { applyDesign } from './design.js?v=160';
+import { route, startRouter, navigate } from './router.js?v=161';
+import { takeSeat } from './seat.js?v=161';
+import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl, rememberReturn } from './auth.js?v=161';
+import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, esc, titlePref, statusLabel } from './store.js?v=161';
+import * as api from './api.js?v=161';
+import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js?v=161';
+import { openDialog, initActivation } from './a11y.js?v=161';
+import { noteVisitor, maybeShowMoveNotice, openChangelog, renderChangelog, hasUnread } from './whatsnew.js?v=161';
+import { refreshPendingStatus, refreshJellyfinStatus } from './status.js?v=161';
+import { applyDesign } from './design.js?v=161';
+import { startPresence } from './presence.js?v=161';
 
 const CLIENT_ID = '50643';
-const APP_VERSION = '160';
+const APP_VERSION = '161';
 
 // Report uncaught errors to our backend (api/server.js → data/client-errors.log).
 // Each distinct message once per page load, at most 10 — a loop must not flood the log.
@@ -68,32 +69,34 @@ async function init() {
     setupRoutes();
     setupNav();
     setupSearch();
+    // Before the first page: it says what is on screen
+    startPresence();
     startRouter();
     initAnimations();
     setupWhatsNew(returning);
 
     // Guests of a Watch Party keep syncing with the host on every page, not only on /watchparty
     if (isLoggedIn() && localStorage.getItem('aniroll_joined_party')) {
-        import('./pages/watchparty.js?v=160').then(m => m.initGuestSync());
+        import('./pages/watchparty.js?v=161').then(m => m.initGuestSync());
     }
     // Hosts get their running party back on a second device, and a pill leading back to it
     if (isLoggedIn()) {
-        import('./pages/watchparty.js?v=160').then(async m => {
+        import('./pages/watchparty.js?v=161').then(async m => {
             if (!localStorage.getItem('aniroll_watchparty')) await m.restoreHostParty();
             m.renderPartyPill();
         });
     }
     // The Jellyfin connection belongs to the AniList account, so pull it in on this device
     if (isLoggedIn()) {
-        import('./jellyfin.js?v=160').then(async m => {
+        import('./jellyfin.js?v=161').then(async m => {
             await m.loadAccountConfig();
             setupJellyfinLive();
         });
     }
     if (isLoggedIn()) setupPendingSaveRetry();
     if (isLoggedIn()) setupJellyfinPull();
-    if (isLoggedIn()) import('./drift.js?v=160').then(m => m.startDrift()).catch(() => { /* not essential */ });
-    import('./touches.js?v=160').then(m => m.startTouches()).catch(() => { /* not essential */ });
+    if (isLoggedIn()) import('./drift.js?v=161').then(m => m.startDrift()).catch(() => { /* not essential */ });
+    import('./touches.js?v=161').then(m => m.startTouches()).catch(() => { /* not essential */ });
     watchMaintenanceMode();
 }
 
@@ -179,13 +182,13 @@ function watchMaintenanceMode() {
 function setupJellyfinPull() {
     const pull = async () => {
         if (api.shouldHoldBackground()) return;
-        const { getConfig, isPullEnabled, pullFromJellyfin } = await import('./jellyfin.js?v=160');
+        const { getConfig, isPullEnabled, pullFromJellyfin } = await import('./jellyfin.js?v=161');
         if (!getConfig() || !isPullEnabled()) return;
         const user = getState().user;
         if (!user) return;
         try {
             // Series linked by hand on another device first
-            await import('./jflinks.js?v=160').then(m => m.syncLinks()).catch(() => {});
+            await import('./jflinks.js?v=161').then(m => m.syncLinks()).catch(() => {});
             const res = await pullFromJellyfin(user, getToken());
             for (const c of res.changes || []) {
                 toast(`Jellyfin: ${c.title} moved to episode ${c.to}`, 'success');
@@ -201,10 +204,10 @@ function setupJellyfinPull() {
 // Jellyfin webhook -> AniRoll backend: the chip in the navbar, toasts for tracked episodes,
 // and episodes the backend could not write (no access, AniList blocking it) applied from here
 async function setupJellyfinLive() {
-    const jf = await import('./jellyfin.js?v=160');
+    const jf = await import('./jellyfin.js?v=161');
     // Set up on another device: fetch the link once, only for people who use Jellyfin at all
     if (!jf.getHookSecret() && jf.getConfig()) await jf.loadHook().catch(() => null);
-    const np = await import('./nowplaying.js?v=160');
+    const np = await import('./nowplaying.js?v=161');
     window.addEventListener(jf.NOW_EVENT, (e) => np.renderNowChip(document.getElementById('jf-now-chip'), e.detail));
     jf.startNowPlaying({
         onTracked: (item) => {
@@ -299,7 +302,7 @@ async function loadViewer() {
 
 function setupRoutes() {
     route('/', async (ctx) => {
-        const { render, loadLandingTrending } = await import('./pages/home.js?v=160');
+        const { render, loadLandingTrending } = await import('./pages/home.js?v=161');
         const cleanup = await render(ctx);
         if (!isLoggedIn()) loadLandingTrending();
         refreshAnimations();
@@ -307,30 +310,30 @@ function setupRoutes() {
     });
 
     route('/studio/:id', async (ctx) => {
-        const { render } = await import('./pages/studio.js?v=160');
+        const { render } = await import('./pages/studio.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/staff/:id', async (ctx) => {
-        const { render } = await import('./pages/staff.js?v=160');
+        const { render } = await import('./pages/staff.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
 
     // The owner's view of how busy AniRoll is (the server checks who asks)
     route('/admin', async (ctx) => {
-        const { render } = await import('./pages/admin.js?v=160');
+        const { render } = await import('./pages/admin.js?v=161');
         return render(ctx);
     });
 
     route('/shelf', async (ctx) => {
-        const { render } = await import('./pages/shelf.js?v=160');
+        const { render } = await import('./pages/shelf.js?v=161');
         return render(ctx);
     });
 
     route('/search', async (ctx) => {
-        const { render } = await import('./pages/search.js?v=160');
+        const { render } = await import('./pages/search.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
@@ -340,14 +343,14 @@ function setupRoutes() {
     });
 
     route('/anime/:id/full', async (ctx) => {
-        const { render } = await import('./pages/detail.js?v=160');
+        const { render } = await import('./pages/detail.js?v=161');
         await render({ params: { id: ctx.params.id }, content: ctx.content });
         refreshAnimations();
     });
 
     // The player loads only when something is played
     route('/play/:id/:episode', async (ctx) => {
-        const { render } = await import('./pages/play.js?v=160');
+        const { render } = await import('./pages/play.js?v=161');
         return render(ctx);
     });
 
@@ -356,62 +359,62 @@ function setupRoutes() {
     });
 
     route('/manga/:id/full', async (ctx) => {
-        const { render } = await import('./pages/detail.js?v=160');
+        const { render } = await import('./pages/detail.js?v=161');
         await render({ params: { id: ctx.params.id }, content: ctx.content });
         refreshAnimations();
     });
 
     route('/list', async (ctx) => {
-        const { render } = await import('./pages/list.js?v=160');
+        const { render } = await import('./pages/list.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/list/:username', async (ctx) => {
-        const { render } = await import('./pages/list.js?v=160');
+        const { render } = await import('./pages/list.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/social', async (ctx) => {
-        const { render } = await import('./pages/social.js?v=160');
+        const { render } = await import('./pages/social.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/profile', async (ctx) => {
-        const { render } = await import('./pages/profile.js?v=160');
+        const { render } = await import('./pages/profile.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/user/:username', async (ctx) => {
-        const { render } = await import('./pages/profile.js?v=160');
+        const { render } = await import('./pages/profile.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/season', async (ctx) => {
-        const { render } = await import('./pages/season.js?v=160');
+        const { render } = await import('./pages/season.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/season/:year/:season', async (ctx) => {
-        const { render } = await import('./pages/season.js?v=160');
+        const { render } = await import('./pages/season.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/roll', async (ctx) => {
-        const { render } = await import('./pages/roll.js?v=160');
+        const { render } = await import('./pages/roll.js?v=161');
         const cleanup = await render(ctx);
         refreshAnimations();
         return cleanup;
     });
 
     route('/calendar', async (ctx) => {
-        const { render } = await import('./pages/calendar.js?v=160');
+        const { render } = await import('./pages/calendar.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
@@ -423,20 +426,20 @@ function setupRoutes() {
     });
 
     route('/notifications', async (ctx) => {
-        const { render } = await import('./pages/notifications.js?v=160');
+        const { render } = await import('./pages/notifications.js?v=161');
         await render(ctx);
         refreshAnimations();
     });
 
     route('/watchparty', async (ctx) => {
-        const { render } = await import('./pages/watchparty.js?v=160');
+        const { render } = await import('./pages/watchparty.js?v=161');
         const cleanup = await render(ctx);
         refreshAnimations();
         return cleanup;
     });
 
     route('/settings', async (ctx) => {
-        const { render } = await import('./pages/settings.js?v=160');
+        const { render } = await import('./pages/settings.js?v=161');
         await render(ctx);
     });
 
@@ -716,7 +719,7 @@ async function openDetailPanel(id) {
     body.scrollTop = 0;
     body.innerHTML = '<div class="page-loader" style="padding:var(--space-3xl)"><div class="loader-spinner"></div></div>';
 
-    const { renderPanel } = await import('./pages/detail.js?v=160');
+    const { renderPanel } = await import('./pages/detail.js?v=161');
     await renderPanel(id, body);
     overlay.dataset.mediaType = body.querySelector('.detail-fullscreen-btn')?.dataset.type || 'anime';
 }

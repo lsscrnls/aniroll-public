@@ -149,14 +149,14 @@ function staticServer() {
     await go('#/social');
     check('Discover tab returns to the last view (Calendar)', (await page.getAttribute('.nav-links [data-page="discover"]', 'href')) === '#/calendar');
 
-    // Settings: four tabs, ?tab= opens one, the design switch loads Material 3 Expressive and back
+    // Settings: five tabs, ?tab= opens one, the design switch loads Material 3 Expressive and back
     await go('#/settings?tab=jellyfin');
     const settings = await page.evaluate(() => ({
         tabs: [...document.querySelectorAll('[data-settings-tab]')].map(b => b.textContent).join(','),
         visible: [...document.querySelectorAll('.settings-panel')].filter(p => !p.hidden).map(p => p.id).join(','),
     }));
-    check('settings: tabs Appearance, Lists, Watch Party, Jellyfin; ?tab= opens one',
-        settings.tabs === 'Appearance,Lists,Watch Party,Jellyfin' && settings.visible === 'settings-jellyfin', settings);
+    check('settings: tabs Appearance, Lists, Watch Party, Jellyfin, Discord; ?tab= opens one',
+        settings.tabs === 'Appearance,Lists,Watch Party,Jellyfin,Discord' && settings.visible === 'settings-jellyfin', settings);
     await page.click('[data-settings-tab="appearance"]');
     await page.waitForTimeout(800);
     const m3 = await page.evaluate(() => ({
@@ -664,6 +664,70 @@ function staticServer() {
         });
         check('watch party: Play the episode the group watches next, straight from the party', /^#\/play\/\d+\/2$/.test(play?.href || '')
             && /Play episode 2/.test(play.text) && play.episodes && !pageErrors.length, { play, pageErrors });
+        await p.close();
+    }
+
+    // Discord status: Settings shows the three steps (a stand-in for the extension answers here), and once it
+    // is on, the player's episode goes out with its time left, paused without it, and a link to the show
+    {
+        const { p, pageErrors } = await playerPage(true);
+        await p.addInitScript(() => {
+            window.__activities = [];
+            window.addEventListener('message', (e) => {
+                const m = e.data;
+                if (m?.aniroll !== 'presence') return;
+                if (m.type === 'activity') window.__activities.push(m.activity);
+                window.postMessage({ aniroll: 'presence-ext', type: 'status', extension: '1.0.0', helper: true, discord: true }, location.origin);
+            });
+        });
+        await p.goto(base + '/#/settings?tab=discord');
+        await p.waitForSelector('.dc-step.is-done', { timeout: 5000 }).catch(() => {});
+        const steps = await p.evaluate(() => [...document.querySelectorAll('.dc-step')].map(s => s.classList.contains('is-done')));
+        await p.click('#dc-toggle').catch(() => {});
+        const stored = await p.evaluate(() => localStorage.getItem('aniroll_discord'));
+        await p.goto(base + '/#/play/101/3');
+        await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2; }, null, { timeout: 10000 }).catch(() => {});
+        await p.evaluate(() => document.getElementById('player-video').play().catch(() => {}));
+        await p.waitForFunction(() => window.__activities.some(a => a?.timestamps), null, { timeout: 5000 }).catch(() => {});
+        const playingNow = await p.evaluate(() => window.__activities.filter(a => a?.timestamps).at(-1));
+        await p.evaluate(() => document.getElementById('player-video').pause());
+        await p.waitForTimeout(800);
+        const paused = await p.evaluate(() => window.__activities.at(-1));
+        check('discord: Settings ticks the steps, the switch turns it on; the episode with time left, paused without, a link to the show',
+            steps.length === 3 && steps.every(Boolean) && stored === 'on'
+            && playingNow?.type === 3 && /^Episode 3( of \d+)?$/.test(playingNow.state || '') && playingNow.details?.length >= 2
+            && playingNow.timestamps.end > playingNow.timestamps.start && /^https:\/\/aniroll\.app\/a\/\d+$/.test(playingNow.buttons?.[0]?.url || '')
+            && /Paused$/.test(paused?.state || '') && !paused?.timestamps && !pageErrors.length, { steps, stored, playingNow, paused, pageErrors });
+        await p.close();
+    }
+
+    // Episodes in the player: E (or the button) lists them, the one playing marked; another one plays right
+    // there, the one playing just closes the list, and the player's keys stay off while it is open
+    {
+        const { p, pageErrors } = await playerPage(true);
+        await p.goto(base + '/#/play/101/3');
+        await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2; }, null, { timeout: 10000 }).catch(() => {});
+        const button = await p.evaluate(() => !document.getElementById('player-episodes')?.hidden);
+        await p.keyboard.press('e');
+        await p.waitForSelector('.ep-row.is-current', { timeout: 5000 }).catch(() => {});
+        const shown = await p.evaluate(() => {
+            const cur = document.querySelector('.ep-row.is-current');
+            return { href: cur?.getAttribute('href'), label: cur?.querySelector('.ep-next')?.textContent, time: document.getElementById('player-video').currentTime };
+        });
+        await p.keyboard.press('ArrowRight');
+        const kept = await p.evaluate(t => Math.abs(document.getElementById('player-video').currentTime - t) < 5, shown.time);
+        await p.evaluate(() => document.querySelector('.ep-row.is-current')?.click());
+        await p.waitForTimeout(300);
+        const same = await p.evaluate(() => ({ open: !!document.querySelector('.ep-dialog'), hash: location.hash }));
+        await p.evaluate(() => document.getElementById('player-episodes')?.click());
+        await p.waitForSelector('.ep-row[href$="/4"]', { timeout: 5000 }).catch(() => {});
+        await p.evaluate(() => document.querySelector('.ep-row[href$="/4"]')?.click());
+        await p.waitForFunction(() => /Episode 4/.test(document.getElementById('player-episode')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+        const other = await p.evaluate(() => ({ open: !!document.querySelector('.ep-dialog'), hash: location.hash,
+            title: document.getElementById('player-episode')?.textContent }));
+        check('player: Episodes (E) marks the one playing, keeps the player keys off, plays another right there',
+            button && /^#\/play\/\d+\/3$/.test(shown.href || '') && shown.label === 'Playing' && kept && !same.open && same.hash === '#/play/101/3'
+            && !other.open && /^#\/play\/\d+\/4$/.test(other.hash) && /Episode 4/.test(other.title || '') && !pageErrors.length, { button, shown, kept, same, other, pageErrors });
         await p.close();
     }
 

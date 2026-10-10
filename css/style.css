@@ -5092,7 +5092,7 @@ body.player-open .cursor { display: none !important; }
     gap: 12px;
     padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
 }
-.player-back, .player-party { background: rgba(255,255,255,0.12); }
+.player-back, .player-party, .player-episodes { background: rgba(255,255,255,0.12); }
 /* Watch Party in the player: a note at the top centre, the panel under the party button (js/pages/watchparty.js) */
 .pl-party-note {
     position: absolute;
@@ -5716,7 +5716,7 @@ body.player-open .cursor { display: none !important; }
     transition: background-color .2s var(--ease);
 }
 .ep-row:hover, .ep-row:focus-visible { background: var(--bg-secondary); outline: none; }
-.ep-row.is-next { background: color-mix(in srgb, var(--user-accent) 12%, transparent); }
+.ep-row.is-next, .ep-row.is-current { background: color-mix(in srgb, var(--user-accent) 12%, transparent); }
 .ep-thumb {
     position: relative;
     flex: none;
@@ -5741,7 +5741,7 @@ body.player-open .cursor { display: none !important; }
     .ep-thumb { width: 112px; }
 }
 :root[data-design="m3"] .ep-row { border-radius: 16px; }
-:root[data-design="m3"] .ep-row.is-next { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+:root[data-design="m3"] .ep-row.is-next, :root[data-design="m3"] .ep-row.is-current { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
 :root[data-design="m3"] .ep-next { color: var(--md-primary); }
 :root[data-design="m3"] .ep-thumb { border-radius: 12px; }
 
@@ -6078,3 +6078,21 @@ h1[tabindex="-1"]:focus { outline: none; }
 .skeleton-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-md); }
 .skeleton-rows { display: grid; gap: var(--space-sm); }
 .skeleton-row { height: 72px; }
+
+/* Settings → Discord: the setup in three steps, each ticked off once it is there (js/presence.js) */
+.dc-steps { list-style: none; margin: 0 0 var(--space-md); padding: 0; display: grid; gap: var(--space-md); }
+.dc-step { display: flex; gap: var(--space-sm); align-items: flex-start; }
+.dc-step-mark { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 0.85rem;
+    background: var(--glass-bg-hover, rgba(127,127,127,0.15)); color: var(--text-secondary); }
+.dc-step.is-done .dc-step-mark { background: var(--user-accent); color: #fff; }
+.dc-step-body { min-width: 0; flex: 1; display: grid; gap: 6px; justify-items: start; }
+.dc-step-title { font-weight: 600; padding-top: 4px; }
+.dc-step.is-done .dc-step-title { color: var(--text-secondary); }
+.dc-list { margin: 0; padding-left: 1.2em; }
+.dc-list code, .dc-copy code { font-size: 0.8rem; }
+.dc-copy { display: flex; gap: var(--space-sm); align-items: center; max-width: 100%; }
+.dc-copy code { min-width: 0; overflow-x: auto; white-space: nowrap; padding: 6px 10px; border-radius: 8px; background: var(--glass-bg-hover, rgba(127,127,127,0.12)); }
+:root[data-design="m3"] .dc-step-mark { background: var(--md-surface-container-highest); color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .dc-step.is-done .dc-step-mark { background: var(--md-primary); color: var(--md-on-primary); }
+:root[data-design="m3"] .dc-copy code { background: var(--md-surface-container-highest); }
+.dc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

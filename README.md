@@ -135,6 +135,16 @@ data are both there while it runs. That is why the server keeps an AniList token
 The server never sees your AniList password. Without background sync it never writes your token to disk:
 the browser sends it with a request, and the server keeps it in memory for up to 10 minutes, to know who you are.
 
+### AniRoll for Discord
+
+An optional browser extension (`discord/extension`) and a small helper program (`discord/helper`, Go) put
+what you do in AniRoll into your Discord status. Turned on in Settings → Discord. The page tells the
+extension what is on screen (the show, the episode and its time, your Watch Party's invite link); the
+extension passes it to the helper on the same computer, and the helper to the Discord app through Discord's
+local connection. Nothing of it goes to AniRoll's server or anywhere else, and nothing is stored: closing
+the last AniRoll tab clears the status. The extension only runs on aniroll.app and asks for no other
+permission than talking to the helper.
+
 ### No bundler
 
 Plain ES modules, loaded by the browser as they are. Every import carries `?v=N`, raised on each

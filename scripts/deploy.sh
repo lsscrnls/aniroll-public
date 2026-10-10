@@ -77,9 +77,11 @@ fi
 if [ "$DRY" -eq 1 ]; then echo; echo "dry run: nothing uploaded"; exit 0; fi
 
 step "Frontend"
+# AniRoll for Discord into downloads/discord (only rebuilt when discord/ changed)
+bash discord/build.sh || fail "building AniRoll for Discord failed"
 # One tar stream over one SSH connection — the many single scp calls used to time out
 files=(index.html css js)
-for extra in favicon.svg favicon.ico manifest.webmanifest robots.txt sitemap.xml move icons fonts media og-image-v4.jpg; do
+for extra in favicon.svg favicon.ico manifest.webmanifest robots.txt sitemap.xml move icons fonts media og-image-v4.jpg downloads; do
     [ -e "$extra" ] && files+=("$extra")
 done
 # Uploaded from a copy, so the protected modules can be obfuscated without touching the repo

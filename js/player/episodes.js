@@ -1,13 +1,14 @@
-import * as api from '../api.js?v=160';
-import { esc, titlePref } from '../store.js?v=160';
-import { getToken } from '../auth.js?v=160';
-import { openDialog } from '../a11y.js?v=160';
-import { listEpisodes } from './library.js?v=160';
+import * as api from '../api.js?v=161';
+import { esc, titlePref } from '../store.js?v=161';
+import { getToken } from '../auth.js?v=161';
+import { openDialog } from '../a11y.js?v=161';
+import { listEpisodes } from './library.js?v=161';
 
 // "Episodes": every episode of a show that Jellyfin has, to start any of them — a rewatch, one skipped,
 // one further back than where the list stands. AniList keeps each season as its own entry, so the
 // seasons before and after are chips that switch the list over; what plays is tracked on that entry.
-//   openEpisodes(media, base)   media: AniList media with relations and mediaListEntry
+//   openEpisodes(media, base, { current })   media: AniList media with relations and mediaListEntry;
+//                               current: the episode playing (in the player), marked and picked first
 //   neighbours(media)           { before, after }: the prequel and sequel seasons (the player's end card)
 const TICKS = 10_000_000;
 const chevron = (dir) => `<svg data-icon="chevron_${dir}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:16px;height:16px;vertical-align:-3px"><path d="${dir === 'left' ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'}"/></svg>`;
@@ -34,23 +35,24 @@ function upNext(media) {
 
 const minutes = (ticks) => (ticks >= 60 * TICKS ? `${Math.round(ticks / TICKS / 60)} min` : '');
 
-function rowHtml(media, ep, next) {
+function rowHtml(media, ep, next, current) {
     const watched = ep.played || ep.episode <= (media.mediaListEntry?.progress || 0);
     const pct = !ep.played && ep.positionTicks && ep.runTimeTicks ? Math.min(100, (ep.positionTicks / ep.runTimeTicks) * 100) : 0;
     const number = ep.episodeEnd ? `${ep.episode}–${ep.episodeEnd}` : `${ep.episode}`;
     const name = ep.name && !/^episode \d+$/i.test(ep.name) ? ep.name : `Episode ${number}`;
     const meta = [minutes(ep.runTimeTicks), watched ? 'Watched' : pct ? 'Started' : ''].filter(Boolean).join(' · ');
-    return `<a class="ep-row${ep.episode === next ? ' is-next' : ''}${watched ? ' is-watched' : ''}" href="#/play/${media.id}/${ep.episode}">
+    const playing = ep.episode === current;
+    return `<a class="ep-row${playing ? ' is-current' : ep.episode === next ? ' is-next' : ''}${watched ? ' is-watched' : ''}" href="#/play/${media.id}/${ep.episode}"${playing ? ' aria-current="true"' : ''}>
         <span class="ep-thumb">${ep.image ? `<img src="${esc(ep.image)}" alt="" loading="lazy" decoding="async">` : ''}
             ${pct ? `<span class="progress-bar ep-progress"><span class="progress-bar-fill" style="width:${pct}%"></span></span>` : ''}</span>
         <span class="ep-text">
             <span class="ep-title"><span class="ep-number">${esc(number)}</span>${esc(name)}</span>
-            <span class="ep-meta">${ep.episode === next ? '<span class="ep-next">Up next</span>' : ''}${esc(meta)}</span>
+            <span class="ep-meta">${playing ? '<span class="ep-next">Playing</span>' : ep.episode === next ? '<span class="ep-next">Up next</span>' : ''}${esc(meta)}</span>
         </span>
     </a>`;
 }
 
-export function openEpisodes(media, base) {
+export function openEpisodes(media, base, { current = 0 } = {}) {
     const container = document.getElementById('modal-container');
     if (!container) return;
     container.hidden = false;
@@ -74,7 +76,7 @@ export function openEpisodes(media, base) {
         container.hidden = true;
         container.innerHTML = '';
     };
-    const release = openDialog(box, { label: 'Episodes', onClose: close, focus: '.ep-row.is-next, .ep-row' });
+    const release = openDialog(box, { label: 'Episodes', onClose: close, focus: '.ep-row.is-current, .ep-row.is-next, .ep-row' });
     // Picking an episode navigates; the dialog goes with the page it was opened on
     window.addEventListener('hashchange', close);
     container.querySelector('.modal-backdrop').addEventListener('click', (ev) => { if (ev.target === ev.currentTarget) close(); });
@@ -93,11 +95,17 @@ export function openEpisodes(media, base) {
         try { eps = await listEpisodes(base, m); } catch { /* shown as empty */ }
         if (mine !== ticket || !box.isConnected) return;
         const next = upNext(m);
+        const playing = m.id === media.id ? current : 0;
         list.innerHTML = eps.length
-            ? eps.map(ep => rowHtml(m, ep, next)).join('')
+            ? eps.map(ep => rowHtml(m, ep, next, playing)).join('')
             : '<p class="ep-empty">None of its episodes are in your Jellyfin library.</p>';
-        list.querySelector('.ep-row.is-next')?.scrollIntoView({ block: 'center' });
+        list.querySelector('.ep-row.is-current, .ep-row.is-next')?.scrollIntoView({ block: 'center' });
     }
+
+    // The episode already playing: nothing to load, just back to it
+    list.addEventListener('click', (ev) => {
+        if (ev.target.closest('.ep-row.is-current')) { ev.preventDefault(); close(); }
+    });
 
     box.querySelector('.ep-seasons').addEventListener('click', async (ev) => {
         const btn = ev.target.closest('[data-season]');
