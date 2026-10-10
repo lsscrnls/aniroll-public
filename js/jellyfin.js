@@ -1,6 +1,6 @@
 // @ts-check
-import { toast } from './store.js?v=160';
-import { getToken } from './auth.js?v=160';
+import { toast } from './store.js?v=161';
+import { getToken } from './auth.js?v=161';
 
 // Jellyfin integration: when AniList progress moves forward, mark the matching
 // episodes watched on the user's own Jellyfin server.
@@ -50,8 +50,8 @@ export function getScope() {
 // The player keeps "is Jellyfin reachable" for five minutes and the found shows per tab. Another
 // server or user makes both wrong at once, so they are dropped right away.
 function forgetPlayerCaches() {
-    import('./player/availability.js?v=160').then(m => m.forgetAvailability()).catch(() => {});
-    import('./player/library.js?v=160').then(m => m.forgetMatches()).catch(() => {});
+    import('./player/availability.js?v=161').then(m => m.forgetAvailability()).catch(() => {});
+    import('./player/library.js?v=161').then(m => m.forgetMatches()).catch(() => {});
 }
 
 function writeLocal(cfg, scope) {
@@ -329,7 +329,7 @@ export async function getStatus(force = false) {
     }
     statusCache = { ts: Date.now(), value };
     // Back online after being off: the player's library check runs (js/player/animemap.js)
-    import('./player/animemap.js?v=160').then(m => m.noteStatus(value.state === 'connected')).catch(() => {});
+    import('./player/animemap.js?v=161').then(m => m.noteStatus(value.state === 'connected')).catch(() => {});
     return value;
 }
 
@@ -358,8 +358,8 @@ export async function markWatched(media, episode) {
     const cfg = getConfig();
     if (!cfg || !episode || !media?.id) return null;
     const [{ availability }, { markPlayedUpTo }] = await Promise.all([
-        import('./player/availability.js?v=160'),
-        import('./player/library.js?v=160'),
+        import('./player/availability.js?v=161'),
+        import('./player/library.js?v=161'),
     ]);
     const avail = await availability();
     if (!avail) return { marked: 0, reason: 'unreachable' };
@@ -562,7 +562,7 @@ function matchFit(media, group) {
 // Pushes AniList forward where Jellyfin is further along; returns what it changed
 export async function pullFromJellyfin(user, token) {
     if (!getConfig() || !isPullEnabled() || !user?.id || !token) return { updated: 0, changes: [] };
-    const api = await import('./api.js?v=160');
+    const api = await import('./api.js?v=161');
     if (api.isBackgroundPaused()) return { updated: 0, changes: [], skipped: 'maintenance' };
     if (api.isRateLimited()) return { updated: 0, changes: [], skipped: 'rate-limited' };
 
@@ -577,7 +577,7 @@ export async function pullFromJellyfin(user, token) {
     // Which played Jellyfin series each list entry stands for. Series linked by hand (js/jflinks.js) first,
     // with their episode numbers moved by the link's offset
     const claims = [];
-    const { linkForSeries } = await import('./jflinks.js?v=160');
+    const { linkForSeries } = await import('./jflinks.js?v=161');
     const linked = new Set();
     for (const p of played) {
         const link = linkForSeries(p.seriesName, p.season);
@@ -588,7 +588,7 @@ export async function pullFromJellyfin(user, token) {
         linked.add(entry.id);
     }
     // Then the player's library check (js/player/animemap.js): the series by TVDB id, a later part from its offset on
-    const { mappedShow } = await import('./player/animemap.js?v=160');
+    const { mappedShow } = await import('./player/animemap.js?v=161');
     const mappedSeasons = new Set();
     for (const entry of entries) {
         const map = !linked.has(entry.id) && mappedShow(entry.media.id);

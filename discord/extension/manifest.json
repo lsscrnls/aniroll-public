@@ -1,0 +1,23 @@
+{
+    "manifest_version": 3,
+    "name": "AniRoll for Discord",
+    "version": "1.0.0",
+    "description": "Shows what you watch on AniRoll in your Discord status. Needs the small AniRoll for Discord helper on your computer.",
+    "homepage_url": "https://aniroll.app/#/settings?tab=discord",
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwntIZvSuUSUOYVdmVEbVpWKlvQgWkum0MCtGV4Jz3PnJVLaQK0j85Cjf8t6wrUeszrKEYvQh76iVpNdIQGHDr4OjNPUIUpm/rsaVxdsPn1BynWFXAaoy1uRO98qY/X5P70xFTf66rYKZtuy10+JwNElccJq6TihWyEb+LCCAi7jNqqgDZuRZ1JN4vpNIvUZdSX+SnPkMtgD9V3u9AHPuiGqouFO0rJDxjnMnkUzxz44xzRyHdvWOJZmBm6D6WNZUu6O50FE894e6Jthr3YzF+xcPkPTKLQd5oeaGQi3nZbgU64WXH07HVJ1/AZGqncPdfkcc/PqRojAxOHFIWENvsQIDAQAB",
+    "permissions": ["nativeMessaging"],
+    "background": { "service_worker": "background.js", "scripts": ["background.js"] },
+    "content_scripts": [{
+        "matches": ["https://aniroll.app/*", "http://localhost:3000/*"],
+        "js": ["content.js"],
+        "run_at": "document_start"
+    }],
+    "icons": { "16": "icons/icon-16.png", "48": "icons/icon-48.png", "96": "icons/icon-96.png", "128": "icons/icon-128.png" },
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "discord@aniroll.app",
+            "strict_min_version": "128.0",
+            "data_collection_permissions": { "required": ["none"] }
+        }
+    }
+}

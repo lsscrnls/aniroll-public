@@ -1,14 +1,14 @@
-import * as api from '../api.js?v=160';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=160';
-import { getToken, isLoggedIn } from '../auth.js?v=160';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=160';
-import { availability } from '../player/availability.js?v=160';
-import { findEpisode, jfGet } from '../player/library.js?v=160';
-import { deviceProfile } from '../player/profile.js?v=160';
-import { HtmlVideoEngine } from '../player/engine.js?v=160';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=160';
-import { createSubtitles } from '../player/subtitles.js?v=160';
-import { neighbours } from '../player/episodes.js?v=160';
+import * as api from '../api.js?v=161';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=161';
+import { getToken, isLoggedIn } from '../auth.js?v=161';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=161';
+import { availability } from '../player/availability.js?v=161';
+import { findEpisode, jfGet } from '../player/library.js?v=161';
+import { deviceProfile } from '../player/profile.js?v=161';
+import { HtmlVideoEngine } from '../player/engine.js?v=161';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=161';
+import { createSubtitles } from '../player/subtitles.js?v=161';
+import { neighbours, openEpisodes } from '../player/episodes.js?v=161';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -38,6 +38,7 @@ export async function render({ params, content }) {
                     <div class="player-episode" id="player-episode">Episode ${episode}</div>
                 </div>
                 <div class="player-method" id="player-method" hidden></div>
+                <button class="pl-btn player-episodes" id="player-episodes" type="button" aria-label="Episodes" title="Episodes (E)" hidden>${icon('episodes')}</button>
                 ${isLoggedIn() ? `<button class="pl-btn player-party" id="player-party" type="button" aria-label="Watch Party" title="Watch Party: start one for this show, or see who is in">${icon('party')}</button>` : ''}
             </div>
             <div class="player-status" id="player-status" role="status"><div class="loader-spinner"></div></div>
@@ -113,11 +114,26 @@ export async function render({ params, content }) {
         if (closed) return cleanup;
         $('player-show').textContent = titlePref(media.title);
         $('player-party')?.addEventListener('click', async () => {
-            const { partyFromPlayer } = await import('./watchparty.js?v=160');
+            const { partyFromPlayer } = await import('./watchparty.js?v=161');
             partyFromPlayer(media, episode, { root: $('player'), pause: () => video.pause() });
         });
         if (!avail) throw new Error('Your Jellyfin server cannot be reached right now');
         session.base = avail.base;
+        // Every episode Jellyfin has, this one marked: picking another plays it right here
+        const episodesBtn = $('player-episodes');
+        const pickEpisode = () => openEpisodes(media, avail.base, { current: episode });
+        episodesBtn.hidden = false;
+        // For whatever tells others what you are watching (js/presence.js)
+        document.dispatchEvent(new CustomEvent('aniroll:playing', { detail: { media, episode } }));
+        episodesBtn.addEventListener('click', pickEpisode);
+        const onEpisodesKey = (ev) => {
+            if (ev.key.toLowerCase() !== 'e' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+            if (ev.target.closest?.('input, textarea, select, [contenteditable], .modal-backdrop')) return;
+            ev.preventDefault();
+            pickEpisode();
+        };
+        document.addEventListener('keydown', onEpisodesKey);
+        window.addEventListener('hashchange', () => document.removeEventListener('keydown', onEpisodesKey), { once: true });
 
         status('Finding the episode...');
         const ep = await findEpisode(avail.base, media, episode);

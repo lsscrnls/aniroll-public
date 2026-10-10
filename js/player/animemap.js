@@ -1,8 +1,8 @@
 // @ts-check
-import { getConfig, getHookSecret, normTitle, splitYear } from '../jellyfin.js?v=160';
-import { getToken } from '../auth.js?v=160';
-import { availability } from './availability.js?v=160';
-import { jfGet, refreshMatches } from './library.js?v=160';
+import { getConfig, getHookSecret, normTitle, splitYear } from '../jellyfin.js?v=161';
+import { getToken } from '../auth.js?v=161';
+import { availability } from './availability.js?v=161';
+import { jfGet, refreshMatches } from './library.js?v=161';
 
 // The library check: which Jellyfin show is which AniList entry, by TVDB/TMDB id instead of title.
 // Jellyfin names a show after TVDB ("X"), AniList often adds a subtitle ("X: Y"), and a later part can

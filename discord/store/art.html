@@ -1,0 +1,87 @@
+<!doctype html>
+<!-- Store art for AniRoll for Discord, rendered by discord/store/render.js:
+     art.html?v=small (440×280), ?v=marquee (1400×560), ?v=status (1280×800, how the status looks) -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+@font-face { font-family: 'Google Sans Flex'; src: url('../../fonts/google-sans-flex-latin-wght-5.3.1.woff2') format('woff2'); font-weight: 100 1000; }
+:root { --violet: #6750a4; --pink: #f4c2e4; --ink: #1d1b20; --night: #16141c; --card: #232029; --soft: #b9b0c9; }
+* { box-sizing: border-box; margin: 0; }
+body { font-family: 'Google Sans Flex', system-ui, sans-serif; color: var(--ink); overflow: hidden; }
+.canvas { position: relative; overflow: hidden; display: flex; align-items: center;
+    background: radial-gradient(120% 140% at 0% 0%, #efe4ff 0%, #f8eef8 45%, #ffe3f1 100%); }
+.blob { position: absolute; border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%; filter: blur(2px); }
+.logo { width: 100%; height: 100%; }
+.brand { display: flex; align-items: center; gap: .35em; font-weight: 800; letter-spacing: -.02em; }
+.brand img { width: 1.25em; height: 1.25em; }
+.plus { color: var(--violet); font-weight: 500; }
+h1 { font-weight: 800; letter-spacing: -.03em; line-height: 1.02; }
+p.sub { color: #4a4458; }
+
+/* the status card */
+.status { background: var(--card); color: #f2eef8; border-radius: 22px; padding: 22px; width: 520px;
+    box-shadow: 0 30px 80px rgba(40, 20, 80, .35); font-size: 17px; }
+.status .kicker { font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--soft); margin-bottom: 14px; }
+.status .row { display: flex; gap: 16px; align-items: center; }
+.status .art { position: relative; flex-shrink: 0; }
+.status .cover { width: 104px; height: 146px; border-radius: 12px; object-fit: cover; display: block; background: #3a3444; }
+.status .badge { position: absolute; right: -8px; bottom: -8px; width: 34px; height: 34px; border-radius: 50%; border: 4px solid var(--card); background: #fff; }
+.status .badge img { width: 100%; height: 100%; }
+.status .t1 { font-weight: 800; font-size: 15px; }
+.status .t2 { font-weight: 700; font-size: 19px; margin-top: 4px; }
+.status .t3 { color: var(--soft); margin-top: 4px; }
+.status .bar { display: flex; align-items: center; gap: 10px; margin-top: 12px; color: var(--soft); font-size: 13px; font-variant-numeric: tabular-nums; }
+.status .track { flex: 1; height: 5px; border-radius: 3px; background: #4a4456; overflow: hidden; }
+.status .fill { height: 100%; width: 22%; background: #fff; border-radius: 3px; }
+.status .btns { display: grid; gap: 8px; margin-top: 18px; }
+.status .btn { background: #3a3546; border-radius: 10px; text-align: center; padding: 11px; font-weight: 700; font-size: 15px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const v = new URLSearchParams(location.search).get('v') || 'small';
+const LOGO = '../../icons/icon-512.png';
+const COVER = 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587-gHSraOSa0nBG.jpg';
+const status = (scale = 1) => `<div class="status" style="transform:scale(${scale});transform-origin:center">
+    <div class="kicker">Watching AniRoll</div>
+    <div class="row">
+        <div class="art"><img class="cover" src="${COVER}" alt=""><span class="badge"><img src="${LOGO}" alt=""></span></div>
+        <div>
+            <div class="t1">AniRoll</div>
+            <div class="t2">Frieren: Beyond Journey’s End</div>
+            <div class="t3">Episode 3 of 28 · Watch Party</div>
+            <div class="bar"><span>05:12</span><span class="track"><span class="fill" style="display:block"></span></span><span>23:40</span></div>
+        </div>
+    </div>
+    <div class="btns"><div class="btn">Join the Watch Party</div><div class="btn">View on AniRoll</div></div>
+</div>`;
+const blobs = (w, h) => `
+    <div class="blob" style="width:${w * .55}px;height:${w * .55}px;right:${-w * .12}px;top:${-h * .35}px;background:#e3d3ff"></div>
+    <div class="blob" style="width:${w * .4}px;height:${w * .4}px;left:${-w * .1}px;bottom:${-h * .45}px;background:#ffd6ea"></div>`;
+const views = {
+    small: () => `<div class="canvas" style="width:440px;height:280px;padding:0 30px">${blobs(440, 280)}
+        <div style="position:relative">
+            <div class="brand" style="font-size:22px"><img src="${LOGO}" alt="">AniRoll <span class="plus">+ Discord</span></div>
+            <h1 style="font-size:40px;margin-top:18px">What you watch,<br>in your status.</h1>
+        </div></div>`,
+    marquee: () => `<div class="canvas" style="width:1400px;height:560px;padding:0 90px;justify-content:space-between">${blobs(1400, 560)}
+        <div style="position:relative;max-width:620px">
+            <div class="brand" style="font-size:34px"><img src="${LOGO}" alt="">AniRoll <span class="plus">+ Discord</span></div>
+            <h1 style="font-size:76px;margin-top:28px">What you watch,<br>in your status.</h1>
+            <p class="sub" style="font-size:26px;margin-top:22px">The episode, the time left, your Watch Party.</p>
+        </div>
+        <div style="position:relative">${status(1.05)}</div></div>`,
+    status: () => `<div class="canvas" style="width:1280px;height:800px;padding:0 100px;justify-content:space-between">${blobs(1280, 800)}
+        <div style="position:relative;max-width:520px">
+            <div class="brand" style="font-size:30px"><img src="${LOGO}" alt="">AniRoll <span class="plus">+ Discord</span></div>
+            <h1 style="font-size:64px;margin-top:26px">Friends see what you watch.</h1>
+            <p class="sub" style="font-size:24px;margin-top:22px;line-height:1.4">The episode with its cover and the time left, your Watch Party with a button to join, and a link to the show.</p>
+        </div>
+        <div style="position:relative">${status(1.1)}</div></div>`,
+};
+document.getElementById('root').innerHTML = views[v]();
+</script>
+</body>
+</html>
