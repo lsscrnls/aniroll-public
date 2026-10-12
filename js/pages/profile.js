@@ -1,7 +1,11 @@
 // @ts-check
-import * as api from '../api.js?v=161';
-import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref } from '../store.js?v=161';
-import { getToken, isLoggedIn } from '../auth.js?v=161';
+import * as api from '../api.js?v=173';
+import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref } from '../store.js?v=173';
+import { getToken, isLoggedIn } from '../auth.js?v=173';
+import { readDna, matchDna } from '../dna.js?v=173';
+import { shareDna } from '../dnashare.js?v=173';
+import { knownMatches, keepMatch, matchVerdict } from '../dnamatches.js?v=173';
+import { accountState, saveAccountState } from '../accountstate.js?v=173';
 
 export async function render({ params, content }) {
     const token = getToken();
@@ -59,6 +63,8 @@ export async function render({ params, content }) {
             <a href="${esc(user.siteUrl || `https://anilist.co/user/${user.name}`)}" target="_blank" rel="noopener" class="glass-btn glass-btn-secondary">AniList Profile</a>
         </div>
 
+        <div id="dna"></div>
+
         ${!animeStats?.count && !mangaStats?.count ? `<div class="empty-state">
             <div class="empty-state-text">${own ? 'Your list is empty' : `${esc(user.name)}'s list is empty`}</div>
             <div class="empty-state-sub">${own ? 'Stats, favourite genres and studios show up here once you add shows.' : 'Stats show up here once there is something on it.'}</div>
@@ -94,10 +100,121 @@ export async function render({ params, content }) {
     </div>`;
 
     // Where this person and everyone else disagree most, from the list (usually read already)
-    api.getMediaList(user.id, 'ANIME', token).then(lists => {
+    const lists = api.getMediaList(user.id, 'ANIME', token);
+    lists.then(lists => {
         const box = content.querySelector('#hot-takes');
-        if (box) box.innerHTML = renderHotTakes(lists, user.name === currentUser?.name);
+        if (box) box.innerHTML = renderHotTakes(lists, own);
     }).catch(() => { /* no section */ });
+
+    // Anime DNA (js/dna.js): from the same list, plus the genres and tags the taste match reads anyway
+    Promise.all([lists, api.getListFeatures(user.id, token)]).then(async ([lists, features]) => {
+        const box = content.querySelector('#dna');
+        const dna = box && readDna(lists, features, own);
+        if (!dna) return;
+        if (own) {
+            const kept = await noteDna(dna);
+            box.innerHTML = renderDna(dna, own, kept.before) + renderTimeline(kept.months) + renderTwins(user.id);
+            const share = box.querySelector('#dna-share');
+            share?.addEventListener('click', async () => {
+                share.disabled = true;
+                try { await shareDna({ name: user.name, dna }); } finally { share.disabled = false; }
+            });
+            return;
+        }
+        box.innerHTML = renderDna(dna, own, null);
+        if (!currentUser || !isLoggedIn()) {
+            // Someone who came from a shared card: their own DNA and the match are one login away
+            box.insertAdjacentHTML('beforeend', `<section class="dna-match dna-match-login">
+                <div class="dna-match-body"><div class="dna-kicker">Taste match</div>
+                <h3 class="dna-match-title">How well do you match ${esc(user.name)}?</h3>
+                <p class="dna-why">Log in with AniList to see your own Anime DNA and what you share.</p>
+                <button class="glass-btn glass-btn-primary" data-login>Log in with AniList</button></div>
+            </section>`);
+            return;
+        }
+        const [myLists, myFeatures] = await Promise.all([api.getMediaList(currentUser.id, 'ANIME', token), api.getListFeatures(currentUser.id, token)]);
+        const match = matchDna({ lists: myLists, features: myFeatures }, { lists, features });
+        if (!match || !box.isConnected) return;
+        keepMatch(user.id, user.name, match.match);
+        box.insertAdjacentHTML('beforeend', renderMatch(match, user));
+    }).catch(() => { /* no section */ });
+}
+
+// The own type, kept with the account: a change is pointed out once, and one snapshot a month is kept
+// for the timeline (type and the five strongest loves; the newest 24 months)
+async function noteDna(dna) {
+    const kept = (await accountState()).dna;
+    const month = new Date().toISOString().slice(0, 7);
+    const months = Array.isArray(kept?.months) ? kept.months.filter(x => x.m !== month) : [];
+    months.push({ m: month, type: dna.type.name, loves: dna.loves.slice(0, 5).map(l => l.name) });
+    const next = { type: dna.type.name, since: kept?.type === dna.type.name ? kept.since : Date.now(), months: months.slice(-24) };
+    if (JSON.stringify(next) !== JSON.stringify(kept)) saveAccountState('dna', next);
+    // Changed since the last visit (a first visit has nothing to compare with)
+    return { before: kept?.type && kept.type !== dna.type.name ? kept.type : null, months: next.months };
+}
+
+function renderDna(dna, own, before) {
+    return `<section class="dna">
+        <div class="dna-visual">${dna.art}</div>
+        <div class="dna-body">
+            <div class="dna-kicker">Anime DNA</div>
+            ${before ? `<div class="dna-changed">New since last time · before: ${esc(before)}</div>` : ''}
+            <h2 class="dna-type">${esc(dna.type.name)}</h2>
+            ${dna.streak ? `<div class="dna-streak">with a streak of ${esc(dna.streak)}</div>` : ''}
+            <p class="dna-line">${esc(dna.type.line)}</p>
+            <p class="dna-why">${esc(dna.type.why)}</p>
+            ${dna.loves.length ? `<div class="dna-loves">${dna.loves.slice(0, 6).map(l => `<span class="dna-love">${esc(l.name)}</span>`).join('')}</div>` : ''}
+            ${dna.quirks.length ? `<ul class="dna-quirks">${dna.quirks.map(q => `<li>${q}</li>`).join('')}</ul>` : ''}
+            ${own ? '<button class="glass-btn glass-btn-secondary dna-share" id="dna-share">Share your DNA</button>' : ''}
+        </div>
+    </section>`;
+}
+
+const monthName = (m) => new Date(`${m}-01T12:00:00Z`).toLocaleDateString('en', { month: 'short', year: 'numeric' });
+
+// How the type moved, month by month (from the snapshots noteDna keeps); nothing until there are two
+function renderTimeline(months) {
+    if (!months || months.length < 2) return '';
+    return `<section class="dna-timeline">
+        <h3 class="section-title">Your DNA over time</h3>
+        <ol>${[...months].reverse().map((x, i, all) => `<li class="${all[i + 1] && all[i + 1].type !== x.type ? 'is-change' : ''}">
+            <span class="dna-tl-month">${esc(monthName(x.m))}</span>
+            <span class="dna-tl-type">${esc(x.type)}</span>
+            <span class="dna-tl-loves">${esc((x.loves || []).slice(0, 3).join(' · '))}</span>
+        </li>`).join('')}</ol>
+    </section>`;
+}
+
+// The people whose taste is closest, from matches already worked out on their profiles or in Social
+function renderTwins(ownId) {
+    const known = Object.entries(knownMatches()).filter(([id]) => id !== String(ownId))
+        .sort((a, b) => b[1].match - a[1].match).slice(0, 5);
+    if (!known.length) return '';
+    return `<section class="dna-twins">
+        <h3 class="section-title">Closest tastes</h3>
+        <div class="dna-twin-row">${known.map(([, m]) => `<a class="dna-twin" href="#/user/${encodeURIComponent(m.name)}">
+            <span class="dna-twin-num">${m.match}%</span><span class="dna-twin-name">${esc(m.name)}</span></a>`).join('')}</div>
+    </section>`;
+}
+
+function renderMatch(m, user) {
+    const name = esc(user.name);
+    return `<section class="dna-match">
+        <div class="dna-match-num" style="--p:${m.match}"><span>${m.match}%</span></div>
+        <div class="dna-match-body">
+            <div class="dna-kicker">Taste match</div>
+            <h3 class="dna-match-title">You and ${name}: ${esc(matchVerdict(m.match))}</h3>
+            <p class="dna-why">${m.shared ? `${m.shared} show${m.shared === 1 ? '' : 's'} you have both seen.` : 'No show you have both seen yet.'}</p>
+            ${m.both.length ? `<div class="dna-loves"><span class="dna-match-label">You both love</span>${m.both.map(b => `<span class="dna-love">${esc(b)}</span>`).join('')}</div>` : ''}
+            ${m.clash.length ? `<div class="dna-match-label">Where you part ways</div>${m.clash.map(c => `<div class="hot-take" data-open="${c.media.id}" role="button" tabindex="0">
+                <img src="${esc(c.media.coverImage?.large || '')}" alt="" loading="lazy">
+                <div class="hot-take-text"><div class="hot-take-title">${esc(titlePref(c.media.title))}</div>
+                <div class="hot-take-meta">You ${Math.round(c.mine)} · ${name} ${Math.round(c.theirs)}</div></div>
+            </div>`).join('')}` : ''}
+            ${m.picks.length ? `<div class="dna-match-label">${name} loved, not on your list</div>
+                <div class="dna-picks">${m.picks.map(p => `<img src="${esc(p.coverImage?.large || '')}" alt="${esc(titlePref(p.title))}" title="${esc(titlePref(p.title))}" data-open="${p.id}" role="button" tabindex="0" loading="lazy">`).join('')}</div>` : ''}
+        </div>
+    </section>`;
 }
 
 // The biggest gaps between a score and AniList's average: loved what most found fine, and the other way

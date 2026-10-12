@@ -1,6 +1,6 @@
-import { getConfig, jfAuth, normTitle, splitYear, splitSeason, nearYear, hasAniListId } from '../jellyfin.js?v=161';
-import { linkForMedia } from '../jflinks.js?v=161';
-import { mappedShow, checkAfterMiss } from './animemap.js?v=161';
+import { getConfig, jfAuth, normTitle, splitYear, splitSeason, nearYear, hasAniListId } from '../jellyfin.js?v=173';
+import { linkForMedia } from '../jflinks.js?v=173';
+import { mappedShow, checkAfterMiss } from './animemap.js?v=173';
 
 // AniList show + episode -> the Jellyfin item to play. The same title rules as the Jellyfin sync
 // (js/jellyfin.js, api/server.js) in the other direction: Jellyfin keeps one series with seasons,
@@ -212,6 +212,8 @@ function toEpisode(item, base = null, offset = 0) {
         runTimeTicks: item.RunTimeTicks || 0,
         positionTicks: item.UserData?.PlaybackPositionTicks || 0,
         played: !!item.UserData?.Played,
+        // When Jellyfin last played it (ms), for the recap after a long break
+        lastPlayed: item.UserData?.LastPlayedDate ? Date.parse(item.UserData.LastPlayedDate) || 0 : 0,
         image: base && item.ImageTags?.Primary
             ? `${base}/Items/${encodeURIComponent(item.Id)}/Images/Primary?fillWidth=400&quality=80&tag=${encodeURIComponent(item.ImageTags.Primary)}`
             : null,

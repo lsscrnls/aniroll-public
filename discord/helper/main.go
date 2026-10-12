@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -22,11 +23,12 @@ import (
 )
 
 const (
-	version  = "1.0.0"
+	version  = "1.0.1"
 	hostName = "app.aniroll.discord"
 	clientID = "1558496660953501827"
-	// Discord takes about five updates in twenty seconds; in between, only the newest one counts
-	minGap = 4 * time.Second
+	// Discord takes five updates in twenty seconds; one every five keeps clear of that, and in between
+	// only the newest one counts
+	minGap = 5 * time.Second
 )
 
 func main() {
@@ -35,10 +37,11 @@ func main() {
 		return
 	}
 	var err error
-	if len(os.Args) > 1 && os.Args[1] == "uninstall" {
+	// "uninstall", or a copy named so (Windows: aniroll-discord-uninstall.exe, double-clicked)
+	if (len(os.Args) > 1 && os.Args[1] == "uninstall") || strings.Contains(strings.ToLower(filepath.Base(os.Args[0])), "uninstall") {
 		err = uninstall()
 		if err == nil {
-			fmt.Println("AniRoll for Discord is removed.")
+			fmt.Println("AniRoll for Discord is removed from this computer. Remove the extension in your browser too.")
 		}
 	} else {
 		err = install()
@@ -147,10 +150,7 @@ func runHost() {
 			case "hello":
 				report()
 			case "activity":
-				want = m.Activity
-				if len(want) == 0 || string(want) == "null" {
-					want = nil
-				}
+				want = sanitize(m.Activity)
 				dirty = true
 			}
 		case <-tick.C:

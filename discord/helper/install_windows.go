@@ -27,6 +27,7 @@ var chromiumKeys = []string{
 	`Software\Google\Chrome`,
 	`Software\Chromium`,
 	`Software\BraveSoftware\Brave-Browser`,
+	`Software\BraveSoftware\Brave-Origin`,
 	`Software\Microsoft\Edge`,
 	`Software\Vivaldi`,
 }

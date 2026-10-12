@@ -1,14 +1,15 @@
-import * as api from '../api.js?v=161';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=161';
-import { getToken, isLoggedIn } from '../auth.js?v=161';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=161';
-import { availability } from '../player/availability.js?v=161';
-import { findEpisode, jfGet } from '../player/library.js?v=161';
-import { deviceProfile } from '../player/profile.js?v=161';
-import { HtmlVideoEngine } from '../player/engine.js?v=161';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=161';
-import { createSubtitles } from '../player/subtitles.js?v=161';
-import { neighbours, openEpisodes } from '../player/episodes.js?v=161';
+import * as api from '../api.js?v=173';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=173';
+import { getToken, isLoggedIn } from '../auth.js?v=173';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=173';
+import { availability } from '../player/availability.js?v=173';
+import { findEpisode, jfGet } from '../player/library.js?v=173';
+import { deviceProfile } from '../player/profile.js?v=173';
+import { HtmlVideoEngine } from '../player/engine.js?v=173';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=173';
+import { createSubtitles } from '../player/subtitles.js?v=173';
+import { neighbours, openEpisodes } from '../player/episodes.js?v=173';
+import { maybeRecap, noteWatched } from '../player/recap.js?v=173';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -114,7 +115,7 @@ export async function render({ params, content }) {
         if (closed) return cleanup;
         $('player-show').textContent = titlePref(media.title);
         $('player-party')?.addEventListener('click', async () => {
-            const { partyFromPlayer } = await import('./watchparty.js?v=161');
+            const { partyFromPlayer } = await import('./watchparty.js?v=173');
             partyFromPlayer(media, episode, { root: $('player'), pause: () => video.pause() });
         });
         if (!avail) throw new Error('Your Jellyfin server cannot be reached right now');
@@ -312,6 +313,7 @@ export async function render({ params, content }) {
             }
             if (!session.done && total && engine.time / total >= WATCHED_AT) {
                 session.done = true;
+                noteWatched(mediaId);
                 if (!session.runtime) session.runtime = total;
                 saveUserData(session, engine.time);
                 if (isLoggedIn()) {
@@ -351,6 +353,26 @@ export async function render({ params, content }) {
             const choice = await controls.askResume(startTime);
             if (closed) return cleanup;
             if (choice === 'restart') engine.seek(0);
+        }
+        // Back after a long break: the last minute of the episode before, in a video of its own (js/player/recap.js)
+        if (startTime === 0 && !cameByUpNext) {
+            await maybeRecap({
+                root: $('player'), media, episode, avail,
+                playbackInfo: async (itemId, at) => playbackInfo(avail, cfg, itemId, at, { maxBitrate: await bitrateFor(session.quality) }),
+                playPlan: (itemId, src) => playPlan(avail.base, cfg, itemId, src),
+                segments: (itemId) => loadSegments(avail.base, cfg, itemId),
+                ending: (n) => loadEnding(media.idMal, n),
+                subtitles: (v, itemId, src) => createSubtitles({ video: v, base: avail.base, cfg, itemId, source: src,
+                    pick: (tracks) => preferredSubs(mediaId, tracks) }),
+                // Switched in the recap: the episode after it follows
+                subtitlesChanged: (track) => {
+                    rememberSubs(mediaId, track);
+                    const id = preferredSubs(mediaId, subsManager.list());
+                    if (id !== undefined) subsManager.select(id);
+                },
+                closed: () => closed,
+            });
+            if (closed) return cleanup;
         }
         engine.play().catch(() => { /* autoplay refused: the controls are there */ });
     } catch (err) {
