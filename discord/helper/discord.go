@@ -88,11 +88,12 @@ func (d *discord) write(op uint32, v any) error {
 	return err
 }
 
-// The next frame that is not a ping (answered) — a reply never takes longer than a few seconds
+// The next frame that is not a ping (answered). A reply never takes longer than a few seconds: a Discord
+// that hangs gets its connection closed after ten, which ends the read. (A deadline alone would not do:
+// the Windows pipe, an os.File, has none.)
 func (d *discord) read(v any) error {
-	if dl, ok := d.conn.(interface{ SetReadDeadline(time.Time) error }); ok {
-		dl.SetReadDeadline(time.Now().Add(10 * time.Second))
-	}
+	timer := time.AfterFunc(10*time.Second, func() { d.conn.Close() })
+	defer timer.Stop()
 	for {
 		var head [8]byte
 		if _, err := io.ReadFull(d.conn, head[:]); err != nil {

@@ -2,17 +2,17 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=161';
-import { openDialog } from './a11y.js?v=161';
-import { prefersReducedMotion } from './animations.js?v=161';
-import { accountState, saveAccountState } from './accountstate.js?v=161';
+import { esc } from './store.js?v=173';
+import { openDialog } from './a11y.js?v=173';
+import { prefersReducedMotion } from './animations.js?v=173';
+import { accountState, saveAccountState } from './accountstate.js?v=173';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.6.0';
+export const RELEASE = '1.6.1';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
-// Newest first. `id` sorts as text: a browser has seen everything up to the id it stored. More
+// Newest first. `id` sorts by date, then release (orderOf): a browser has seen everything up to the id it stored. More
 // changes on the same day go into that day's entry (one entry per day); if that entry was already
 // live, raise its id ('<date>.2', '.3', ...) and add the new items as { rev: N, text } with that N:
 // people who confirmed the earlier release of the day get a pop-up with only the new items.
@@ -20,10 +20,46 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        // '.2': episodes in the player, AniRoll for Discord
-        id: '2026-10-10.2',
-        title: 'AniRoll in your Discord status',
+        id: '2026-10-12',
+        title: 'Pause the recap',
         items: [
+            '<strong>Previously on</strong> can now be paused, switched to full screen and shown with subtitles (Space, F, C). Subtitles switched there stay for the episode after it.',
+            'Notes in the player, like a saved episode, now appear at the top right instead of over the subtitles.',
+            '<strong>AniRoll for Discord</strong>: Watch Party guests now show the show, the party’s episode and its cover, like the host. AniRoll also points out when the browser extension has an update.',
+        ],
+    },
+    {
+        id: '2026-10-11',
+        title: 'Steadier subtitles in Firefox',
+        items: [
+            'Styled subtitles in <strong>Firefox</strong> and Zen should no longer blink away for a moment.',
+            'What’s new shows every change of a busy day again: the tenth release of a day no longer counts as older than the ninth.',
+        ],
+    },
+    {
+        // '.2': episodes in the player, AniRoll for Discord
+        // '.3': AniRoll for Discord in Firefox
+        // '.4': the legacy design is gone, removing AniRoll for Discord
+        // '.5': an older helper is pointed out
+        // '.6': Previously on, ambient light, one player menu, the countdown follows the calendar
+        // '.7': ambient light lights the black bars only
+        // '.8': Anime DNA on the profile
+        // '.9': taste match, closest tastes, the DNA over time, sharing it
+        // '.10': Watch Party posts name every show and what was finished; steadier styled subtitles in Firefox
+        id: '2026-10-10.10',
+        title: 'Your Anime DNA',
+        items: [
+            { rev: 10, text: 'The <strong>Watch Party</strong> post now names every show of the evening, also after switching from the player, and says when a show was finished or completed.' },
+            { rev: 9, text: 'How well do you <strong>match</strong>? Anyone\u2019s profile now shows it in percent: what you both love, where you part ways, and what they loved that you have not seen. Social shows it next to every friend, your profile your closest tastes.' },
+            { rev: 9, text: '<strong>Share your DNA</strong>: a card with your picture and type, as a link that shows it in Discord & co. Whoever opens it sees how well you match. Your profile also keeps how your DNA changes, month by month.' },
+            { rev: 8, text: '<strong>Anime DNA</strong> on your profile: what kind of viewer you are, quirks you never counted (the episode you usually drop a show at, the studio that never misses), and a picture only your list draws. It changes as you watch, and works on anyone\u2019s profile.' },
+            { rev: 6, text: '<strong>Previously on</strong>: back to a show after two weeks or more, the last minute of the episode before plays first, right up to its ending. It never counts as watched.' },
+            { rev: 7, text: '<strong>Ambient light</strong> in the player: where the picture leaves black bars (a 16:9 episode on a wide screen, a narrow window), they glow in its colours, scene by scene. A switches it, or the player menu.' },
+            { rev: 6, text: 'One player menu with pages: audio and subtitles, quality and speed each open their own, so nothing needs scrolling.' },
+            { rev: 6, text: 'Home’s countdown shows the next episode your calendar shows, and moves on an hour after it is out.' },
+            { rev: 5, text: 'When AniRoll for Discord’s helper has an update, AniRoll tells you once and shows how to get it.' },
+            { rev: 4, text: 'The <strong>legacy design</strong> is gone: AniRoll is Material 3 Expressive for everyone now. Settings → Discord also shows how to remove AniRoll for Discord again.' },
+            { rev: 3, text: 'AniRoll for Discord now works in <strong>Firefox</strong>, Zen and LibreWolf too.' },
             { rev: 2, text: 'Your <strong>Discord status</strong> can now show what you watch in AniRoll: the episode with the time left, the show you look at, your Watch Party with a button to join. Set it up under Settings → Discord.' },
             { rev: 2, text: 'Pick any episode right in the <strong>player</strong>: the new Episodes button (or E) lists every episode in your Jellyfin, the one playing marked, with the seasons before and after one click away.' },
             'With live tracking off, the AniRoll server no longer keeps the list of shows in your <strong>Jellyfin</strong> library; turning live tracking off now deletes it, along with episodes still waiting to be saved.',
@@ -280,6 +316,10 @@ const OLD_TABS = [['home', 'Home'], ['roll', 'Roll'], ['search', 'Browse'], ['se
 const NEW_TABS = [['home', 'Home'], ['list', 'My List'], ['roll', 'Roll'], ['discover', 'Discover'], ['social', 'Social']];
 const MERGED = ['search', 'season', 'calendar'];
 
+// Ids in release order: as text, '2026-10-10.10' would come before '2026-10-10.9'
+const orderOf = (id) => (id ? `${String(id).slice(0, 10)}.${String(revOf(id)).padStart(4, '0')}` : '');
+const isNewer = (a, b) => orderOf(a) > orderOf(b);
+
 function seen() {
     try { return localStorage.getItem(SEEN_KEY) || ''; } catch { return LATEST; }
 }
@@ -302,15 +342,15 @@ async function syncSeen() {
     let auto = false;
     try { auto = localStorage.getItem(AUTO_KEY) === '1'; } catch { /* no storage */ }
     const local = seen();
-    if (typeof remote === 'string' && remote && (auto || remote > local)) {
+    if (typeof remote === 'string' && remote && (auto || isNewer(remote, local))) {
         try { localStorage.setItem(SEEN_KEY, remote); localStorage.removeItem(AUTO_KEY); } catch { /* no storage */ }
-    } else if (!auto && local && local > (remote || '')) {
+    } else if (!auto && local && isNewer(local, remote || '')) {
         saveAccountState('changes', local);
     }
     document.documentElement.classList.toggle('whatsnew-unread', hasUnread());
     return typeof remote === 'string' && !!remote;
 }
-export const hasUnread = () => seen() < LATEST;
+export const hasUnread = () => isNewer(LATEST, seen());
 
 // Call first thing on start, before anything else writes to storage: a browser that has AniRoll
 // data already knew the old layout. A new one never sees the "things moved" notice — it is
@@ -343,7 +383,7 @@ function itemsOf(c) {
     return c.items.filter(item => !sameDay || (item.rev || 1) > revOf(confirmed)).map(itemText);
 }
 function pendingNotices() {
-    return CHANGES.filter(c => seen() < c.id && itemsOf(c).length).reverse();
+    return CHANGES.filter(c => isNewer(c.id, seen()) && itemsOf(c).length).reverse();
 }
 
 // The one-time notice: returning visitors, everything they have not confirmed with "Got it"

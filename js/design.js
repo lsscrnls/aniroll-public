@@ -1,22 +1,20 @@
 // @ts-check
-// Material 3 Expressive is AniRoll's design, for everyone and on the landing page. AniRoll's first design stays
-// as "legacy", a switch in Settings → Appearance for logged-in people who want it back.
+// Material 3 Expressive is AniRoll's design, for everyone and on the landing page (the first, "legacy" design
+// is gone since 1.6; css/style.css is the base it builds on).
 // M3 = css/m3.css (components, shapes, type, motion), js/m3.js (page additions) and a colour scheme generated from
 // its own seed colour (not AniRoll's accent)
 // with Google's Material Color Utilities (2025 spec, the one M3 Expressive uses). The scheme is written as a
 // <style> with a light and a dark block, so System/Light/Dark keep working without recomputing; it is cached
 // in localStorage so a reload paints M3 colours before the colour library has even loaded.
-import { BASELINE_TONAL_CSS } from './m3-baseline.js?v=161';
+import { BASELINE_TONAL_CSS } from './m3-baseline.js?v=173';
 
-// 'aniroll' only when chosen as legacy. A new key: choices from the time AniRoll's design was the default
-// (and M3 the one to try) do not carry over, so everyone starts in Material 3 once
-const DESIGN_KEY = 'aniroll_design_v2';     // 'aniroll' (legacy) | absent = 'm3'
-const OLD_DESIGN_KEY = 'aniroll_design';
+// The switch to the legacy design, from before it was removed: forgotten
+const OLD_DESIGN_KEYS = ['aniroll_design_v2', 'aniroll_design'];
 const VARIANT_KEY = 'aniroll_m3_variant';   // 'tonal' | 'vibrant' | 'expressive'
 const SEED_KEY = 'aniroll_m3_seed';         // M3 has its own palette, unrelated to AniRoll's accent colour
 const CACHE_KEY = 'aniroll_m3_scheme3';     // { key, css } — new name when the generated CSS changes
 const SHOW_KEY = 'aniroll_m3_show';         // { color, cover } of the show you're on: the app's "wallpaper" 
-const CSS_HREF = 'css/m3.css?v=37';
+const CSS_HREF = 'css/m3.css?v=38';
 // m3.css used to @import these two; as links of their own they load in parallel instead of after it
 const EXTRA_CSS = [['m3-icons-css', 'css/m3-icons.css?v=2'], ['m3-shapes-css', 'css/m3-shapes.css?v=1']];
 
@@ -42,9 +40,6 @@ export const VARIANTS = [
     { key: 'expressive', label: 'Expressive' },
 ];
 
-export function getDesign() {
-    try { return localStorage.getItem(DESIGN_KEY) === 'aniroll' ? 'aniroll' : 'm3'; } catch { return 'm3'; }
-}
 export function getVariant() {
     try { return VARIANTS.some(v => v.key === localStorage.getItem(VARIANT_KEY)) ? localStorage.getItem(VARIANT_KEY) : 'tonal'; } catch { return 'tonal'; }
 }
@@ -66,25 +61,12 @@ export function setSeed(hex, loggedIn) {
     return applyDesign(loggedIn);
 }
 
-export function setDesign(design, loggedIn) {
-    try {
-        if (design === 'aniroll') localStorage.setItem(DESIGN_KEY, 'aniroll');
-        else localStorage.removeItem(DESIGN_KEY);
-    } catch { /* storage blocked */ }
-    return applyDesign(loggedIn);
-}
 export function setVariant(variant, loggedIn) {
     try { localStorage.setItem(VARIANT_KEY, variant); } catch { /* storage blocked */ }
     return applyDesign(loggedIn);
 }
 
 let enhancer = null;
-
-// Switches with a flourish: the new design spreads as a circle from where it was chosen (View Transitions,
-// where supported; elsewhere it just switches). Waits for the stylesheet, so the circle never shows a half-styled page.
-export function switchDesign(design, loggedIn, from) {
-    return reveal(() => setDesign(design, loggedIn), from);
-}
 
 // Any change of the whole look, spreading as a circle from `from` ({ x, y }) where View Transitions exist
 export async function reveal(change, from) {
@@ -124,24 +106,14 @@ export async function previewSeed(hex) {
     writeScheme(css);
 }
 
-// Logged out: always Material 3 (the landing page exists only in it). index.html starts in M3 with its
-// stylesheet, so nobody sees the other design flash first; legacy takes both away here.
+// index.html starts in M3 with its stylesheet; this adds the colours and the page additions (loggedIn: kept
+// for the callers, it no longer changes anything)
 export async function applyDesign(loggedIn) {
     const root = document.documentElement;
-    try { localStorage.removeItem(OLD_DESIGN_KEY); } catch { /* nothing kept */ }
-    const on = !loggedIn || getDesign() === 'm3';
-    if (!on) {
-        root.removeAttribute('data-design');
-        document.getElementById('m3-css')?.remove();
-        EXTRA_CSS.forEach(([id]) => document.getElementById(id)?.remove());
-        document.getElementById('m3-scheme')?.remove();
-        enhancer?.then(m => m.teardown());
-        enhancer = null;
-        return;
-    }
+    try { OLD_DESIGN_KEYS.forEach(k => localStorage.removeItem(k)); } catch { /* nothing kept */ }
     // Page additions only M3 has (hero, search bar, rail FAB ...)
     if (enhancer) enhancer.then(m => m.refresh());
-    enhancer ??= import('./m3.js?v=161').then(m => { m.setup(); return m; });
+    enhancer ??= import('./m3.js?v=173').then(m => { m.setup(); return m; });
 
     // Stylesheet first; keep the page hidden until it's there, so AniRoll's look never flashes
     let sheet = null;

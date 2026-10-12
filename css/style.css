@@ -5028,6 +5028,9 @@ body.player-open { overflow: hidden; }
 /* Dialogs and toasts opened from the player (Watch Party) above it, not behind it */
 body.player-open .modal-backdrop { z-index: 800; }
 body.player-open .toast-container { z-index: 800; }
+/* In the player the toasts sit up top on the right, where they cover no subtitles (the id outranks every design's placement) */
+body.player-open #toast-container { top: max(76px, env(safe-area-inset-top, 0px)); bottom: auto; left: auto; right: clamp(12px, 3vw, 32px);
+    transform: none; flex-direction: column; align-items: flex-end; }
 /* The pointer in the player: Material 3 keeps its own cursor (js/m3.js moves it into the player in full
    screen; its rule on :root outranks the ones below). AniRoll's trailing cursor would sit on the picture,
    so there the system pointer comes back — AniRoll hides it everywhere else (cursor: none) */
@@ -6096,3 +6099,114 @@ h1[tabindex="-1"]:focus { outline: none; }
 :root[data-design="m3"] .dc-step.is-done .dc-step-mark { background: var(--md-primary); color: var(--md-on-primary); }
 :root[data-design="m3"] .dc-copy code { background: var(--md-surface-container-highest); }
 .dc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.dc-remove { margin-top: var(--space-md); }
+.dc-remove summary { cursor: pointer; font-size: 0.9rem; color: var(--text-secondary); }
+.dc-remove .dc-list { margin-top: var(--space-sm); display: grid; gap: var(--space-sm); }
+.dc-remove .dc-copy { margin-top: 6px; }
+
+/* Ambient light (js/player/ambient.js): only where the picture leaves bars, they glow in its edge colours.
+   The canvas holds the frame where the video shows it; the video stays on top at its usual size */
+.pl-ambient { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0;
+    filter: blur(48px) saturate(1.5) brightness(0.65); transform: translateZ(0); transition: opacity .6s ease; }
+.player.has-ambient.ambient-bars .pl-ambient { opacity: 1; }
+.player.has-ambient.ambient-bars .player-video { background: transparent; }
+
+/* "Previously on" (js/player/recap.js): the last minute of the episode before, like the cold open of a series */
+.pl-recap { position: absolute; inset: 0; z-index: 60; background: #000; animation: plRecapIn .9s ease both; }
+.pl-recap.is-leaving { animation: plRecapOut .7s ease both; }
+.pl-recap-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; filter: saturate(0.8) contrast(1.05); }
+.pl-recap::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.65) 100%), linear-gradient(to top, rgba(0,0,0,0.7), transparent 35%); }
+.pl-recap-card { position: absolute; z-index: 1; left: clamp(20px, 5vw, 72px); bottom: clamp(24px, 8vh, 96px); display: grid; gap: 6px;
+    animation: plRecapCard 4.5s ease forwards; pointer-events: none; }
+.pl-recap-kicker { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.28em; text-transform: uppercase; color: var(--pl-primary); }
+.pl-recap-title { font-size: clamp(1.8rem, 4.5vw, 3.4rem); font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; max-width: 70vw; }
+.pl-recap-sub { font-size: 1rem; color: rgba(255,255,255,0.75); }
+.pl-recap-video { cursor: pointer; }
+.pl-recap-video::cue { font-family: var(--font); font-size: clamp(18px, 3.2vw, 34px); line-height: 1.3; color: #fff; background: rgba(0,0,0,0.55); }
+.pl-recap .pl-subs-canvas { z-index: 1; }
+.pl-recap-bar { position: absolute; z-index: 2; right: clamp(16px, 4vw, 48px); bottom: clamp(24px, 8vh, 96px); display: flex; align-items: center; gap: 8px; }
+.pl-recap-btn { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 999px;
+    background: rgba(255,255,255,0.14); color: #fff; cursor: pointer; backdrop-filter: blur(12px); }
+.pl-recap-btn[hidden] { display: none; }
+.pl-recap-btn[aria-pressed="true"] { background: var(--pl-primary); color: var(--pl-on-primary, #000); }
+.pl-recap-btn:hover, .pl-recap-btn:focus-visible { background: rgba(255,255,255,0.26); }
+.pl-recap-btn[aria-pressed="true"]:hover { filter: brightness(1.1); }
+.pl-recap-skip { padding: 10px 18px; border: 0;
+    border-radius: 999px; background: rgba(255,255,255,0.14); color: #fff; font: inherit; font-weight: 700; cursor: pointer; backdrop-filter: blur(12px); }
+.pl-recap-skip:hover, .pl-recap-skip:focus-visible { background: rgba(255,255,255,0.26); }
+@keyframes plRecapIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes plRecapOut { to { opacity: 0; } }
+@keyframes plRecapCard { 0% { opacity: 0; transform: translateY(12px); } 15%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pl-recap, .pl-recap.is-leaving, .pl-recap-card { animation-duration: .01s; } }
+
+/* The player's menu pages: a row per setting with what is chosen, "‹" back to the main page */
+.pl-menu-row { display: flex; align-items: center; gap: 12px; padding-left: 16px; }
+.pl-menu-row-label { flex: 1; text-align: left; }
+.pl-menu-value { color: rgba(255,255,255,0.6); font-size: 0.85rem; max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-menu-more { font-size: 1.2rem; line-height: 1; color: rgba(255,255,255,0.6); }
+.pl-menu-back { gap: 10px; padding-left: 14px; font-weight: 700; }
+.pl-menu-back .pl-menu-more { width: 24px; text-align: center; }
+
+/* Anime DNA (js/dna.js) on the profile: the picture only this list draws, the type, the quirks */
+.dna { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: var(--space-xl); align-items: center;
+    margin-bottom: var(--space-xl); padding: var(--space-lg); border-radius: var(--radius-xl);
+    background: var(--md-surface-container-low); overflow: hidden; }
+.dna-visual { aspect-ratio: 1; }
+.dna-art { width: 100%; height: 100%; display: block; overflow: visible; }
+.dna-petal { transform-origin: 160px 160px; mix-blend-mode: screen; animation: dnaPetal 1.1s cubic-bezier(0.2, 0, 0, 1) both;
+    animation-delay: calc(var(--i) * 60ms); }
+.dna-stars circle { fill: var(--md-on-surface); opacity: 0.7; animation: dnaStar 1.4s ease both .4s; }
+.dna-core { fill: var(--md-on-surface); }
+@keyframes dnaPetal { from { transform: scale(0) rotate(-40deg); opacity: 0; } }
+@keyframes dnaStar { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .dna-petal, .dna-stars circle { animation: none; } }
+.dna-kicker { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--md-primary); }
+.dna-changed { display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.8rem;
+    background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+.dna-type { margin: 6px 0 0; font-size: clamp(1.7rem, 3.4vw, 2.5rem); line-height: 1.1; font-weight: 800; }
+.dna-streak { margin-top: 4px; color: var(--md-on-surface-variant); font-size: 0.95rem; }
+.dna-line { margin: var(--space-md) 0 4px; font-size: 1.05rem; }
+.dna-why { margin: 0; color: var(--md-on-surface-variant); font-size: 0.9rem; }
+.dna-loves { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--space-md); }
+.dna-love { padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.8rem;
+    background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+.dna-quirks { margin: var(--space-md) 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.dna-quirks li { padding: 10px 14px; border-radius: var(--radius-lg); background: var(--md-surface-container); font-size: 0.9rem; }
+@media (max-width: 720px) { .dna { grid-template-columns: 1fr; } .dna-visual { max-width: 280px; margin: 0 auto; width: 100%; } }
+.dna-rings circle { fill: none; stroke: var(--md-on-surface); stroke-opacity: 0.08; }
+.dna-stars circle.fav { fill: var(--md-primary); opacity: 1; }
+.dna-share { margin-top: var(--space-lg); }
+
+/* Taste match on someone else's profile, and the own DNA's timeline and closest tastes */
+.dna-match { display: grid; grid-template-columns: auto 1fr; gap: var(--space-xl); align-items: start; margin-bottom: var(--space-xl);
+    padding: var(--space-lg); border-radius: var(--radius-xl); background: var(--md-surface-container-low); }
+.dna-match-login { grid-template-columns: 1fr; }
+.dna-match-login .glass-btn { margin-top: var(--space-md); }
+.dna-match-num { --p: 50; width: 132px; height: 132px; border-radius: 50%; display: grid; place-items: center;
+    background: conic-gradient(var(--md-primary) calc(var(--p) * 1%), var(--md-surface-container-highest) 0); }
+.dna-match-num span { width: 108px; height: 108px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--md-surface-container-low); font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.dna-match-title { margin: 6px 0 4px; font-size: 1.4rem; font-weight: 800; }
+.dna-match-label { margin: var(--space-md) 0 6px; font-size: 0.8rem; font-weight: 600; color: var(--md-on-surface-variant); }
+.dna-loves .dna-match-label { margin: 0 4px 0 0; align-self: center; }
+.dna-picks { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.dna-picks img { width: 84px; height: 120px; object-fit: cover; border-radius: var(--radius-md); flex: none; cursor: pointer; }
+@media (max-width: 720px) { .dna-match { grid-template-columns: 1fr; } .dna-match-num { margin: 0 auto; } }
+.dna-timeline, .dna-twins { margin-bottom: var(--space-xl); }
+.dna-timeline .section-title, .dna-twins .section-title { margin-bottom: var(--space-md); }
+.dna-timeline ol { list-style: none; margin: 0; padding: 0; display: flex; gap: 10px; overflow-x: auto; }
+.dna-timeline li { flex: none; min-width: 170px; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--md-surface-container);
+    display: grid; gap: 2px; }
+.dna-timeline li.is-change { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+.dna-tl-month { font-size: 0.75rem; color: var(--md-on-surface-variant); }
+.dna-timeline li.is-change .dna-tl-month, .dna-timeline li.is-change .dna-tl-loves { color: inherit; opacity: 0.8; }
+.dna-tl-type { font-weight: 700; }
+.dna-tl-loves { font-size: 0.75rem; color: var(--md-on-surface-variant); }
+.dna-twin-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.dna-twin { display: inline-flex; align-items: baseline; gap: 8px; padding: 8px 14px; border-radius: var(--radius-full);
+    background: var(--md-surface-container); color: inherit; text-decoration: none; }
+.dna-twin:hover { background: var(--md-surface-container-high); }
+.dna-twin-num { font-weight: 800; color: var(--md-primary); font-variant-numeric: tabular-nums; }
+.dna-friend-match { margin-left: 6px; padding: 2px 8px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700;
+    background: var(--md-primary-container); color: var(--md-on-primary-container); vertical-align: 1px; }

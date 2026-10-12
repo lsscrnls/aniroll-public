@@ -1,12 +1,14 @@
 // Settings (#/settings): appearance, lists, Watch Party and Jellyfin, in tabs. Loaded when opened, so the
 // app shell (js/app.js) stays small and a change here only needs the browser checks of this page.
-import * as api from '../api.js?v=161';
-import { getState, setState, applyTheme, getTheme, toast, getAccentColor, setAccentColor, getAccentColors, esc } from '../store.js?v=161';
-import { getToken, isLoggedIn } from '../auth.js?v=161';
-import { showConfirm } from '../a11y.js?v=161';
-import { applyDesign, getDesign, switchDesign, getVariant, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from '../design.js?v=161';
-import { refreshJellyfinStatus } from '../status.js?v=161';
-import { mountPresenceSettings } from '../presence.js?v=161';
+import * as api from '../api.js?v=173';
+import { getState, setState, applyTheme, getTheme, toast, esc } from '../store.js?v=173';
+import { getToken, isLoggedIn } from '../auth.js?v=173';
+import { showConfirm } from '../a11y.js?v=173';
+import { getVariant, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from '../design.js?v=173';
+import { refreshJellyfinStatus } from '../status.js?v=173';
+import { mountPresenceSettings } from '../presence.js?v=173';
+import { ambientOn, setAmbient } from '../player/ambient.js?v=173';
+import { recapOn, setRecap } from '../player/recap.js?v=173';
 
 const SETTINGS_TABS = [
     { key: 'appearance', label: 'Appearance' },
@@ -19,11 +21,7 @@ const SETTINGS_TABS = [
 export async function render({ content, query }) {
     const theme = getTheme();
 
-    const accentColor = getAccentColor();
-    const accentColors = getAccentColors();
-
     const loggedIn = isLoggedIn();
-    const design = getDesign();
     const variant = getVariant();
     const titleLang = localStorage.getItem('aniroll_title_lang') || 'romaji';
     const choice = (attr, value, current, label) =>
@@ -53,17 +51,8 @@ export async function render({ content, query }) {
                     ${hexField('m3-hex', getSeed() === SHOW_SEED ? '' : getSeed())}
                     <div class="settings-sub-label" style="margin-top:var(--space-md)">Colour style</div>
                     <div class="settings-choices">${VARIANTS.map(v => choice('variant', v.key, variant, v.label)).join('')}</div>
-                </div>`, ` id="m3-card"${loggedIn && design === 'aniroll' ? ' hidden' : ''}`)}
+                </div>`, ' id="m3-card"')}
             ${card('Theme', '', `<div class="settings-choices">${choice('theme', 'system', theme, 'System')}${choice('theme', 'light', theme, 'Light')}${choice('theme', 'dark', theme, 'Dark')}</div>`)}
-            ${card('Accent Color', 'Personalise your interface', `
-                <div class="accent-picker">
-                    ${accentColors.map(c => `<button class="accent-swatch ${c.hex === accentColor ? 'active' : ''}" data-color="${c.hex}" style="background:${c.hex}" title="${c.name}" aria-label="${c.name}"></button>`).join('')}
-                </div>
-                ${hexField('accent-hex', accentColor)}`, ` id="accent-card"${design === 'm3' || !loggedIn ? ' hidden' : ''}`)}
-            ${loggedIn ? card('Legacy design', 'AniRoll’s first look: monochrome and cinematic, with one accent colour', `
-                <label class="settings-choice"><input type="checkbox" id="legacy-design" ${design === 'aniroll' ? 'checked' : ''}>
-                    <span>Use the legacy design</span></label>
-                <p class="settings-hint">It stays available, but new pages and features are made for Material 3 first.</p>`) : ''}
             ${card('Title Language', 'Choose how anime and manga titles are displayed', `
                 <div class="settings-choices">${choice('titlelang', 'romaji', titleLang, 'Romaji')}${choice('titlelang', 'english', titleLang, 'English')}${choice('titlelang', 'native', titleLang, 'Native')}</div>`)}
         </div>
@@ -92,7 +81,11 @@ export async function render({ content, query }) {
             ${card('Player', 'How episodes play in AniRoll', `
                 <label class="settings-choice"><input type="checkbox" id="toggle-autoskip" ${localStorage.getItem('aniroll_autoskip_all') === 'on' ? 'checked' : ''}>
                     <span>Skip intros and recaps automatically</span></label>
-                <p class="settings-hint">For every show. In the player (settings button) you can still switch it for one show; that choice wins.</p>`)}
+                <p class="settings-hint">For every show. In the player (settings button) you can still switch it for one show; that choice wins.</p>
+                <label class="settings-choice"><input type="checkbox" id="toggle-ambient" ${ambientOn() ? 'checked' : ''}>
+                    <span>Ambient light<small>The picture glows out into the room around it, scene by scene (A in the player).</small></span></label>
+                <label class="settings-choice"><input type="checkbox" id="toggle-recap" ${recapOn() ? 'checked' : ''}>
+                    <span>“Previously on” after a long break<small>Back to a show after two weeks or more: the last minute of the episode before plays first. It never counts as watched.</small></span></label>`)}
         </div>
 
         <div class="settings-panel" id="settings-discord" role="tabpanel" aria-labelledby="settings-tab-discord" ${tab === 'discord' ? '' : 'hidden'}>
@@ -123,15 +116,6 @@ export async function render({ content, query }) {
         });
     });
 
-    content.querySelector('#legacy-design')?.addEventListener('change', async (ev) => {
-        const d = ev.target.checked ? 'aniroll' : 'm3';
-        content.querySelector('#m3-card').hidden = d !== 'm3';
-        content.querySelector('#accent-card').hidden = d === 'm3';
-        const r = ev.target.getBoundingClientRect();
-        await switchDesign(d, isLoggedIn(), { x: r.left + r.width / 2, y: r.top + r.height / 2 });
-        toast(d === 'm3' ? 'Material 3 Expressive on' : 'Legacy design on', 'success');
-    });
-
     const markSeed = (hex) => content.querySelectorAll('.m3-seed').forEach(b => {
         b.classList.toggle('active', b.dataset.seed === hex);
         b.setAttribute('aria-checked', String(b.dataset.seed === hex));
@@ -150,12 +134,6 @@ export async function render({ content, query }) {
         clearTimeout(seedTimer);
         seedTimer = setTimeout(() => setSeed(hex, isLoggedIn()), 120);
     });
-    bindHexField(content.querySelector('#accent-hex'), (hex) => {
-        setAccentColor(hex);
-        applyDesign(isLoggedIn());
-        content.querySelectorAll('.accent-swatch').forEach(b => b.classList.toggle('active', b.dataset.color.toLowerCase() === hex));
-    });
-
     content.querySelectorAll('[data-variant]').forEach(btn => {
         btn.addEventListener('click', async () => {
             content.querySelectorAll('[data-variant]').forEach(b => {
@@ -178,18 +156,6 @@ export async function render({ content, query }) {
         });
     });
 
-    content.querySelectorAll('.accent-swatch').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const hex = btn.dataset.color;
-            setAccentColor(hex);
-            applyDesign(isLoggedIn());
-            setHexField(content.querySelector('#accent-hex'), hex);
-            content.querySelectorAll('.accent-swatch').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            toast('Accent color saved', 'success');
-        });
-    });
-
     content.querySelectorAll('[data-titlelang]').forEach(btn => {
         btn.addEventListener('click', () => {
             const lang = btn.dataset.titlelang;
@@ -206,6 +172,8 @@ export async function render({ content, query }) {
         toast(e.target.checked ? 'Friends status enabled' : 'Friends status disabled', 'success');
     });
 
+    content.querySelector('#toggle-ambient')?.addEventListener('change', (e) => setAmbient(e.target.checked));
+    content.querySelector('#toggle-recap')?.addEventListener('change', (e) => setRecap(e.target.checked));
     content.querySelector('#toggle-autoskip')?.addEventListener('change', (e) => {
         try { localStorage.setItem('aniroll_autoskip_all', e.target.checked ? 'on' : 'off'); } catch { /* not kept */ }
         toast(e.target.checked ? 'Intros are skipped automatically' : 'Intros play again', 'success');
@@ -214,7 +182,7 @@ export async function render({ content, query }) {
     document.getElementById('mal-xml-upload')?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        import('./mal-import.js?v=161').then(m => m.startXMLImport(file));
+        import('./mal-import.js?v=173').then(m => m.startXMLImport(file));
     });
 
     renderJellyfinSettings();
@@ -231,7 +199,7 @@ async function renderPartySyncSettings() {
         box.innerHTML = '<p class="dot-label">Log in to change this.</p>';
         return;
     }
-    const bg = await import('../background.js?v=161');
+    const bg = await import('../background.js?v=173');
     const mode = bg.getPartySyncMode();
     box.innerHTML = `
         <label class="settings-choice"><input type="radio" name="party-sync" value="open" ${mode === 'open' ? 'checked' : ''}>
@@ -305,7 +273,7 @@ async function renderJellyfinLive() {
         return;
     }
     const [jf, bg, np] = await Promise.all([
-        import('../jellyfin.js?v=161'), import('../background.js?v=161'), import('../nowplaying.js?v=161'),
+        import('../jellyfin.js?v=173'), import('../background.js?v=173'), import('../nowplaying.js?v=173'),
     ]);
     const head = `<h4 class="jf-live-title">Live tracking</h4>
         <p class="dot-label">See what you are watching right in AniRoll, and finished episodes and movies land on your AniList within seconds, even when AniRoll is closed. Uses the Webhook plugin of your Jellyfin server.</p>`;
@@ -458,7 +426,7 @@ function linksHtml() {
 async function renderJellyfinSettings() {
     const box = document.getElementById('jf-settings');
     if (!box) return;
-    const jf = await import('../jellyfin.js?v=161');
+    const jf = await import('../jellyfin.js?v=173');
     await jf.loadAccountConfig();
     const cfg = jf.getConfig();
 
@@ -555,7 +523,7 @@ async function renderJellyfinSettings() {
     }
 
     const scope = jf.getScope();
-    const player = await import('../player/availability.js?v=161');
+    const player = await import('../player/availability.js?v=173');
     const localUrl = player.getLocalUrl();
     box.innerHTML = `
         <div class="jf-row"><span class="jf-dot jf-dot-checking" id="jf-settings-dot"></span><span id="jf-settings-state">Checking...</span></div>
@@ -610,7 +578,7 @@ async function renderJellyfinSettings() {
     box.querySelector('.jf-links')?.addEventListener('click', async (ev) => {
         const btn = ev.target.closest('[data-unlink]');
         if (!btn) return;
-        const { removeLink } = await import('../jflinks.js?v=161');
+        const { removeLink } = await import('../jflinks.js?v=173');
         removeLink(btn.dataset.unlink);
         btn.closest('.jf-link-row')?.remove();
         toast('Link removed', 'success');

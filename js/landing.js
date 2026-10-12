@@ -1,5 +1,5 @@
-import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=161';
-import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=161';
+import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=173';
+import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=173';
 
 // The landing page, in Material 3 Expressive (the only design logged out): the headline arrives word by word,
 // a roll to try sits next to it, the feature tour plays one clip after another, and Watch Party shows up as the
@@ -54,6 +54,31 @@ export function renderParty() {
             </div>
         </figure>
     </section>
+    <section class="lp-discord" aria-labelledby="lp-discord-title">
+        <figure class="lp-presence" aria-label="AniRoll in a Discord profile">
+            <div class="lp-presence-kicker">Watching AniRoll</div>
+            <div class="lp-presence-row">
+                <span class="lp-presence-cover" aria-hidden="true"><img class="lp-presence-badge" src="icons/icon-192.png" alt=""></span>
+                <div class="lp-presence-text">
+                    <div class="lp-presence-app">AniRoll</div>
+                    <div class="lp-presence-show">Frieren</div>
+                    <div class="lp-presence-state">Episode 5 of 28 · Watch Party</div>
+                    <div class="lp-presence-time"><span>05:12</span><span class="lp-presence-bar" aria-hidden="true"><span></span></span><span>23:40</span></div>
+                </div>
+            </div>
+            <span class="lp-presence-btn">Join the Watch Party</span>
+            <span class="lp-presence-btn">View on AniRoll</span>
+        </figure>
+        <div class="lp-discord-text">
+            <h2 class="landing-tour-title" id="lp-discord-title">Your Discord shows it too</h2>
+            <p class="landing-tour-sub">With AniRoll for Discord, friends see what you watch: the show with its cover, the episode and the time left. In a Watch Party, they join with one click.</p>
+            <ul class="lp-party-points">
+                <li>Chrome, Brave, Edge, Vivaldi and Firefox, on Windows, macOS and Linux</li>
+                <li>Set up in a minute from Settings → Discord</li>
+                <li>Stays on your computer: nothing goes through AniRoll’s server</li>
+            </ul>
+        </div>
+    </section>
     <section class="lp-also">
         <p><strong>Tracked from your own Jellyfin.</strong> Watch on your server, in any app, and the episode lands on your AniList by itself.</p>
         <p><strong>Friends in the loop.</strong> See what the people you follow are watching, reply, like and compare lists.</p>
@@ -62,11 +87,14 @@ export function renderParty() {
 // The invite shows a real cover: the first trending show the page loaded anyway
 export function fillInvite(root, media) {
     const m = media.find(x => x.coverImage?.large);
-    const cover = root.querySelector('.lp-invite-cover');
-    if (!m || !cover) return;
-    cover.style.backgroundImage = `url("${m.coverImage.large.replace(/"/g, '')}")`;
+    if (!m) return;
+    const url = `url("${m.coverImage.large.replace(/"/g, '')}")`;
+    for (const el of root.querySelectorAll('.lp-invite-cover, .lp-presence-cover')) el.style.backgroundImage = url;
     const title = m.title?.english || m.title?.romaji;
-    if (title) root.querySelector('.lp-invite-show').textContent = title;
+    if (title) for (const el of root.querySelectorAll('.lp-invite-show, .lp-presence-show')) el.textContent = title;
+    // The Discord status counts the show's own episodes
+    const state = root.querySelector('.lp-presence-state');
+    if (state) state.textContent = `Episode 5${m.episodes > 5 ? ` of ${m.episodes}` : ''} · Watch Party`;
 }
 
 // Material 3 takes its colours from the show you watched last: the clip shows it, and each shape below it

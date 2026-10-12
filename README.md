@@ -36,6 +36,8 @@ New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start read
 - **Play from Jellyfin**: episodes from your own Jellyfin server play right in AniRoll, subtitles as the release styled them,
   with skip intro; sign-in by Quick Connect, no password typed into AniRoll.
 - **Jellyfin live tracking**: an episode played past 90% counts as watched, rewatches included.
+- **AniRoll for Discord**: a browser extension (Chrome, Brave, Edge, Vivaldi, Firefox) puts the show, the episode and
+  its time left into your Discord status; in a Watch Party, friends join with one click. Stays on your computer.
 - **Calendar**: the week (or month) with air times and where you stand on each show.
 - **Recommendations with a taste match** from your own scores, genres and tags.
 - **Studio and voice actor pages**: everything a studio made, every role a voice actor plays; related shows as covers, spoiler tags only on request.
@@ -54,6 +56,10 @@ New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start read
 **Play from Jellyfin**: an episode picked from the list, Skip intro, subtitles drawn the way the release styled them
 
 ![The player: Episodes on a show's page, an episode started, the Audio & subtitles menu, Skip intro, then the episode with its styled subtitles](docs/screenshots/clip-player.webp)
+
+**AniRoll for Discord**: what you watch in your Discord status, with a button to join your Watch Party
+
+![AniRoll for Discord: the episode with its cover and time left, Join the Watch Party and View on AniRoll](docs/screenshots/discord.webp)
 
 <p align="center">
   <img src="docs/screenshots/mobile-roll.webp" width="260" alt="Roll on a phone">
@@ -143,7 +149,8 @@ extension what is on screen (the show, the episode and its time, your Watch Part
 extension passes it to the helper on the same computer, and the helper to the Discord app through Discord's
 local connection. Nothing of it goes to AniRoll's server or anywhere else, and nothing is stored: closing
 the last AniRoll tab clears the status. The extension only runs on aniroll.app and asks for no other
-permission than talking to the helper.
+permission than talking to the helper. The helper trusts no message blindly, not even the extension's:
+it passes on only the fields AniRoll uses, within Discord's limits, pictures and links only over https.
 
 ### No bundler
 
@@ -234,7 +241,7 @@ The player uses [hls.js](https://github.com/video-dev/hls.js) (Apache-2.0),
 [libpgs](https://github.com/Arcus92/libpgs-js) (MIT) and [JASSUB](https://github.com/ThaUnknown/jassub) (MIT).
 JASSUB's WebAssembly contains libass, FreeType, HarfBuzz, FriBidi and other libraries under their own
 licences, some of them LGPL-2.1-or-later; they ship as separate, replaceable files in
-`js/vendor/jassub-2.5.16/`, rebuilt from the published package by `tools/vendor/jassub.sh`. Every
+`js/vendor/jassub-2.5.18p1/`, rebuilt from the published package by `tools/vendor/jassub.sh`. Every
 library's licence text lies next to it in `js/vendor/`.
 
 ## License

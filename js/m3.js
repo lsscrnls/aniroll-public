@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=161';
-import { upNext, glance, DAYS, greeting, playFromHero, heroEntry } from './upnext.js?v=161';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=161';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=173';
+import { upNext, glance, DAYS, greeting, playFromHero, heroEntry } from './upnext.js?v=173';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=173';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -568,10 +568,9 @@ function renderWidgets(hero, entries, planning, lead) {
         box.setAttribute('aria-label', 'At a glance');
         hero.after(box);
     }
-    const { next: soonest, airing, week, waiting, waitingTotal: total, byDay, today } = glance(entries, undefined, planning);
-    // The hero already counts down to its own show's next episode: then the clock shows the one after it
-    const heroId = lead?.media.id;
-    const next = soonest && !soonest.premiere && soonest.media.id === heroId && airing[1] ? { ...airing[1], later: true } : soonest;
+    // The clock: the next episode the calendar (My List) shows; the ones after it wait in line for when it is out
+    const { next, upcoming, week, waiting, waitingTotal: total, byDay, today } = glance(entries, undefined, planning);
+    clockQueue = upcoming;
 
     box.innerHTML = `
         ${next ? clockWidgetHtml(next) : ''}
@@ -594,9 +593,15 @@ function renderWidgets(hero, entries, planning, lead) {
             <span class="m3-widget-sub">${week.length ? `${week.length} ${week.length === 1 ? 'show airs' : 'shows air'} this week` : 'Nothing airing'}</span>
         </a>`;
     box.querySelectorAll('[data-m3-until]').forEach(renderCountdown);
-    // A premiere takes the colours of its cover
-    const clock = box.querySelector('.m3-widget-clock.is-premiere');
-    if (clock) setScope(clock, next.media.coverImage?.color || null);
+    scopeClock(box.querySelector('.m3-widget-clock'), next);
+}
+
+let clockQueue = [];
+const OUT_NOW_S = 3600;
+
+// A premiere takes the colours of its cover
+function scopeClock(clock, entry) {
+    if (clock?.classList.contains('is-premiere')) setScope(clock, entry.media.coverImage?.color || null);
 }
 
 // The countdown to the next episode: the show's cover peeking in from the side, a ring that fills up
@@ -611,7 +616,7 @@ function clockWidgetHtml(next) {
     return `<button class="m3-widget m3-widget-clock${premiere ? ' is-premiere' : ''}" data-open="${m.id}" data-m3-until="${m.nextAiringEpisode.airingAt}" data-m3-span="${premiere ? 30 * 86400 : 7 * 86400}">
             ${cover ? `<img class="m3-clock-cover" src="${esc(cover)}" alt="" aria-hidden="true">` : ''}
             <svg class="m3-clock-ring" viewBox="0 0 40 40" aria-hidden="true"><circle class="m3-clock-ring-track" cx="20" cy="20" r="${RING_R}"/><circle class="m3-clock-ring-fill" cx="20" cy="20" r="${RING_R}" stroke-dasharray="${RING_C.toFixed(2)}" stroke-dashoffset="${RING_C.toFixed(2)}"/></svg>
-            <span class="m3-widget-label">${next.premiere ? 'Starts in' : next.later ? 'Then' : 'Next episode'}${premiere ? ' <span class="m3-clock-chip">Premiere</span>' : ''}</span>
+            <span class="m3-widget-label">${next.premiere ? 'Starts in' : 'Next episode'}${premiere ? ' <span class="m3-clock-chip">Premiere</span>' : ''}</span>
             <span class="m3-widget-clock-num"></span>
             <span class="m3-clock-when"></span>
             <span class="m3-widget-sub">${esc(titlePref(m.title))} · Ep ${ep}</span>
@@ -635,6 +640,19 @@ function airsWhen(at) {
 function renderCountdown(el) {
     if (!el.isConnected) return;
     const at = Number(el.dataset.m3Until);
+    // Out for an hour: the clock moves on to the next one in line, without asking AniList again
+    if (el.classList.contains('m3-widget-clock') && Date.now() / 1000 - at > OUT_NOW_S) {
+        const following = clockQueue.find(e => e.media.nextAiringEpisode.airingAt > Date.now() / 1000 - OUT_NOW_S);
+        clearTimeout(el._m3Tick);
+        if (!following) { el.remove(); return; }
+        const t = document.createElement('template');
+        t.innerHTML = clockWidgetHtml(following).trim();
+        const fresh = /** @type {HTMLElement} */ (t.content.firstElementChild);
+        el.replaceWith(fresh);
+        scopeClock(fresh, following);
+        renderCountdown(fresh);
+        return;
+    }
     const left = Math.max(0, at - Date.now() / 1000);
     const d = Math.floor(left / 86400), h = Math.floor(left % 86400 / 3600), m = Math.floor(left % 3600 / 60), s = Math.floor(left % 60);
     const num = el.querySelector('.m3-widget-clock-num');

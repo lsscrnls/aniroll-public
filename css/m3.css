@@ -2044,6 +2044,37 @@
     width: 72px; aspect-ratio: 2 / 3; border-radius: 8px;
     background: var(--md-surface-container-highest) center / cover no-repeat;
 }
+/* AniRoll for Discord: the status as a Discord profile shows it (Discord's own dark card, whatever the theme) */
+:root[data-design="m3"] .lp-discord {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(24px, 5vw, 72px);
+    margin: var(--space-3xl, 64px) 0 var(--space-xl);
+}
+:root[data-design="m3"] .lp-presence {
+    display: grid; gap: 10px; margin: 0; padding: 20px; max-width: 520px; justify-self: center; width: 100%; box-sizing: border-box;
+    border-radius: var(--md-shape-xl-plus, 32px); background: #232129; color: #f2f0f5;
+    box-shadow: 0 24px 60px rgba(0,0,0,.18);
+}
+:root[data-design="m3"] .lp-presence-kicker { font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #b7b2c2; }
+:root[data-design="m3"] .lp-presence-row { display: flex; gap: 16px; align-items: center; margin-bottom: 4px; }
+:root[data-design="m3"] .lp-presence-cover {
+    position: relative; flex: 0 0 96px; aspect-ratio: 3 / 4; border-radius: 12px; background: #3a3644 center / cover no-repeat;
+}
+:root[data-design="m3"] .lp-presence-badge {
+    position: absolute; right: -8px; bottom: -8px; width: 30px; height: 30px; padding: 2px; border-radius: 50%; background: #232129;
+}
+:root[data-design="m3"] .lp-presence-text { min-width: 0; flex: 1; display: grid; gap: 3px; }
+:root[data-design="m3"] .lp-presence-app { font-size: .9rem; font-weight: 700; }
+:root[data-design="m3"] .lp-presence-show { font-size: 1.1rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-design="m3"] .lp-presence-state { color: #b7b2c2; }
+:root[data-design="m3"] .lp-presence-time { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: .78rem; color: #b7b2c2; font-variant-numeric: tabular-nums; }
+:root[data-design="m3"] .lp-presence-bar { flex: 1; height: 4px; border-radius: 2px; background: #47434f; overflow: hidden; }
+:root[data-design="m3"] .lp-presence-bar > span { display: block; width: 22%; height: 100%; background: #fff; border-radius: inherit; }
+:root[data-design="m3"] .lp-presence-btn {
+    display: block; padding: 10px; border-radius: 10px; background: #3a3644; text-align: center; font-size: .88rem; font-weight: 700;
+}
 /* The two features without a clip of their own: two lines, no cards */
 :root[data-design="m3"] .lp-also {
     display: grid;
@@ -2129,7 +2160,9 @@
     /* Phones: the headline and its button first, the roll right under them */
     :root[data-design="m3"] .lp-machine { padding-top: 0; }
     :root[data-design="m3"] .lp-machine-window { width: min(46vw, 200px); }
-    :root[data-design="m3"] :is(.lp-party, .lp-also) { grid-template-columns: 1fr; }
+    :root[data-design="m3"] :is(.lp-party, .lp-discord, .lp-also) { grid-template-columns: 1fr; }
+    /* Phones: the words first, the status under them */
+    :root[data-design="m3"] .lp-discord-text { order: -1; }
     :root[data-design="m3"] .lp-colour { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {

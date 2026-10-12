@@ -71,6 +71,23 @@ test('glance: weekly shows sit on their weekday, Monday first', () => {
     assert.deepEqual(g.byDay.map(d => d.map(m => m.id)), [[], [], [2], [], [], [], [1]]);
 });
 
+test('glance: the next one comes from all the calendar shows, a planned premiere too', () => {
+    const g = glance([show(1, { next: [5, '2026-10-08T18:00:00'] })], NOW, [
+        show(10, { status: 'NOT_YET_RELEASED', next: [1, '2026-10-07T16:00:00'] }),
+        show(20, { status: 'RELEASING', next: [2, '2026-10-06T16:00:00'] }),
+    ]);
+    assert.deepEqual(g.upcoming.map(e => e.media.id), [20, 10, 1]);
+    assert.equal(g.next.media.id, 20);
+    assert.equal(g.upcoming[1].premiere, true);
+});
+
+test('glance: an episode out for an hour gives way to the next', () => {
+    const t = at('2026-10-06T12:00:00');
+    const shows = [show(1, { next: [3, '2026-10-06T11:30:00'] }), show(2, { next: [4, '2026-10-07T11:30:00'] })];
+    assert.equal(glance(shows, t).next.media.id, 1, 'out half an hour ago: still "Out now"');
+    assert.equal(glance(shows, t + 3600).next.media.id, 2, 'out 90 minutes ago: the next one');
+});
+
 test('glance: nothing watched airs, so the next Planning premiere counts down', () => {
     const g = glance([show(1, { status: 'FINISHED', progress: 3 })], NOW, [
         show(10, { status: 'NOT_YET_RELEASED', next: [1, '2026-10-09T16:00:00'] }),
@@ -95,7 +112,7 @@ test('glance: a planned show that already started airs weekly in the week', () =
     const g = glance([], NOW, [show(20, { status: 'RELEASING', next: [2, '2026-10-12T16:00:00'] })]);
     assert.deepEqual(g.week.map(e => e.media.id), [20]);
     assert.deepEqual(g.byDay[0].map(m => m.id), [20]);
-    assert.equal(g.next, null, 'only premieres count down, not running Planning shows');
+    assert.equal(g.next.media.id, 20, 'a running Planning show counts down like the calendar shows it');
 });
 
 test('glance: the week ends right on Sunday too', () => {

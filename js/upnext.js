@@ -24,8 +24,11 @@ export function heroEntry(entries) {
     return entries.find(e => upNext(e).canWatch) || entries[0];
 }
 
-// All of Continue Watching: the soonest airing episode, what's waiting, which weekday each show airs (Monday first).
-// Nothing on it airing? Then `next` is the next premiere from Planning (`premiere: true`), so the countdown stays
+// All of Continue Watching: the next episodes, what's waiting, which weekday each show airs (Monday first).
+// `upcoming` is what the calendar's "My List" shows, soonest first: watched shows, planned ones already running
+// and planned premieres (`premiere: true`). One that aired within the last hour stays at the front ("Out now");
+// `next` is its first.
+const OUT_NOW_S = 3600;
 export function glance(entries, now = Date.now() / 1000, planning = []) {
     const airing = entries.filter(e => e.media.nextAiringEpisode?.airingAt > now)
         .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt);
@@ -42,9 +45,13 @@ export function glance(entries, now = Date.now() / 1000, planning = []) {
     const week = [...airing, ...running, ...premieres.filter(e => e.media.nextAiringEpisode.airingAt < sunday.getTime() / 1000)];
     const byDay = Array.from({ length: 7 }, () => []);
     week.forEach(e => byDay[weekday(e.media.nextAiringEpisode.airingAt)].push(e.media));
-    const premiere = airing.length ? null : premieres[0];
-    const next = airing[0] || (premiere ? { ...premiere, premiere: true } : null);
-    return { next, airing, week, waiting, waitingTotal: waiting.reduce((s, x) => s + x.n, 0), byDay, today: weekday(now) };
+    const seen = new Set();
+    const upcoming = [...entries, ...planning]
+        .filter(e => e.media.nextAiringEpisode?.airingAt > now - OUT_NOW_S && !seen.has(e.media.id) && seen.add(e.media.id))
+        .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt)
+        .map(e => (e.media.status === 'NOT_YET_RELEASED' ? { ...e, premiere: true } : e));
+    const next = upcoming[0] || null;
+    return { next, upcoming, airing, week, waiting, waitingTotal: waiting.reduce((s, x) => s + x.n, 0), byDay, today: weekday(now) };
 }
 
 export const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -68,5 +75,5 @@ export function playFromHero(root, entry, size = '') {
     const { m, next, canWatch } = upNext(entry);
     if (!canWatch) return;
     // List entries come without `type`: Home's hero is anime only
-    import('./player/playbutton.js?v=161').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
+    import('./player/playbutton.js?v=173').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
 }

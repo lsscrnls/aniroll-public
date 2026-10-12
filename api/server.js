@@ -79,6 +79,27 @@ function readJson(file) {
     return data;
 }
 
+// ===== AniRoll for Discord in the Chrome Web Store =====
+// Chrome's own update check answers with the published version; asked at most every 30 minutes
+const CHROME_EXTENSION_ID = 'hmhmljkgppjpmmoodiboockbboniipcj';
+let chromeStore = { at: 0, version: null, pending: null };
+async function chromeStoreVersion() {
+    if (Date.now() - chromeStore.at < 30 * 60 * 1000) return chromeStore.version;
+    chromeStore.pending ||= (async () => {
+        try {
+            const url = `https://clients2.google.com/service/update2/crx?response=updatecheck&acceptformat=crx3&prodversion=140.0&x=${encodeURIComponent(`id=${CHROME_EXTENSION_ID}&uc`)}`;
+            const xml = await (await fetch(url, { signal: AbortSignal.timeout(5000) })).text();
+            const m = xml.match(/<updatecheck\b[^>]*\bversion="(\d+(?:\.\d+){0,3})"/);
+            chromeStore = { at: Date.now(), version: m ? m[1] : null, pending: null };
+        } catch {
+            // Unreachable: keep the last answer, ask again in 5 minutes
+            chromeStore = { at: Date.now() - 25 * 60 * 1000, version: chromeStore.version, pending: null };
+        }
+        return chromeStore.version;
+    })();
+    return chromeStore.pending;
+}
+
 // ===== Jellyfin config, stored per AniList account =====
 // Holds the user's own Jellyfin API key, so the connection follows the account to any
 // device instead of living in one browser. File is written with owner-only permissions.
@@ -158,6 +179,41 @@ function sharePage(entry, id) {
 </html>`;
 }
 
+// A shared Anime DNA: "<name> is The Simulcaster", the card as a large image, then the profile, where
+// a signed-in visitor sees how well they match
+function dnaPage(name, entry) {
+    const target = `/#/user/${encodeURIComponent(name)}`;
+    const title = entry ? `${entry.name} is ${entry.type}` : `${name}'s Anime DNA`;
+    const description = `${entry && entry.line ? `${entry.line} ` : ''}See your own Anime DNA on AniRoll, and how well your tastes match.`;
+    const image = entry ? `${SITE}/share/dna/${encodeURIComponent(entry.name)}/card?v=${entry.savedAt}` : `${SITE}/og-image-v4.jpg`;
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(title)} · AniRoll</title>
+<meta property="og:site_name" content="AniRoll">
+<meta property="og:type" content="website">
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="${escapeHtml(description)}">
+<meta property="og:url" content="${SITE}/d/${encodeURIComponent(name)}">
+<meta property="og:image" content="${escapeHtml(image)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escapeHtml(title)}">
+<meta name="twitter:description" content="${escapeHtml(description)}">
+<meta name="twitter:image" content="${escapeHtml(image)}">
+<meta name="theme-color" content="#d13438">
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0; url=${target}">
+<style>body{background:#0a0a0a;color:#fff;font-family:system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0}a{color:#d13438}</style>
+</head>
+<body>
+<p>Opening <a href="${target}">${escapeHtml(title)}</a> …</p>
+</body>
+</html>`;
+}
+
 // A watch party invite's preview: "<host> is hosting a Watch Party · <show> · Episode N", the cover
 // `stamp`: the link's ?s=<show>-<episode>, echoed in og:url so a scraper keys the preview by it too
 function partyPage(host, info, stamp = '') {
@@ -212,6 +268,11 @@ function readMaintenance() {
 
 // Per-account values synced across devices (see "/api/me/state")
 const USER_STATE_FILE = path.join(DATA_DIR, 'user-state.json');
+// Anime DNA cards (js/dna.js): the picture someone shares, drawn by their browser, kept one per account
+// (data/dna/<id>.jpg) with who it belongs to and what it says (dna.json, by lowercase name)
+const DNA_DIR = path.join(DATA_DIR, 'dna');
+const DNA_FILE = path.join(DATA_DIR, 'dna.json');
+const DNA_MAX_BYTES = 600 * 1024;
 const USER_STATE_NAME = /^[a-z]{1,16}$/;
 const USER_STATE_MAX_KEYS = 16;
 const USER_STATE_MAX_BYTES = 4096;
@@ -1219,6 +1280,23 @@ function json(res, code, data) {
     res.end(JSON.stringify(data));
 }
 
+// The raw request body up to `max` bytes; null when it is larger (the rest is not read)
+function readRaw(req, max) {
+    return new Promise(function(resolve) {
+        const chunks = [];
+        let size = 0;
+        let done = false;
+        req.on('data', function(c) {
+            if (done) return;
+            size += c.length;
+            if (size > max) { done = true; resolve(null); return; }
+            chunks.push(c);
+        });
+        req.on('end', function() { if (!done) { done = true; resolve(Buffer.concat(chunks)); } });
+        req.on('error', function() { if (!done) { done = true; resolve(null); } });
+    });
+}
+
 function readBody(req) {
     return new Promise(function(resolve) {
         // Collect buffers, not strings: a multi-byte character (Japanese titles!) can be
@@ -1409,6 +1487,22 @@ async function handle(req, res) {
         return html(res, 200, sharePage(entry, id));
     }
 
+    // Anime DNA links (/d/<name> through nginx): the shared card as the preview, then on to the profile
+    const dnaCard = pathname.match(/^\/share\/dna\/([^/]+)(\/card)?$/);
+    if (dnaCard && req.method === 'GET') {
+        let name = '';
+        try { name = decodeURIComponent(dnaCard[1]).slice(0, 40); } catch { return html(res, 400, sharePage(null, null)); }
+        const entry = readJson(DNA_FILE)[name.toLowerCase()] || null;
+        if (dnaCard[2]) {
+            const file = entry && path.join(DNA_DIR, `${entry.id}.jpg`);
+            if (!file || !fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
+            res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=300' });
+            res.end(fs.readFileSync(file));
+            return;
+        }
+        return html(res, 200, dnaPage(name, entry));
+    }
+
     // Watch party invites (/w/<host> through nginx): the running party as a link preview, then on to it
     const invite = pathname.match(/^\/share\/party\/([^/]+)$/);
     if (invite && req.method === 'GET') {
@@ -1499,6 +1593,12 @@ async function handle(req, res) {
         }
     }
 
+    // Which AniRoll for Discord the Chrome Web Store hands out (null: not there), so Settings offers the store
+    // only once it has the newest one and the download until then
+    if (pathname === '/api/discord/store' && req.method === 'GET') {
+        return json(res, 200, { chrome: await chromeStoreVersion() });
+    }
+
     if (pathname === '/api/maintenance' && req.method === 'GET') {
         const m = readMaintenance();
         return json(res, 200, m
@@ -1583,6 +1683,37 @@ async function handle(req, res) {
             return json(res, 405, { error: 'Method not allowed' });
         }
         return json(res, 200, { enabled: !!all[key], savedAt: all[key] ? all[key].savedAt : null });
+    }
+
+    // An Anime DNA card: a JPEG of at most 600 KB from the profile's Share button, the type and its line
+    // in the query. It replaces the account's last card; /d/<name> shows it as the link preview.
+    if (pathname === '/api/me/dna-card' && req.method === 'POST') {
+        const auth = await verifyViewer(req);
+        if (auth.status !== 'ok') return refuseAuth(res, auth);
+        if (overLimit('dna-card', String(auth.viewer.id), 10, 10 * 60000)) return json(res, 429, { error: 'Too many cards, try again later' });
+        const image = await readRaw(req, DNA_MAX_BYTES);
+        // JPEG only, checked by its first bytes rather than what the request claims
+        if (!image || image.length < 1000 || image[0] !== 0xff || image[1] !== 0xd8 || image[2] !== 0xff) {
+            return json(res, 400, { error: 'A JPEG of at most 600 KB is expected' });
+        }
+        const params = new URL(req.url, 'http://x').searchParams;
+        const type = str(params.get('type'), 60).trim();
+        const line = str(params.get('line'), 200).trim();
+        if (!type) return json(res, 400, { error: 'type is required' });
+        const id = String(auth.viewer.id);
+        const name = String(auth.viewer.name || '');
+        ensureDataDir();
+        fs.mkdirSync(DNA_DIR, { recursive: true });
+        const file = path.join(DNA_DIR, `${id}.jpg`);
+        const tmp = `${file}.tmp-${process.pid}`;
+        fs.writeFileSync(tmp, image);
+        fs.renameSync(tmp, file);
+        const all = readJson(DNA_FILE);
+        // A renamed account: its old name stops pointing at the card
+        for (const key of Object.keys(all)) if (all[key].id === id && key !== name.toLowerCase()) delete all[key];
+        all[name.toLowerCase()] = { id, name, type, line, savedAt: Date.now() };
+        writeJson(DNA_FILE, all, { pretty: false });
+        return json(res, 200, { ok: true, url: `${SITE}/d/${encodeURIComponent(name)}` });
     }
 
     // A few small values that belong to the AniList account rather than one browser, so every device
