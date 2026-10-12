@@ -1,4 +1,4 @@
-import { jfAuth } from '../jellyfin.js?v=161';
+import { jfAuth } from '../jellyfin.js?v=173';
 
 // Every subtitle of a file behind one list, whatever draws it:
 //   ASS/SSA  -> JASSUB (libass in WebAssembly) with the fonts embedded in the MKV — typesetting, signs,
@@ -9,7 +9,7 @@ import { jfAuth } from '../jellyfin.js?v=161';
 //   DVD/DVB pictures      -> not offered (one file in the library)
 //   manager = { list(), current(), select(id | null), delay(), setDelay(seconds), destroy() }; `pick` chooses the first track
 //   delay: seconds the lines come later (negative: earlier), for a release timed off by a bit
-const JASSUB_URL = '../vendor/jassub-2.5.16/jassub.js';
+const JASSUB_URL = '../vendor/jassub-2.5.18p1/jassub.js';
 const LIBPGS_URL = '../vendor/libpgs-0.9.0/libpgs.js';
 const LIBPGS_WORKER = new URL('../vendor/libpgs-0.9.0/libpgs.worker.js', import.meta.url).href;
 const ASS = new Set(['ass', 'ssa']);
@@ -142,7 +142,7 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
             pgs.loadFromUrl(subUrl);
         } else {
             pgs = new PgsRenderer({ video, subUrl, workerUrl: LIBPGS_WORKER, aspectRatio: 'contain', timeOffset: -offset });
-            pgs.canvas.classList.add('pl-subs-canvas');
+            pgs.canvas.classList.add('pl-subs-canvas', 'pl-subs-pgs');
         }
         pgs.canvas.hidden = false;
         followFrames();

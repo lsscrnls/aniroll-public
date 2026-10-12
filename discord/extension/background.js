@@ -9,10 +9,11 @@ const pages = new Map(); // port -> { activity, at }
 let helper = null;       // the native port while the helper runs
 let helperUp = false;    // it answered
 let discordUp = false;
+let helperVersion = ''; // what the helper says it is, so AniRoll can tell when it is out of date
 let triedAt = 0;
 
 function status() {
-    return { type: 'status', extension: VERSION, helper: helperUp, discord: discordUp };
+    return { type: 'status', extension: VERSION, helper: helperUp, helperVersion, discord: discordUp };
 }
 
 function tellPages() {
@@ -34,12 +35,14 @@ function startHelper() {
         if (msg?.type !== 'status') return;
         helperUp = true;
         discordUp = !!msg.discord;
+        helperVersion = typeof msg.version === 'string' ? msg.version.slice(0, 20) : '';
         tellPages();
     });
     helper.onDisconnect.addListener(() => {
         helper = null;
         helperUp = false;
         discordUp = false;
+        helperVersion = '';
         tellPages();
     });
     helper.postMessage({ type: 'hello' });

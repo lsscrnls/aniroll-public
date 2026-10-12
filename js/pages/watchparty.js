@@ -21,7 +21,7 @@ export async function copyPartyLink(link) { return null; }
 export async function partyFromPlayer(media, episode, player = null) { return null; }
 
 // Moves the running party to another show; members and the invite link stay.
-export async function switchPartyTo(target, fromProgress) { return null; }
+export async function switchPartyTo(target, fromProgress = null) { return null; }
 
 // A dialog to pick a show from the host's list; calls `onPick` with the choice.
 export function openPartyPicker({ title, sub, excludeId = null, includePlanning = false, onPick }) { return null; }
@@ -51,6 +51,3 @@ export function renderPartyPill() { return null; }
 export async function render({ query: q, content }) {
     content.innerHTML = '<div class="page-enter"><p class="empty-state">This part of AniRoll is not in the public source. Try it on aniroll.app.</p></div>';
 }
-
-// The text of the AniList post that sums up a party: its shows and who watched.
-export function buildPartyPost({ shows, members = [], best = '' }) { return null; }

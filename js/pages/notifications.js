@@ -1,6 +1,6 @@
-import * as api from '../api.js?v=161';
-import { esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=161';
-import { getToken, isLoggedIn } from '../auth.js?v=161';
+import * as api from '../api.js?v=173';
+import { esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=173';
+import { getToken, isLoggedIn } from '../auth.js?v=173';
 
 export async function render({ content }) {
     const token = getToken();
@@ -57,7 +57,7 @@ export async function render({ content }) {
         if (!open || box.dataset.loaded) return;
         box.innerHTML = '<div class="activity-replies-status">Loading…</div>';
         try {
-            const [replies, { renderReply }] = await Promise.all([api.getActivityReplies(id, token), import('./social.js?v=161')]);
+            const [replies, { renderReply }] = await Promise.all([api.getActivityReplies(id, token), import('./social.js?v=173')]);
             box.dataset.loaded = '1';
             box.innerHTML = (replies.length ? replies.slice(-5).map(renderReply).join('') : '<div class="activity-replies-status">No replies yet</div>')
                 + `<a class="notif-thread-link" href="https://anilist.co/activity/${id}" target="_blank" rel="noopener">Open on AniList</a>`;

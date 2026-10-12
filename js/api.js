@@ -1,7 +1,7 @@
 // @ts-check
-import { buildTasteProfile, tasteMatch } from './taste.js?v=161';
-import { dismissedIds } from './dismissed.js?v=161';
-import { statusLabel } from './store.js?v=161';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=173';
+import { dismissedIds } from './dismissed.js?v=173';
+import { statusLabel } from './store.js?v=173';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -352,7 +352,7 @@ fragment mediaFields on Media {
     startDate { year month day }
     endDate { year month day }
     nextAiringEpisode { airingAt episode timeUntilAiring }
-    mediaListEntry { id status score(format: POINT_100) progress repeat notes startedAt { year month day } completedAt { year month day } }
+    mediaListEntry { id status score(format: POINT_100) progress repeat notes updatedAt startedAt { year month day } completedAt { year month day } }
     type
     description(asHtml: false)
     source
@@ -695,7 +695,7 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update.
     // Only when this save set the progress: a new score or status leaves Jellyfin alone.
     if (mirror && saved?.mediaId && saved.progress && variables.progress !== undefined) {
-        import('./jellyfin.js?v=161').then(m =>
+        import('./jellyfin.js?v=173').then(m =>
             m.syncProgress(saved.progress, () => mediaForSync(saved.mediaId, token)));
     }
 
@@ -1114,10 +1114,16 @@ function tasteData(userId, token) {
     return cachedQuery(`
         query ($userId: Int) {
             MediaListCollection(userId: $userId, type: ANIME) {
-                lists { entries { score(format: POINT_100) status media { id genres tags { name rank } } } }
+                lists { entries { score(format: POINT_100) status media { id genres tags { name rank } popularity studios(isMain: true) { nodes { name isAnimationStudio } } } } }
             }
         }
     `, { userId }, token, TTL.recommendations);
+}
+
+// The list as the taste query has it (score, status, genres, tags; no titles): enough for a taste match
+// with someone (js/dna.js matchDna) at one request
+export async function getTasteLists(userId, token = null) {
+    return (await tasteData(userId, token)).MediaListCollection?.lists || [];
 }
 
 // The genres and tags of every show on the list (id -> { id, genres, tags }), from the same answer as the

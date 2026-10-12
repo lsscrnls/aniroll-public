@@ -172,17 +172,14 @@ function staticServer() {
     await page.waitForTimeout(800);
     const vibrant = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--md-primary').trim());
     check('design: colour style changes the palette', /^(#[0-9a-f]{6}|rgb\()/.test(vibrant) && vibrant !== m3.primary, { tonal: m3.primary, vibrant });
-    await page.click('#legacy-design');
-    await page.waitForTimeout(300);
-    const off = await page.evaluate(() => ({ attr: document.documentElement.dataset.design || null, css: !!document.querySelector('link#m3-css'),
-        stored: localStorage.getItem('aniroll_design_v2'), accent: !document.getElementById('accent-card').hidden }));
-    check('design: the legacy switch brings back AniRoll’s first design (kept, accent colour offered)', off.attr === null && !off.css && off.stored === 'aniroll' && off.accent, off);
-    // Accent by hex code: short codes expand, junk is flagged and not saved
-    await page.fill('#accent-hex', 'zz');
-    const junk = await page.evaluate(() => ({ invalid: document.getElementById('accent-hex').classList.contains('invalid'), saved: localStorage.getItem('aniroll_accent') }));
-    await page.fill('#accent-hex', '0cf');
-    const hex = await page.evaluate(() => ({ saved: localStorage.getItem('aniroll_accent'), accent: getComputedStyle(document.documentElement).getPropertyValue('--user-accent').trim() }));
-    check('accent: any colour by hex code', junk.invalid && junk.saved !== 'zz' && hex.saved === '#00ccff' && hex.accent === '#00ccff', { junk, hex });
+    // The legacy design is gone: no switch, no accent colour, and an old choice of it is forgotten
+    const legacy = await page.evaluate(() => ({ toggle: !!document.getElementById('legacy-design'), accent: !!document.getElementById('accent-card') }));
+    await page.evaluate(() => localStorage.setItem('aniroll_design_v2', 'aniroll'));
+    await page.reload();
+    await page.waitForSelector('link#m3-css', { state: 'attached', timeout: 5000 }).catch(() => {});
+    const after = await page.evaluate(() => ({ attr: document.documentElement.dataset.design, stored: localStorage.getItem('aniroll_design_v2') }));
+    check('design: no legacy switch or accent colour any more; an old legacy choice lands in Material 3 and is forgotten',
+        !legacy.toggle && !legacy.accent && after.attr === 'm3' && after.stored === null, { legacy, after });
     await page.evaluate(() => { localStorage.removeItem('aniroll_settings_tab'); localStorage.removeItem('aniroll_m3_variant'); });
     // Skipping intros for every show: a switch under Jellyfin → Player
     await page.click('[data-settings-tab="jellyfin"]').catch(() => {});
@@ -470,7 +467,8 @@ function staticServer() {
     // host's own view. Runs against the obfuscated build too (scripts/deploy.sh), where joining once broke
     const wp = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     wp.on('pageerror', e => errors.push(`watch party: ${e.message}`));
-    const party = { hostName: 'Hosty', mediaId: 21, mediaTitle: 'One Piece', active: true, members: [], hostProgress: 3, hostProgressAt: Date.now(), startedAt: Date.now(), startEp: 2 };
+    const party = { hostName: 'Hosty', mediaId: 21, mediaTitle: 'One Piece', active: true, members: [], hostProgress: 3, hostProgressAt: Date.now(), startedAt: Date.now(), startEp: 2,
+        coverImage: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/21.jpg' };
     await wp.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
     await wp.route(`${base}/api/**`, route => {
         const p = new URL(route.request().url()).pathname;
@@ -486,6 +484,12 @@ function staticServer() {
         localStorage.setItem('aniroll_user_ts', String(Date.now()));
         localStorage.setItem('aniroll_seen_changes', '9999');
     }, VIEWER);
+    // Discord status on, with a stand-in for the extension that keeps what the page sends
+    await wp.addInitScript(() => {
+        localStorage.setItem('aniroll_discord', 'on');
+        window.__activities = [];
+        window.addEventListener('message', (e) => { if (e.data?.aniroll === 'presence' && e.data.type === 'activity') window.__activities.push(e.data.activity); });
+    });
     const wpText = () => wp.evaluate(() => document.getElementById('content').innerText.replace(/\s+/g, ' '));
     await wp.goto(base + '/#/watchparty?host=Hosty&anime=21');
     await idle(wp, 3000);
@@ -507,6 +511,13 @@ function staticServer() {
         .then(() => true, () => false);
     check('watch party: the host\'s next episode arrives live, not with the next poll', pushed,
         await wp.evaluate(() => document.getElementById('wp-host-ep')?.textContent));
+    // A guest's Discord status, away from the player: the show, the episode the party is on, the cover, like the host's
+    await wp.waitForFunction(() => /^Episode 8/.test(window.__activities.at(-1)?.state || ''), null, { timeout: 3000 }).catch(() => {});
+    const guestStatus = await wp.evaluate(() => window.__activities.at(-1));
+    check('discord: a party guest shows the show, the party\'s episode and its cover, with a link to the show',
+        guestStatus?.details?.length >= 2 && /^Episode 8( of \d+)? · Watch Party with \S+$/.test(guestStatus.state || '')
+        && /s4\.anilist\.co/.test(guestStatus.assets?.large_image || '') && guestStatus.assets?.large_text === guestStatus.details
+        && /^https:\/\/aniroll\.app\/a\/\d+$/.test(guestStatus.buttons?.at(-1)?.url || ''), guestStatus);
     Object.assign(party, { hostName: VIEWER.name, hostKey: 'k' });
     await wp.evaluate(n => {
         localStorage.setItem('aniroll_watchparty', JSON.stringify({ hostName: n, mediaId: 21, hostKey: 'k', mediaTitle: 'One Piece', startEp: 2 }));
@@ -677,12 +688,13 @@ function staticServer() {
                 const m = e.data;
                 if (m?.aniroll !== 'presence') return;
                 if (m.type === 'activity') window.__activities.push(m.activity);
-                window.postMessage({ aniroll: 'presence-ext', type: 'status', extension: '1.0.0', helper: true, discord: true }, location.origin);
+                window.postMessage({ aniroll: 'presence-ext', type: 'status', extension: '1.0.2', helper: true, discord: true }, location.origin);
             });
         });
         await p.goto(base + '/#/settings?tab=discord');
         await p.waitForSelector('.dc-step.is-done', { timeout: 5000 }).catch(() => {});
         const steps = await p.evaluate(() => [...document.querySelectorAll('.dc-step')].map(s => s.classList.contains('is-done')));
+        const remove = await p.evaluate(() => document.querySelector('.dc-remove code')?.textContent || '');
         await p.click('#dc-toggle').catch(() => {});
         const stored = await p.evaluate(() => localStorage.getItem('aniroll_discord'));
         await p.goto(base + '/#/play/101/3');
@@ -693,11 +705,105 @@ function staticServer() {
         await p.evaluate(() => document.getElementById('player-video').pause());
         await p.waitForTimeout(800);
         const paused = await p.evaluate(() => window.__activities.at(-1));
-        check('discord: Settings ticks the steps, the switch turns it on; the episode with time left, paused without, a link to the show',
-            steps.length === 3 && steps.every(Boolean) && stored === 'on'
+        check('discord: Settings ticks the steps, tells how to remove it, the switch turns it on; the episode with time left, paused without, a link to the show',
+            steps.length === 3 && steps.every(Boolean) && stored === 'on' && /uninstall\.sh \| sh$/.test(remove)
             && playingNow?.type === 3 && /^Episode 3( of \d+)?$/.test(playingNow.state || '') && playingNow.details?.length >= 2
             && playingNow.timestamps.end > playingNow.timestamps.start && /^https:\/\/aniroll\.app\/a\/\d+$/.test(playingNow.buttons?.[0]?.url || '')
-            && /Paused$/.test(paused?.state || '') && !paused?.timestamps && !pageErrors.length, { steps, stored, playingNow, paused, pageErrors });
+            && /Paused$/.test(paused?.state || '') && !paused?.timestamps && !pageErrors.length, { steps, remove, stored, playingNow, paused, pageErrors });
+        await p.close();
+    }
+
+    // An older helper: pointed out once per version (a note with the way to Settings), and Settings asks
+    // for the update in step 2
+    {
+        const { p, pageErrors } = await playerPage(true);
+        await p.addInitScript(() => {
+            localStorage.setItem('aniroll_discord', 'on');
+            window.addEventListener('message', (e) => {
+                if (e.data?.aniroll !== 'presence') return;
+                window.postMessage({ aniroll: 'presence-ext', type: 'status', extension: '1.0.1', helper: true, helperVersion: '1.0.0', discord: true }, location.origin);
+            });
+        });
+        await p.goto(base + '/#/home');
+        await p.waitForSelector('.toast', { timeout: 5000 }).catch(() => {});
+        const first = await p.evaluate(() => [...document.querySelectorAll('.toast')].map(t => t.textContent).join('|'));
+        await p.reload();
+        await p.waitForTimeout(1500);
+        const again = await p.evaluate(() => [...document.querySelectorAll('.toast')].map(t => t.textContent).join('|'));
+        // The Chrome Web Store has the newest version by now: Settings sends there instead of the download
+        await p.route(`${base}/api/discord/store`, route => route.fulfill({ contentType: 'application/json', body: '{"chrome":"1.0.2"}' }));
+        await p.goto(base + '/#/settings?tab=discord');
+        await p.waitForSelector('.dc-step a[href*="chromewebstore.google.com"]', { timeout: 5000 }).catch(() => {});
+        await p.waitForSelector('.dc-step', { timeout: 5000 }).catch(() => {});
+        await p.waitForTimeout(500);
+        const step = await p.evaluate(() => ({ title: document.querySelectorAll('.dc-step-title')[1]?.textContent || '', done: document.querySelectorAll('.dc-step')[1]?.classList.contains('is-done'),
+            extTitle: document.querySelectorAll('.dc-step-title')[0]?.textContent || '', extDone: document.querySelectorAll('.dc-step')[0]?.classList.contains('is-done'),
+            store: !!document.querySelector('.dc-step a[href*="chromewebstore.google.com"]'), zip: !!document.querySelector('.dc-step a[href$=".zip"]') }));
+        check('discord: an older extension and helper are pointed out once, Settings asks to set both up again, from the Chrome Web Store once it has the newest',
+            /update for the browser extension and its helper/.test(first) && !/update for/.test(again) && /update for the helper \(1\.0\.0 → /.test(step.title) && !step.done
+            && /update for the extension \(1\.0\.1 → /.test(step.extTitle) && !step.extDone && step.store && !step.zip && !pageErrors.length,
+            { first, again, step, pageErrors });
+        await p.close();
+    }
+
+    // Ambient light (A), the menu's pages, and "Previously on": episode 8 was last played weeks ago, so episode 9
+    // starts with its last moments up to its ending, in a video of its own: no report to Jellyfin about episode 8,
+    // nothing saved to AniList, the episode itself waits and then plays
+    {
+        const { p, pageErrors, saves, calls } = await playerPage(true);
+        const reportsBefore = calls.length;
+        // The pages share one browser: an episode watched by an earlier check would count as recent
+        await p.addInitScript(() => localStorage.removeItem('aniroll_last_watched'));
+        // The mock dates every list entry an hour ago; here the list was last touched weeks ago too
+        await p.route('https://graphql.anilist.co/**', route => {
+            const answer = respond(route.request().postDataJSON());
+            const old = (o) => { if (o && typeof o === 'object') for (const k of Object.keys(o)) { if (k === 'updatedAt') o[k] = 1785614400; else old(o[k]); } };
+            old(answer);
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify(answer) });
+        });
+        // …and no cached copy of the show from earlier checks (the cache lives in IndexedDB)
+        await p.goto(base + '/move/index.html');
+        await p.evaluate(() => new Promise(r => { const q = indexedDB.deleteDatabase('aniroll_cache'); q.onsuccess = q.onerror = q.onblocked = r; }));
+        await p.goto(base + '/#/play/101/9');
+        await p.waitForSelector('.pl-recap', { timeout: 10000 }).catch(() => {});
+        const recap = await p.evaluate(() => ({ kicker: document.querySelector('.pl-recap-kicker')?.textContent, sub: document.querySelector('.pl-recap-sub')?.textContent,
+            mainPaused: document.getElementById('player-video').paused }));
+        await p.waitForFunction(() => { const v = document.querySelector('.pl-recap-video'); return v && v.currentTime > 2; }, null, { timeout: 8000 }).catch(() => {});
+        await p.keyboard.press('ArrowRight'); // the player's keys sleep during the recap
+        // Pause (K) and the buttons for subtitles and full screen
+        await p.keyboard.press('k');
+        await p.waitForFunction(() => document.querySelector('.pl-recap-btn[data-act="play"]')?.getAttribute('aria-label') === 'Play', null, { timeout: 3000 }).catch(() => {});
+        const paused = await p.evaluate(() => ({ paused: document.querySelector('.pl-recap-video').paused,
+            label: document.querySelector('.pl-recap-btn[data-act="play"]')?.getAttribute('aria-label'),
+            buttons: [...document.querySelectorAll('.pl-recap-btn')].map(b => b.dataset.act).join() }));
+        await p.keyboard.press('k');
+        const mainTime = await p.evaluate(() => document.getElementById('player-video').currentTime);
+        await p.waitForFunction(() => !document.querySelector('.pl-recap'), null, { timeout: 15000 }).catch(() => {});
+        await p.waitForFunction(() => !document.getElementById('player-video').paused, null, { timeout: 5000 }).catch(() => {});
+        const after = await p.evaluate(() => ({ gone: !document.querySelector('.pl-recap'), playing: !document.getElementById('player-video').paused }));
+        const ep8Reports = calls.slice(reportsBefore).filter(c => /^Playing/.test(c.type) && c.body?.ItemId === 'ep8').length;
+        check('player: "Previously on" plays episode 8 up to its ending first, keys asleep, nothing reported or saved for it, then episode 9',
+            recap.kicker === 'Previously on' && paused.paused && paused.label === 'Play' && paused.buttons === 'play,subs,fullscreen' && /^Episode 8 · watched \d+ (days|months) ago$/.test(recap.sub || '') && recap.mainPaused && mainTime < 1
+            && after.gone && after.playing && ep8Reports === 0 && !saves.some(s => s.progress === 8) && !pageErrors.length,
+            { recap, paused, mainTime, after, ep8Reports, saves, pageErrors });
+
+        // Ambient light: on by default, A switches it off and on, and it is kept
+        const amb = await p.evaluate(() => ({ on: document.getElementById('player').classList.contains('has-ambient'), canvas: !!document.querySelector('.pl-ambient') }));
+        await p.keyboard.press('a');
+        const off = await p.evaluate(() => ({ on: document.getElementById('player').classList.contains('has-ambient'), kept: localStorage.getItem('aniroll_ambient') }));
+        await p.keyboard.press('a');
+        // The menu: rows open their page, Escape goes back to the main page and then closes
+        await p.mouse.move(640, 500);
+        await p.click('[data-act="settings"]').catch(() => {});
+        await p.click('[data-page="speed"]').catch(() => {});
+        const speeds = await p.$$eval('[data-speed]', els => els.map(e => e.textContent.trim()));
+        await p.keyboard.press('Escape');
+        const backMain = await p.evaluate(() => document.querySelector('.pl-menu')?.dataset.page);
+        await p.keyboard.press('Escape');
+        const closedMenu = await p.evaluate(() => document.querySelector('.pl-menu')?.hidden);
+        check('player: ambient light on, A switches it and keeps it; menu rows open pages, Escape steps back and closes',
+            amb.on && amb.canvas && !off.on && off.kept === 'off' && speeds.includes('Normal') && speeds.length >= 4 && backMain === 'main' && closedMenu && !pageErrors.length,
+            { amb, off, speeds, backMain, closedMenu, pageErrors });
         await p.close();
     }
 
@@ -1046,7 +1152,7 @@ function staticServer() {
         await p.mouse.move(640, 500);
         await p.click('[data-act="subs"]').catch(() => {});
         await p.waitForTimeout(300);
-        const menuItems = await p.$$eval('.pl-menu-item', els => els.map(e => e.textContent.trim()));
+        const menuItems = await p.$$eval('.pl-menu-item:not(.pl-menu-back)', els => els.map(e => e.textContent.trim()));
         await p.keyboard.press('Escape');
         check('player: styled ASS through JASSUB with the embedded font, text tracks stay off',
             ass.canvas && ass.shown && ass.w > 0 && ass.textTracks === 'disabled' && calls.some(c => c.type === 'ass') && calls.some(c => c.type === 'font' && /Token=/.test(c.auth))
@@ -1075,7 +1181,7 @@ function staticServer() {
         await p.mouse.move(640, 500);
         await p.click('[data-act="subs"]').catch(() => {});
         await p.waitForTimeout(300);
-        const pgsMenu = await p.$$eval('.pl-menu-item', els => els.map(e => e.textContent.trim()));
+        const pgsMenu = await p.$$eval('.pl-menu-item:not(.pl-menu-back)', els => els.map(e => e.textContent.trim()));
         await p.keyboard.press('Escape');
         check('player: Blu-ray subtitles (PGS) drawn by libpgs where the disc places them, the loading note gone',
             pgs.canvas && pgs.noteGone && pgs.bar?.[3] > 200 && pgs.bar[0] > 200 && pgs.above?.[3] === 0 && pgs.textTracks === 'disabled'
@@ -1137,6 +1243,9 @@ function staticServer() {
         await p.mouse.move(640, 500);
         await p.click('[data-act="settings"]').catch(() => {});
         await p.waitForTimeout(300);
+        const mainRows = await p.$$eval('.pl-menu-row .pl-menu-row-label', els => els.map(e => e.textContent));
+        await p.click('[data-page="quality"]').catch(() => {});
+        await p.waitForTimeout(200);
         const qMenu = await p.$$eval('[data-quality]', els => els.map(e => `${e.textContent.trim()}:${e.getAttribute('aria-checked')}`));
         const before7 = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep7').length;
         await p.click('[data-quality="4000000"]').catch(() => {});
@@ -1152,7 +1261,7 @@ function staticServer() {
         const nerdGone = await p.evaluate(() => document.querySelector('.pl-stats').hidden);
         await p.evaluate(() => localStorage.removeItem('aniroll_player_quality'));
         check('player: quality menu (Auto measured, Maximum, bitrate steps) asks Jellyfin under the bitrate and keeps it; I toggles the stats',
-            /^Auto \(\d/.test(qMenu[0] || '') && qMenu[0].endsWith(':true') && /^Maximum \(120 Mbps\)/.test(qMenu[1] || '') && qMenu.some(q => q.startsWith('4 Mbps'))
+            mainRows.includes('Quality') && mainRows.includes('Speed') && /^Auto \(\d/.test(qMenu[0] || '') && qMenu[0].endsWith(':true') && /^Maximum \(120 Mbps\)/.test(qMenu[1] || '') && qMenu.some(q => q.startsWith('4 Mbps'))
             && asked7.join() === '4000000' && kept === '4000000' && calls.some(c => c.type === 'bitrateTest')
             && nerd.shown && nerd.titles.join() === 'Playback,Source,Stream,This browser' && nerd.quality === '4 Mbps' && nerdGone,
             { qMenu: qMenu.slice(0, 3), asked7, kept, nerd, nerdGone });
@@ -1515,7 +1624,7 @@ function staticServer() {
         check('a day confirmed earlier shows only the items added since', shown.length >= 1 && !shown.some(t => /^The player answers every key/.test(t)), shown);
         await later.close();
     }
-    check('logged out: always Material 3, even with the legacy design chosen', await grown.evaluate(() => document.documentElement.dataset.design === 'm3' && !!document.querySelector('#m3-css')));
+    check('logged out: always Material 3, even with the old legacy choice kept', await grown.evaluate(() => document.documentElement.dataset.design === 'm3' && !!document.querySelector('#m3-css')));
     await grown.close();
 
     const late = await visitor({ aniroll_theme: 'dark' }, new Date(2026, 10, 1, 9, 0));

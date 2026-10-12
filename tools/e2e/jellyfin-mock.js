@@ -13,7 +13,7 @@ const SUP = fs.readFileSync(path.join(__dirname, 'media', 'sub.sup'));
 // The repository (deploy.sh points this at the obfuscated copy)
 const ROOT = path.join(__dirname, '..', '..');
 // Any font does for the embedded-font path: JASSUB's own default face
-const FONT = fs.readFileSync(path.join(ROOT, 'js', 'vendor', 'jassub-2.5.16', 'default.woff2'));
+const FONT = fs.readFileSync(path.join(ROOT, 'js', 'vendor', 'jassub-2.5.18p1', 'default.woff2'));
 // Any picture does for the episode thumbnails
 const THUMB = fs.readFileSync(path.join(ROOT, 'og-image-v4.jpg'));
 const ASS_SCRIPT = `[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Liberation Sans,36,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,20,20,20,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:19.00,Default,,0,0,0,,{\\an8\\pos(320,60)}A styled sign\n`;
@@ -30,7 +30,9 @@ function episode(n) {
         ...(n === 10 ? { IndexNumberEnd: 11 } : {}),
         RunTimeTicks: RUNTIME, ImageTags: { Primary: `t${n}` },
         // Episode 1 watched, episode 3 half-way
-        UserData: { Played: n === 1, PlaybackPositionTicks: n === 3 ? RUNTIME / 2 : 0 } };
+        UserData: { Played: n === 1, PlaybackPositionTicks: n === 3 ? RUNTIME / 2 : 0,
+            // Episode 8 last played weeks ago: episode 9 starts with "Previously on"
+            ...(n === 8 ? { Played: true, LastPlayedDate: '2026-08-01T20:00:00.0000000Z' } : {}) } };
 }
 const SEASON_1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12].map(episode);
 // A second season of the same series, none played: marking season 1 must never touch it
@@ -178,6 +180,8 @@ async function mockJellyfin(page, { anyTitle = false, library = null } = {}) {
         }
         // The Intro Skipper plugin's intro: 2 s to 14 s (long enough for Skip intro to step back)
         if (/^\/MediaSegments\/ep\d+$/.test(p)) {
+            // Episode 8's ending starts at 12 s: the recap before episode 9 runs up to there
+            if (p.endsWith('/ep8')) return json({ Items: [{ Id: 's8', ItemId: 'ep8', Type: 'Outro', StartTicks: 12 * 10_000_000, EndTicks: 18 * 10_000_000 }], TotalRecordCount: 1 });
             return json({ Items: [{ Id: 's1', ItemId: p.split('/')[2], Type: 'Intro', StartTicks: 2 * 10_000_000, EndTicks: 14 * 10_000_000 }], TotalRecordCount: 1 });
         }
         if (p.startsWith('/Sessions/Playing')) {

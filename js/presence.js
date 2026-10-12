@@ -1,5 +1,5 @@
 // @ts-check
-import { esc, titlePref } from './store.js?v=161';
+import { esc, titlePref, toast } from './store.js?v=173';
 
 // Discord status: what you do in AniRoll, shown in Discord (Settings → Discord). The page only says what is
 // going on; the AniRoll for Discord extension (discord/extension) passes it to a small helper on this
@@ -11,9 +11,27 @@ const KEY = 'aniroll_discord';
 const SITE = 'https://aniroll.app';
 const LOGO = `${SITE}/icons/icon-512.png`;
 const DL = `${SITE}/downloads/discord`;
-// Set once the extension is in the stores; until then it is loaded by hand
-const CHROME_STORE = '';
-const FIREFOX_ADDON = '';
+// The helper's newest version (discord/helper/main.go): an older one is pointed out, once per version
+const HELPER_LATEST = '1.0.1';
+const NAG_KEY = 'aniroll_discord_nagged';
+// The extension's newest version (discord/extension/manifest.json): an older one is pointed out the same way
+const EXTENSION_LATEST = '1.0.2';
+const EXT_NAG_KEY = 'aniroll_discord_ext_nagged';
+// The Chrome Web Store, offered once it hands out EXTENSION_LATEST (asked via /api/discord/store, the store
+// takes a few days to review each version); until then the download, loaded by hand
+const CHROME_STORE = 'https://chromewebstore.google.com/detail/hmhmljkgppjpmmoodiboockbboniipcj';
+/** @type {Promise<boolean> | null} */
+let storeCheck = null;
+let storeReady = false;
+function checkStore() {
+    storeCheck ||= fetch('/api/discord/store', { signal: AbortSignal.timeout(6000) })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => (storeReady = !!d?.chrome && !older(String(d.chrome), EXTENSION_LATEST)))
+        .catch(() => false);
+    return storeCheck;
+}
+// Firefox, Zen, LibreWolf: signed by Mozilla, installed from here (discord/sign-firefox.sh)
+const FIREFOX_ADDON = `${DL}/aniroll-discord-firefox.xpi`;
 
 /** @type {{ media: any, episode: number } | null} */
 let playing = null;      // the player's show and episode (aniroll:playing)
@@ -21,7 +39,7 @@ let playing = null;      // the player's show and episode (aniroll:playing)
 let video = null;
 let looking = null;      // the show on screen (aniroll:media-shown)
 let party = null;        // the Watch Party you are in (aniroll:party)
-/** @type {{ extension?: string, helper?: boolean, discord?: boolean } | null} */
+/** @type {{ extension?: string, helper?: boolean, helperVersion?: string, discord?: boolean } | null} */
 let ext = null;          // the extension's last word
 let sent = '';
 let timer = 0;
@@ -69,12 +87,18 @@ function activity() {
             buttons: showButtons(media),
         };
     }
+    // Away from the player (a guest, mostly): the show and the episode the party is on, like the host's status
     if (party) {
+        const title = party.title || 'Watch Party';
+        const total = party.episodes || 0;
+        const at = typeof party.progress === 'number' ? party.progress + 1 : 0;
+        const episode = at && (!total || at <= total) ? `Episode ${at}${total ? ` of ${total}` : ''} · ` : '';
+        const host = party.hosting || !party.host ? '' : ` with ${party.host}`;
         return {
             type: 3,
-            details: 'In a Watch Party',
-            state: line(party.title) || undefined,
-            assets: { large_image: LOGO, large_text: 'AniRoll', ...small },
+            details: line(title),
+            state: line(`${episode}Watch Party${host}`),
+            assets: { large_image: cover({ coverImage: { large: party.cover } }), large_text: line(title), ...small },
             buttons: showButtons({ id: party.mediaId }),
         };
     }
@@ -146,7 +170,8 @@ export function startPresence() {
     window.addEventListener('message', (e) => {
         if (e.source !== window || e.data?.aniroll !== 'presence-ext' || e.data.type !== 'status') return;
         const first = !ext;
-        ext = { extension: e.data.extension, helper: !!e.data.helper, discord: !!e.data.discord };
+        ext = { extension: e.data.extension, helper: !!e.data.helper, helperVersion: String(e.data.helperVersion || ''), discord: !!e.data.discord };
+        nagOutdated();
         // The extension just arrived (or came back): it has not heard anything yet
         if (first) sent = '';
         update();
@@ -154,6 +179,33 @@ export function startPresence() {
     });
     window.postMessage({ aniroll: 'presence', type: 'hello' }, location.origin);
     update();
+}
+
+// '1.0.0' < '1.0.1'; an extension too old to say (no version) is never out of date
+function older(version, than) {
+    if (!version) return false;
+    const a = version.split('.').map(Number), b = than.split('.').map(Number);
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+        if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) < (b[i] || 0);
+    }
+    return false;
+}
+const helperOutdated = () => !!ext?.helper && older(ext.helperVersion || '', HELPER_LATEST);
+const extensionOutdated = () => !!ext && older(ext.extension || '', EXTENSION_LATEST);
+
+// Once per new version, and only for people who use it: a note with the way to Settings
+function nagOutdated() {
+    if (!presenceOn()) return;
+    const nags = [];
+    if (extensionOutdated()) nags.push({ key: EXT_NAG_KEY, version: EXTENSION_LATEST, what: 'the browser extension' });
+    if (helperOutdated()) nags.push({ key: NAG_KEY, version: HELPER_LATEST, what: 'its helper' });
+    const due = nags.filter(n => { try { return localStorage.getItem(n.key) !== n.version; } catch { return false; } });
+    if (!due.length) return;
+    try { for (const n of due) localStorage.setItem(n.key, n.version); } catch { return; }
+    if (location.hash.startsWith('#/settings')) return;
+    toast(`AniRoll for Discord has an update for ${due.map(n => n.what).join(' and ')}`, 'info', {
+        action: { label: 'Update', run: () => { location.hash = '#/settings?tab=discord'; } },
+    });
 }
 
 // ===== Settings → Discord =====
@@ -180,21 +232,26 @@ export function mountPresenceSettings(box) {
     startPresence();
     const os = system();
     const installLine = `curl -fsSL ${DL}/install.sh | sh`;
+    const uninstallLine = `curl -fsSL ${DL}/uninstall.sh | sh`;
+    const copyLine = (line) => `<div class="dc-copy"><code>${esc(line)}</code><button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-dc-copy="${esc(line)}">Copy</button></div>`;
 
     const extensionBody = () => {
         if (firefox()) {
             return FIREFOX_ADDON
-                ? `<a class="glass-btn glass-btn-primary glass-btn-sm" href="${FIREFOX_ADDON}" target="_blank" rel="noopener">Add to Firefox</a>`
+                ? `<a class="glass-btn glass-btn-primary glass-btn-sm" href="${FIREFOX_ADDON}">Add to Firefox</a>
+                   <p class="settings-hint">Firefox asks once whether aniroll.app may install it: <strong>Continue to installation</strong>, then <strong>Add</strong>.</p>`
                 : '<p class="settings-hint">The Firefox version (also for Zen and LibreWolf) is on its way. Until then, a Chromium browser (Chrome, Brave, Edge, Vivaldi) works.</p>';
         }
-        return CHROME_STORE
-            ? `<a class="glass-btn glass-btn-primary glass-btn-sm" href="${CHROME_STORE}" target="_blank" rel="noopener">Add to your browser</a>`
+        return storeReady
+            ? `<a class="glass-btn glass-btn-primary glass-btn-sm" href="${CHROME_STORE}" target="_blank" rel="noopener">Add from the Chrome Web Store</a>
+               <p class="settings-hint">Works in Chrome, Brave, Edge and Vivaldi, and updates by itself.${extensionOutdated()
+                   ? ' Then remove the old one you loaded by hand: <code>chrome://extensions</code> → AniRoll for Discord → <strong>Remove</strong>.' : ''}</p>`
             : `<a class="glass-btn glass-btn-primary glass-btn-sm" href="${DL}/aniroll-discord-extension.zip" download>Download the extension</a>
                <ol class="settings-hint dc-list">
                    <li>Unzip it into a folder you keep.</li>
                    <li>Open <code>chrome://extensions</code>, turn on <strong>Developer mode</strong> (top right).</li>
                    <li><strong>Load unpacked</strong> and pick that folder. Then come back here.</li>
-               </ol>`;
+               </ol>${extensionOutdated() ? '<p class="settings-hint">An update: unzip it over the old folder, then press the reload arrow on AniRoll for Discord in <code>chrome://extensions</code>.</p>' : ''}`;
     };
     const helperBody = () => {
         if (os === 'windows') {
@@ -202,8 +259,7 @@ export function mountPresenceSettings(box) {
                 <p class="settings-hint">Run it once. Windows may warn about an unknown app: <strong>More info</strong> → <strong>Run anyway</strong>.</p>`;
         }
         if (os === 'mac' || os === 'linux') {
-            return `<p class="settings-hint">Paste this into a terminal, once:</p>
-                <div class="dc-copy"><code>${esc(installLine)}</code><button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-dc-copy>Copy</button></div>`;
+            return `<p class="settings-hint">Paste this into a terminal, once:</p>${copyLine(installLine)}`;
         }
         return '<p class="settings-hint">The helper runs on Windows, macOS and Linux computers.</p>';
     };
@@ -211,17 +267,31 @@ export function mountPresenceSettings(box) {
     function paint() {
         const hasExt = !!ext;
         const hasHelper = !!ext?.helper;
+        const outdated = helperOutdated();
         const on = presenceOn();
         box.innerHTML = `
             <ol class="dc-steps">
-                ${stepHtml(1, hasExt, 'The AniRoll for Discord extension', extensionBody())}
-                ${stepHtml(2, hasHelper, 'The helper on this computer', hasExt ? helperBody() : '<p class="settings-hint">After the extension.</p>')}
+                ${stepHtml(1, hasExt && !extensionOutdated(), extensionOutdated() ? `An update for the extension (${esc(ext?.extension || '')} → ${EXTENSION_LATEST})` : 'The AniRoll for Discord extension', extensionBody())}
+                ${stepHtml(2, hasHelper && !outdated, outdated ? `An update for the helper (${esc(ext?.helperVersion || '')} → ${HELPER_LATEST})` : 'The helper on this computer',
+                    !hasExt ? '<p class="settings-hint">After the extension.</p>'
+                        : outdated ? `<p class="settings-hint">Set it up again the same way; it replaces the old one. Reload AniRoll afterwards.</p>${helperBody()}` : helperBody())}
                 ${stepHtml(3, hasHelper && !!ext?.discord, 'The Discord app, running', hasHelper ? '<p class="settings-hint">Open Discord on this computer (the app, not the website).</p>' : '<p class="settings-hint">After the helper.</p>')}
             </ol>
             <label class="settings-choice"><input type="checkbox" id="dc-toggle" ${on ? 'checked' : ''}>
                 <span>Show what I do in AniRoll in my Discord status</span></label>
             <p class="settings-hint">The episode you watch (with the time left), the show you look at, your Watch Party with a button to join it. Stays on this computer: AniRoll's server never sees it.</p>
-            ${hasExt ? '' : '<button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-dc-check>Check again</button>'}`;
+            ${hasExt ? '' : '<button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-dc-check>Check again</button>'}
+            <details class="dc-remove">
+                <summary>Remove AniRoll for Discord</summary>
+                <ol class="settings-hint dc-list">
+                    <li>${os === 'windows'
+                        ? `Remove the helper: <a href="${DL}/aniroll-discord-uninstall.exe" download>download the remover</a> and run it once (close your browser first, it is still using the helper).`
+                        : os === 'mac' || os === 'linux'
+                            ? `Remove the helper: paste this into a terminal.${copyLine(uninstallLine)}`
+                            : 'Remove the helper on the computer you set it up on: Settings → Discord there shows how.'}</li>
+                    <li>Remove the extension: right-click its icon in the toolbar → <strong>Remove</strong>, or on the browser's extensions page.</li>
+                </ol>
+            </details>`;
     }
 
     const hello = () => window.postMessage({ aniroll: 'presence', type: 'hello' }, location.origin);
@@ -234,9 +304,9 @@ export function mountPresenceSettings(box) {
     box.addEventListener('click', async (e) => {
         const el = /** @type {HTMLElement} */ (e.target);
         if (el.closest('[data-dc-check]')) hello();
-        const copy = el.closest('[data-dc-copy]');
+        const copy = /** @type {HTMLElement | null} */ (el.closest('[data-dc-copy]'));
         if (copy) {
-            try { await navigator.clipboard.writeText(installLine); copy.textContent = 'Copied'; } catch { /* select by hand */ }
+            try { await navigator.clipboard.writeText(copy.dataset.dcCopy || ''); copy.textContent = 'Copied'; } catch { /* select by hand */ }
         }
     });
     let shown = JSON.stringify(ext);
@@ -249,4 +319,5 @@ export function mountPresenceSettings(box) {
     const poll = setInterval(() => (box.isConnected ? hello() : clearInterval(poll)), 3000);
     paint();
     hello();
+    checkStore().then(ready => { if (ready && box.isConnected) paint(); });
 }

@@ -1,6 +1,8 @@
-import * as api from '../api.js?v=161';
-import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=161';
-import { getToken, isLoggedIn } from '../auth.js?v=161';
+import * as api from '../api.js?v=173';
+import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=173';
+import { getToken, isLoggedIn } from '../auth.js?v=173';
+import { matchDna } from '../dna.js?v=173';
+import { freshMatch, keepMatch } from '../dnamatches.js?v=173';
 
 export async function render({ content }) {
     const token = getToken();
@@ -164,6 +166,7 @@ export async function render({ content }) {
                 container.querySelector('.friends-more')?.remove();
                 container.querySelector('.friends-grid')?.insertAdjacentHTML('beforeend', friends.map(friendTile).join(''));
                 if (result.pageInfo?.hasNextPage) container.insertAdjacentHTML('beforeend', moreFriends(page + 1));
+                fillMatches(container, friends);
                 return;
             }
 
@@ -175,6 +178,7 @@ export async function render({ content }) {
             container.innerHTML = `<div class="friends-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-md)">
                 ${friends.map(friendTile).join('')}
             </div>${result.pageInfo?.hasNextPage ? moreFriends(2) : ''}`;
+            fillMatches(container, friends);
             if (!container.dataset.friendsMore) {
                 container.dataset.friendsMore = '1';
                 container.addEventListener('click', (ev) => {
@@ -188,13 +192,37 @@ export async function render({ content }) {
             container.innerHTML = `<div class="empty-state"><div class="empty-state-sub">${esc(err.message)}</div></div>`;
         }
     }
+    // Taste match next to each friend (js/dna.js): known ones at once; the rest one list at a time, a few
+    // seconds apart and at most eight per page, so AniList barely notices. Kept a week (js/dnamatches.js).
+    async function fillMatches(container, friends) {
+        const badge = (id, match) => {
+            const el = container.querySelector(`[data-match-for="${id}"]`);
+            if (el) { el.textContent = `${match}% match`; el.hidden = false; }
+        };
+        const todo = [];
+        for (const f of friends) {
+            const hit = freshMatch(f.id);
+            if (hit) badge(f.id, hit.match); else todo.push(f);
+        }
+        if (!todo.length) return;
+        let mine;
+        try { mine = { lists: await api.getTasteLists(user.id, token), features: new Map() }; } catch { return; }
+        for (const f of todo.slice(0, 8)) {
+            if (!container.isConnected) return;
+            try {
+                const result = matchDna(mine, { lists: await api.getTasteLists(f.id, token), features: new Map() });
+                if (result) { keepMatch(f.id, f.name, result.match); badge(f.id, result.match); }
+            } catch { /* a private list or AniList busy: no number */ }
+            await new Promise(r => setTimeout(r, 2500));
+        }
+    }
     const moreFriends = (next) => `<div class="friends-more" style="text-align:center;margin-top:var(--space-lg)"><button class="glass-btn glass-btn-secondary" data-friends-page="${next}">Show more</button></div>`;
     const friendTile = (f) => `
                     <div class="friend-tile" data-go="/user/${esc(f.name)}" role="link" tabindex="0">
                         <div style="display:flex;align-items:center;gap:var(--space-md)">
                             <img src="${f.avatar?.medium || ''}" alt="${esc(f.name)}" style="width:48px;height:48px;border-radius:var(--radius-full);object-fit:cover">
                             <div>
-                                <div style="font-weight:600">${esc(f.name)}</div>
+                                <div style="font-weight:600">${esc(f.name)} <span class="dna-friend-match" data-match-for="${f.id}" hidden></span></div>
                                 <div style="font-size:0.75rem;color:var(--text-secondary)">
                                     ${f.statistics?.anime?.count || 0} Anime · ${f.statistics?.anime?.episodesWatched || 0} Ep · Avg ${f.statistics?.anime?.meanScore || 0}
                                 </div>

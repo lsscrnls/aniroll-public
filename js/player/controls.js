@@ -4,8 +4,9 @@
 // flat track after it. The dot on the track marks 90%, where AniList counts the episode.
 //   mountControls(root, video, { watchedAt, runtime, autoSkip }) -> { set...(), act(name), destroy() }
 // Icons: Material Symbols Rounded 400 (Apache-2.0), inline so both designs show them.
-import { esc } from '../store.js?v=161';
-import { endingInfo, upNextAt } from './ending.js?v=161';
+import { esc } from '../store.js?v=173';
+import { endingInfo, upNextAt } from './ending.js?v=173';
+import { mountAmbient } from './ambient.js?v=173';
 
 
 const ICON = {
@@ -122,7 +123,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
     const menu = $('.pl-menu');
     const subsBtn = $('[data-act="subs"]');
     const settingsBtn = $('[data-act="settings"]');
-    let menuKind = null; // 'subs' | 'settings' while the menu is open
+    let menuKind = null; // 'settings' while the menu is open (menuPage says which page)
     const muteBtn = $('[data-act="mute"]');
     const volume = $('.pl-volume-slider');
     const offs = [];
@@ -234,6 +235,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
         osd(d === 0 ? 'Subtitle timing reset' : `Subtitles ${d > 0 ? 'later' : 'earlier'} by ${Math.abs(d).toFixed(1)} s`);
     };
     let stopAfter = sessionNumber(STOP_AFTER_KEY) === 1;
+    const ambient = mountAmbient(root, video);
+    const toggleAmbient = () => osd(ambient.toggle() ? 'Ambient light on' : 'Ambient light off');
     const toggleStopAfter = () => {
         stopAfter = !stopAfter;
         setSession(STOP_AFTER_KEY, stopAfter ? 1 : 0);
@@ -260,54 +263,76 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
     };
     const menuItem = (label, attr, id, selected, role = 'menuitemradio') => `<button class="pl-menu-item" role="${role}" aria-checked="${selected}" ${attr}="${id}">
             <span class="pl-menu-check">${selected ? icon('check') : ''}</span>${label}</button>`;
-    const openSettings = () => {
-        const nowQ = quality.current();
-        menu.innerHTML = `<div class="pl-menu-title">Quality</div>`
-            + quality.list().map(q => menuItem(esc(q.label), 'data-quality', q.id, q.id === nowQ)).join('')
-            + '<div class="pl-menu-divider" role="separator"></div>'
-            + `<div class="pl-menu-title">Speed</div><div class="pl-menu-chips" role="group" aria-label="Speed">`
-            + SPEEDS.map(r => `<button class="pl-menu-chip${r === video.playbackRate ? ' is-on' : ''}" data-speed="${r}" aria-pressed="${r === video.playbackRate}">${r === 1 ? 'Normal' : `${r}×`}</button>`).join('')
-            + '</div><div class="pl-menu-divider" role="separator"></div>'
-            + (autoSkip ? menuItem('Skip intros automatically', 'data-autoskip', '1', !!autoSkip.get(), 'menuitemcheckbox') : '')
-            + menuItem('Stop after this episode', 'data-stopafter', '1', stopAfter, 'menuitemcheckbox')
-            + menuItem('Stats for nerds', 'data-stats', '1', !statsBox.hidden, 'menuitemcheckbox');
+    // One menu with pages: the settings button opens its main page (a row per setting, with what is chosen),
+    // a row opens that page, and "‹" goes back. The subtitles button opens the audio and subtitles page directly.
+    let menuPage = 'main';
+    const speedLabel = (r) => (r === 1 ? 'Normal' : `${r}×`);
+    const row = (page, label, value) => `<button class="pl-menu-item pl-menu-row" role="menuitem" aria-haspopup="menu" data-page="${page}">
+            <span class="pl-menu-row-label">${label}</span><span class="pl-menu-value">${esc(value)}</span><span class="pl-menu-more" aria-hidden="true">›</span></button>`;
+    const backTo = (title) => `<button class="pl-menu-item pl-menu-back" role="menuitem" data-page="main"><span class="pl-menu-more" aria-hidden="true">‹</span>${title}</button>
+            <div class="pl-menu-divider" role="separator"></div>`;
+    const subsValue = () => {
+        const t = subs.list().find(x => x.id === subs.current());
+        const a = audio.list().length > 1 ? audio.list().find(x => x.id === audio.current())?.label : '';
+        return [a, t ? t.label : subs.list().length ? 'Off' : ''].filter(Boolean).join(' · ') || 'None';
+    };
+    const pages = {
+        main: () => {
+            const q = quality.list().find(x => x.id === quality.current());
+            const hasSubs = subs.list().length || audio.list().length > 1;
+            return (hasSubs ? row('subs', 'Audio & subtitles', subsValue()) : '')
+                + (quality.list().length ? row('quality', 'Quality', q?.label || '') : '')
+                + row('speed', 'Speed', speedLabel(video.playbackRate))
+                + '<div class="pl-menu-divider" role="separator"></div>'
+                + (autoSkip ? menuItem('Skip intros automatically', 'data-autoskip', '1', !!autoSkip.get(), 'menuitemcheckbox') : '')
+                + menuItem('Ambient light', 'data-ambient', '1', root.classList.contains('has-ambient'), 'menuitemcheckbox')
+                + menuItem('Stop after this episode', 'data-stopafter', '1', stopAfter, 'menuitemcheckbox')
+                + menuItem('Stats for nerds', 'data-stats', '1', !statsBox.hidden, 'menuitemcheckbox');
+        },
+        quality: () => backTo('Quality')
+            + quality.list().map(q => menuItem(esc(q.label), 'data-quality', q.id, q.id === quality.current())).join(''),
+        speed: () => backTo('Speed')
+            + SPEEDS.map(r => menuItem(speedLabel(r), 'data-speed', r, r === video.playbackRate)).join(''),
+        subs: () => {
+            const list = subs.list();
+            const current = subs.current();
+            const tracks = audio.list();
+            const nowAudio = audio.current();
+            return backTo('Audio & subtitles')
+                + (tracks.length > 1
+                    ? `<div class="pl-menu-title">Audio</div>`
+                        + tracks.map(t => menuItem(esc(t.label), 'data-audio', t.id, t.id === nowAudio)).join('')
+                        + (list.length ? '<div class="pl-menu-divider" role="separator"></div>' : '')
+                    : '')
+                + (list.length
+                    ? `<div class="pl-menu-title">Subtitles</div>`
+                        + menuItem('Off', 'data-track', 'off', current == null)
+                        + list.map(t => menuItem(esc(t.label), 'data-track', t.id, t.id === current)).join('')
+                        + (subs.setDelay ? '<div class="pl-menu-divider" role="separator"></div>'
+                            + `<div class="pl-menu-title">Timing${subs.delay?.() ? ` · ${subs.delay() > 0 ? '+' : ''}${subs.delay().toFixed(1)} s` : ''}</div><div class="pl-menu-chips" role="group" aria-label="Subtitle timing">`
+                            + `<button class="pl-menu-chip" data-subdelay="-0.5" title="Earlier (Z: 0.1 s)">−0.5 s</button>`
+                            + `<button class="pl-menu-chip" data-subdelay="0">Reset</button>`
+                            + `<button class="pl-menu-chip" data-subdelay="0.5" title="Later (X: 0.1 s)">+0.5 s</button></div>` : '')
+                        + `<div class="pl-menu-title">Size</div><div class="pl-menu-chips" role="group" aria-label="Subtitle size">`
+                        + Object.entries(SUB_SIZES).map(([k, label]) => `<button class="pl-menu-chip${k === subSize ? ' is-on' : ''}" data-subsize="${k}" aria-pressed="${k === subSize}" title="${label}">${k.toUpperCase()}</button>`).join('')
+                        + '</div>'
+                    : '');
+        },
+    };
+    const showPage = (page, focusBack = false) => {
+        const from = menuPage;
+        menuPage = page;
+        menu.innerHTML = pages[page]();
+        menu.dataset.page = page;
         menuKind = 'settings';
         menu.hidden = false;
         settingsBtn.setAttribute('aria-expanded', 'true');
         wake();
-        (menu.querySelector('[data-quality][aria-checked="true"]') || menu.querySelector('.pl-menu-item'))?.focus();
+        const focus = focusBack ? menu.querySelector(`[data-page="${from}"]`) : null;
+        (focus || menu.querySelector('.pl-menu-item[aria-checked="true"]:not([role="menuitemcheckbox"])') || menu.querySelector('.pl-menu-item:not(.pl-menu-back)') || menu.querySelector('.pl-menu-item'))?.focus();
     };
-    const openMenu = () => {
-        const list = subs.list();
-        const current = subs.current();
-        const item = (label, attr, id, selected) => `<button class="pl-menu-item" role="menuitemradio" aria-checked="${selected}" ${attr}="${id}">
-            <span class="pl-menu-check">${selected ? icon('check') : ''}</span>${label}</button>`;
-        const tracks = audio.list();
-        const nowAudio = audio.current();
-        menu.innerHTML = (tracks.length > 1
-            ? `<div class="pl-menu-title">Audio</div>`
-                + tracks.map(t => item(esc(t.label), 'data-audio', t.id, t.id === nowAudio)).join('')
-                + (list.length ? '<div class="pl-menu-divider" role="separator"></div>' : '')
-            : '')
-            + (list.length
-                ? `<div class="pl-menu-title">Subtitles</div>`
-                    + item('Off', 'data-track', 'off', current == null)
-                    + list.map(t => item(esc(t.label), 'data-track', t.id, t.id === current)).join('')
-                    + (subs.setDelay ? '<div class="pl-menu-divider" role="separator"></div>'
-                        + `<div class="pl-menu-title">Timing${subs.delay?.() ? ` · ${subs.delay() > 0 ? '+' : ''}${subs.delay().toFixed(1)} s` : ''}</div><div class="pl-menu-chips" role="group" aria-label="Subtitle timing">`
-                        + `<button class="pl-menu-chip" data-subdelay="-0.5" title="Earlier (Z: 0.1 s)">−0.5 s</button>`
-                        + `<button class="pl-menu-chip" data-subdelay="0">Reset</button>`
-                        + `<button class="pl-menu-chip" data-subdelay="0.5" title="Later (X: 0.1 s)">+0.5 s</button></div>` : '')
-                    + `<div class="pl-menu-title">Size</div><div class="pl-menu-chips" role="group" aria-label="Subtitle size">`
-                    + Object.entries(SUB_SIZES).map(([k, label]) => `<button class="pl-menu-chip${k === subSize ? ' is-on' : ''}" data-subsize="${k}" aria-pressed="${k === subSize}" title="${label}">${k.toUpperCase()}</button>`).join('')
-                    + '</div>'
-                : '');
-        menuKind = 'subs';
-        menu.hidden = false;
-        subsBtn.setAttribute('aria-expanded', 'true');
-        wake();
-        (menu.querySelector('[aria-checked="true"]') || menu.querySelector('.pl-menu-item'))?.focus();
-    };
+    const openSettings = () => showPage('main');
+    const openMenu = () => { showPage('subs'); subsBtn.setAttribute('aria-expanded', 'true'); };
     const closeMenu = () => {
         menu.hidden = true;
         menuKind = null;
@@ -340,8 +365,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             else if (act === 'back10') jump(-STEP);
             else if (act === 'fwd10') jump(STEP);
             else if (act === 'mute') { video.muted = !video.muted; if (!video.muted && video.volume === 0) video.volume = 0.5; }
-            else if (act === 'subs') (menuKind === 'subs' ? closeMenu() : openMenu());
-            else if (act === 'settings') (menuKind === 'settings' ? closeMenu() : openSettings());
+            else if (act === 'subs') (menuKind && menuPage === 'subs' ? closeMenu() : openMenu());
+            else if (act === 'settings') (menuKind && menuPage === 'main' ? closeMenu() : openSettings());
             else if (act === 'stats') toggleStats();
             else if (act === 'pip') togglePip();
             else if (act === 'fullscreen') toggleFullscreen();
@@ -352,24 +377,26 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
         }
         const chip = ev.target.closest('.pl-menu-chip');
         if (chip) {
-            if (chip.dataset.speed) setSpeed(Number(chip.dataset.speed));
-            else if (chip.dataset.subdelay != null) shiftSubs(Number(chip.dataset.subdelay));
+            if (chip.dataset.subdelay != null) shiftSubs(Number(chip.dataset.subdelay));
             else if (chip.dataset.subsize) {
                 subSize = chip.dataset.subsize;
                 root.dataset.subSize = subSize;
                 try { localStorage.setItem(SUB_SIZE_KEY, subSize); } catch { /* not kept */ }
             }
             // The menu stays open for another step; redraw it with the new choice
-            const reopen = menuKind === 'settings' ? openSettings : openMenu;
-            reopen();
+            showPage(menuPage);
             menu.querySelector(`.pl-menu-chip[data-${Object.keys(chip.dataset)[0]}="${Object.values(chip.dataset)[0]}"]`)?.focus();
             return;
         }
+        const pageBtn = ev.target.closest('.pl-menu [data-page]');
+        if (pageBtn) { showPage(pageBtn.dataset.page, pageBtn.dataset.page === 'main'); return; }
         const item = ev.target.closest('.pl-menu-item');
         if (item) {
             if (item.dataset.audio != null) {
                 const id = Number(item.dataset.audio);
                 if (id !== audio.current()) audio.select(id);
+            } else if (item.dataset.speed != null) {
+                setSpeed(Number(item.dataset.speed));
             } else if (item.dataset.quality != null) {
                 const q = /^\d+(\.\d+)?$/.test(item.dataset.quality) ? Number(item.dataset.quality) : item.dataset.quality;
                 if (q !== quality.current()) quality.select(q);
@@ -378,6 +405,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             } else if (item.dataset.autoskip != null) {
                 autoSkip.set(!autoSkip.get());
                 osd(autoSkip.get() ? 'Intros are skipped for this show' : 'Intros play again');
+            } else if (item.dataset.ambient != null) {
+                toggleAmbient();
             } else if (item.dataset.stopafter != null) {
                 toggleStopAfter();
             } else {
@@ -641,7 +670,14 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
         if (ev.target.closest?.('.modal-backdrop')) return;
         if (ev.target.closest?.('input, textarea, select, [contenteditable]') && ev.target !== volume) return;
         if (!menu.hidden) {
-            if (ev.key === 'Escape') { ev.preventDefault(); const back = menuKind === 'settings' ? settingsBtn : subsBtn; closeMenu(); back.focus(); }
+            // Escape: a page goes back to the main one, the main one closes
+            if (ev.key === 'Escape' || (ev.key === 'ArrowLeft' && menuPage !== 'main')) {
+                ev.preventDefault();
+                if (menuPage !== 'main') showPage('main', true);
+                else { closeMenu(); settingsBtn.focus(); }
+            }
+            const into = /** @type {HTMLElement} */ (document.activeElement)?.closest?.('.pl-menu-row');
+            if (ev.key === 'ArrowRight' && into) { ev.preventDefault(); showPage(into.dataset.page); }
             if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
                 ev.preventDefault();
                 const items = [...menu.querySelectorAll('.pl-menu-item')];
@@ -680,6 +716,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
                 if (ev.shiftKey) { if (prev) prev.go(); else return false; } else if (next) playNext(); else return false;
             },
             i: () => toggleStats(),
+            a: toggleAmbient,
             '[': () => stepSpeed(-1),
             ']': () => stepSpeed(1),
             z: () => shiftSubs(-0.1),
@@ -826,6 +863,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             paintChapterBar();
         },
         destroy() {
+            ambient.destroy();
             clearTimeout(idleTimer);
             offs.forEach(off => off());
             clearInterval(nextTimer);

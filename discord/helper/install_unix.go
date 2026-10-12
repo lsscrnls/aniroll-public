@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 func exeName() string { return "aniroll-discord" }
@@ -30,11 +31,12 @@ func hostDirs() (chromium, firefox []string) {
 	home, _ := os.UserHomeDir()
 	if runtime.GOOS == "darwin" {
 		support := filepath.Join(home, "Library", "Application Support")
-		for _, b := range []string{"Google/Chrome", "Google/Chrome Beta", "Chromium", "BraveSoftware/Brave-Browser", "Microsoft Edge", "Vivaldi", "Arc/User Data"} {
+		for _, b := range []string{"Google/Chrome", "Google/Chrome Beta", "Chromium", "Microsoft Edge", "Vivaldi", "Arc/User Data"} {
 			if exists(filepath.Join(support, b)) {
 				chromium = append(chromium, filepath.Join(support, b, "NativeMessagingHosts"))
 			}
 		}
+		chromium = append(chromium, braveDirs(filepath.Join(support, "BraveSoftware"))...)
 		firefox = []string{filepath.Join(support, "Mozilla", "NativeMessagingHosts")}
 		if exists(filepath.Join(support, "zen")) {
 			firefox = append(firefox, filepath.Join(support, "zen", "NativeMessagingHosts"))
@@ -45,15 +47,22 @@ func hostDirs() (chromium, firefox []string) {
 	if config == "" {
 		config = filepath.Join(home, ".config")
 	}
-	for _, b := range []string{"google-chrome", "google-chrome-beta", "google-chrome-unstable", "google-chrome-for-testing", "chromium", "BraveSoftware/Brave-Browser", "microsoft-edge", "vivaldi", "opera", "thorium"} {
+	for _, b := range []string{"google-chrome", "google-chrome-beta", "google-chrome-unstable", "google-chrome-for-testing", "chromium", "microsoft-edge", "vivaldi", "opera", "thorium"} {
 		if exists(filepath.Join(config, b)) {
 			chromium = append(chromium, filepath.Join(config, b, "NativeMessagingHosts"))
 		}
 	}
+	chromium = append(chromium, braveDirs(filepath.Join(config, "BraveSoftware"))...)
 	firefox = []string{filepath.Join(home, ".mozilla", "native-messaging-hosts")}
 	for _, b := range []string{".zen", ".librewolf", ".floorp", ".waterfox"} {
 		if exists(filepath.Join(home, b)) {
 			firefox = append(firefox, filepath.Join(home, b, "native-messaging-hosts"))
+		}
+	}
+	// Newer Firefox and its forks keep everything under ~/.config instead
+	for _, b := range []string{"mozilla", "zen", "librewolf", "floorp", "waterfox"} {
+		if exists(filepath.Join(config, b)) {
+			firefox = append(firefox, filepath.Join(config, b, "native-messaging-hosts"))
 		}
 	}
 	return
@@ -84,4 +93,15 @@ func unregisterHosts() {
 func exists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+// Every Brave there is (Brave-Browser, -Beta, -Nightly, Brave-Origin, …): each keeps its own folder
+func braveDirs(base string) (dirs []string) {
+	entries, _ := os.ReadDir(base)
+	for _, e := range entries {
+		if e.IsDir() && strings.HasPrefix(e.Name(), "Brave-") {
+			dirs = append(dirs, filepath.Join(base, e.Name(), "NativeMessagingHosts"))
+		}
+	}
+	return
 }
