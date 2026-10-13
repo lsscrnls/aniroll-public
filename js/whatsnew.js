@@ -2,13 +2,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=173';
-import { openDialog } from './a11y.js?v=173';
-import { prefersReducedMotion } from './animations.js?v=173';
-import { accountState, saveAccountState } from './accountstate.js?v=173';
+import { esc } from './store.js?v=175';
+import { openDialog } from './a11y.js?v=175';
+import { prefersReducedMotion } from './animations.js?v=175';
+import { accountState, saveAccountState } from './accountstate.js?v=175';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.6.1';
+export const RELEASE = '1.7.0';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -20,9 +20,19 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-12',
+        id: '2026-10-13',
+        title: 'Your friends\u2019 calendars',
+        items: [
+            'The <strong>Calendar</strong> can show what the people you follow are watching: pick <strong>Friends</strong>, and each episode shows who watches it. A tap on a face shows only theirs.',
+            'Only for people who turned it on: share your own calendar in <strong>Settings → Lists</strong>. It is off until you do.',
+        ],
+    },
+    {
+        // '.2': Firefox draws styled subtitles without WebGL
+        id: '2026-10-12.2',
         title: 'Pause the recap',
         items: [
+            { rev: 2, text: 'Styled subtitles in <strong>Firefox</strong> and Zen should blink even less now.' },
             '<strong>Previously on</strong> can now be paused, switched to full screen and shown with subtitles (Space, F, C). Subtitles switched there stay for the episode after it.',
             'Notes in the player, like a saved episode, now appear at the top right instead of over the subtitles.',
             '<strong>AniRoll for Discord</strong>: Watch Party guests now show the show, the party’s episode and its cover, like the host. AniRoll also points out when the browser extension has an update.',

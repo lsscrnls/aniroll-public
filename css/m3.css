@@ -757,6 +757,38 @@
     transform: translateX(18px);
     background: var(--md-on-primary);
 }
+/* Calendar → Friends: faces of who watches a show, and one chip per person to show only theirs */
+.calendar-friends { display: inline-flex; align-items: center; flex-shrink: 0; }
+.calendar-friends img {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--md-surface-container-low);
+    margin-left: -5px;
+}
+.calendar-friends img:first-child { margin-left: 0; }
+.calendar-friends em { font-style: normal; font-size: 0.68rem; font-weight: 600; margin-left: 3px; color: var(--md-on-surface-variant); }
+.calendar-friend-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.calendar-friend-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--md-on-surface-variant);
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+.calendar-friend-chip:has(img) { padding-left: 4px; }
+.calendar-friend-chip img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+.calendar-friend-chip:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+.calendar-friend-chip.active { background: var(--md-secondary-container); border-color: transparent; color: var(--md-on-secondary-container); }
 
 /* ----- Search view ----- */
 :root[data-design="m3"] .search-result-item { border-radius: var(--radius-lg); min-height: 64px; }
