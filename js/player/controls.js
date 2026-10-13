@@ -4,9 +4,9 @@
 // flat track after it. The dot on the track marks 90%, where AniList counts the episode.
 //   mountControls(root, video, { watchedAt, runtime, autoSkip }) -> { set...(), act(name), destroy() }
 // Icons: Material Symbols Rounded 400 (Apache-2.0), inline so both designs show them.
-import { esc } from '../store.js?v=175';
-import { endingInfo, upNextAt } from './ending.js?v=175';
-import { mountAmbient } from './ambient.js?v=175';
+import { esc } from '../store.js?v=176';
+import { endingInfo, upNextAt } from './ending.js?v=176';
+import { mountAmbient } from './ambient.js?v=176';
 
 
 const ICON = {
@@ -784,13 +784,21 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
                     ev.stopPropagation();
                     if (b) done(b.dataset.resume);
                 });
-                const onKey = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); done('continue'); } };
+                // Escape in a dialog over the player (episodes) closes that one, not this
+                const onKey = (ev) => {
+                    if (ev.key !== 'Escape' || ev.target.closest?.('.modal-backdrop')) return;
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    done('continue');
+                };
                 document.addEventListener('keydown', onKey, true);
                 const offKey = () => document.removeEventListener('keydown', onKey, true);
-                offs.push(offKey);
+                // The player closed while asking: the page waiting for the answer goes on and finds it closed
+                offs.push(() => { offKey(); resolve('continue'); });
                 root.appendChild(box);
                 root.classList.add('has-resume');
-                box.querySelector('[data-resume="continue"]').focus();
+                // Not out of a dialog already open over the player: its keys would reach the player
+                if (!document.activeElement?.closest?.('.modal-backdrop')) box.querySelector('[data-resume="continue"]').focus();
             });
         },
         // { list() -> [{ id: 'auto' | 'max' | bps, label }], current(), select(id) }

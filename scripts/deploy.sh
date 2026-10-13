@@ -53,10 +53,12 @@ stale_tests=$(grep -rnoE "\.js\?v=[0-9]+" tools/e2e/*.js | grep -v "v=$js_versio
 echo "JS v$js_versions, CSS v$css_version, M3 v$m3_index"
 
 tmp_check="$(mktemp -d)"
+# As .mjs so they parse as modules; several at once (one node per file, 1.5 s one after the other)
 for f in js/*.js js/pages/*.js js/player/*.js; do
-    cp "$f" "$tmp_check/check.mjs"
-    node --check "$tmp_check/check.mjs" || fail "syntax error in $f"
+    mkdir -p "$tmp_check/$(dirname "$f")"
+    cp "$f" "$tmp_check/${f%.js}.mjs"
 done
+(cd "$tmp_check" && find js -name '*.mjs' -print0 | xargs -0 -n 1 -P 8 node --check) || fail "syntax error in the module named above"
 if [ "$WITH_API" -eq 1 ]; then
     for f in api/server.js api/party.js api/animemap.js; do node --check "$f" || fail "syntax error in $f"; done
 fi

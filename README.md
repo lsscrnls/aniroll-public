@@ -138,7 +138,10 @@ data are both there while it runs. That is why the server keeps an AniList token
 | Watch Party members (AniList name, avatar, episode) | While a party runs | The party itself | Leave or end the party |
 | Shared pages (title, cover, description of a show) | When you share one | The share link preview | — |
 | Error reports (message, page, version, browser) | When something breaks in the app | Fixing it | The file is rotated at 1 MB, one older file is kept |
-| Web server logs (IP address, page) | Every request | Running the server | Deleted after 14 days |
+
+No IP addresses are written anywhere: the web server keeps no access or error log, and error reports carry
+none. Rate limits count requests per address in memory only and forget them within about 20 minutes.
+Your AniList account is the one identity the server knows.
 
 The server never sees your AniList password. Without background sync it never writes your token to disk:
 the browser sends it with a request, and the server keeps it in memory for up to 10 minutes, to know who you are.

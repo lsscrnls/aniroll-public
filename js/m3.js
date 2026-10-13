@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=175';
-import { upNext, glance, DAYS, greeting, playFromHero, heroEntry } from './upnext.js?v=175';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=175';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=176';
+import { upNext, glance, DAYS, greeting, playFromHero, heroEntry } from './upnext.js?v=176';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=176';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -471,7 +471,7 @@ function heroHtml(entry, name, others = []) {
     const cover = (media, cls) => `<img class="m3-hero-cover ${cls}" src="${esc(coverOf(media))}" alt="${esc(titlePref(media.title))}" data-open="${media.id}" role="button" tabindex="0">`;
     // Nothing out yet (the hero only picks such a show when no other one has an episode waiting): the big
     // number would count something you can't watch, so the date it airs leads and Roll offers something else
-    const waitsFor = !canWatch && !done && airing?.airingAt ? airing : null;
+    const waitsFor = !canWatch && !done && airing?.airingAt > Date.now() / 1000 ? airing : null;
     const when = waitsFor && airsWhen(waitsFor.airingAt).replace(/^(Today|Tomorrow)/, s => s.toLowerCase());
     return `<div class="m3-hero-glow" data-cover="${esc(coverOf(m))}" aria-hidden="true"></div>
         <div class="m3-hero-body">

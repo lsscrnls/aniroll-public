@@ -3,25 +3,28 @@
 // the next episode of the show you're on, what is waiting, and the week ahead.
 
 // One entry: the next episode, how many are out and unwatched, a one-line status
-export function upNext(entry) {
+export function upNext(entry, now = Date.now() / 1000) {
     const m = entry.media;
     const progress = entry.progress || 0;
     const total = m.episodes || null;
     const airing = m.nextAiringEpisode || null;
-    const out = airing ? Math.max(0, airing.episode - 1) : total;    // episodes you could watch right now
+    // A list from the cache can be older than the airing it names: airingAt is absolute, timeUntilAiring a snapshot
+    const left = airing?.airingAt ? airing.airingAt - now : airing?.timeUntilAiring;
+    const aired = airing?.airingAt != null && left <= 0;
+    const out = airing ? Math.max(0, airing.episode - (aired ? 0 : 1)) : total;    // episodes you could watch right now
     const behind = out != null ? Math.max(0, out - progress) : null;
     const done = !!total && progress >= total;
     const status = done ? 'All caught up'
         : behind > 1 ? `${behind} episodes waiting`
         : behind === 1 ? 'Ready to watch'
-        : airing ? `Episode ${airing.episode} airs in ${until(airing.timeUntilAiring)}` : '';
+        : airing && !aired ? `Episode ${airing.episode} airs in ${until(left)}` : '';
     return { m, progress, next: progress + 1, total, airing, out, behind, done, status, canWatch: !done && (behind == null || behind > 0) };
 }
 
 // The show Home's hero is about: the most recent one with an episode out to watch, so a show that is waiting
 // for its next airing doesn't take the spot from one you can play right now. Nothing to watch: the most recent
-export function heroEntry(entries) {
-    return entries.find(e => upNext(e).canWatch) || entries[0];
+export function heroEntry(entries, now) {
+    return entries.find(e => upNext(e, now).canWatch) || entries[0];
 }
 
 // All of Continue Watching: the next episodes, what's waiting, which weekday each show airs (Monday first).
@@ -32,7 +35,7 @@ const OUT_NOW_S = 3600;
 export function glance(entries, now = Date.now() / 1000, planning = []) {
     const airing = entries.filter(e => e.media.nextAiringEpisode?.airingAt > now)
         .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt);
-    const waiting = entries.map(e => ({ e, n: upNext(e).behind || 0 })).filter(x => x.n > 0);
+    const waiting = entries.map(e => ({ e, n: upNext(e, now).behind || 0 })).filter(x => x.n > 0);
     const premieres = planning
         .filter(e => e.media.status === 'NOT_YET_RELEASED' && e.media.nextAiringEpisode?.airingAt > now)
         .sort((a, b) => a.media.nextAiringEpisode.airingAt - b.media.nextAiringEpisode.airingAt);
@@ -75,5 +78,5 @@ export function playFromHero(root, entry, size = '') {
     const { m, next, canWatch } = upNext(entry);
     if (!canWatch) return;
     // List entries come without `type`: Home's hero is anime only
-    import('./player/playbutton.js?v=175').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
+    import('./player/playbutton.js?v=176').then(p => p.mountHeroPlay(root, { ...m, type: m.type || 'ANIME' }, next, size)).catch(() => {});
 }

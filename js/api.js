@@ -1,7 +1,7 @@
 // @ts-check
-import { buildTasteProfile, tasteMatch } from './taste.js?v=175';
-import { dismissedIds } from './dismissed.js?v=175';
-import { statusLabel } from './store.js?v=175';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=176';
+import { dismissedIds } from './dismissed.js?v=176';
+import { statusLabel } from './store.js?v=176';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -145,8 +145,11 @@ export async function flushPendingSaves(token) {
                 done++;
                 savePending(loadPending().filter(x => x.key !== item.key));
             } catch (err) {
-                if (err.rateLimited) break; // still limited: keep the rest for later
-                savePending(loadPending().filter(x => x.key !== item.key)); // permanent failure, drop it
+                // Still limited, our own budget full, or no answer at all (offline, a 5xx page that is
+                // not JSON): keep it and the rest for later. Only a refusal by AniList itself drops it
+                if (err.rateLimited || err.throttled || err instanceof TypeError || err instanceof SyntaxError
+                    || navigator.onLine === false) break;
+                savePending(loadPending().filter(x => x.key !== item.key)); // refused (e.g. entry gone), drop it
             }
             await new Promise(r => setTimeout(r, 2000)); // stay under AniList's write limit
         }
@@ -682,6 +685,24 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
             }
         }
     `);
+    // A change still queued for this entry (rate limited before) must not undo this one when it goes out
+    // later: its progress, if not ahead of what was just saved, and the status that came with it are dropped
+    const done = data.SaveMediaListEntry;
+    if (queue && done?.id && variables.progress !== undefined) {
+        const keys = [String(done.id), `media-${done.mediaId}`];
+        const queued = loadPending();
+        let changed = false;
+        const kept = queued.filter(item => {
+            if (!keys.includes(item.key) || item.vars?.progress === undefined || item.vars.progress > done.progress) return true;
+            changed = true;
+            const { progress, status, repeat, completedAt, ...rest } = item.vars;
+            item.vars = { ...rest, id: done.id };
+            delete item.vars.mediaId;
+            item.key = String(done.id);
+            return Object.keys(item.vars).length > 1;
+        });
+        if (changed) savePending(kept);
+    }
     // The list in the cache is changed in place instead of read again: one full list less per save
     if (!patchListCache(data.SaveMediaListEntry)) clearCache('MediaListCollection');
     clearCache('Media(id');
@@ -695,7 +716,7 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update.
     // Only when this save set the progress: a new score or status leaves Jellyfin alone.
     if (mirror && saved?.mediaId && saved.progress && variables.progress !== undefined) {
-        import('./jellyfin.js?v=175').then(m =>
+        import('./jellyfin.js?v=176').then(m =>
             m.syncProgress(saved.progress, () => mediaForSync(saved.mediaId, token)));
     }
 

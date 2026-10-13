@@ -1,15 +1,15 @@
-import * as api from '../api.js?v=175';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=175';
-import { getToken, isLoggedIn } from '../auth.js?v=175';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=175';
-import { availability } from '../player/availability.js?v=175';
-import { findEpisode, jfGet } from '../player/library.js?v=175';
-import { deviceProfile } from '../player/profile.js?v=175';
-import { HtmlVideoEngine } from '../player/engine.js?v=175';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=175';
-import { createSubtitles } from '../player/subtitles.js?v=175';
-import { neighbours, openEpisodes } from '../player/episodes.js?v=175';
-import { maybeRecap, noteWatched } from '../player/recap.js?v=175';
+import * as api from '../api.js?v=176';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=176';
+import { getToken, isLoggedIn } from '../auth.js?v=176';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=176';
+import { availability } from '../player/availability.js?v=176';
+import { findEpisode, jfGet } from '../player/library.js?v=176';
+import { deviceProfile } from '../player/profile.js?v=176';
+import { HtmlVideoEngine } from '../player/engine.js?v=176';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=176';
+import { createSubtitles } from '../player/subtitles.js?v=176';
+import { neighbours, openEpisodes } from '../player/episodes.js?v=176';
+import { maybeRecap, noteWatched } from '../player/recap.js?v=176';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -98,12 +98,16 @@ export async function render({ params, content }) {
         subtitles?.destroy();
         offTracked();
         window.removeEventListener('pagehide', onPageHide);
+        window.removeEventListener('hashchange', cleanup, true);
         document.body.classList.remove('player-open');
         stopSession(session, engine.time);
         engine.destroy();
     };
     const onPageHide = () => stopSession(session, engine.time);
     window.addEventListener('pagehide', onPageHide);
+    // Left while this is still starting (the resume question, a slow server): the router only gets the
+    // cleanup once render returns, so it would keep running unseen. Capture: before the next page renders
+    window.addEventListener('hashchange', cleanup, true);
 
     try {
         const cfg = getConfig();
@@ -115,7 +119,7 @@ export async function render({ params, content }) {
         if (closed) return cleanup;
         $('player-show').textContent = titlePref(media.title);
         $('player-party')?.addEventListener('click', async () => {
-            const { partyFromPlayer } = await import('./watchparty.js?v=175');
+            const { partyFromPlayer } = await import('./watchparty.js?v=176');
             partyFromPlayer(media, episode, { root: $('player'), pause: () => video.pause() });
         });
         if (!avail) throw new Error('Your Jellyfin server cannot be reached right now');
@@ -345,6 +349,7 @@ export async function render({ params, content }) {
         if (media.idMal) loadEnding(media.idMal, episode).then(list => { if (!closed && list.length) controls.setEnding(list); });
         loadChapters(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setChapters(list); });
         await reportStart(session, engine);
+        if (closed) return cleanup;
         reportTimer = setInterval(report, REPORT_EVERY);
         // Stopped part-way before: continue there or start over. Not when Up next brought us here
         const cameByUpNext = upNextArrival === `${mediaId}/${episode}`;
