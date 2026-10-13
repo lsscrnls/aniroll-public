@@ -1599,6 +1599,17 @@ async function handle(req, res) {
         return json(res, 200, { chrome: await chromeStoreVersion() });
     }
 
+    // Which of the given accounts share their calendar (account state "calshare", off unless they turn it on):
+    // the calendar shows only their shows. The lists themselves come from AniList
+    if (pathname === '/api/calendar/shared' && req.method === 'GET') {
+        const auth = await verifyViewer(req);
+        if (auth.status !== 'ok') return refuseAuth(res, auth);
+        const ids = String(new URL(req.url, 'http://x').searchParams.get('ids') || '').split(',').map(Number)
+            .filter(n => Number.isInteger(n) && n > 0).slice(0, 200);
+        const all = readJson(USER_STATE_FILE);
+        return json(res, 200, { ids: ids.filter(id => all[String(id)]?.calshare === true) });
+    }
+
     if (pathname === '/api/maintenance' && req.method === 'GET') {
         const m = readMaintenance();
         return json(res, 200, m

@@ -421,6 +421,43 @@ function staticServer() {
     if (file) { const pathOnDisk = await file.path(); ics = pathOnDisk ? fs.readFileSync(pathOnDisk, 'utf8') : ''; }
     check('calendar: Add to my calendar downloads the episodes as an .ics file', /BEGIN:VCALENDAR/.test(ics) && /BEGIN:VEVENT/.test(ics) && /#\/anime\/\d+/.test(ics), ics.slice(0, 200));
 
+    // Calendar → Friends: only people who share, their faces on the shows they watch, one chip each
+    const friendsList = async route => {
+        const body = route.request().postDataJSON();
+        if (!/status_in: \[CURRENT, REPEATING\]/.test(body.query)) return route.fallback();
+        const [first] = body.variables.users;
+        route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: { Page: { pageInfo: { hasNextPage: false },
+            mediaList: [101, 102, 103, 104, 105, 106].map(mediaId => ({ userId: first, mediaId, progress: 2 })) } } }) });
+    };
+    let sharedAsked = '';
+    const sharedRoute = route => {
+        const ids = new URL(route.request().url()).searchParams.get('ids') || '';
+        sharedAsked = ids;
+        route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ids: ids.split(',').slice(0, 1).map(Number) }) });
+    };
+    await page.route('https://graphql.anilist.co/**', friendsList);
+    await page.route(`${base}/api/calendar/shared*`, sharedRoute);
+    await go('#/calendar');
+    await page.click('[data-filter="friends"]');
+    await page.waitForSelector('.calendar-friend-chip[data-friend]:not([data-friend=""])', { timeout: 5000 }).catch(() => {});
+    await settle(300);
+    const friendsCal = await page.evaluate(() => ({ chips: document.querySelectorAll('.calendar-friend-chip').length,
+        faces: document.querySelectorAll('.calendar-week-item .calendar-friends img').length,
+        items: document.querySelectorAll('.calendar-week-item').length }));
+    check('calendar Friends: asks who shares, shows only their shows with faces and a chip per person',
+        sharedAsked.split(',').length >= 2 && friendsCal.chips === 2 && friendsCal.items > 0 && friendsCal.faces === friendsCal.items, { sharedAsked, ...friendsCal });
+    await page.click('.calendar-friend-chip[data-friend]:not([data-friend=""])');
+    check('calendar Friends: a chip picks that person', await page.$eval('.calendar-friend-chip.active', b => b.dataset.friend !== ''));
+    await page.unroute('https://graphql.anilist.co/**', friendsList);
+    await page.unroute(`${base}/api/calendar/shared*`, sharedRoute);
+    // Sharing is off until turned on, and kept with the account
+    await go('#/settings?tab=lists');
+    const shareOff = await page.$eval('#toggle-calshare', b => !b.checked).catch(() => null);
+    const sharePut = page.waitForRequest(r => r.method() === 'PUT' && r.url().endsWith('/api/me/state'), { timeout: 3000 }).catch(() => null);
+    await page.click('#toggle-calshare');
+    const shareBody = (await sharePut)?.postDataJSON();
+    check('settings: sharing the calendar starts off and is saved with the account', shareOff === true && shareBody?.key === 'calshare' && shareBody.value === true, { shareOff, shareBody });
+
     // Profile: where your scores and AniList's differ most
     // The test account carries no statistics: give the cached one some, as AniList's Viewer would
     await page.evaluate((v) => import(`/js/store.js?v=${v}`).then(st => st.setState({ user: { ...st.getState().user, statistics: { anime: {

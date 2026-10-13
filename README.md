@@ -38,7 +38,8 @@ New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start read
 - **Jellyfin live tracking**: an episode played past 90% counts as watched, rewatches included.
 - **AniRoll for Discord**: a browser extension (Chrome, Brave, Edge, Vivaldi, Firefox) puts the show, the episode and
   its time left into your Discord status; in a Watch Party, friends join with one click. Stays on your computer.
-- **Calendar**: the week (or month) with air times and where you stand on each show.
+- **Calendar**: the week (or month) with air times and where you stand on each show, and, under Friends,
+  what the people you follow are watching (only those who share their calendar; it is off until they turn it on).
 - **Recommendations with a taste match** from your own scores, genres and tags.
 - **Studio and voice actor pages**: everything a studio made, every role a voice actor plays; related shows as covers, spoiler tags only on request.
 - **My List** with format chips, **Social** (your AniList feed), **scores out of 100** whatever your AniList format, installable as a PWA.
@@ -133,6 +134,7 @@ data are both there while it runs. That is why the server keeps an AniList token
 | Your Jellyfin address, user name and API key or sign-in token (encrypted) | When you link Jellyfin to AniRoll | The relay and the Play button | Unlink Jellyfin |
 | A webhook secret, the shows in your Jellyfin library (ids only), episodes waiting to be saved | When you set up live tracking | Live tracking from Jellyfin | Turn live tracking off, which deletes all three; a waiting episode is dropped after 7 days anyway |
 | A few small settings per AniList account | When you change them | The same settings on every device | — |
+| Whether you share your calendar | When you turn it on (Settings → Lists) | People who follow you see what you are watching in their calendar | Turn it off |
 | Watch Party members (AniList name, avatar, episode) | While a party runs | The party itself | Leave or end the party |
 | Shared pages (title, cover, description of a show) | When you share one | The share link preview | — |
 | Error reports (message, page, version, browser) | When something breaks in the app | Fixing it | The file is rotated at 1 MB, one older file is kept |
@@ -241,7 +243,7 @@ The player uses [hls.js](https://github.com/video-dev/hls.js) (Apache-2.0),
 [libpgs](https://github.com/Arcus92/libpgs-js) (MIT) and [JASSUB](https://github.com/ThaUnknown/jassub) (MIT).
 JASSUB's WebAssembly contains libass, FreeType, HarfBuzz, FriBidi and other libraries under their own
 licences, some of them LGPL-2.1-or-later; they ship as separate, replaceable files in
-`js/vendor/jassub-2.5.18p1/`, rebuilt from the published package by `tools/vendor/jassub.sh`. Every
+`js/vendor/jassub-2.5.18p2/`, rebuilt from the published package by `tools/vendor/jassub.sh`. Every
 library's licence text lies next to it in `js/vendor/`.
 
 ## License
