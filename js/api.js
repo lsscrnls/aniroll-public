@@ -1,7 +1,7 @@
 // @ts-check
-import { buildTasteProfile, tasteMatch } from './taste.js?v=173';
-import { dismissedIds } from './dismissed.js?v=173';
-import { statusLabel } from './store.js?v=173';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=175';
+import { dismissedIds } from './dismissed.js?v=175';
+import { statusLabel } from './store.js?v=175';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -695,7 +695,7 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update.
     // Only when this save set the progress: a new score or status leaves Jellyfin alone.
     if (mirror && saved?.mediaId && saved.progress && variables.progress !== undefined) {
-        import('./jellyfin.js?v=173').then(m =>
+        import('./jellyfin.js?v=175').then(m =>
             m.syncProgress(saved.progress, () => mediaForSync(saved.mediaId, token)));
     }
 
@@ -982,6 +982,24 @@ export async function getFriendsMediaStatus(mediaId, userId, token) {
         }));
         return results.filter(Boolean);
     }
+}
+
+// What these people are watching right now, for the calendar: one request per 50 entries for all of them
+export async function getFriendsWatching(userIds, token = null) {
+    const rows = [];
+    for (let page = 1; userIds.length && page <= 6; page++) {
+        const data = await cachedQuery(`
+            query ($users: [Int], $page: Int) {
+                Page(page: $page, perPage: 50) {
+                    pageInfo { hasNextPage }
+                    mediaList(userId_in: $users, type: ANIME, status_in: [CURRENT, REPEATING]) { userId mediaId progress }
+                }
+            }
+        `, { users: userIds, page }, token, TTL.friends);
+        rows.push(...(data.Page.mediaList || []));
+        if (!data.Page.pageInfo?.hasNextPage) break;
+    }
+    return rows;
 }
 
 export async function getFollowing(userId, page = 1, token = null) {

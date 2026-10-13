@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=173';
-import { cachedQuery } from '../api.js?v=173';
-import { getState, esc, titlePref, renderPageSwitch, toast } from '../store.js?v=173';
-import { getToken, isLoggedIn } from '../auth.js?v=173';
+import * as api from '../api.js?v=175';
+import { cachedQuery } from '../api.js?v=175';
+import { getState, esc, titlePref, renderPageSwitch, toast } from '../store.js?v=175';
+import { getToken, isLoggedIn } from '../auth.js?v=175';
 
 const VIEW_KEY = 'aniroll_cal_view';
 const ANCHOR_KEY = 'aniroll_cal_anchor';
@@ -56,6 +56,7 @@ export async function render({ content, query: q }) {
                 <button class="list-tab${filter === 'all' ? ' active' : ''}" data-filter="all">All Airing</button>
                 ${isLoggedIn() ? `
                     <button class="list-tab${filter === 'mylist' ? ' active' : ''}" data-filter="mylist">My List</button>
+                    <button class="list-tab" data-filter="friends" title="What the people you follow are watching, if they share their calendar">Friends</button>
                 ` : ''}
             </div>
             <button class="glass-btn glass-btn-secondary glass-btn-sm" id="cal-ics" title="Download what is shown as a calendar file: your phone's calendar reminds you at air time">Add to my calendar</button>
@@ -64,6 +65,7 @@ export async function render({ content, query: q }) {
                 <button class="calendar-toggle-switch ${showImages ? 'on' : ''}" id="cal-img-toggle"></button>
             </div>
         </div>
+        <div class="calendar-friend-chips" id="cal-friends" hidden></div>
         <div id="cal-grid"></div>
     </div>`;
 
@@ -94,6 +96,68 @@ export async function render({ content, query: q }) {
         } catch (e) {
             console.error('Failed to load user lists:', e);
         }
+    }
+
+    // "Friends": the people you follow who share their calendar (Settings → Lists), what each of them is
+    // watching (mediaId → [{ user, progress }]) and, after a tap on a face, the one person shown
+    let friends = null;
+    const friendWatch = new Map();
+    let friendFocus = null;
+
+    async function loadFriends() {
+        if (friends) return;
+        const user = getState().user;
+        if (!user) { friends = []; return; }
+        try {
+            const following = [];
+            for (let page = 1; page <= 4; page++) {
+                const p = await api.getFollowing(user.id, page, token);
+                following.push(...(p.following || []));
+                if (!p.pageInfo?.hasNextPage) break;
+            }
+            let shared = [];
+            if (following.length) {
+                const res = await fetch(`/api/calendar/shared?ids=${following.map(f => f.id).join(',')}`, {
+                    headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000),
+                });
+                if (res.ok) shared = (await res.json()).ids || [];
+            }
+            const byId = new Map(following.map(f => [f.id, f]));
+            for (const row of await api.getFriendsWatching(shared, token)) {
+                const person = byId.get(row.userId);
+                if (!person) continue;
+                if (!friendWatch.has(row.mediaId)) friendWatch.set(row.mediaId, []);
+                friendWatch.get(row.mediaId).push({ user: person, progress: row.progress || 0 });
+            }
+            friends = shared.map(id => byId.get(id)).filter(Boolean);
+        } catch (e) {
+            console.error('Failed to load friends\' calendars:', e);
+        }
+    }
+
+    // Who of them watches the show of this episode (only the chosen one, after a tap on a face)
+    const watchersOf = (item) => (friendWatch.get(item.media?.id) || []).filter(w => !friendFocus || w.user.id === friendFocus);
+
+    function friendFaces(item) {
+        if (filter !== 'friends') return '';
+        const list = watchersOf(item);
+        if (!list.length) return '';
+        const names = list.map(w => `${w.user.name} (watched ${w.progress})`).join(', ');
+        return `<span class="calendar-friends" title="${esc(names)}">${list.slice(0, 3).map(w =>
+            `<img src="${esc(w.user.avatar?.medium || '')}" alt="" loading="lazy">`).join('')}${list.length > 3 ? `<em>+${list.length - 3}</em>` : ''}</span>`;
+    }
+
+    function renderFriendChips() {
+        const box = document.getElementById('cal-friends');
+        if (!box) return;
+        box.hidden = filter !== 'friends' || !friends?.length;
+        if (box.hidden) return;
+        // Only people with something on: an empty face would filter to an empty calendar
+        const watching = new Set([...friendWatch.values()].flat().map(w => w.user.id));
+        const people = friends.filter(f => watching.has(f.id));
+        box.innerHTML = `<button class="calendar-friend-chip${friendFocus ? '' : ' active'}" data-friend="" aria-pressed="${!friendFocus}">Everyone</button>${
+            people.map(f => `<button class="calendar-friend-chip${friendFocus === f.id ? ' active' : ''}" data-friend="${f.id}" aria-pressed="${friendFocus === f.id}">
+                <img src="${esc(f.avatar?.medium || '')}" alt="" loading="lazy">${esc(f.name)}</button>`).join('')}`;
     }
 
     let kitsuData = new Map();
@@ -239,10 +303,16 @@ export async function render({ content, query: q }) {
         const startTs = Math.floor(start.getTime() / 1000) - WEEK;
         const endTs = Math.floor(end.getTime() / 1000);
 
-        // "My List" asks AniList only for the listed shows; "All Airing" walks every page
-        const mine = filter === 'mylist' && userOnList.size > 0;
+        // "My List" and "Friends" ask AniList only for those shows; "All Airing" walks every page
+        const ids = filter === 'friends' ? [...friendWatch.keys()] : filter === 'mylist' ? [...userOnList] : [];
+        if (filter === 'friends' && !ids.length) {
+            airingData = [];
+            airingComplete = true;
+            return;
+        }
+        const mine = ids.length > 0;
         const query = scheduleQuery(mine);
-        const vars = { airingAtGreater: startTs, airingAtLesser: endTs, ...(mine ? { mediaIds: [...userOnList] } : {}) };
+        const vars = { airingAtGreater: startTs, airingAtLesser: endTs, ...(mine ? { mediaIds: ids } : {}) };
 
         let rows = [];
         let page = 1;
@@ -292,7 +362,8 @@ export async function render({ content, query: q }) {
             ...generateForecastEntries(),
             ...projectMissingEpisodes(startTs, endTs),
         ];
-        const filtered = filter === 'mylist' ? allData.filter(a => userOnList.has(a.media?.id)) : allData;
+        const filtered = filter === 'mylist' ? allData.filter(a => userOnList.has(a.media?.id))
+            : filter === 'friends' ? allData.filter(a => watchersOf(a).length) : allData;
         shownEpisodes = filtered;
 
         const byDay = {};
@@ -307,6 +378,13 @@ export async function render({ content, query: q }) {
         for (let d = start; d <= end; d = addDays(d, 1)) days.push(d);
         const isMobile = window.innerWidth < 769;
 
+        renderFriendChips();
+        if (filter === 'friends' && !friends?.length) {
+            grid.innerHTML = `<div class="empty-state"><div class="empty-state-sub">${friends
+                ? 'Nobody you follow shares their calendar yet. You can share yours in <a href="#/settings?tab=lists">Settings → Lists</a>.'
+                : 'Your friends\' calendars could not be loaded.'}</div></div>`;
+            return;
+        }
         if (isMobile) grid.innerHTML = renderAgenda(days, byDay, today);
         else if (view === 'week') grid.innerHTML = renderWeek(days, byDay, today);
         else grid.innerHTML = renderMonth(days, byDay, today);
@@ -341,7 +419,7 @@ export async function render({ content, query: q }) {
                             <div class="schedule-ep${isFinale(item) ? ' finale' : ''}">${epLabel(item)}</div>
                         </div>
                         <span class="schedule-time">${timeOf(item)}</span>
-                        ${standing(item) || (userOnList.has(item.media?.id) ? '<span class="schedule-onlist">On List</span>' : '')}
+                        ${friendFaces(item)}${standing(item) || (userOnList.has(item.media?.id) ? '<span class="schedule-onlist">On List</span>' : '')}
                     </div>`).join('')}
                 </div>
             </div>`;
@@ -379,7 +457,7 @@ export async function render({ content, query: q }) {
                         <div class="calendar-week-info">
                             <div class="calendar-week-time">${timeOf(item)}</div>
                             <div class="calendar-week-title">${esc(titlePref(item.media?.title))}</div>
-                            <div class="calendar-week-meta"><span class="calendar-week-ep">${epLabel(item)}</span>${standing(item)}</div>
+                            <div class="calendar-week-meta"><span class="calendar-week-ep">${epLabel(item)}</span>${standing(item)}${friendFaces(item)}</div>
                         </div>
                     </div>`;
                 }).join('') : '<div class="calendar-week-empty">No episodes</div>'}
@@ -477,13 +555,21 @@ export async function render({ content, query: q }) {
             content.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             filter = btn.dataset.filter;
-            // The two filters load different schedules ("My List" is only the listed shows)
+            // The filters load different schedules ("My List" and "Friends" are only those shows)
             const grid = document.getElementById('cal-grid');
             if (grid) grid.style.opacity = '0.5';
+            if (filter === 'friends') await loadFriends();
             await loadAiring();
             if (grid) grid.style.opacity = '';
             renderCalendar();
         });
+    });
+
+    document.getElementById('cal-friends')?.addEventListener('click', (e) => {
+        const chip = e.target.closest('[data-friend]');
+        if (!chip) return;
+        friendFocus = Number(chip.dataset.friend) || null;
+        renderCalendar();
     });
 
     document.getElementById('cal-ics')?.addEventListener('click', () => downloadIcs(shownEpisodes));

@@ -1,14 +1,15 @@
 // Settings (#/settings): appearance, lists, Watch Party and Jellyfin, in tabs. Loaded when opened, so the
 // app shell (js/app.js) stays small and a change here only needs the browser checks of this page.
-import * as api from '../api.js?v=173';
-import { getState, setState, applyTheme, getTheme, toast, esc } from '../store.js?v=173';
-import { getToken, isLoggedIn } from '../auth.js?v=173';
-import { showConfirm } from '../a11y.js?v=173';
-import { getVariant, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from '../design.js?v=173';
-import { refreshJellyfinStatus } from '../status.js?v=173';
-import { mountPresenceSettings } from '../presence.js?v=173';
-import { ambientOn, setAmbient } from '../player/ambient.js?v=173';
-import { recapOn, setRecap } from '../player/recap.js?v=173';
+import * as api from '../api.js?v=175';
+import { getState, setState, applyTheme, getTheme, toast, esc } from '../store.js?v=175';
+import { getToken, isLoggedIn } from '../auth.js?v=175';
+import { showConfirm } from '../a11y.js?v=175';
+import { getVariant, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from '../design.js?v=175';
+import { refreshJellyfinStatus } from '../status.js?v=175';
+import { mountPresenceSettings } from '../presence.js?v=175';
+import { ambientOn, setAmbient } from '../player/ambient.js?v=175';
+import { recapOn, setRecap } from '../player/recap.js?v=175';
+import { accountState, saveAccountState } from '../accountstate.js?v=175';
 
 const SETTINGS_TABS = [
     { key: 'appearance', label: 'Appearance' },
@@ -61,6 +62,9 @@ export async function render({ content, query }) {
             ${card('Friends Status', "Show friends' progress and scores on anime/manga detail pages", `
                 <label class="settings-choice"><input type="checkbox" id="toggle-friends-status" ${localStorage.getItem('aniroll_friends_status') !== 'off' ? 'checked' : ''}>
                     <span>Show friends' status in detail view</span></label>`)}
+            ${isLoggedIn() ? card('Share my calendar', 'Off unless you turn it on', `
+                <label class="settings-choice"><input type="checkbox" id="toggle-calshare">
+                    <span>People who follow you see what you are watching in their calendar (Calendar → Friends)</span></label>`) : ''}
             ${card('MAL Import', 'Import your MyAnimeList export to AniList', `
                 <div class="settings-choices">
                     <label class="glass-btn glass-btn-primary glass-btn-sm" style="cursor:pointer">
@@ -167,6 +171,16 @@ export async function render({ content, query }) {
         });
     });
 
+    // Kept on the server with the account: a friend's calendar asks whether you share yours
+    const calshare = document.getElementById('toggle-calshare');
+    if (calshare) {
+        accountState().then(state => { calshare.checked = state.calshare === true; });
+        calshare.addEventListener('change', () => {
+            saveAccountState('calshare', calshare.checked);
+            toast(calshare.checked ? 'Your calendar is shared with the people who follow you' : 'Your calendar is no longer shared', 'success');
+        });
+    }
+
     document.getElementById('toggle-friends-status')?.addEventListener('change', (e) => {
         localStorage.setItem('aniroll_friends_status', e.target.checked ? 'on' : 'off');
         toast(e.target.checked ? 'Friends status enabled' : 'Friends status disabled', 'success');
@@ -182,7 +196,7 @@ export async function render({ content, query }) {
     document.getElementById('mal-xml-upload')?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        import('./mal-import.js?v=173').then(m => m.startXMLImport(file));
+        import('./mal-import.js?v=175').then(m => m.startXMLImport(file));
     });
 
     renderJellyfinSettings();
@@ -199,7 +213,7 @@ async function renderPartySyncSettings() {
         box.innerHTML = '<p class="dot-label">Log in to change this.</p>';
         return;
     }
-    const bg = await import('../background.js?v=173');
+    const bg = await import('../background.js?v=175');
     const mode = bg.getPartySyncMode();
     box.innerHTML = `
         <label class="settings-choice"><input type="radio" name="party-sync" value="open" ${mode === 'open' ? 'checked' : ''}>
@@ -273,7 +287,7 @@ async function renderJellyfinLive() {
         return;
     }
     const [jf, bg, np] = await Promise.all([
-        import('../jellyfin.js?v=173'), import('../background.js?v=173'), import('../nowplaying.js?v=173'),
+        import('../jellyfin.js?v=175'), import('../background.js?v=175'), import('../nowplaying.js?v=175'),
     ]);
     const head = `<h4 class="jf-live-title">Live tracking</h4>
         <p class="dot-label">See what you are watching right in AniRoll, and finished episodes and movies land on your AniList within seconds, even when AniRoll is closed. Uses the Webhook plugin of your Jellyfin server.</p>`;
@@ -426,7 +440,7 @@ function linksHtml() {
 async function renderJellyfinSettings() {
     const box = document.getElementById('jf-settings');
     if (!box) return;
-    const jf = await import('../jellyfin.js?v=173');
+    const jf = await import('../jellyfin.js?v=175');
     await jf.loadAccountConfig();
     const cfg = jf.getConfig();
 
@@ -523,7 +537,7 @@ async function renderJellyfinSettings() {
     }
 
     const scope = jf.getScope();
-    const player = await import('../player/availability.js?v=173');
+    const player = await import('../player/availability.js?v=175');
     const localUrl = player.getLocalUrl();
     box.innerHTML = `
         <div class="jf-row"><span class="jf-dot jf-dot-checking" id="jf-settings-dot"></span><span id="jf-settings-state">Checking...</span></div>
@@ -578,7 +592,7 @@ async function renderJellyfinSettings() {
     box.querySelector('.jf-links')?.addEventListener('click', async (ev) => {
         const btn = ev.target.closest('[data-unlink]');
         if (!btn) return;
-        const { removeLink } = await import('../jflinks.js?v=173');
+        const { removeLink } = await import('../jflinks.js?v=175');
         removeLink(btn.dataset.unlink);
         btn.closest('.jf-link-row')?.remove();
         toast('Link removed', 'success');
