@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Off-site copy of the server's nightly backups (scripts/aniroll-backup.sh) onto this machine.
-# Incremental: only the days that are not here yet are fetched; nothing here is ever deleted,
-# so the copy keeps more than the server's 14 days. From here they go on to OneDrive by hand.
+# Incremental: only the days that are not here yet are fetched. Like the server, it keeps 14 days: the backups hold
+# Jellyfin addresses (often a home IP), which must not outlive an unlinked account for long. From here they go on to OneDrive by hand.
 #   scripts/pull-backups.sh [target dir]     default /mnt/games-nvme/aniroll-backups
 # Runs daily from the user timer aniroll-backup-pull.timer (see deploy/systemd/).
 set -euo pipefail
@@ -15,6 +15,8 @@ ssh_() { ssh -o BatchMode=yes -o ConnectTimeout=15 "$SERVER" "$@"; }
 
 remote=$(ssh_ "cd $SRC && ls aniroll-data-*.tar.gz 2>/dev/null" || true)
 [ -n "$remote" ] || { echo "no backups on the server" >&2; exit 1; }
+# Same rule as the server (find -mtime, tar keeps the file times), so a pruned day is not fetched again
+find "$DEST" -maxdepth 1 -name 'aniroll-data-*.tar.gz' -mtime +14 -delete
 missing=()
 for f in $remote; do [ -s "$DEST/$f" ] || missing+=("$f"); done
 if [ ${#missing[@]} -eq 0 ]; then echo "up to date ($(ls "$DEST" | wc -l) days here)"; exit 0; fi

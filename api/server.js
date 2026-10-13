@@ -1240,7 +1240,8 @@ function adminAction(body) {
     } else {
         return { status: 400, error: 'Unknown action' };
     }
-    console.log(`admin: ${action}`, JSON.stringify({ ...body, action: undefined }));
+    // Only what was done: the values (account ids among them) stay out of the container log
+    console.log(`admin: ${action}`);
     return { status: 200 };
 }
 
@@ -1344,6 +1345,16 @@ function redactSecrets(text) {
         .replace(/\/api\/jellyfin\/hook\/[a-f0-9]{48}/gi, '/api/jellyfin/hook/…');
 }
 
+// Enough to reproduce a bug (browser, major version, system), too little to tell one visitor from another
+function browserFamily(ua) {
+    ua = String(ua || '');
+    const browser = [[/Edg\/(\d+)/, 'Edge'], [/OPR\/(\d+)/, 'Opera'], [/Firefox\/(\d+)/, 'Firefox'], [/Chrome\/(\d+)/, 'Chrome'],
+        [/Version\/(\d+).*Safari/, 'Safari']].find(([re]) => re.test(ua));
+    const system = [[/Android/, 'Android'], [/iPhone|iPad/, 'iOS'], [/Windows/, 'Windows'], [/Mac OS X/, 'macOS'], [/CrOS/, 'ChromeOS'],
+        [/Linux/, 'Linux']].find(([re]) => re.test(ua));
+    return [browser ? `${browser[1]} ${ua.match(browser[0])[1]}` : 'other', system ? system[1] : ''].filter(Boolean).join(' / ');
+}
+
 function logClientError(req, body) {
     if (!str(body.message, 1)) return;
     if (overLimit('log', clientIp(req), 20, 60000)) return;
@@ -1356,7 +1367,7 @@ function logClientError(req, body) {
         stack: clean('stack', 2000),
         route: clean('route', 100),
         version: str(body.version, 10),
-        ua: str(req.headers['user-agent'], 200),
+        ua: browserFamily(req.headers['user-agent']),
     };
     try {
         fs.mkdirSync(path.dirname(ERROR_LOG), { recursive: true });
