@@ -162,7 +162,7 @@ async function mockJellyfin(page, { anyTitle = false, library = null } = {}) {
         }
         if (/\/Subtitles\/\d+\/0\/Stream\.vtt$/.test(p)) {
             calls.push({ type: 'vtt', item: p.split('/')[2] });
-            return route.fulfill({ status: 200, headers: CORS, contentType: 'text/vtt', body: 'WEBVTT\n\n00:00:00.000 --> 00:00:19.000\nHello from Jellyfin\n' });
+            return route.fulfill({ status: 200, headers: CORS, contentType: 'text/vtt', body: 'WEBVTT\n\n00:00:00.000 --> 00:00:19.000\nHello from <i>Jellyfin</i>\n\n00:00:00.000 --> 00:00:19.000\n{\\an8}A sign up top\n' });
         }
         // The playlists come back fine, the first segment fails with 500 — as when ffmpeg finds no GPU memory
         if (/\/master\.m3u8$/.test(p)) {

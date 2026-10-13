@@ -963,6 +963,8 @@ function sweepRateHits() {
         if (!hits.length || now - hits[hits.length - 1] > RATE_KEEP_MS) rateHits.delete(id);
     }
 }
+// Counters name addresses: they leave memory soon after their window, not only under load
+setInterval(sweepRateHits, RATE_KEEP_MS).unref();
 
 // ===== AniList token check =====
 // AniList regularly blocks requests from this server (403 "temporarily disabled").
@@ -1242,6 +1244,14 @@ function adminAction(body) {
     return { status: 200 };
 }
 
+// Every account write rewrites a whole data file: capped per account, so one token cannot keep the disk busy
+const ACCOUNT_WRITES_PER_MIN = 120;
+function tooManyWrites(res, userId, bucket = 'account-write', max = ACCOUNT_WRITES_PER_MIN) {
+    if (!overLimit(bucket, String(userId), max, 60000)) return false;
+    json(res, 429, { error: 'Too many changes, try again in a minute' });
+    return true;
+}
+
 // The answer for a request whose account could not be confirmed (auth.status !== 'ok')
 function refuseAuth(res, auth) {
     if (auth.status === 'limited') return json(res, 429, { error: 'Too many sign-in checks, try again in a minute' });
@@ -1324,16 +1334,27 @@ function str(value, max) {
 const ERROR_LOG = path.join(__dirname, 'data', 'client-errors.log');
 const ERROR_LOG_MAX = 1024 * 1024;
 
+// Credentials that can end up in an error text, a stack or the route (the AniList login arrives in the
+// URL fragment, Jellyfin keys ride in media URLs): masked before anything is written
+function redactSecrets(text) {
+    return String(text)
+        .replace(/((?:access_token|api_?key|apikey|token|x-emby-token|secret)=)[^&\s"'#]+/gi, '$1…')
+        .replace(/(Bearer\s+|Token=")[A-Za-z0-9_.~+/=-]+/gi, '$1…')
+        .replace(/\beyJ[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+){1,2}/g, '…')
+        .replace(/\/api\/jellyfin\/hook\/[a-f0-9]{48}/gi, '/api/jellyfin/hook/…');
+}
+
 function logClientError(req, body) {
     if (!str(body.message, 1)) return;
     if (overLimit('log', clientIp(req), 20, 60000)) return;
 
+    const clean = (name, max) => redactSecrets(str(body[name], max * 2)).slice(0, max);
     const entry = {
         at: new Date().toISOString(),
-        message: str(body.message, 500),
-        source: str(body.source, 200),
-        stack: str(body.stack, 2000),
-        route: str(body.route, 100),
+        message: clean('message', 500),
+        source: clean('source', 200),
+        stack: clean('stack', 2000),
+        route: clean('route', 100),
         version: str(body.version, 10),
         ua: str(req.headers['user-agent'], 200),
     };
@@ -1357,17 +1378,26 @@ const JF_PATHS = [
     /^\/Users\/[A-Za-z0-9-]+\/PlayedItems\/[A-Za-z0-9-]+$/,
 ];
 
+// Anything that is not a plain public unicast address counts as private, and so does anything that
+// is no address at all. Parsed as addresses, not compared as text: "fe9a::1" is link-local too.
 function isPrivateIp(ip) {
-    if (net.isIPv4(ip)) {
-        const [a, b] = ip.split('.').map(Number);
-        return a === 0 || a === 10 || a === 127 || a >= 224
-            || (a === 100 && b >= 64 && b <= 127) // carrier-grade NAT
-            || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
-            || (a === 198 && (b === 18 || b === 19)); // benchmarking range
+    const family = net.isIPv4(ip) ? 'ipv4' : net.isIPv6(ip) ? 'ipv6' : null;
+    if (!family) return true;
+    // One list per family: a BlockList also matches IPv4 addresses against IPv6 rules (as ::ffff:a.b.c.d)
+    if (!isPrivateIp.ranges) {
+        const ranges = { ipv4: new net.BlockList(), ipv6: new net.BlockList() };
+        for (const [net4, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16],
+            ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 3]]) {
+            ranges.ipv4.addSubnet(net4, bits, 'ipv4');
+        }
+        // Unspecified/loopback/IPv4-compatible, IPv4-mapped, NAT64, unique local, link-local, site-local, multicast
+        for (const [net6, bits] of [['::', 96], ['::ffff:0:0', 96], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['fc00::', 7],
+            ['fe80::', 10], ['fec0::', 10], ['ff00::', 8]]) {
+            ranges.ipv6.addSubnet(net6, bits, 'ipv6');
+        }
+        isPrivateIp.ranges = ranges;
     }
-    const v = ip.toLowerCase();
-    return v === '::1' || v === '::' || v.startsWith('fe80') || v.startsWith('fc') || v.startsWith('fd')
-        || v.startsWith('::ffff:') || v.startsWith('64:ff9b:'); // IPv4-mapped, NAT64
+    return isPrivateIp.ranges[family].check(ip, family);
 }
 
 // DNS lookup for the relay's own connection that refuses private addresses. The check sits in
@@ -1492,7 +1522,8 @@ async function handle(req, res) {
     if (dnaCard && req.method === 'GET') {
         let name = '';
         try { name = decodeURIComponent(dnaCard[1]).slice(0, 40); } catch { return html(res, 400, sharePage(null, null)); }
-        const entry = readJson(DNA_FILE)[name.toLowerCase()] || null;
+        const dna = readJson(DNA_FILE);
+        const entry = Object.hasOwn(dna, name.toLowerCase()) ? dna[name.toLowerCase()] : null;
         if (dnaCard[2]) {
             const file = entry && path.join(DNA_DIR, `${entry.id}.jpg`);
             if (!file || !fs.existsSync(file)) { res.writeHead(404); res.end(); return; }
@@ -1666,6 +1697,7 @@ async function handle(req, res) {
         const userId = auth.viewer.id;
         if (req.method === 'GET') return json(res, 200, hookInfo(userId));
         if (req.method !== 'POST' && req.method !== 'DELETE') return json(res, 405, { error: 'Method not allowed' });
+        if (tooManyWrites(res, userId)) return;
         const all = loadPrivate(HOOK_FILE);
         for (const secret of Object.keys(all)) if (all[secret].userId === userId) delete all[secret];
         if (req.method === 'POST') all[crypto.randomBytes(24).toString('hex')] = { userId, createdAt: Date.now() };
@@ -1683,6 +1715,7 @@ async function handle(req, res) {
         const auth = await verifyViewer(req);
         if (auth.status !== 'ok') return refuseAuth(res, auth);
         const key = String(auth.viewer.id);
+        if ((req.method === 'PUT' || req.method === 'DELETE') && tooManyWrites(res, key)) return;
         const all = loadPrivate(TOKEN_FILE);
         if (req.method === 'PUT') {
             all[key] = { tokenEnc: encryptSecret(bearerToken(req)), name: auth.viewer.name, savedAt: Date.now() };
@@ -1738,13 +1771,14 @@ async function handle(req, res) {
         if (req.method === 'GET') return json(res, 200, { state: all[key] || {} });
 
         if (req.method === 'PUT') {
+            if (tooManyWrites(res, key)) return;
             const body = await readBody(req);
             const name = typeof body.key === 'string' ? body.key : '';
             if (!USER_STATE_NAME.test(name) || body.value === undefined) return json(res, 400, { error: 'Invalid key or value' });
             const size = JSON.stringify(body.value).length;
             if (size > USER_STATE_MAX_BYTES) return json(res, 413, { error: 'Value too large' });
             const mine = { ...(all[key] || {}) };
-            if (!(name in mine) && Object.keys(mine).length >= USER_STATE_MAX_KEYS) return json(res, 400, { error: 'Too many keys' });
+            if (!Object.hasOwn(mine, name) && Object.keys(mine).length >= USER_STATE_MAX_KEYS) return json(res, 400, { error: 'Too many keys' });
             mine[name] = body.value;
             all[key] = mine;
             writeJson(USER_STATE_FILE, all, { pretty: false, mode: 0o600 });
@@ -1773,6 +1807,7 @@ async function handle(req, res) {
             return json(res, 200, { configured: true, ...entry });
         }
 
+        if ((req.method === 'PUT' || req.method === 'DELETE') && tooManyWrites(res, key)) return;
         if (req.method === 'PUT') {
             const body = await readBody(req);
             let base;

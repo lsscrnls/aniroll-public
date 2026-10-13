@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=175';
-import { cachedQuery } from '../api.js?v=175';
-import { getState, esc, titlePref, renderPageSwitch, toast } from '../store.js?v=175';
-import { getToken, isLoggedIn } from '../auth.js?v=175';
+import * as api from '../api.js?v=176';
+import { cachedQuery } from '../api.js?v=176';
+import { getState, esc, titlePref, renderPageSwitch, toast } from '../store.js?v=176';
+import { getToken, isLoggedIn } from '../auth.js?v=176';
 
 const VIEW_KEY = 'aniroll_cal_view';
 const ANCHOR_KEY = 'aniroll_cal_anchor';
@@ -295,8 +295,12 @@ export async function render({ content, query: q }) {
     // everything after mid-month; this cap only guards against a runaway loop.
     const MAX_SCHEDULE_PAGES = 20;
     let airingComplete = false;
+    // Only the newest load lands: a slower one started before (other week, other filter) is dropped
+    let airingTicket = 0;
 
+    // false: superseded by a newer load meanwhile, the caller leaves the grid to that one
     async function loadAiring() {
+        const ticket = ++airingTicket;
         const { start, end } = range();
         // One week before the range too: an episode dated in the week before is what an estimate
         // in the first days of this range continues from
@@ -305,10 +309,11 @@ export async function render({ content, query: q }) {
 
         // "My List" and "Friends" ask AniList only for those shows; "All Airing" walks every page
         const ids = filter === 'friends' ? [...friendWatch.keys()] : filter === 'mylist' ? [...userOnList] : [];
-        if (filter === 'friends' && !ids.length) {
+        // Nothing listed (or nobody shares): nothing to ask for, not every airing show
+        if (filter !== 'all' && !ids.length) {
             airingData = [];
             airingComplete = true;
-            return;
+            return true;
         }
         const mine = ids.length > 0;
         const query = scheduleQuery(mine);
@@ -327,10 +332,12 @@ export async function render({ content, query: q }) {
         } catch (e) {
             console.error('Failed to load airing schedule:', e);
         }
+        if (ticket !== airingTicket) return false;
         airingData = rows;
         // Estimates only on a complete schedule: a missing page looks exactly like a show
         // without dates and would fill the rest of the month with guesses
         airingComplete = !more;
+        return true;
     }
 
     function renderCalendar() {
@@ -506,7 +513,7 @@ export async function render({ content, query: q }) {
         try { sessionStorage.setItem(ANCHOR_KEY, String(anchor.getTime())); } catch { /* storage blocked */ }
         const grid = document.getElementById('cal-grid');
         if (grid) grid.style.opacity = '0.5';
-        await loadAiring();
+        if (!await loadAiring()) return;
         if (grid) grid.style.opacity = '';
         renderCalendar();
     }
@@ -559,7 +566,7 @@ export async function render({ content, query: q }) {
             const grid = document.getElementById('cal-grid');
             if (grid) grid.style.opacity = '0.5';
             if (filter === 'friends') await loadFriends();
-            await loadAiring();
+            if (!await loadAiring()) return;
             if (grid) grid.style.opacity = '';
             renderCalendar();
         });
@@ -586,8 +593,7 @@ export async function render({ content, query: q }) {
 
     // Lists first: "My List" needs their ids to ask AniList for just those shows
     await loadUserLists();
-    await loadAiring();
-    renderCalendar();
+    if (await loadAiring()) renderCalendar();
 
     if (isLoggedIn() && userMediaMap.size) {
         await loadKitsuFallbacks();

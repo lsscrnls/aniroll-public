@@ -13,7 +13,7 @@ const show = (id, { status = 'RELEASING', episodes = 12, next = null, progress =
 });
 
 test('upNext: episodes waiting while a show airs', () => {
-    const u = upNext(show(1, { next: [8, '2026-10-07T16:00:00'], progress: 4 }));
+    const u = upNext(show(1, { next: [8, '2026-10-07T16:00:00'], progress: 4 }), NOW);
     assert.equal(u.out, 7);
     assert.equal(u.behind, 3);
     assert.equal(u.status, '3 episodes waiting');
@@ -22,7 +22,7 @@ test('upNext: episodes waiting while a show airs', () => {
 });
 
 test('upNext: caught up on an airing show says when the next one comes', () => {
-    const u = upNext(show(1, { next: [8, '2026-10-07T16:00:00'], progress: 7 }));
+    const u = upNext(show(1, { next: [8, '2026-10-07T16:00:00'], progress: 7 }), NOW);
     assert.equal(u.behind, 0);
     assert.equal(u.status, 'Episode 8 airs in 2d');
     assert.equal(u.canWatch, false);
@@ -31,15 +31,15 @@ test('upNext: caught up on an airing show says when the next one comes', () => {
 test('heroEntry: the most recent show with an episode to watch, else the most recent', () => {
     const waiting = show(1, { next: [8, '2026-10-07T16:00:00'], progress: 7 });    // caught up, next one airs Wednesday
     const ready = show(2, { next: [5, '2026-10-08T16:00:00'], progress: 2 });
-    assert.equal(heroEntry([waiting, ready]), ready);
-    assert.equal(heroEntry([waiting]), waiting);
+    assert.equal(heroEntry([waiting, ready], NOW), ready);
+    assert.equal(heroEntry([waiting], NOW), waiting);
     assert.equal(heroEntry([]), undefined);
 });
 
 test('upNext: finished and unknown lengths', () => {
-    assert.equal(upNext(show(1, { status: 'FINISHED', progress: 12 })).status, 'All caught up');
-    assert.equal(upNext(show(1, { status: 'FINISHED', progress: 11 })).status, 'Ready to watch');
-    const open = upNext(show(1, { status: 'FINISHED', episodes: null, progress: 3 }));
+    assert.equal(upNext(show(1, { status: 'FINISHED', progress: 12 }), NOW).status, 'All caught up');
+    assert.equal(upNext(show(1, { status: 'FINISHED', progress: 11 }), NOW).status, 'Ready to watch');
+    const open = upNext(show(1, { status: 'FINISHED', episodes: null, progress: 3 }), NOW);
     assert.equal(open.behind, null);
     assert.ok(open.canWatch);
 });
@@ -122,4 +122,10 @@ test('glance: the week ends right on Sunday too', () => {
         show(11, { status: 'NOT_YET_RELEASED', next: [1, '2026-10-12T01:00:00'] }),
     ]);
     assert.deepEqual(g.week.map(e => e.media.id), [10]);
+});
+
+test('upNext: a cached list whose next episode has aired since counts it as out', () => {
+    const u = upNext(show(1, { next: [8, '2026-10-07T16:00:00'], progress: 7 }), at('2026-10-07T17:00:00'));
+    assert.equal(u.out, 8);
+    assert.equal(u.status, 'Ready to watch');
 });

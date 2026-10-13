@@ -2,13 +2,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=175';
-import { openDialog } from './a11y.js?v=175';
-import { prefersReducedMotion } from './animations.js?v=175';
-import { accountState, saveAccountState } from './accountstate.js?v=175';
+import { esc } from './store.js?v=176';
+import { openDialog } from './a11y.js?v=176';
+import { prefersReducedMotion } from './animations.js?v=176';
+import { accountState, saveAccountState } from './accountstate.js?v=176';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.7.0';
+export const RELEASE = '1.7.1';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -20,9 +20,13 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-13',
+        // '.2': plain subtitles drawn by AniRoll, faster start, fixes
+        id: '2026-10-13.2',
         title: 'Your friends\u2019 calendars',
         items: [
+            { rev: 2, text: 'Plain subtitles (SRT and the like) now look like proper ones: larger, white with a dark outline, no grey box, and out of the way of the controls.' },
+            { rev: 2, text: 'AniRoll opens faster, and sign-in is safer: it only takes a login this browser asked for. The server no longer keeps logs with IP addresses.' },
+            { rev: 2, text: 'Fixes: leaving the player while it asks where to continue, changes waiting offline getting lost, the calendar and search showing an older result after quick clicks, and the countdown on Home.' },
             'The <strong>Calendar</strong> can show what the people you follow are watching: pick <strong>Friends</strong>, and each episode shows who watches it. A tap on a face shows only theirs.',
             'Only for people who turned it on: share your own calendar in <strong>Settings → Lists</strong>. It is off until you do.',
         ],

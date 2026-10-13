@@ -13,7 +13,10 @@
             if (value != null && value.length < 50000) data[key] = value;
         }
     } catch { /* storage blocked: nothing to take along */ }
-    const route = location.hash;
+    // Only an app route (or AniList's login answer) goes along: a fragment of any other shape (one carrying
+    // data itself) is dropped, or a link to this page could hand the new address someone else's data as if
+    // it came from here
+    const route = /^#(\/|access_token=)[^#]*$/.test(location.hash) ? location.hash : '';
     const target = Object.keys(data).length
         ? `${NEW}${location.search}#carry=${encodeURIComponent(JSON.stringify(data))}&to=${encodeURIComponent(route)}`
         : NEW + location.search + route;
