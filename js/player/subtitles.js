@@ -1,9 +1,10 @@
-import { jfAuth } from '../jellyfin.js?v=175';
+import { jfAuth } from '../jellyfin.js?v=176';
 
 // Every subtitle of a file behind one list, whatever draws it:
 //   ASS/SSA  -> JASSUB (libass in WebAssembly) with the fonts embedded in the MKV — typesetting, signs,
 //               karaoke as the release intended. Loaded only when such a track is chosen.
-//   SRT, mov_text, WebVTT -> a <track> with Jellyfin's WebVTT conversion
+//   SRT, mov_text, WebVTT -> a <track> with Jellyfin's WebVTT conversion; AniRoll draws its lines itself
+//               (white, outlined, no grey box) instead of the browser's small boxed cues
 //   PGS (Blu-ray pictures) -> libpgs on a canvas; Jellyfin hands the track out as is (Stream.pgssub,
 //               Stream.sup answers 400). The first request waits while Jellyfin extracts every track (~25 s).
 //   DVD/DVB pictures      -> not offered (one file in the library)
@@ -53,6 +54,30 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         }
     }
 
+    // Text lines: the track stays 'hidden' (cues still run), the active ones are drawn in a layer over the video.
+    // Lines placed up top ({\an8} or a WebVTT line near the top) go there, the rest sit at the bottom.
+    let layer = null;
+    const ASS_TAG = /\{\\[^}]*\}/g;
+    const atTop = (cue) => /\{\\an[789]\}/.test(cue.text)
+        || (typeof cue.line === 'number' && (cue.snapToLines ? cue.line >= 0 : cue.line < 40));
+    function lineOf(cue) {
+        const el = document.createElement('div');
+        el.className = 'pl-subs-line';
+        el.append(cue.getCueAsHTML ? cue.getCueAsHTML() : cue.text);
+        // Override tags some SRT files carry ({\an8}, {\i1}) are not for reading
+        const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        for (let n = walk.nextNode(); n; n = walk.nextNode()) if (n.data.includes('{\\')) n.data = n.data.replace(ASS_TAG, '');
+        el.normalize();
+        return el.textContent.trim() ? el : null;
+    }
+    function paintText() {
+        if (!layer) return;
+        const cues = active?.kind === 'text' ? [...(active.el.track.activeCues || [])] : [];
+        const [top, bottom] = layer.children;
+        top.replaceChildren(...cues.filter(atTop).map(lineOf).filter(Boolean));
+        bottom.replaceChildren(...cues.filter(c => !atTop(c)).map(lineOf).filter(Boolean));
+    }
+
     // One chosen track at a time: loading ends when it is there, fails, or another is chosen
     let loadingFor = null;
     const loading = (t) => { loadingFor = t; onLoading(!!t); };
@@ -60,6 +85,13 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
 
     // <track> elements for the text subtitles, all switched off until chosen
     for (const t of tracks.filter(t => t.kind === 'text')) {
+        if (!layer) {
+            layer = document.createElement('div');
+            layer.className = 'pl-subs-text';
+            layer.setAttribute('aria-hidden', 'true');
+            layer.innerHTML = '<div class="pl-subs-top"></div><div class="pl-subs-bottom"></div>';
+            video.after(layer);
+        }
         const el = document.createElement('track');
         el.kind = 'subtitles';
         el.label = t.label;
@@ -68,6 +100,7 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         video.append(el);
         t.el = el;
         el.track.mode = 'disabled';
+        el.track.addEventListener('cuechange', () => { if (active === t) paintText(); });
         el.addEventListener('load', () => { shiftCues(t); loaded(t); });
         el.addEventListener('error', () => loaded(t));
     }
@@ -159,13 +192,14 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
     function select(id) {
         const t = tracks.find(x => x.id === id) || null;
         active = t;
-        for (const x of tracks) if (x.el) x.el.track.mode = x === t ? 'showing' : 'disabled';
+        for (const x of tracks) if (x.el) x.el.track.mode = x === t ? 'hidden' : 'disabled';
         pending++;
         // A <track> already loaded does not fire again
         loading(t && !(t.el && t.el.readyState === 2) ? t : null);
         if (t?.kind !== 'ass') hideAss();
         if (t?.kind !== 'pgs') hidePgs();
         if (t?.kind === 'text') shiftCues(t);
+        paintText();
         if (t?.kind === 'ass') {
             if (jassub?._canvas) jassub._canvas.hidden = false;
             showAss(t).catch(err => console.warn('ASS subtitles failed:', err.message)).finally(() => loaded(t));
@@ -196,6 +230,7 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         setDelay(seconds) {
             offset = Math.round(Math.max(-30, Math.min(30, Number(seconds) || 0)) * 10) / 10;
             for (const t of tracks) if (t.kind === 'text') shiftCues(t);
+            paintText();
             if (jassub) jassub.timeOffset = -offset;
             if (pgs) {
                 pgs.timeOffset = -offset;
@@ -206,6 +241,8 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         destroy() {
             closed = true;
             loading(null);
+            layer?.remove();
+            layer = null;
             try { jassub?.destroy(); } catch { /* already gone */ }
             jassub = null;
             hidePgs();

@@ -1,6 +1,6 @@
 // @ts-check
-import { getConfig, normalizeUrl } from '../jellyfin.js?v=175';
-import { noteStatus } from './animemap.js?v=175';
+import { getConfig, normalizeUrl } from '../jellyfin.js?v=176';
+import { noteStatus } from './animemap.js?v=176';
 
 // Is the user's Jellyfin reachable from this browser right now? AniRoll has to work the same
 // with the whole stack switched off, so this never blocks anything: a short timeout, the answer

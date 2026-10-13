@@ -97,8 +97,10 @@ module.exports = function animeMap({ dataDir, writeJson, readJson, json, readBod
         if (req.method !== 'PUT') return json(res, 405, { error: 'Method not allowed' });
         const auth = await verifyViewer(req);
         if (auth.status !== 'ok') return refuseAuth(res, auth);
+        // Sent again only when the library changed; each one rewrites the whole file
+        if (overLimit('jflibrary', String(auth.viewer.id), 10, 60000)) return json(res, 429, { error: 'Too many updates, try again in a minute' });
         const body = await readBody(req);
-        const map = {};
+        const map = Object.create(null);
         for (const [key, list] of Object.entries(body.map && typeof body.map === 'object' ? body.map : {}).slice(0, MAX_IDS)) {
             if (typeof key !== 'string' || key.length > 200 || !Array.isArray(list)) continue;
             const pairs = list.slice(0, 8).map(p => [num(p?.[0]), Math.max(0, num(p?.[1]) || 0)]).filter(p => p[0]);

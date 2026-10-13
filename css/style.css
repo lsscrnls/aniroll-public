@@ -5058,7 +5058,21 @@ body.player-open .cursor { display: none !important; }
     -webkit-tap-highlight-color: transparent;
 }
 .player-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
-.player-video::cue { font-family: var(--font); font-size: clamp(18px, 3.2vw, 34px); line-height: 1.3; color: #fff; background: rgba(0,0,0,0.55); }
+/* Text subtitles (SRT, WebVTT): drawn by AniRoll as white lines with a dark outline, sized to the picture */
+.pl-subs-text { --sub-scale: 1; position: absolute; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+    align-items: center; padding: max(3.5vh, 16px) 6% max(6.5vh, 24px); text-align: center; color: #fff; font-family: var(--font);
+    font-size: calc(var(--sub-scale) * clamp(17px, min(2.9vw, 4.9vh), 64px)); font-weight: 600; line-height: 1.24; letter-spacing: 0.005em;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+.pl-subs-top, .pl-subs-bottom { display: flex; flex-direction: column; align-items: center; gap: 0.12em; max-width: 100%; }
+.pl-subs-bottom { transition: transform .4s var(--pl-ease, ease); }
+.pl-subs-line { max-width: min(100%, 34em); white-space: pre-line; text-wrap: balance; overflow-wrap: break-word;
+    text-shadow: 0 0 0.06em #000, 0.055em 0 0.03em #000, -0.055em 0 0.03em #000, 0 0.055em 0.03em #000, 0 -0.055em 0.03em #000,
+        0.04em 0.04em 0.03em #000, -0.04em 0.04em 0.03em #000, 0.04em -0.04em 0.03em #000, -0.04em -0.04em 0.03em #000,
+        0 0.06em 0.3em rgba(0,0,0,0.55); }
+.pl-subs-line i, .pl-subs-line em { font-style: italic; }
+.pl-subs-line b, .pl-subs-line strong { font-weight: 800; }
+/* While the controls show, the bottom lines move up out of their way */
+.player:not(.is-idle) > .pl-subs-text .pl-subs-bottom { transform: translateY(calc(-1 * max(0px, 112px - max(6.5vh, 24px)))); }
 .player.is-idle { cursor: none; }
 /* JASSUB draws ASS subtitles on a canvas it lays over the video */
 .player .pl-subs-canvas { pointer-events: none; }
@@ -5366,9 +5380,9 @@ body.player-open .cursor { display: none !important; }
 .pl-rate-save.is-saved { background: transparent; color: var(--pl-primary); }
 
 /* Text subtitles in four sizes (ASS and PGS keep the size their release gave them) */
-.player[data-sub-size="s"] .player-video::cue { font-size: clamp(14px, 2.4vw, 26px); }
-.player[data-sub-size="l"] .player-video::cue { font-size: clamp(22px, 4vw, 44px); }
-.player[data-sub-size="xl"] .player-video::cue { font-size: clamp(26px, 4.8vw, 54px); }
+.player[data-sub-size="s"] .pl-subs-text { --sub-scale: 0.8; }
+.player[data-sub-size="l"] .pl-subs-text { --sub-scale: 1.2; }
+.player[data-sub-size="xl"] .pl-subs-text { --sub-scale: 1.4; }
 
 /* Skip intro / credits: an extended FAB above the bar, on the right. It stays while the controls hide */
 .pl-skip-segment {
@@ -6123,8 +6137,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pl-recap-title { font-size: clamp(1.8rem, 4.5vw, 3.4rem); font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; max-width: 70vw; }
 .pl-recap-sub { font-size: 1rem; color: rgba(255,255,255,0.75); }
 .pl-recap-video { cursor: pointer; }
-.pl-recap-video::cue { font-family: var(--font); font-size: clamp(18px, 3.2vw, 34px); line-height: 1.3; color: #fff; background: rgba(0,0,0,0.55); }
-.pl-recap .pl-subs-canvas { z-index: 1; }
+.pl-recap :is(.pl-subs-canvas, .pl-subs-text) { z-index: 1; }
 .pl-recap-bar { position: absolute; z-index: 2; right: clamp(16px, 4vw, 48px); bottom: clamp(24px, 8vh, 96px); display: flex; align-items: center; gap: 8px; }
 .pl-recap-btn { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 999px;
     background: rgba(255,255,255,0.14); color: #fff; cursor: pointer; backdrop-filter: blur(12px); }

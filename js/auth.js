@@ -33,8 +33,13 @@ export function setCachedUser(user) {
 // Where the visitor was when they pressed Log in (a party invite, a shared show): AniList sends
 // everyone back to the start, so the page is kept for the moment the login comes back
 const RETURN_KEY = 'aniroll_login_return';
+// When this browser last sent someone to AniList's login. A token in the address is only taken in answer to
+// that: a link carrying somebody else's token must not quietly sign a visitor into a stranger's account.
+const LOGIN_STARTED_KEY = 'aniroll_login_started';
+const LOGIN_WINDOW_MS = 30 * 60 * 1000;
 
 export function rememberReturn() {
+    try { localStorage.setItem(LOGIN_STARTED_KEY, String(Date.now())); } catch { /* the login cannot come back */ }
     const hash = window.location.hash;
     // Only an app route, never a token or anything that is not one of our pages
     if (/^#\/[\w\-/?=&%.,]*$/.test(hash) && hash.length < 300 && hash !== '#/') {
@@ -55,9 +60,15 @@ export function handleOAuthCallback() {
     if (!hash.includes('access_token')) return false;
 
     const token = new URLSearchParams(hash.substring(1)).get('access_token');
+    let started = 0;
+    try {
+        started = Number(localStorage.getItem(LOGIN_STARTED_KEY)) || 0;
+        localStorage.removeItem(LOGIN_STARTED_KEY);
+    } catch { /* no login pending */ }
+    const asked = Date.now() - started < LOGIN_WINDOW_MS;
     // replaceState instead of setting location.hash keeps the token out of the browser history
-    history.replaceState(null, '', window.location.pathname + window.location.search + (token ? takeReturn() : '#/'));
-    if (!token) return false;
+    history.replaceState(null, '', window.location.pathname + window.location.search + (token && asked ? takeReturn() : '#/'));
+    if (!token || !asked) return false;
     setToken(token);
     localStorage.removeItem(USER_KEY); // don't flash a previous account's cached user
     return true;

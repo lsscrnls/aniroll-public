@@ -4,6 +4,7 @@
 // CHROMIUM_PATH picks a browser binary (defaults to Playwright's own). Runs in CI as the "browser" job.
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { chromium } = require('playwright');
 const { respond, VIEWER } = require('./mock');
@@ -71,7 +72,9 @@ function staticServer() {
     const errors = [];
     const groups = {};
 
-    groups.main = async () => {
+    // A page logged in to AniList with the mocked answers, and its helpers. Main's checks come in parts
+    // (see the runner at the end), each on a page of its own from here
+    async function mainPage() {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
     const mutations = [];
@@ -116,7 +119,11 @@ function staticServer() {
     };
     const panelOpen = () => page.evaluate(() => document.getElementById('detail-panel-overlay').classList.contains('open'));
     const closePanel = async () => { await page.keyboard.press('Escape'); await settle(300); };
+    return { page, mutations, settle, go, panelOpen, closePanel };
+    }
 
+    groups.main = [async () => {
+    const { page, settle, go, panelOpen, closePanel } = await mainPage();
     await page.goto(base + '/#/');
     await settle(1500);
     check('logged in as the test account', await page.evaluate(() => !document.getElementById('login-btn') || document.getElementById('login-btn').hidden));
@@ -203,6 +210,17 @@ function staticServer() {
         await settle();
         check('Roll from this list opens Roll', page.url().endsWith('#/roll'));
     }
+    await page.close();
+    }, async () => {
+    const { page, mutations, settle, go } = await mainPage();
+    await page.goto(base + '/#/');
+    await settle(1500);
+    // Into Roll the way the part before left it: from My List's Planning tab
+    await go('#/list');
+    await page.click('#list-tabs .list-tab:nth-child(2)').catch(() => {});
+    await settle(300);
+    await page.click('#list-roll a').catch(() => {});
+    await settle();
 
     // Roll: ticking "Include recommended titles" adds recommendations to the pool, a recommended pick
     // offers Plan to Watch and saves a new entry by mediaId
@@ -241,7 +259,11 @@ function staticServer() {
         winners.push(await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_roll_seen') || '[]').at(-1)));
     }
     check('Roll: no show comes up twice until the others had their turn', new Set(winners).size === winners.length && winners.every(Boolean), winners);
-    await page.evaluate(() => localStorage.removeItem('aniroll_roll_filters'));
+    await page.close();
+    }, async () => {
+    const { page, mutations, settle, go, panelOpen, closePanel } = await mainPage();
+    await page.goto(base + '/#/');
+    await settle(1500);
 
     // My List: −/+ changes progress and must not open the detail panel; the card itself does
     await go('#/list');
@@ -270,6 +292,29 @@ function staticServer() {
         const sent = mutations.slice(before).includes('SaveMediaListEntry');
         const left = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_pending_saves') || '[]').length);
         check('offline: a + is kept and sent once back online', kept >= 1 && sent && left === 0, { kept, sent, left });
+
+        // A + kept offline, then another + that goes through: the kept one (one episode less) is not sent
+        // later over it
+        await page.route('https://graphql.anilist.co/**', offline);
+        await page.$eval('.list-card [data-action="inc"], .list-entry [data-action="inc"]', b => b.click());
+        await settle(1200);
+        const kept2 = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_pending_saves') || '[]').length);
+        await page.unroute('https://graphql.anilist.co/**', offline);
+        // AniList answers with the entry as saved
+        const echo = (route) => {
+            const body = route.request().postDataJSON();
+            if (!/SaveMediaListEntry/.test(body?.query || '')) return route.fallback();
+            const v = body.variables;
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify({ data: { SaveMediaListEntry: {
+                id: v.id, mediaId: 1, status: v.status || 'CURRENT', score: 0, progress: v.progress, progressVolumes: 0, repeat: 0, notes: null,
+                startedAt: { year: null, month: null, day: null }, completedAt: { year: null, month: null, day: null } } } }) });
+        };
+        await page.route('https://graphql.anilist.co/**', echo);
+        await page.$eval('.list-card [data-action="inc"], .list-entry [data-action="inc"]', b => b.click());
+        await settle(1200);
+        await page.unroute('https://graphql.anilist.co/**', echo);
+        const left2 = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_pending_saves') || '[]'));
+        check('offline: a later + that goes through drops the older kept progress', kept2 === 1 && left2.length === 0, { kept2, left2 });
     }
     // A card with −/+1 in it is not a button itself: its title is
     const card = await page.$('.list-card [role="button"][data-open], .list-card[role="button"][data-open], .list-entry-title[data-open]');
@@ -319,6 +364,21 @@ function staticServer() {
     await page.click('[data-view="week"]');
     await settle();
     check('calendar: back to the week with today', await page.evaluate(() => !!document.querySelector('.calendar-week-day.today')));
+    // Back and forth quickly: the week before answers late, the week on screen keeps its own schedule
+    const thisWeek = await page.evaluate(() => document.getElementById('cal-grid').innerHTML);
+    const lateWeek = async (route) => {
+        const body = route.request().postDataJSON();
+        if (/airingSchedules/.test(body?.query || '') && !lateWeek.seen) { lateWeek.seen = true; await new Promise(r => setTimeout(r, 1500)); }
+        return route.fallback();
+    };
+    await page.route('https://graphql.anilist.co/**', lateWeek);
+    await page.click('#cal-prev');
+    await page.waitForTimeout(100);
+    await page.click('#cal-next');
+    await page.waitForTimeout(2000);
+    await page.unroute('https://graphql.anilist.co/**', lateWeek);
+    const keptWeek = await page.evaluate(() => document.getElementById('cal-grid').innerHTML);
+    check('calendar: a late answer for the week before leaves this week as it is', lateWeek.seen && keptWeek === thisWeek, { seen: lateWeek.seen, same: keptWeek === thisWeek });
     // A week across two months: dates run on, the label names both months
     await page.evaluate(() => sessionStorage.setItem('aniroll_cal_anchor', String(new Date(2026, 8, 28).getTime())));
     await go('#/season');
@@ -403,6 +463,20 @@ function staticServer() {
         status: !!document.querySelector('.search-result-status') }));
     const reqAfter = await page.evaluate(() => performance.getEntriesByType('resource').filter(r => r.name.includes('graphql')).length);
     check('search: your own shows at once, with their status, no request', own.group === 'On your list' && own.rows > 0 && own.status && reqAfter === reqBefore, { ...own, reqBefore, reqAfter });
+    // An answer that comes late, for text typed before, leaves the results of the newer text alone
+    const slow = async (route) => {
+        if (route.request().postDataJSON()?.variables?.search === 'Slowshow') await new Promise(r => setTimeout(r, 1500));
+        return route.fallback();
+    };
+    await page.route('https://graphql.anilist.co/**', slow);
+    await page.fill('#search-input', 'Slowshow');
+    await page.waitForTimeout(500);
+    await page.fill('#search-input', 'Sh');
+    const shBefore = await page.evaluate(() => document.getElementById('search-results').innerHTML);
+    await page.waitForTimeout(1800);
+    const shAfter = await page.evaluate(() => document.getElementById('search-results').innerHTML);
+    await page.unroute('https://graphql.anilist.co/**', slow);
+    check('search: a late answer for older text does not replace the results', shBefore === shAfter && shBefore.length > 0, { same: shBefore === shAfter });
     await page.keyboard.press('Escape');
     await settle(300);
 
@@ -482,11 +556,17 @@ function staticServer() {
         history.replaceState(null, '', '#access_token=new-token&token_type=Bearer');
         const ok = auth.handleOAuthCallback();
         const hash = location.hash;
+        // A token nobody here asked for (a link made up elsewhere) is dropped, the login stays as it was
+        history.replaceState(null, '', '#access_token=planted-token&token_type=Bearer');
+        const planted = auth.handleOAuthCallback();
+        const after = { token: localStorage.getItem('aniroll_token'), hash: location.hash };
         localStorage.setItem('aniroll_token', keep);
         history.replaceState(null, '', '#/');
-        return { ok, hash };
+        return { ok, hash, planted, after };
     }, APP_VERSION);
     check('login: back on the page where Log in was pressed (a party invite)', back.ok && back.hash === '#/watchparty?host=Friend', back);
+    check('login: a token in a link without a login started here is ignored',
+        back.planted === false && back.after.token === 'new-token' && back.after.hash === '#/', back);
 
     // Toasts are read out; the skip link is the first stop
     await go('#/list');
@@ -497,7 +577,7 @@ function staticServer() {
         a11y.live === 'polite' && a11y.skip === '#content' && a11y.current === 'list' && /My List · AniRoll/.test(a11y.title), a11y);
 
     await page.close();
-    };
+    }];
 
     groups.party = async () => {
     // Watch Party as a guest: the invite link shows the host's party, joining starts the sync; then the
@@ -669,7 +749,6 @@ function staticServer() {
 
     };
 
-    groups.player = async () => {
     // Jellyfin player. A page logged in to AniList and to Jellyfin (a friend's sign-in, not an API key)
     async function playerPage(jellyfinUp, signedIn = true, jfMock = {}) {
         const p = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -697,6 +776,8 @@ function staticServer() {
         return { p, pageErrors, saves, calls };
     }
 
+    // The player's checks in four parts of similar length that run side by side (each on pages of its own)
+    groups.player = [async () => {
     // Watch Party: "Play episode N" right on the party page — the one after the host's counter
     {
         const { p, pageErrors } = await playerPage(true);
@@ -843,6 +924,7 @@ function staticServer() {
             { amb, off, speeds, backMain, closedMenu, pageErrors });
         await p.close();
     }
+    }, async () => {
 
     // Episodes in the player: E (or the button) lists them, the one playing marked; another one plays right
     // there, the one playing just closes the list, and the player's keys stay off while it is open
@@ -853,6 +935,9 @@ function staticServer() {
         const button = await p.evaluate(() => !document.getElementById('player-episodes')?.hidden);
         await p.keyboard.press('e');
         await p.waitForSelector('.ep-row.is-current', { timeout: 5000 }).catch(() => {});
+        // The dialog takes focus on the next frame, which a busy test browser draws late: a key before that
+        // lands on the page (where the player has it) and the check below fails for the wrong reason
+        await p.waitForFunction(() => document.activeElement?.closest('.ep-dialog'), null, { timeout: 3000 }).catch(() => {});
         const shown = await p.evaluate(() => {
             const cur = document.querySelector('.ep-row.is-current');
             return { href: cur?.getAttribute('href'), label: cur?.querySelector('.ep-next')?.textContent, time: document.getElementById('player-video').currentTime };
@@ -867,10 +952,29 @@ function staticServer() {
         await p.evaluate(() => document.querySelector('.ep-row[href$="/4"]')?.click());
         await p.waitForFunction(() => /Episode 4/.test(document.getElementById('player-episode')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
         const other = await p.evaluate(() => ({ open: !!document.querySelector('.ep-dialog'), hash: location.hash,
-            title: document.getElementById('player-episode')?.textContent }));
+            title: document.getElementById('player-episode')?.textContent, playerOpen: document.body.classList.contains('player-open') }));
         check('player: Episodes (E) marks the one playing, keeps the player keys off, plays another right there',
             button && /^#\/play\/\d+\/3$/.test(shown.href || '') && shown.label === 'Playing' && kept && !same.open && same.hash === '#/play/101/3'
-            && !other.open && /^#\/play\/\d+\/4$/.test(other.hash) && /Episode 4/.test(other.title || '') && !pageErrors.length, { button, shown, kept, same, other, pageErrors });
+            && !other.open && /^#\/play\/\d+\/4$/.test(other.hash) && /Episode 4/.test(other.title || '') && other.playerOpen && !pageErrors.length, { button, shown, kept, same, other, pageErrors });
+        await p.close();
+    }
+
+    // Leaving while the player still asks where to continue: the player closes with the page (it used to
+    // keep running unseen, the page kept the player's look and Space played its sound)
+    {
+        const { p, pageErrors } = await playerPage(true);
+        await p.goto(base + '/#/play/101/3');
+        await p.waitForSelector('.pl-resume', { timeout: 10000 }).catch(() => {});
+        const asked = await p.evaluate(() => !!document.querySelector('.pl-resume'));
+        await p.evaluate(() => { window.__plays = 0; HTMLMediaElement.prototype.play = function () { window.__plays++; return Promise.resolve(); }; });
+        await p.evaluate(() => { location.hash = '#/search'; });
+        await p.waitForFunction(() => !document.getElementById('player'), null, { timeout: 5000 }).catch(() => {});
+        await p.keyboard.press('Escape');
+        await p.keyboard.press(' ');
+        await p.waitForTimeout(300);
+        const left = await p.evaluate(() => ({ playerOpen: document.body.classList.contains('player-open'), plays: window.__plays }));
+        check('player: leaving during the resume question closes the player (no player look, no sound from it)',
+            asked && !left.playerOpen && left.plays === 0 && !pageErrors.length, { asked, left, pageErrors });
         await p.close();
     }
 
@@ -995,6 +1099,7 @@ function staticServer() {
             && !pageErrors.length, { before, mapFor, button, asked, pageErrors });
         await p.close();
     }
+    }, async () => {
 
     // Stack on: Play button, direct play from the stream URL, reports to Jellyfin, AniList exactly once at 90%
     {
@@ -1048,6 +1153,8 @@ function staticServer() {
         const playing = await p.evaluate(() => {
             const v = document.getElementById('player-video');
             return { src: v?.currentSrc || '', ready: v?.readyState, tracks: v ? [...v.textTracks].map(t => `${t.label}:${t.mode}`) : [],
+                lines: [...document.querySelectorAll('.pl-subs-text > div')].map(d => d.textContent),
+                italic: !!document.querySelector('.pl-subs-bottom .pl-subs-line i'),
                 status: document.getElementById('player-status')?.hidden, method: document.getElementById('player-method')?.textContent,
                 open: document.body.classList.contains('player-open') };
         });
@@ -1057,8 +1164,9 @@ function staticServer() {
             info?.item === 'ep2' && profile?.DirectPlayProfiles?.some(d => /webm/.test(d.Container) && /vp9/.test(d.VideoCodec))
             && JSON.stringify(profile.CodecProfiles).includes('VideoBitDepth') && profile.MaxStreamingBitrate > 0 && profile.MaxStreamingBitrate <= 120000000
             && calls.some(c => c.type === 'bitrateTest'), profile);
-        check('player: direct play from the static stream, subtitles shown, full screen',
-            /\/Videos\/ep2\/stream\?static=true/.test(playing.src) && playing.ready >= 2 && playing.tracks.join() === 'English:showing'
+        check('player: direct play from the static stream, subtitles drawn by AniRoll (sign up top, italics kept), full screen',
+            /\/Videos\/ep2\/stream\?static=true/.test(playing.src) && playing.ready >= 2 && playing.tracks.join() === 'English:hidden'
+            && playing.lines.join('|') === 'A sign up top|Hello from Jellyfin' && playing.italic
             && playing.status === true && playing.method === 'Direct play' && playing.open, playing);
         const start = calls.find(c => c.type === 'Playing');
         check('player: Jellyfin gets the start report with this device', start?.body?.ItemId === 'ep2' && start.body.PlaySessionId === 'ps-ep2'
@@ -1240,7 +1348,17 @@ function staticServer() {
             pref: Object.values(JSON.parse(localStorage.getItem('aniroll_subs_pref') || '{}'))[0],
         }));
         await p.evaluate(() => localStorage.removeItem('aniroll_subs_pref'));
-        check('player: the subtitles picked carry over to the next episode', keptSubs.text === 'English:showing' && !keptSubs.pictures && keptSubs.pref?.label === 'English', keptSubs);
+        check('player: the subtitles picked carry over to the next episode', keptSubs.text === 'English:hidden' && !keptSubs.pictures && keptSubs.pref?.label === 'English', keptSubs);
+        if (pageErrors.length) errors.push(...pageErrors.map(e => `player: ${e}`));
+        await p.close();
+    }
+    }, async () => {
+    // Stack on, from audio tracks on: a page of its own, on the show's page first like the part before
+    {
+        const { p, pageErrors, saves, calls } = await playerPage(true);
+        await p.goto(base + '/#/anime/101/full');
+        await idle(p, 3000);
+        const playHash = '#/play/101/2';
 
         // Audio tracks: a second section in the menu; picking the dub asks Jellyfin again with that track and
         // goes on from the same spot; the next episode of the show starts with the dub
@@ -1438,8 +1556,7 @@ function staticServer() {
         check('player v134: no errors', !pageErrors.length, pageErrors);
         await p.close();
     }
-
-    };
+    }];
 
     groups.seats = async () => {
     // A full house: logged in, the app waits on the waiting page with the place in line, nothing of the app
@@ -1532,7 +1649,24 @@ function staticServer() {
 
     };
 
-    groups.misc = async () => {
+    // "What's new": returning visitors get everything they have not confirmed, on every visit until "Got it";
+    // new visitors never get a pop-up
+    async function visitor(storage, time) {
+        const p = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+        if (time) await p.clock.install({ time });
+        await p.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
+        await p.route(`${base}/api/**`, route => route.fulfill({ contentType: 'application/json', body: '{"maintenance":false}' }));
+        await p.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
+        await p.addInitScript(entries => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); for (const [k, v] of entries) localStorage.setItem(k, v); } }, Object.entries(storage));
+        p.on('pageerror', e => errors.push(`whatsnew: ${e.message}`));
+        await p.goto(base + '/#/');
+        if (time) await p.clock.runFor(4000); else await p.waitForTimeout(4000);
+        return p;
+    }
+    const dialogTitle = (p) => p.evaluate(() => document.querySelector('.whatsnew .modal-title')?.textContent || null);
+
+    // In two parts that run side by side
+    groups.misc = [async () => {
     // "Reduce motion": no smooth scrolling (Lenis marks <html>), no cards flying in, no count-up
     const calm = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
     await calm.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
@@ -1549,21 +1683,6 @@ function staticServer() {
         !motion.lenis && motion.hiddenCards === 0 && motion.transition.split(',').every(t => parseFloat(t) < 0.001), motion);
     await calm.close();
 
-    // "What's new": returning visitors get everything they have not confirmed, on every visit until "Got it";
-    // new visitors never get a pop-up
-    async function visitor(storage, time) {
-        const p = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-        if (time) await p.clock.install({ time });
-        await p.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
-        await p.route(`${base}/api/**`, route => route.fulfill({ contentType: 'application/json', body: '{"maintenance":false}' }));
-        await p.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
-        await p.addInitScript(entries => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); for (const [k, v] of entries) localStorage.setItem(k, v); } }, Object.entries(storage));
-        p.on('pageerror', e => errors.push(`whatsnew: ${e.message}`));
-        await p.goto(base + '/#/');
-        if (time) await p.clock.runFor(4000); else await p.waitForTimeout(4000);
-        return p;
-    }
-    const dialogTitle = (p) => p.evaluate(() => document.querySelector('.whatsnew .modal-title')?.textContent || null);
 
     const back = await visitor({ aniroll_theme: 'dark' });
     const both = await back.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent));
@@ -1639,7 +1758,8 @@ function staticServer() {
         const pressed = document.querySelector('[data-preview-seed="#006a6a"]').getAttribute('aria-pressed');
         const stored = localStorage.getItem('aniroll_m3_seed');
         document.querySelector('[data-preview-seed=""]').click();
-        await new Promise(r => setTimeout(r, 1200));
+        // The way back is a tween too: wait until it lands (up to 5 s, it takes longer with several groups at once)
+        for (let i = 0; i < 50 && primary() !== before; i++) await new Promise(r => setTimeout(r, 100));
         return { before, picked, pressed, stored, after: primary() };
     });
     check('landing: a colour shape turns the page into its palette, keeps nothing, and goes back',
@@ -1648,6 +1768,7 @@ function staticServer() {
         m3landing.design === 'm3' && m3landing.tiles === 2 && m3landing.colour === 'media/m3.mp4' && !m3landing.tryDesign, m3landing);
     await fresh.close();
 
+    }, async () => {
     // Confirmed today's entry before it grew: its new id brings it back, on its own
     const grown = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-25', aniroll_design_v2: 'aniroll' });
     const grownHeads = await grown.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent));
@@ -1695,24 +1816,28 @@ function staticServer() {
     await clipped.close();
     await late.close();
 
-    };
+    }];
 
     // Checks kept out of the published source, when present
     const extra = path.join(__dirname, 'private.js');
-    if (fs.existsSync(extra)) groups.private = () => require(extra)({ browser, base, check, respond, VIEWER, errors, idle });
+    if (fs.existsSync(extra)) groups.private = [require(extra)].flat().map(run => () => run({ browser, base, check, respond, VIEWER, errors, idle }));
 
     // The groups share nothing but the browser: several run at once, each in its own tabs (E2E_WORKERS,
-    // default 3). E2E_ONLY=player,private runs just those (handy while working on one part; the deploy
-    // always runs everything). The longest go first.
+    // default 8, fewer on a smaller machine). A group that is a list runs as parts of its own, side by side like groups. E2E_ONLY=player,private
+    // runs just those (handy while working on one part; the deploy always runs everything). The longest go first.
     const only = (process.env.E2E_ONLY || '').split(',').map(x => x.trim()).filter(Boolean);
     const unknown = only.filter(n => !groups[n]);
     if (unknown.length) throw new Error(`E2E_ONLY: no group ${unknown.join(', ')} (there are ${Object.keys(groups).join(', ')})`);
-    const order = ['player', 'main', 'misc', 'private', 'discover', 'seats', 'party'].filter(n => groups[n] && (!only.length || only.includes(n)));
+    const order = ['private', 'misc', 'player', 'main', 'seats', 'discover', 'party'].filter(n => groups[n] && (!only.length || only.includes(n)));
+    const jobs = order.flatMap(n => [groups[n]].flat().map((run, i, all) => ({ name: all.length > 1 ? `${n} ${i + 1}/${all.length}` : n, run })));
     let next = 0;
-    await Promise.all(Array.from({ length: Math.max(1, Number(process.env.E2E_WORKERS) || 3) }, async () => {
-        while (next < order.length) {
-            const name = order[next++];
-            try { await groups[name](); } catch (e) { check(`${name}: the group runs to its end`, false, e.stack || e.message); }
+    await Promise.all(Array.from({ length: Math.max(1, Number(process.env.E2E_WORKERS) || Math.min(8, os.availableParallelism())) }, async () => {
+        while (next < jobs.length) {
+            const { name, run } = jobs[next++];
+            const t0 = Date.now();
+            try { await run(); } catch (e) { check(`${name}: the group runs to its end`, false, e.stack || e.message); }
+            // How long each took: the longest part sets the length of the whole run
+            console.error(`${name}: ${((Date.now() - t0) / 1000).toFixed(1)} s`);
         }
     }));
 

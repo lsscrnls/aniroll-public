@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=175';
-import { enhanceSelect } from '../select.js?v=175';
-import { renderMediaCard, getState, esc, emptyIcon, renderPageSwitch } from '../store.js?v=175';
-import { getToken } from '../auth.js?v=175';
+import * as api from '../api.js?v=176';
+import { enhanceSelect } from '../select.js?v=176';
+import { renderMediaCard, getState, esc, emptyIcon, renderPageSwitch } from '../store.js?v=176';
+import { getToken } from '../auth.js?v=176';
 
 export async function render({ content, query: params }) {
     const token = getToken();
@@ -73,7 +73,11 @@ export async function render({ content, query: params }) {
         }).catch(() => { /* no chips */ });
     }
 
+    // Only the newest request fills the grid: an older, slower one (shorter text, the filter before) is dropped
+    let ticket = 0;
+
     async function loadResults(page = 1, append = false) {
+        const mine = ++ticket;
         const vars = {
             page,
             perPage: 24,
@@ -99,6 +103,7 @@ export async function render({ content, query: params }) {
 
         try {
             const result = await api.browseMedia(vars, token);
+            if (mine !== ticket) return;
             const grid = document.getElementById('browse-grid');
             if (!grid) return;
 
@@ -110,6 +115,7 @@ export async function render({ content, query: params }) {
             if (moreBtn) moreBtn.hidden = !result.pageInfo.hasNextPage;
             currentPage = page;
         } catch (err) {
+            if (mine !== ticket) return;
             const grid = document.getElementById('browse-grid');
             if (grid) {
                 grid.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${emptyIcon('alert')}</div><div class="empty-state-text" style="color:var(--error)">${esc(err.message)}</div></div>`;

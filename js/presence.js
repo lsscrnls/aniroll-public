@@ -1,5 +1,5 @@
 // @ts-check
-import { esc, titlePref, toast } from './store.js?v=175';
+import { esc, titlePref, toast } from './store.js?v=176';
 
 // Discord status: what you do in AniRoll, shown in Discord (Settings → Discord). The page only says what is
 // going on; the AniRoll for Discord extension (discord/extension) passes it to a small helper on this
@@ -310,11 +310,14 @@ export function mountPresenceSettings(box) {
         }
     });
     let shown = JSON.stringify(ext);
-    document.addEventListener('aniroll:presence-status', () => {
-        if (!box.isConnected || JSON.stringify(ext) === shown) return;
+    // Settings opened again draws a new box: this one's listener goes with it
+    const onStatus = () => {
+        if (!box.isConnected) return document.removeEventListener('aniroll:presence-status', onStatus);
+        if (JSON.stringify(ext) === shown) return;
         shown = JSON.stringify(ext);
         paint();
-    });
+    };
+    document.addEventListener('aniroll:presence-status', onStatus);
     // Checked again while the steps are open: the helper may just have been installed
     const poll = setInterval(() => (box.isConnected ? hello() : clearInterval(poll)), 3000);
     paint();

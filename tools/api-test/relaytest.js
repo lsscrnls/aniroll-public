@@ -29,7 +29,8 @@ function load(table, isPrivateOverride) {
 (async () => {
     const { isPrivateIp } = load({});
     const privateIps = ['127.0.0.1', '10.1.2.3', '172.16.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '100.127.255.1',
-        '198.18.0.1', '0.0.0.0', '::1', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1', '::ffff:7f00:1', '64:ff9b::7f00:1'];
+        '198.18.0.1', '0.0.0.0', '192.0.0.1', '240.0.0.1', '::1', '::', 'fd00::1', 'fe80::1', 'fe9a::1', 'fec0::1', 'ff02::1',
+        '::7f00:1', '::ffff:127.0.0.1', '::ffff:7f00:1', '64:ff9b::7f00:1', 'not-an-address'];
     const publicIps = ['93.184.216.34', '1.1.1.1', '100.63.255.1', '100.128.0.1', '172.32.0.1', '2606:4700::1111'];
     const wrongPrivate = privateIps.filter(ip => !isPrivateIp(ip));
     const wrongPublic = publicIps.filter(ip => isPrivateIp(ip));
