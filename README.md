@@ -131,17 +131,20 @@ data are both there while it runs. That is why the server keeps an AniList token
 | What | When | Why | How to remove it |
 |------|------|-----|------------------|
 | Your AniList token, encrypted | Only after you turn on **background sync** (Settings, or when joining a Watch Party) | Moves your list forward while AniRoll is closed: Watch Party guests following the host, episodes finished in Jellyfin | Turn background sync off; a token AniList rejects is deleted too. AniList tokens from this login last about a year, revoking AniRoll on AniList ends it at once |
-| Your Jellyfin address, user name and API key or sign-in token (encrypted) | When you link Jellyfin to AniRoll | The relay and the Play button | Unlink Jellyfin |
+| Your Jellyfin address (encrypted; for a server at home this is usually your home IP address or a name pointing to it), user name and API key or sign-in token | When you link Jellyfin to AniRoll | The relay and the Play button | Unlink Jellyfin |
 | A webhook secret, the shows in your Jellyfin library (ids only), episodes waiting to be saved | When you set up live tracking | Live tracking from Jellyfin | Turn live tracking off, which deletes all three; a waiting episode is dropped after 7 days anyway |
 | A few small settings per AniList account | When you change them | The same settings on every device | — |
 | Whether you share your calendar | When you turn it on (Settings → Lists) | People who follow you see what you are watching in their calendar | Turn it off |
 | Watch Party members (AniList name, avatar, episode) | While a party runs | The party itself | Leave or end the party |
 | Shared pages (title, cover, description of a show) | When you share one | The share link preview | — |
-| Error reports (message, page, version, browser) | When something breaks in the app | Fixing it | The file is rotated at 1 MB, one older file is kept |
+| Error reports (message, page, version, browser name and system, like "Firefox 140 / Linux") | When something breaks in the app | Fixing it | The file is rotated at 1 MB, one older file is kept |
 
 No IP addresses are written anywhere: the web server keeps no access or error log, and error reports carry
 none. Rate limits count requests per address in memory only and forget them within about 20 minutes.
 Your AniList account is the one identity the server knows.
+Watch Party covers and avatars only come from AniList's image server, so a host cannot make guests load
+pictures from a server of their own. Backups of all this are kept for 14 days; after you remove something,
+it is gone from them two weeks later.
 
 The server never sees your AniList password. Without background sync it never writes your token to disk:
 the browser sends it with a request, and the server keeps it in memory for up to 10 minutes, to know who you are.

@@ -6,7 +6,7 @@
 // with Google's Material Color Utilities (2025 spec, the one M3 Expressive uses). The scheme is written as a
 // <style> with a light and a dark block, so System/Light/Dark keep working without recomputing; it is cached
 // in localStorage so a reload paints M3 colours before the colour library has even loaded.
-import { BASELINE_TONAL_CSS } from './m3-baseline.js?v=176';
+import { BASELINE_TONAL_CSS } from './m3-baseline.js?v=177';
 
 // The switch to the legacy design, from before it was removed: forgotten
 const OLD_DESIGN_KEYS = ['aniroll_design_v2', 'aniroll_design'];
@@ -113,7 +113,7 @@ export async function applyDesign(loggedIn) {
     try { OLD_DESIGN_KEYS.forEach(k => localStorage.removeItem(k)); } catch { /* nothing kept */ }
     // Page additions only M3 has (hero, search bar, rail FAB ...)
     if (enhancer) enhancer.then(m => m.refresh());
-    enhancer ??= import('./m3.js?v=176').then(m => { m.setup(); return m; });
+    enhancer ??= import('./m3.js?v=177').then(m => { m.setup(); return m; });
 
     // Stylesheet first; keep the page hidden until it's there, so AniRoll's look never flashes
     let sheet = null;
