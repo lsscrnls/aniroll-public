@@ -17,6 +17,7 @@ module.exports = function animeMap({ dataDir, writeJson, readJson, json, readBod
     let byTvdb = new Map();   // TVDB series id -> entries
     let byTmdb = new Map();   // TMDB tv id -> entries
     let byMovie = new Map();  // TMDB movie id -> entries
+    let byAnilist = new Map(); // AniList id -> entry
     let loadedAt = 0;
     let loading = null;
 
@@ -25,9 +26,9 @@ module.exports = function animeMap({ dataDir, writeJson, readJson, json, readBod
     function index(list, at) {
         entries = list;
         loadedAt = at;
-        byTvdb = new Map(); byTmdb = new Map(); byMovie = new Map();
+        byTvdb = new Map(); byTmdb = new Map(); byMovie = new Map(); byAnilist = new Map();
         const add = (map, key, e) => { if (key) map.set(key, [...(map.get(key) || []), e]); };
-        for (const e of list) { add(byTvdb, e.tvdb, e); add(byTmdb, e.tmdb, e); (e.movie || []).forEach(id => add(byMovie, id, e)); }
+        for (const e of list) { add(byTvdb, e.tvdb, e); add(byTmdb, e.tmdb, e); (e.movie || []).forEach(id => add(byMovie, id, e)); byAnilist.set(e.a, e); }
     }
 
     // The full list carries a dozen ids per show; only the ones the player needs are kept
@@ -137,5 +138,8 @@ module.exports = function animeMap({ dataDir, writeJson, readJson, json, readBod
         writeJson(libraryFile, all, { pretty: false, mode: 0o600 });
     }
 
-    return { handle, handleLibrary, libraryMatch, forgetLibrary, stats: () => ({ entries: entries.length, at: loadedAt }) };
+    // The TVDB/TMDB ids of one AniList entry, or null
+    const forAnilist = (id) => byAnilist.get(num(id)) || null;
+
+    return { handle, handleLibrary, libraryMatch, forgetLibrary, forAnilist, stats: () => ({ entries: entries.length, at: loadedAt }) };
 };

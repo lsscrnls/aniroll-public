@@ -2308,3 +2308,42 @@
 
 /* Detail recommendations: the AniList score is the one number on this page already (top), not again on every card */
 :root[data-design="m3"] .detail-recs .media-card-score { display: none; }
+
+/* ----- Going back in the installed app (js/backnav.js): a button island before the logo, a swipe from the left edge ----- */
+:root[data-design="m3"] .nav-back {
+    flex: 0 0 auto;
+    width: 48px;
+    color: var(--md-on-surface);
+    background: var(--m3-island);
+    -webkit-backdrop-filter: var(--m3-island-blur);
+    backdrop-filter: var(--m3-island-blur);
+    box-shadow: var(--m3-island-shadow);
+}
+:root[data-design="m3"] .nav-back:hover { background: color-mix(in srgb, var(--md-surface-container-highest) 80%, transparent); }
+.back-swipe {
+    --p: 0;
+    position: fixed;
+    left: 0;
+    z-index: 9500;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-top: -22px;
+    border-radius: var(--radius-full);
+    color: var(--md-on-surface, #fff);
+    background: var(--md-surface-container-highest, #333);
+    box-shadow: var(--md-elev-2, 0 4px 12px rgba(0,0,0,.4));
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(calc(-48px + var(--p) * 64px)) scale(calc(.7 + var(--p) * .3));
+    transition: opacity .15s, background-color .15s, color .15s;
+}
+.back-swipe.is-on { opacity: calc(.4 + var(--p) * .6); }
+.back-swipe.is-ready { color: var(--md-on-primary, #fff); background: var(--md-primary, #d13438); }
+.back-swipe svg { width: 22px; height: 22px; }
+/* The smallest phones: with the back button there, the mark alone stands for AniRoll */
+@media (max-width: 379px) {
+    :root[data-design="m3"] .nav-back:not([hidden]) + .nav-logo { padding: 0 8px; }
+    :root[data-design="m3"] .nav-back:not([hidden]) + .nav-logo .logo-text { display: none; }
+}

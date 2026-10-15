@@ -1,5 +1,5 @@
 // Keyboard and screen reader support that every page shares.
-import { esc } from './store.js?v=177';
+import { esc } from './store.js?v=179';
 
 // ===== Dialogs =====
 // An open overlay behaves as a dialog: announced as one, focus moves in and stays inside
@@ -15,9 +15,28 @@ function focusables(root) {
     return [...root.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null || el.getClientRects().length);
 }
 
+// Android's back button and gesture close the topmost dialog instead of leaving the page, where the
+// browser has close watchers (Chromium). One watcher per step: a dialog that went deeper (the detail
+// panel showing a related title) steps back once per press before it closes.
+function watch(entry) {
+    if (typeof window.CloseWatcher !== 'function') return;
+    try {
+        // @ts-ignore: not in every DOM typing yet
+        const watcher = new window.CloseWatcher();
+        watcher.onclose = () => {
+            const i = entry.watchers.indexOf(watcher);
+            if (i < 0) return;
+            entry.watchers.splice(i, 1);
+            entry.onBack?.();
+        };
+        entry.watchers.push(watcher);
+    } catch { /* too many without a tap in between: the step below covers it */ }
+}
+
 // root: the element holding the dialog's content. onClose: what Escape does — it must end
-// up calling the returned release(). focus: selector of the element to focus first.
-export function openDialog(root, { label, onClose, focus } = {}) {
+// up calling the returned release(). onBack: what going back does (the back button, a swipe
+// from the edge), when that is not simply closing. focus: selector of the element to focus first.
+export function openDialog(root, { label, onClose, onBack, focus } = {}) {
     const open = stack.find(d => d.root === root);
     if (open) return open.release;
 
@@ -25,11 +44,12 @@ export function openDialog(root, { label, onClose, focus } = {}) {
     root.setAttribute('aria-modal', 'true');
     if (label) root.setAttribute('aria-label', label);
 
-    const entry = { root, onClose, returnTo: document.activeElement };
+    const entry = { root, onClose, onBack: onBack || onClose, watchers: [], returnTo: document.activeElement };
     entry.release = () => {
         const i = stack.indexOf(entry);
         if (i < 0) return;
         stack.splice(i, 1);
+        entry.watchers.splice(0).forEach(w => w.destroy());
         root.removeAttribute('aria-modal');
         // Only take focus back if it is still in the dialog (or lost), not if the user moved on
         const active = document.activeElement;
@@ -38,6 +58,7 @@ export function openDialog(root, { label, onClose, focus } = {}) {
         }
     };
     stack.push(entry);
+    watch(entry);
 
     requestAnimationFrame(() => {
         if (!stack.includes(entry)) return;
@@ -49,6 +70,32 @@ export function openDialog(root, { label, onClose, focus } = {}) {
         target.focus({ preventScroll: true });
     });
     return entry.release;
+}
+
+// The open dialog went one step deeper; going back returns to this step first
+export function addDialogStep(root) {
+    const entry = stack.find(d => d.root === root);
+    if (entry) watch(entry);
+}
+
+export function dialogOpen() {
+    return stack.length > 0;
+}
+
+// Going back while a dialog is open: one step back in the topmost one (or closing it)
+export function dialogBack() {
+    const top = stack.at(-1);
+    if (!top) return false;
+    top.watchers.pop()?.destroy();
+    top.onBack?.();
+    return true;
+}
+
+// Going back to another page closes whatever was open over the one being left
+export function closeAllDialogs() {
+    for (const entry of [...stack].reverse()) {
+        if (stack.includes(entry)) entry.onClose?.();
+    }
 }
 
 document.addEventListener('keydown', (e) => {

@@ -23,7 +23,7 @@ for port in 3001 3099; do
     fi
 done
 
-cp "$root/api/server.js" "$root/api/party.js" "$root/api/animemap.js" "$work/"
+cp "$root/api/server.js" "$root/api/party.js" "$root/api/animemap.js" "$root/api/sources.js" "$work/"
 # A tiny anime map instead of the real download: two parts of one TVDB season, a movie
 mkdir -p "$work/data"
 echo '{"at":'"$(date +%s)000"',"entries":[{"a":101,"tvdb":5001,"ts":1,"to":0,"tmdb":7001,"ms":1,"mo":0,"movie":[]},{"a":102,"tvdb":5001,"ts":1,"to":12,"tmdb":7001,"ms":1,"mo":12,"movie":[]},{"a":103,"tvdb":null,"ts":null,"to":0,"tmdb":null,"ms":null,"mo":0,"movie":[9001]}]}' > "$work/data/animemap.json"
