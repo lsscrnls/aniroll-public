@@ -1483,6 +1483,10 @@ const party = require('./party')({
 const animeMap = require('./animemap')({ dataDir: DATA_DIR, writeJson, readJson, json, readBody, overLimit, clientIp,
     verifyViewer, refuseAuth, normTitle, splitYear });
 
+// The owner's own tools (api/sources.js); nobody else is answered there
+const sources = require('./sources')({ dataDir: DATA_DIR, readJson, writeJson, verifyViewer, refuseAuth, json, readBody, str,
+    encryptSecret, decryptSecret, isOwner: (viewer) => viewer?.id === ADMIN_ID, animeMap });
+
 async function handle(req, res) {
     setCors(req, res);
     if (req.method === 'OPTIONS') {
@@ -1511,6 +1515,7 @@ async function handle(req, res) {
 
     if (pathname === '/api/animemap' && req.method === 'POST') return animeMap.handle(req, res);
     if (pathname === '/api/me/jflibrary') return animeMap.handleLibrary(req, res);
+    if (pathname.startsWith('/api/sources/')) return sources.handle(req, res, pathname);
 
     if (pathname === '/api/log' && req.method === 'POST') {
         const body = await readBody(req);

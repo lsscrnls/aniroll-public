@@ -1,10 +1,10 @@
-import * as api from '../api.js?v=177';
-import { enhanceSelect } from '../select.js?v=177';
-import { tasteMatch } from '../taste.js?v=177';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=177';
-import { getToken, isLoggedIn } from '../auth.js?v=177';
-import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=177';
-import { showConfirm } from '../a11y.js?v=177';
+import * as api from '../api.js?v=179';
+import { enhanceSelect } from '../select.js?v=179';
+import { tasteMatch } from '../taste.js?v=179';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js?v=179';
+import { getToken, isLoggedIn } from '../auth.js?v=179';
+import { getActiveParty, startParty, createPartyLink } from './watchparty.js?v=179';
+import { showConfirm } from '../a11y.js?v=179';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -54,7 +54,7 @@ async function loadPlayButton(media, root) {
     const slot = root.querySelector('#detail-play');
     if (!slot || media.type !== 'ANIME') return;
     try {
-        const { mountPlayButton } = await import('../player/playbutton.js?v=177');
+        const { mountPlayButton } = await import('../player/playbutton.js?v=179');
         await mountPlayButton(slot, media, nextEpisode(media));
     } catch (err) {
         console.warn('Jellyfin player unavailable:', err.message);
