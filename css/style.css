@@ -5075,7 +5075,9 @@ body.player-open .cursor { display: none !important; }
 .player:not(.is-idle) > .pl-subs-text .pl-subs-bottom { transform: translateY(calc(-1 * max(0px, 112px - max(6.5vh, 24px)))); }
 .player.is-idle { cursor: none; }
 /* JASSUB draws ASS subtitles on a canvas it lays over the video */
-.player .pl-subs-canvas { pointer-events: none; }
+.player .pl-subs-canvas { pointer-events: none; transition: transform .4s var(--pl-ease); }
+/* While the controls show, styled and picture subtitles rise a little too (the whole layer, signs included) */
+.player:not(.is-idle) > .pl-subs-canvas { transform: translateY(calc(-1 * clamp(28px, 6vh, 72px))); }
 .player .pl-subs-canvas[hidden] { display: none; }
 
 .pl-icon { width: 24px; height: 24px; fill: currentColor; display: block; }

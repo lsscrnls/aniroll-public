@@ -9,3 +9,5 @@ api/party.js
 js/drift.js
 js/pages/shelf.js
 js/touches.js
+js/sources.js
+api/sources.js

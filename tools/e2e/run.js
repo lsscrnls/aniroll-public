@@ -657,7 +657,7 @@ function staticServer() {
         // The mock has every show airing and every show on TV: one planned show premieres in 8 days, one is a movie
         for (const list of answer.data?.MediaListCollection?.lists || []) {
             if (list.status === 'PLANNING' && list.entries[0]) {
-                Object.assign(list.entries[0].media, { status: 'NOT_YET_RELEASED', nextAiringEpisode: { episode: 1, airingAt: Math.floor(Date.now() / 1000) + 8 * 86400, timeUntilAiring: 8 * 86400 } });
+                Object.assign(list.entries[0].media, { status: 'NOT_YET_RELEASED', nextAiringEpisode: { episode: 1, airingAt: Math.floor(Date.now() / 1000) + 8 * 86400 + 3600, timeUntilAiring: 8 * 86400 + 3600 } });
             }
             if (list.status === 'CURRENT' && list.entries[1]) list.entries[1].media.format = 'MOVIE';
         }
@@ -1263,21 +1263,26 @@ function staticServer() {
         await p.evaluate(h => { location.hash = h; }, playHash);
         await idle(p, 2500);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.6; v.play(); });
-        await p.waitForTimeout(800);
+        // Conditions instead of fixed times: on a busy machine the clip runs on while the test waits
+        await p.waitForFunction(() => !document.querySelector('.pl-next').hidden, null, { timeout: 5000 }).catch(() => {});
         const upNext = await p.evaluate(() => ({ shown: !document.querySelector('.pl-next').hidden,
             title: document.querySelector('.pl-next-title').textContent, label: document.querySelector('.pl-next-label').textContent }));
         await p.click('[data-act="cancelNext"]');
         // Watch credits: the card goes, and no Skip credits button takes its place
         const cancelled = await p.evaluate(() => document.querySelector('.pl-next').hidden && document.querySelector('.pl-skip-segment').hidden);
         // Watched the credits to the end: the card asks once more instead of leaving at once
-        await p.waitForTimeout(1800);
+        await p.waitForFunction(() => document.getElementById('player-video').ended, null, { timeout: 8000 }).catch(() => {});
+        await p.waitForTimeout(300);
         const atEnd = await p.evaluate(() => ({ ended: document.getElementById('player-video').ended, shown: !document.querySelector('.pl-next').hidden, hash: location.hash }));
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 5; });
         await p.waitForTimeout(400);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.6; v.play(); });
-        await p.waitForTimeout(800);
+        await p.waitForFunction(() => !document.querySelector('.pl-next').hidden, null, { timeout: 5000 }).catch(() => {});
+        // Paused, so the clip cannot reach its end and move on by itself before the click lands
+        await p.evaluate(() => document.getElementById('player-video').pause());
         const again = await p.evaluate(() => !document.querySelector('.pl-next').hidden);
-        await p.click('[data-act="playNext"]');
+        await p.click('[data-act="playNext"]', { timeout: 5000 }).catch(() => {});
+        await p.waitForFunction(() => /\/3$/.test(location.hash), null, { timeout: 5000 }).catch(() => {});
         await idle(p, 2500);
         const moved = await p.evaluate(() => location.hash);
         const askedOnUpNext = await p.evaluate(() => !!document.querySelector('.pl-resume'));
@@ -1295,8 +1300,8 @@ function staticServer() {
             return { canvas: !!c, shown: c && !c.hidden, w: c?.width || 0, textTracks: [...document.getElementById('player-video').textTracks].map(t => t.mode).join() };
         });
         await p.mouse.move(640, 500);
-        await p.click('[data-act="subs"]').catch(() => {});
-        await p.waitForTimeout(300);
+        await p.click('[data-act="subs"]', { timeout: 5000 }).catch(() => {});
+        await p.waitForSelector('.pl-menu-item:not(.pl-menu-back)', { timeout: 3000 }).catch(() => {});
         const menuItems = await p.$$eval('.pl-menu-item:not(.pl-menu-back)', els => els.map(e => e.textContent.trim()));
         await p.keyboard.press('Escape');
         check('player: styled ASS through JASSUB with the embedded font, text tracks stay off',
@@ -1815,6 +1820,77 @@ function staticServer() {
         teaser.heads.some(h => h.startsWith('A new Home')) && teaser.teaser && played.wide && played.video === 'media/design-aniroll.mp4' && played.width > 600, { ...teaser, ...played });
     await clipped.close();
     await late.close();
+
+    }, async () => {
+    // The installed app (iOS: navigator.standalone) on a phone: a back button once there is a page to go back to,
+    // a swipe from the left edge; both step back through the detail panel first and never leave the app
+    const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    phone.on('pageerror', e => errors.push(`installed app: ${e.message}`));
+    await phone.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
+    await phone.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false}' }));
+    await phone.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
+    await phone.addInitScript(({ id, name }) => {
+        localStorage.setItem('aniroll_token', 'e2e-token');
+        localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+        localStorage.setItem('aniroll_user_ts', String(Date.now()));
+        localStorage.setItem('aniroll_seen_changes', '9999');
+        Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true });
+    }, VIEWER);
+    const cdp = await phone.context().newCDPSession(phone);
+    const swipe = async (to = 160) => {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 6, y: 420 }] });
+        for (const x of [20, 40, 80, 120, to]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: 422 }] });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await idle(phone, 2000);
+    };
+    const state = () => phone.evaluate(() => ({ hash: location.hash, back: !document.getElementById('nav-back').hidden,
+        panel: document.getElementById('detail-panel-overlay').classList.contains('open') ? document.getElementById('detail-panel-overlay').dataset.mediaId : null }));
+    const phoneGo = async (hash) => { await phone.evaluate(h => { localStorage.removeItem('aniroll_req_times'); location.hash = h; }, hash); await idle(phone, 2500); };
+
+    await phone.goto(base + '/#/');
+    await idle(phone, 3000);
+    const start = await state();
+    await swipe();
+    const stayed = await state();
+    await phoneGo('#/list');
+    await phoneGo('#/anime/21/full');
+    const deep = await state();
+    await phone.click('#nav-back');
+    await idle(phone, 2500);
+    const once = await state();
+    check('installed app: no back button on the first page, and a swipe there stays in the app; one per page deeper, it goes back a page',
+        start.hash === '#/' && !start.back && stayed.hash === '#/' && deep.back && once.hash === '#/list' && once.back, { start, stayed, deep, once });
+
+    await phone.evaluate(() => window.__openDetailPanel(21));
+    await idle(phone, 2500);
+    const related = await phone.evaluate(() => [...document.querySelectorAll('#detail-panel-body .detail-related-item[data-open]')].map(b => b.dataset.open).find(id => id !== '21'));
+    if (related) await phone.click(`#detail-panel-body .detail-related-item[data-open="${related}"]`);
+    await idle(phone, 2500);
+    const second = await state();
+    await swipe();
+    const stepped = await state();
+    await swipe(60);
+    const short = await state();
+    await swipe();
+    const closed = await state();
+    await swipe();
+    const home = await state();
+    check('installed app: a swipe from the edge steps back through the detail panel, closes it, then goes back a page (a short one does nothing)',
+        !!related && second.panel === related && stepped.panel === '21' && short.panel === '21' && closed.panel === null && closed.hash === '#/list'
+        && home.hash === '#/' && !home.back, { related, second, stepped, short, closed, home });
+    await phone.close();
+
+    // In a browser tab the browser has its own back: no button
+    const tab = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await tab.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
+    await tab.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false}' }));
+    await tab.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
+    await tab.goto(base + '/#/');
+    await idle(tab, 2500);
+    await tab.evaluate(() => { location.hash = '#/search'; });
+    await idle(tab, 2500);
+    check('browser tab: no back button of our own', await tab.evaluate(() => document.getElementById('nav-back').hidden));
+    await tab.close();
 
     }];
 
