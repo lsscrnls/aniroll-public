@@ -35,6 +35,19 @@ func TestSanitize(t *testing.T) {
 	if out["timestamps"] == nil {
 		t.Error("valid timestamps dropped")
 	}
+	if out["status_display_type"] != nil {
+		t.Error("display type set without being asked")
+	}
+	var shown map[string]any
+	json.Unmarshal(sanitize(json.RawMessage(`{"type":3,"details":"xy","status_display_type":2}`)), &shown)
+	if shown["status_display_type"] != float64(2) {
+		t.Errorf("display type %v", shown["status_display_type"])
+	}
+	shown = nil
+	json.Unmarshal(sanitize(json.RawMessage(`{"type":3,"details":"xy","status_display_type":7}`)), &shown)
+	if shown["status_display_type"] != nil {
+		t.Error("unknown display type passed")
+	}
 	if sanitize(json.RawMessage(`{"type":3,"details":"x","timestamps":{"start":-5}}`)) == nil {
 		t.Error("activity with bad time dropped entirely")
 	}

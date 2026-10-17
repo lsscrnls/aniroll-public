@@ -24,7 +24,7 @@ export async function partyFromPlayer(media, episode, player = null) { return nu
 export async function switchPartyTo(target, fromProgress = null) { return null; }
 
 // A dialog to pick a show from the host's list; calls `onPick` with the choice.
-export function openPartyPicker({ title, sub, excludeId = null, includePlanning = false, onPick }) { return null; }
+export function openPartyPicker({ title, sub, excludeId = null, allLists = false, onPick }) { return null; }
 
 // Ends the party this browser hosts.
 export async function endParty() { return null; }
