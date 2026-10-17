@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	version  = "1.0.1"
+	version  = "1.0.2"
 	hostName = "app.aniroll.discord"
 	clientID = "1558496660953501827"
 	// Discord takes five updates in twenty seconds; one every five keeps clear of that, and in between

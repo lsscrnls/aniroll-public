@@ -16,6 +16,8 @@ type activity struct {
 	Timestamps *timestamps `json:"timestamps,omitempty"`
 	Assets     *assets     `json:"assets,omitempty"`
 	Buttons    []button    `json:"buttons,omitempty"`
+	// What the member list shows after "Watching": 0 the app's name, 1 the state, 2 the details
+	StatusDisplayType int `json:"status_display_type,omitempty"`
 }
 
 type timestamps struct {
@@ -50,6 +52,9 @@ func sanitize(raw json.RawMessage) json.RawMessage {
 	}
 	if out.Details == "" {
 		return nil
+	}
+	if in.StatusDisplayType == 1 || in.StatusDisplayType == 2 {
+		out.StatusDisplayType = in.StatusDisplayType
 	}
 	if t := in.Timestamps; t != nil {
 		// Milliseconds within a day of now, the end after the start

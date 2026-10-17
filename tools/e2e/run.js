@@ -1271,9 +1271,16 @@ function staticServer() {
         // Watch credits: the card goes, and no Skip credits button takes its place
         const cancelled = await p.evaluate(() => document.querySelector('.pl-next').hidden && document.querySelector('.pl-skip-segment').hidden);
         // Watched the credits to the end: the card asks once more instead of leaving at once
-        await p.waitForFunction(() => document.getElementById('player-video').ended, null, { timeout: 8000 }).catch(() => {});
-        await p.waitForTimeout(300);
-        const atEnd = await p.evaluate(() => ({ ended: document.getElementById('player-video').ended, shown: !document.querySelector('.pl-next').hidden, hash: location.hash }));
+        // Read the moment it ends: the card counts down from there and, on a busy machine, may move on before a later look
+        const atEnd = await p.waitForFunction(() => {
+            const v = document.getElementById('player-video');
+            return v.ended && !document.querySelector('.pl-next').hidden ? { ended: true, shown: true, hash: location.hash } : null;
+        }, null, { timeout: 8000, polling: 50 }).then(h => h.jsonValue()).catch(() => p.evaluate(() => ({
+            ended: document.getElementById('player-video').ended, shown: !document.querySelector('.pl-next').hidden, hash: location.hash })));
+        if (!/\/2$/.test(await p.evaluate(() => location.hash))) {
+            await p.evaluate(h => { location.hash = h; }, playHash);
+            await idle(p, 2500);
+        }
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 5; });
         await p.waitForTimeout(400);
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 18.6; v.play(); });

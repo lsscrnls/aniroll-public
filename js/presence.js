@@ -1,5 +1,5 @@
 // @ts-check
-import { esc, titlePref, toast } from './store.js?v=179';
+import { esc, titlePref, toast } from './store.js?v=186';
 
 // Discord status: what you do in AniRoll, shown in Discord (Settings → Discord). The page only says what is
 // going on; the AniRoll for Discord extension (discord/extension) passes it to a small helper on this
@@ -12,7 +12,7 @@ const SITE = 'https://aniroll.app';
 const LOGO = `${SITE}/icons/icon-512.png`;
 const DL = `${SITE}/downloads/discord`;
 // The helper's newest version (discord/helper/main.go): an older one is pointed out, once per version
-const HELPER_LATEST = '1.0.1';
+const HELPER_LATEST = '1.0.2';
 const NAG_KEY = 'aniroll_discord_nagged';
 // The extension's newest version (discord/extension/manifest.json): an older one is pointed out the same way
 const EXTENSION_LATEST = '1.0.2';
@@ -39,8 +39,12 @@ let playing = null;      // the player's show and episode (aniroll:playing)
 let video = null;
 let looking = null;      // the show on screen (aniroll:media-shown)
 let party = null;        // the Watch Party you are in (aniroll:party)
+let note = null;         // a line from elsewhere in AniRoll (aniroll:activity, detail { details, state } or null)
 /** @type {{ extension?: string, helper?: boolean, helperVersion?: string, discord?: boolean } | null} */
 let ext = null;          // the extension's last word
+let idle = false;        // in the background for a while with nothing playing: no status
+let idleTimer = 0;
+const IDLE_AFTER = 2 * 60_000;
 let sent = '';
 let timer = 0;
 
@@ -66,7 +70,7 @@ function cover(media) {
 
 /** What Discord shows now, or null for nothing */
 function activity() {
-    if (!presenceOn()) return null;
+    if (!presenceOn() || idle) return null;
     const hash = location.hash;
     const small = { small_image: LOGO, small_text: 'AniRoll' };
     if (playing && hash.startsWith('#/play/')) {
@@ -85,6 +89,16 @@ function activity() {
             } : undefined,
             assets: { large_image: cover(media), large_text: line(title), ...small },
             buttons: showButtons(media),
+        };
+    }
+    if (note) {
+        return {
+            type: 3,
+            details: line(note.details),
+            state: note.state ? line(note.state) : undefined,
+            assets: { large_image: LOGO, large_text: 'AniRoll', ...small },
+            // The member list shows this line instead of just "AniRoll" (helper 1.0.2)
+            status_display_type: 2,
         };
     }
     // Away from the player (a guest, mostly): the show and the episode the party is on, like the host's status
@@ -124,6 +138,19 @@ function activity() {
     return { type: 3, details: 'Browsing', assets: { large_image: LOGO, large_text: 'AniRoll' } };
 }
 
+// A tab left in the background with nothing playing goes quiet after IDLE_AFTER; back in front, or
+// playing again, it shows up at once
+function watchIdle() {
+    clearTimeout(idleTimer);
+    const busy = video && !video.paused && !video.ended;
+    if (document.hidden && !busy) {
+        idleTimer = window.setTimeout(() => { idle = true; update(); }, IDLE_AFTER);
+    } else if (idle) {
+        idle = false;
+        update();
+    }
+}
+
 // A moment later, once: a page change brings several events at once
 function update() {
     clearTimeout(timer);
@@ -149,6 +176,11 @@ export function startPresence() {
         looking = /** @type {CustomEvent} */ (e).detail?.media || null;
         update();
     });
+    document.addEventListener('aniroll:activity', (e) => {
+        const d = /** @type {CustomEvent} */ (e).detail;
+        note = d && typeof d.details === 'string' ? { details: d.details, state: typeof d.state === 'string' ? d.state : '' } : null;
+        update();
+    });
     document.addEventListener('aniroll:party', (e) => {
         party = /** @type {CustomEvent} */ (e).detail || null;
         update();
@@ -159,9 +191,11 @@ export function startPresence() {
             const t = /** @type {HTMLElement} */ (e.target);
             if (t?.id !== 'player-video') return;
             video = /** @type {HTMLVideoElement} */ (t);
+            watchIdle();
             update();
         }, true);
     }
+    document.addEventListener('visibilitychange', watchIdle);
     window.addEventListener('hashchange', () => {
         if (!location.hash.startsWith('#/play/')) { playing = null; video = null; }
         looking = null;
