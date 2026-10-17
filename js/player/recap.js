@@ -7,11 +7,11 @@
 // and the last time the show was watched is two weeks or more ago. Where its ending starts comes from Jellyfin's
 // segments or AniSkip (for a file of that length); without it there is no recap rather than a guessed one.
 // Settings → Jellyfin → Player switches it off. Pause, subtitles and full screen work in it too.
-import { HtmlVideoEngine } from './engine.js?v=179';
-import { icon } from './controls.js?v=179';
-import { findEpisode } from './library.js?v=179';
-import { getConfig, jfAuth, deviceId } from '../jellyfin.js?v=179';
-import { esc, titlePref } from '../store.js?v=179';
+import { HtmlVideoEngine } from './engine.js?v=186';
+import { icon } from './controls.js?v=186';
+import { findEpisode } from './library.js?v=186';
+import { getConfig, jfAuth, deviceId } from '../jellyfin.js?v=186';
+import { esc, titlePref } from '../store.js?v=186';
 
 const KEY = 'aniroll_recap';
 const SEEN_KEY = 'aniroll_last_watched'; // { [mediaId]: ms } when an episode was last watched in AniRoll
