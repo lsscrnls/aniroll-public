@@ -1,8 +1,8 @@
-import * as api from '../api.js?v=186';
-import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=186';
-import { getToken, isLoggedIn } from '../auth.js?v=186';
-import { matchDna } from '../dna.js?v=186';
-import { freshMatch, keepMatch } from '../dnamatches.js?v=186';
+import * as api from '../api.js?v=188';
+import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=188';
+import { getToken, isLoggedIn } from '../auth.js?v=188';
+import { matchDna } from '../dna.js?v=188';
+import { freshMatch, keepMatch } from '../dnamatches.js?v=188';
 
 export async function render({ content }) {
     const token = getToken();
