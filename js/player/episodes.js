@@ -1,8 +1,8 @@
-import * as api from '../api.js?v=188';
-import { esc, titlePref } from '../store.js?v=188';
-import { getToken } from '../auth.js?v=188';
-import { openDialog } from '../a11y.js?v=188';
-import { listEpisodes } from './library.js?v=188';
+import * as api from '../api.js?v=189';
+import { esc, titlePref } from '../store.js?v=189';
+import { getToken } from '../auth.js?v=189';
+import { openDialog } from '../a11y.js?v=189';
+import { listEpisodes } from './library.js?v=189';
 
 // "Episodes": every episode of a show that Jellyfin has, to start any of them — a rewatch, one skipped,
 // one further back than where the list stands. AniList keeps each season as its own entry, so the

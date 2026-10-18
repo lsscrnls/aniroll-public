@@ -1,11 +1,11 @@
 // @ts-check
-import * as api from '../api.js?v=188';
-import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref } from '../store.js?v=188';
-import { getToken, isLoggedIn } from '../auth.js?v=188';
-import { readDna, matchDna } from '../dna.js?v=188';
-import { shareDna } from '../dnashare.js?v=188';
-import { knownMatches, keepMatch, matchVerdict } from '../dnamatches.js?v=188';
-import { accountState, saveAccountState } from '../accountstate.js?v=188';
+import * as api from '../api.js?v=189';
+import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref, toast } from '../store.js?v=189';
+import { getToken, isLoggedIn } from '../auth.js?v=189';
+import { readDna, matchDna } from '../dna.js?v=189';
+import { shareDna } from '../dnashare.js?v=189';
+import { knownMatches, keepMatch, matchVerdict } from '../dnamatches.js?v=189';
+import { accountState, saveAccountState } from '../accountstate.js?v=189';
 
 export async function render({ params, content }) {
     const token = getToken();
@@ -59,6 +59,7 @@ export async function render({ params, content }) {
         </div>
 
         <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-xl);flex-wrap:wrap">
+            ${!own && token && currentUser ? followButton(user) : ''}
             <a href="#/list/${esc(user.name)}" class="glass-btn glass-btn-secondary">View List</a>
             <a href="${esc(user.siteUrl || `https://anilist.co/user/${user.name}`)}" target="_blank" rel="noopener" class="glass-btn glass-btn-secondary">AniList Profile</a>
         </div>
@@ -98,6 +99,24 @@ export async function render({ params, content }) {
                 </div>
             </div>` : ''}
     </div>`;
+
+    // Follow from here instead of on AniList: the button turns at once, back if AniList says no
+    const follow = content.querySelector('#profile-follow');
+    follow?.addEventListener('click', async () => {
+        follow.disabled = true;
+        const was = follow.dataset.following === '1';
+        setFollow(follow, !was);
+        try {
+            const now = await api.toggleFollow(user.id, token);
+            setFollow(follow, now);
+            toast(now ? `Following ${user.name}` : `Unfollowed ${user.name}`);
+        } catch (e) {
+            setFollow(follow, was);
+            toast(e.message, 'error');
+        } finally {
+            follow.disabled = false;
+        }
+    });
 
     // Where this person and everyone else disagree most, from the list (usually read already)
     const lists = api.getMediaList(user.id, 'ANIME', token);
@@ -151,6 +170,20 @@ async function noteDna(dna) {
     if (JSON.stringify(next) !== JSON.stringify(kept)) saveAccountState('dna', next);
     // Changed since the last visit (a first visit has nothing to compare with)
     return { before: kept?.type && kept.type !== dna.type.name ? kept.type : null, months: next.months };
+}
+
+function followButton(user) {
+    return `<button type="button" id="profile-follow" class="glass-btn ${user.isFollowing ? 'glass-btn-secondary' : 'glass-btn-primary'}"
+        data-following="${user.isFollowing ? 1 : 0}" aria-pressed="${!!user.isFollowing}">${user.isFollowing ? 'Following' : user.isFollower ? 'Follow back' : 'Follow'}</button>
+        ${user.isFollower ? '<span class="profile-follows-you">Follows you</span>' : ''}`;
+}
+
+function setFollow(btn, on) {
+    btn.dataset.following = on ? '1' : '0';
+    btn.setAttribute('aria-pressed', String(on));
+    btn.classList.toggle('glass-btn-primary', !on);
+    btn.classList.toggle('glass-btn-secondary', on);
+    btn.textContent = on ? 'Following' : btn.nextElementSibling?.classList.contains('profile-follows-you') ? 'Follow back' : 'Follow';
 }
 
 function renderDna(dna, own, before) {

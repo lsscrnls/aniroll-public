@@ -3,8 +3,8 @@
 // from the DNA's own picture and words, kept by the server for the account (api/server.js "/api/me/dna-card"),
 // and the link /d/<name> shows it in Discord & co., then opens the profile, where a signed-in visitor sees
 // how well they match. Without the server (localhost), the image can still be saved.
-import { getToken } from './auth.js?v=188';
-import { toast } from './store.js?v=188';
+import { getToken } from './auth.js?v=189';
+import { toast } from './store.js?v=189';
 
 const W = 1200, H = 630;
 

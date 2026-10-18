@@ -1,15 +1,15 @@
-import * as api from '../api.js?v=188';
-import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=188';
-import { getToken, isLoggedIn } from '../auth.js?v=188';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=188';
-import { availability } from '../player/availability.js?v=188';
-import { findEpisode, jfGet } from '../player/library.js?v=188';
-import { deviceProfile } from '../player/profile.js?v=188';
-import { HtmlVideoEngine } from '../player/engine.js?v=188';
-import { controlsHtml, mountControls, icon } from '../player/controls.js?v=188';
-import { createSubtitles } from '../player/subtitles.js?v=188';
-import { neighbours, openEpisodes } from '../player/episodes.js?v=188';
-import { maybeRecap, noteWatched } from '../player/recap.js?v=188';
+import * as api from '../api.js?v=189';
+import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js?v=189';
+import { getToken, isLoggedIn } from '../auth.js?v=189';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js?v=189';
+import { availability } from '../player/availability.js?v=189';
+import { findEpisode, jfGet } from '../player/library.js?v=189';
+import { deviceProfile } from '../player/profile.js?v=189';
+import { HtmlVideoEngine } from '../player/engine.js?v=189';
+import { controlsHtml, mountControls, icon } from '../player/controls.js?v=189';
+import { createSubtitles } from '../player/subtitles.js?v=189';
+import { neighbours, openEpisodes } from '../player/episodes.js?v=189';
+import { maybeRecap, noteWatched } from '../player/recap.js?v=189';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -119,7 +119,7 @@ export async function render({ params, content }) {
         if (closed) return cleanup;
         $('player-show').textContent = titlePref(media.title);
         $('player-party')?.addEventListener('click', async () => {
-            const { partyFromPlayer } = await import('./watchparty.js?v=188');
+            const { partyFromPlayer } = await import('./watchparty.js?v=189');
             partyFromPlayer(media, episode, { root: $('player'), pause: () => video.pause() });
         });
         if (!avail) throw new Error('Your Jellyfin server cannot be reached right now');

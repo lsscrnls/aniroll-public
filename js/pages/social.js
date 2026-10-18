@@ -1,8 +1,9 @@
-import * as api from '../api.js?v=188';
-import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=188';
-import { getToken, isLoggedIn } from '../auth.js?v=188';
-import { matchDna } from '../dna.js?v=188';
-import { freshMatch, keepMatch } from '../dnamatches.js?v=188';
+import * as api from '../api.js?v=189';
+import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=189';
+import { getToken, isLoggedIn } from '../auth.js?v=189';
+import { showConfirm } from '../a11y.js?v=189';
+import { matchDna } from '../dna.js?v=189';
+import { freshMatch, keepMatch } from '../dnamatches.js?v=189';
 
 export async function render({ content }) {
     const token = getToken();
@@ -132,6 +133,11 @@ export async function render({ content }) {
                     const shield = e.target.closest('.activity-ahead');
                     if (shield) {
                         shield.closest('.activity-card')?.classList.add('is-revealed');
+                        return;
+                    }
+                    const del = e.target.closest('.activity-delete, .activity-reply-delete');
+                    if (del) {
+                        removePost(del, token);
                         return;
                     }
                     const replyTo = e.target.closest('.activity-reply-to');
@@ -437,10 +443,44 @@ export function renderReply(r) {
                 <a href="#/user/${esc(r.user?.name)}" class="activity-user">${esc(r.user?.name)}</a>
                 <span class="activity-time">${api.timeAgo(r.createdAt)}</span>
                 ${r.user?.name ? `<button type="button" class="activity-reply-to" data-name="${esc(r.user.name)}" aria-label="Reply to ${esc(r.user.name)}">Reply</button>` : ''}
+                ${r.id && r.user?.id && r.user.id === getState().user?.id ? `<button type="button" class="activity-reply-delete" data-id="${r.id}" title="Delete" aria-label="Delete reply">${TRASH}</button>` : ''}
             </div>
             <div class="activity-text">${formatActivityText(r.text || '')}</div>
         </div>
     </div>`;
+}
+
+// Deletes your post or reply after asking; it goes from the page at once, and a reply's count goes down
+async function removePost(btn, token) {
+    const reply = btn.classList.contains('activity-reply-delete');
+    const ok = await showConfirm({
+        title: reply ? 'Delete reply' : btn.dataset.id.includes(',') ? 'Delete posts' : 'Delete post',
+        message: reply ? 'Delete this reply? It is removed on AniList too.'
+            : btn.dataset.id.includes(',') ? `Delete these ${btn.dataset.id.split(',').length} posts? They are removed on AniList too, with their likes and replies.`
+            : 'Delete this post? It is removed on AniList too, with its likes and replies.',
+        confirmText: 'Delete',
+        danger: true,
+    });
+    if (!ok) return;
+    btn.disabled = true;
+    try {
+        const ids = btn.dataset.id.split(',').map(Number);
+        if (reply) {
+            await api.deleteActivityReply(ids[0], token);
+            const card = btn.closest('.activity-card');
+            btn.closest('.activity-reply')?.remove();
+            const count = card?.querySelector('.reply-toggle .reply-count');
+            if (count) count.textContent = String(Math.max(0, Number(count.textContent) - 1));
+        } else {
+            // A binge card stands for several posts: all of them go
+            for (const id of ids) await api.deleteActivity(id, token);
+            btn.closest('.activity-card')?.remove();
+        }
+        toast(reply ? 'Reply deleted' : ids.length > 1 ? 'Posts deleted' : 'Post deleted');
+    } catch (e) {
+        btn.disabled = false;
+        toast(e.message, 'error');
+    }
 }
 
 // "Reply" on a reply: starts the answer with @name, so AniList notifies that person too
@@ -600,6 +640,7 @@ function collapseRuns(activities) {
             const [lo2, hi2] = progressRange(a.progress);
             last.progress = `${Math.min(lo1, lo2)} - ${Math.max(hi1, hi2)}`;
             last.collapsed = (last.collapsed || 1) + 1;
+            last.ids = [...(last.ids || [last.id]), a.id];
             continue;
         }
         out.push(a);
@@ -680,6 +721,14 @@ function getActivityStatusText(activity) {
     return `${esc(status)} ${mediaName}`;
 }
 
+// Yours to delete: your own posts, and messages you sent or got (AniList lets both sides remove them)
+function isMine(activity) {
+    const me = getState().user?.id;
+    return !!me && [activity.user?.id, activity.messenger?.id, activity.recipient?.id].includes(me);
+}
+
+const TRASH = '<svg data-icon="delete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>';
+
 function renderActivityActions(activity, likeType) {
     const likerAvatars = (activity.likes || []).slice(0, 5);
     const extraLikers = (activity.likeCount || 0) - likerAvatars.length;
@@ -697,6 +746,7 @@ function renderActivityActions(activity, likeType) {
             <svg data-icon="chat_bubble" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span class="reply-count">${activity.replyCount || 0}</span>
         </button>
+        ${isMine(activity) ? `<button class="activity-action-btn activity-delete" data-id="${(activity.ids || [activity.id]).join(',')}" title="Delete" aria-label="${activity.ids ? `Delete these ${activity.ids.length} posts` : 'Delete post'}">${TRASH}</button>` : ''}
     </div>
     <div class="activity-replies" data-for="${activity.id}" hidden></div>`;
 }

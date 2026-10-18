@@ -4528,6 +4528,14 @@ html.m3-loading body { visibility: hidden; }
     cursor: pointer;
 }
 .activity-reply-to:hover, .activity-reply-to:focus-visible { color: var(--text); text-decoration: underline; }
+/* Deleting your own post or reply: the bin sits at the far end, red only on hover */
+.activity-delete { margin-left: auto; }
+.activity-delete svg, .activity-reply-delete svg { width: 16px; height: 16px; }
+.activity-delete:hover, .activity-delete:focus-visible, .activity-reply-delete:hover, .activity-reply-delete:focus-visible { color: var(--md-error, #e5484d); }
+.activity-reply-delete { display: inline-flex; padding: 0 4px; border: none; background: none; color: var(--text-secondary); cursor: pointer; }
+/* Follow on someone's profile, and whether they follow you */
+.profile-follows-you { align-self: center; padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.8rem;
+    background: var(--md-tertiary-container, var(--surface-2)); color: var(--md-on-tertiary-container, var(--text)); }
 
 /* "Reduce motion" in the system settings: transitions and animations finish at once.
    The loading spinner keeps turning, otherwise a loading page looks frozen.
