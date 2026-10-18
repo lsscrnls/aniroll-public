@@ -110,6 +110,10 @@ function build(selections, parent, index, path, fragments) {
             out[key] = build(children, name, index, childPath, fragments);
         }
     }
+    // The second post in a feed, and the first reply in a thread, are the viewer's own (they can be deleted)
+    if ((parent === 'user' || parent === 'messenger') && /activities\[1\]\.(user|messenger)$|replies\[0\]\.user$/.test(path)) {
+        Object.assign(out, 'id' in out ? { id: VIEWER.id } : {}, 'name' in out ? { name: VIEWER.name } : {});
+    }
     // The viewer is always the same test account
     if (parent === 'Viewer') Object.assign(out, 'id' in out ? { id: VIEWER.id } : {}, 'name' in out ? { name: VIEWER.name } : {});
     return out;
