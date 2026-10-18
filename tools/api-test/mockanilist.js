@@ -80,6 +80,13 @@ http.createServer((req, res) => {
             list[v.mediaId] = e;
             return send(res, 200, { data: { SaveMediaListEntry: { progress: e.progress, status: e.status, repeat: e.repeat } } });
         }
+        if (/MediaListCollection/.test(text) && v.name) {
+            // The landing page's DNA try (by name): one public list, one private, the rest unknown
+            if (v.name === 'private-one') return send(res, 404, { data: { MediaListCollection: null }, errors: [{ message: 'Private User', status: 404 }] });
+            if (v.name !== 'Viewer2') return send(res, 404, { data: { MediaListCollection: null }, errors: [{ message: 'User not found', status: 404 }] });
+            const entries = Object.values(MEDIA).map(m => ({ status: 'COMPLETED', score: 80, progress: m.episodes || 1, repeat: 0, media: m }));
+            return send(res, 200, { data: { MediaListCollection: { user: { name: 'Viewer2' }, lists: [{ entries }] } } });
+        }
         if (/MediaListCollection/.test(text)) {
             const list = lists[v.userId] || {};
             const entries = Object.entries(list).map(([id, e]) => ({ status: e.status, progress: e.progress, media: MEDIA[id] }));

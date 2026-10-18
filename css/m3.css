@@ -2185,6 +2185,35 @@
 }
 :root[data-design="m3"] .lp-swatch-reset[aria-pressed="true"] { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
 
+/* Anime DNA to try: the words, example viewers as chips and a name field; the DNA itself beside them */
+:root[data-design="m3"] .lp-dna {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    gap: clamp(24px, 4vw, 64px);
+    align-items: center;
+    margin-top: calc(var(--space-3xl) * 1.5);
+}
+:root[data-design="m3"] .lp-dna-stage { margin: 0; min-height: 340px; border-radius: var(--md-shape-xl-plus); }
+:root[data-design="m3"] .lp-dna-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--space-lg); }
+:root[data-design="m3"] .lp-dna-tabs button {
+    height: 40px; padding: 0 16px; border: 0; border-radius: 20px; font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer;
+    background: var(--md-surface-container-high); color: var(--md-on-surface);
+    transition: background-color .2s var(--md-standard), border-radius .45s var(--m3-bouncy);
+}
+:root[data-design="m3"] .lp-dna-tabs button[aria-selected="true"] { background: var(--md-secondary-container); color: var(--md-on-secondary-container); border-radius: 12px; }
+:root[data-design="m3"] .lp-dna-tabs button:focus-visible { outline: 3px solid var(--md-primary); outline-offset: 2px; }
+:root[data-design="m3"] .lp-dna-form { margin-top: var(--space-xl); }
+:root[data-design="m3"] .lp-dna-label { display: block; margin-bottom: 8px; font-weight: 700; }
+:root[data-design="m3"] .lp-dna-field { display: flex; flex-wrap: wrap; gap: 8px; }
+:root[data-design="m3"] .lp-dna-field input {
+    flex: 1 1 180px; min-width: 0; height: 48px; padding: 0 18px; border: 0; border-radius: 24px; font: inherit;
+    background: var(--md-surface-container-highest); color: var(--md-on-surface); outline: 2px solid transparent;
+    transition: outline-color .2s var(--md-standard);
+}
+:root[data-design="m3"] .lp-dna-field input:focus-visible { outline-color: var(--md-primary); }
+:root[data-design="m3"] .lp-dna-field :disabled { opacity: 0.5; cursor: not-allowed; }
+:root[data-design="m3"] .lp-dna-note { min-height: 2.6em; margin: 10px 0 0; font-size: 0.85rem; color: var(--md-on-surface-variant); max-width: 52ch; }
+
 /* And there's more: tonal cards, the icon in a cookie */
 
 @media (max-width: 899px) {
@@ -2196,6 +2225,7 @@
     /* Phones: the words first, the status under them */
     :root[data-design="m3"] .lp-discord-text { order: -1; }
     :root[data-design="m3"] .lp-colour { grid-template-columns: 1fr; }
+    :root[data-design="m3"] .lp-dna { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
     :root[data-design="m3"] :is(.lp-btn, .lp-swatch) { transition: none; }
