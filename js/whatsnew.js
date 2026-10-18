@@ -2,13 +2,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=188';
-import { openDialog } from './a11y.js?v=188';
-import { prefersReducedMotion } from './animations.js?v=188';
-import { accountState, saveAccountState } from './accountstate.js?v=188';
+import { esc } from './store.js?v=189';
+import { openDialog } from './a11y.js?v=189';
+import { prefersReducedMotion } from './animations.js?v=189';
+import { accountState, saveAccountState } from './accountstate.js?v=189';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.8.2';
+export const RELEASE = '1.8.3';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -20,9 +20,10 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-18.2',
+        id: '2026-10-18.3',
         title: 'Try your Anime DNA',
         items: [
+            { rev: 3, text: '<strong>Follow</strong> people right from their profile in AniRoll, and delete your own posts and replies in Social, no trip to AniList needed.' },
             { rev: 2, text: 'The start page now shows <strong>Anime DNA</strong>: flip through three example viewers, or type your AniList name to see your own without logging in.' },
             'The <strong>ambient light</strong> in the player now follows the picture without lagging behind, also on wide 21:9 screens.',
         ],

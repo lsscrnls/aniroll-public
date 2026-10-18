@@ -1,7 +1,7 @@
 // @ts-check
-import { buildTasteProfile, tasteMatch } from './taste.js?v=188';
-import { dismissedIds } from './dismissed.js?v=188';
-import { statusLabel } from './store.js?v=188';
+import { buildTasteProfile, tasteMatch } from './taste.js?v=189';
+import { dismissedIds } from './dismissed.js?v=189';
+import { statusLabel } from './store.js?v=189';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -593,6 +593,7 @@ export async function getUserProfile(name, token = null) {
         query ($name: String) {
             User(name: $name) {
                 id name avatar { large medium } bannerImage
+                isFollowing isFollower
                 about
                 statistics {
                     anime {
@@ -716,7 +717,7 @@ export async function saveMediaListEntry(variables, token, { queue = true, mirro
     // Mirror the new progress to Jellyfin — fire and forget, a failure never breaks the list update.
     // Only when this save set the progress: a new score or status leaves Jellyfin alone.
     if (mirror && saved?.mediaId && saved.progress && variables.progress !== undefined) {
-        import('./jellyfin.js?v=188').then(m =>
+        import('./jellyfin.js?v=189').then(m =>
             m.syncProgress(saved.progress, () => mediaForSync(saved.mediaId, token)));
     }
 
@@ -1051,6 +1052,31 @@ export async function postActivityReply(activityId, text, token) {
     clearCache('on TextActivity { id replies {');
     expireCache('activities(');
     return data.SaveActivityReply;
+}
+
+// Deletes one of your own posts (or a message sent to or by you). The feeds and profile posts are
+// dropped from the cache, not kept as fallback: the deleted post must not come back from there
+export async function deleteActivity(id, token) {
+    const data = await query(`mutation ($id: Int) { DeleteActivity(id: $id) { deleted } }`, { id }, token);
+    clearCache('activities(');
+    return !!data.DeleteActivity?.deleted;
+}
+
+export async function deleteActivityReply(id, token) {
+    const data = await query(`mutation ($id: Int) { DeleteActivityReply(id: $id) { deleted } }`, { id }, token);
+    clearCache('on TextActivity { id replies {');
+    expireCache('activities(');
+    return !!data.DeleteActivityReply?.deleted;
+}
+
+// Follows or unfollows someone; the answer says which it is now. Their profile and your
+// following list are read again next time
+export async function toggleFollow(userId, token) {
+    const data = await query(`mutation ($userId: Int) { ToggleFollow(userId: $userId) { id isFollowing } }`, { userId }, token);
+    clearCache('isFollowing isFollower');
+    clearCache('following(userId');
+    expireCache('activities(');
+    return !!data.ToggleFollow?.isFollowing;
 }
 
 export async function toggleLike(id, type, token) {

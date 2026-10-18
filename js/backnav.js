@@ -3,7 +3,7 @@
 // Android only its system back. So there is a back button in the top bar and a swipe from the left edge,
 // both only in the installed app. Going back first closes what is open over the page (a dialog, or one
 // step of the detail panel), then returns one page, and never further than the page the app started on.
-import { dialogOpen, dialogBack, closeAllDialogs } from './a11y.js?v=188';
+import { dialogOpen, dialogBack, closeAllDialogs } from './a11y.js?v=189';
 
 const KEY = 'anirollDepth';
 // How many pages of this app lie behind the current one

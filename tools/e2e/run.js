@@ -408,6 +408,36 @@ function staticServer() {
     } else {
         check('social: posts have a reply toggle', false);
     }
+    // Your own posts and replies have a bin: asked first, then gone from the page and from AniList
+    const ownBins = await page.evaluate(() => ({ posts: document.querySelectorAll('.activity-delete').length, replies: document.querySelectorAll('.activity-reply-delete').length,
+        cards: document.querySelectorAll('.activity-card').length }));
+    const beforeDelete = mutations.length;
+    await page.click('.activity-delete').catch(() => {});
+    await page.waitForSelector('#modal-confirm', { timeout: 3000 }).catch(() => {});
+    await page.click('#modal-cancel').catch(() => {});
+    const keptAfterCancel = mutations.length === beforeDelete;
+    await page.click('.activity-delete').catch(() => {});
+    await page.click('#modal-confirm').catch(() => {});
+    await page.waitForFunction((n) => document.querySelectorAll('.activity-card').length < n, ownBins.cards, { timeout: 3000 }).catch(() => {});
+    await page.click('.activity-reply-delete').catch(() => {});
+    await page.click('#modal-confirm').catch(() => {});
+    await settle(600);
+    const afterDelete = await page.evaluate(() => ({ cards: document.querySelectorAll('.activity-card').length, replies: document.querySelectorAll('.activity-reply-delete').length }));
+    const deleted = mutations.slice(beforeDelete);
+    check('social: own posts and replies can be deleted, after asking (Cancel keeps them)',
+        ownBins.posts >= 1 && ownBins.replies >= 1 && keptAfterCancel && deleted.includes('DeleteActivity') && deleted.includes('DeleteActivityReply')
+        && afterDelete.cards === ownBins.cards - 1 && afterDelete.replies === ownBins.replies - 1, { ownBins, keptAfterCancel, deleted, afterDelete });
+
+    // Follow from someone's profile
+    await go('#/user/someone');
+    const followBtn = await page.$eval('#profile-follow', b => b.textContent.trim()).catch(() => null);
+    const beforeFollow = mutations.length;
+    await page.click('#profile-follow').catch(() => {});
+    await settle(600);
+    check('profile: Follow on someone else\'s profile asks AniList, none on your own',
+        followBtn === 'Follow' && mutations.slice(beforeFollow).includes('ToggleFollow'), { followBtn, sent: mutations.slice(beforeFollow) });
+    await go('#/profile');
+    check('profile: no Follow button on your own profile', !(await page.$('#profile-follow')));
 
     // One browser, two accounts: cached answers and queued saves never cross over (js/api.js)
     const isolation = await page.evaluate(async () => {
