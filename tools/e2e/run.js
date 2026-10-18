@@ -922,6 +922,18 @@ function staticServer() {
         check('player: ambient light on, A switches it and keeps it; menu rows open pages, Escape steps back and closes',
             amb.on && amb.canvas && !off.on && off.kept === 'off' && speeds.includes('Normal') && speeds.length >= 4 && backMain === 'main' && closedMenu && !pageErrors.length,
             { amb, off, speeds, backMain, closedMenu, pageErrors });
+        // On a 21:9 screen the small canvas, blurred at its own size, is scaled up over the whole player
+        await p.setViewportSize({ width: 2560, height: 1080 });
+        await p.waitForFunction(() => document.getElementById('player').classList.contains('ambient-bars')
+            && Math.abs(document.querySelector('.pl-ambient').getBoundingClientRect().width - document.getElementById('player').clientWidth) < 2, null, { timeout: 5000 }).catch(() => {});
+        const wide = await p.evaluate(() => {
+            const c = document.querySelector('.pl-ambient').getBoundingClientRect(), r = document.getElementById('player').getBoundingClientRect();
+            return { bars: document.getElementById('player').classList.contains('ambient-bars'), dx: Math.abs(c.width - r.width), dy: Math.abs(c.height - r.height),
+                blur: getComputedStyle(document.querySelector('.pl-ambient')).getPropertyValue('--amb-blur') };
+        });
+        if (process.env.E2E_SHOT) await p.screenshot({ path: process.env.E2E_SHOT });
+        check('player: ambient light on 21:9 covers the player from a small blurred canvas',
+            wide.bars && wide.dx < 2 && wide.dy < 2 && parseFloat(wide.blur) > 0 && parseFloat(wide.blur) < 5, wide);
         await p.close();
     }
     }, async () => {
@@ -1778,6 +1790,31 @@ function staticServer() {
         palette.picked !== palette.before && palette.pressed === 'true' && palette.stored === null && palette.after === palette.before, palette);
     check('landing: Material 3 only, shapes behind the roll, the colours section, no design switch',
         m3landing.design === 'm3' && m3landing.tiles === 2 && m3landing.colour === 'media/m3.mp4' && !m3landing.tryDesign, m3landing);
+
+    // Anime DNA: example viewers drawn in the page, and an own list by name (the server's answer stands in here)
+    const sampleLists = JSON.parse(fs.readFileSync(path.join(ROOT, 'media', 'dna-samples.json'), 'utf8'))[1].lists;
+    const dnaPosts = [];
+    await fresh.route(`${base}/api/dna/try`, route => {
+        if (route.request().method() === 'GET') return route.fulfill({ json: { open: true, left: 1, again: 0 } });
+        dnaPosts.push(route.request().postDataJSON());
+        return route.fulfill({ json: { name: 'Someone', lists: sampleLists, left: 0 } });
+    });
+    await fresh.evaluate(() => document.querySelector('.lp-dna').scrollIntoView());
+    await fresh.waitForSelector('.lp-dna-stage svg', { timeout: 10000 }).catch(() => {});
+    const dnaFirst = await fresh.evaluate(() => ({ tabs: document.querySelectorAll('.lp-dna-tabs [role="tab"]').length,
+        type: document.querySelector('.lp-dna-stage .dna-type')?.textContent, petals: document.querySelectorAll('.lp-dna-stage .dna-petal').length }));
+    await fresh.click('[data-sample="2"]');
+    const dnaThird = await fresh.evaluate(() => document.querySelector('.lp-dna-stage .dna-type')?.textContent);
+    await fresh.waitForFunction(() => !document.querySelector('.lp-dna-field input').disabled, null, { timeout: 5000 }).catch(() => {});
+    await fresh.fill('#lp-dna-name', 'Someone');
+    await fresh.click('.lp-dna-form button');
+    await fresh.waitForFunction(() => /Someone/.test(document.querySelector('.lp-dna-note')?.textContent || ''), null, { timeout: 5000 }).catch(() => {});
+    const dnaOwn = await fresh.evaluate(() => ({ type: document.querySelector('.lp-dna-stage .dna-type')?.textContent,
+        closed: document.querySelector('.lp-dna-field input').disabled, note: document.querySelector('.lp-dna-note').textContent }));
+    check('landing: Anime DNA of three example viewers, then an own list by name, and the field closes after it',
+        dnaFirst.tabs === 3 && dnaFirst.petals > 3 && dnaFirst.type && dnaThird && dnaThird !== dnaFirst.type
+        && dnaPosts.length === 1 && dnaPosts[0].name === 'Someone' && dnaOwn.type && dnaOwn.closed && /Log in with AniList/.test(dnaOwn.note),
+        { dnaFirst, dnaThird, dnaPosts, dnaOwn });
     await fresh.close();
 
     }, async () => {

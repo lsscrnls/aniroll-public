@@ -40,5 +40,5 @@ else
 fi
 
 echo "browser checks: ${groups:-all groups}" >&2
-docker run --rm -e E2E_ONLY="$groups" -v "$root":/work mcr.microsoft.com/playwright:v1.63.0-noble sh -c \
+docker run --rm -e E2E_ONLY="$groups" -e E2E_SHOT -v "$root":/work mcr.microsoft.com/playwright:v1.63.0-noble sh -c \
     "cp -r /work/tools/e2e /tmp/e2e && cd /tmp/e2e && npm ci --silent && sed -i \"s#path.join(__dirname, '..', '..')#'/work'#\" run.js jellyfin-mock.js && node run.js"

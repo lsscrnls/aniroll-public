@@ -4,7 +4,7 @@
 
 // Anime DNA on the profile: a type, quirks and a picture, read from the anime list alone.
 //
-// Used by: js/pages/profile.js, js/pages/social.js
+// Used by: js/landingdna.js, js/pages/profile.js, js/pages/social.js
 
 // `mine`, `theirs`: { lists, features } of two people. Returns { match: 1-99, shared, both: [loved by both],
 // clash: [{ media, mine, theirs }], picks: [shows they loved that are not on your list] }, or null.

@@ -3,11 +3,14 @@
 // taller or wider than the stream), the black bars glow in the colours of the picture's nearest edge, scene by
 // scene. The picture itself keeps its size. Behind the video a small canvas in the player's shape holds the
 // frame where the video shows it, with its edge strips stretched out into the bars, blurred far by CSS.
+// The canvas is blurred at its own small size and only then scaled up to the player: blurring the full screen
+// on every new frame (a 21:9 monitor is 3440 pixels wide) is what made the light trail the picture.
 // Only drawn, never read back, so a stream from another origin works too.
 // On by default; the player's settings menu, the A key and Settings → Jellyfin → Player switch it.
 const KEY = 'aniroll_ambient';
 const CW = 96; // canvas width; the height follows the player's shape
-const EVERY_MS = 80; // about 12 frames a second is plenty for light that is blurred this far
+const EVERY_MS = 33; // up to 30 frames a second, drawn as each new frame of the video is shown
+const BLUR = 48; // CSS pixels on screen
 const MIN_BAR = 8; // bars thinner than this (in CSS pixels) are not worth lighting
 const EDGE = 0.06; // the share of the picture next to a bar that is stretched into it
 
@@ -45,6 +48,10 @@ export function mountAmbient(root, video) {
                 const ch = Math.max(1, Math.round(CW * H / W));
                 if (canvas.width !== CW || canvas.height !== ch) { canvas.width = CW; canvas.height = ch; }
                 const k = CW / W;
+                canvas.style.width = `${CW}px`;
+                canvas.style.height = `${ch}px`;
+                canvas.style.transform = `scale(${W / CW}, ${H / ch})`;
+                canvas.style.setProperty('--amb-blur', `${(BLUR * k).toFixed(2)}px`);
                 box = { x: barX * k, y: barY * k, w: vw * s * k, h: vh * s * k };
             }
         }
@@ -71,10 +78,18 @@ export function mountAmbient(root, video) {
             }
         } catch { /* no frame yet */ }
     };
+    // Drawn when the video shows a new frame where the browser can say so, else on the next screen refresh
+    const byFrame = 'requestVideoFrameCallback' in video;
+    const next = () => {
+        frame = byFrame ? video.requestVideoFrameCallback(loop) : requestAnimationFrame(loop);
+    };
+    const stop = () => {
+        if (byFrame) video.cancelVideoFrameCallback(frame); else cancelAnimationFrame(frame);
+    };
     const loop = (now) => {
         if (!on) return;
         if (box && now - last >= EVERY_MS && !video.paused) { last = now; draw(); }
-        frame = requestAnimationFrame(loop);
+        next();
     };
     // Paused or after a jump: the light still shows where the picture is
     const once = () => { if (on) draw(); };
@@ -90,8 +105,8 @@ export function mountAmbient(root, video) {
     const apply = (value) => {
         on = value;
         root.classList.toggle('has-ambient', on);
-        cancelAnimationFrame(frame);
-        if (on) { measure(); draw(); frame = requestAnimationFrame(loop); }
+        stop();
+        if (on) { measure(); draw(); next(); }
     };
     apply(ambientOn());
 
@@ -103,7 +118,7 @@ export function mountAmbient(root, video) {
         },
         destroy() {
             on = false;
-            cancelAnimationFrame(frame);
+            stop();
             watcher.disconnect();
             video.removeEventListener('seeked', once);
             video.removeEventListener('loadeddata', remeasure);

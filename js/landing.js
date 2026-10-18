@@ -1,5 +1,5 @@
-import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=186';
-import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=186';
+import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=188';
+import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=188';
 
 // The landing page, in Material 3 Expressive (the only design logged out): the headline arrives word by word,
 // a roll to try sits next to it, the feature tour plays one clip after another, and Watch Party shows up as the
@@ -113,6 +113,27 @@ export function renderColour() {
         <div class="lp-colour-frame" style="background-image:url(media/m3.jpg)">
             <video class="landing-video" src="media/m3.mp4" poster="media/m3.jpg" muted loop playsinline preload="none" aria-label="AniRoll taking on the colours of a show"></video>
         </div>
+    </section>`;
+}
+
+// Anime DNA without logging in: a picture beside the words, made-up viewers to flip through and a field for
+// your own AniList name (js/landingdna.js fills it when it comes near)
+export function renderDnaTry() {
+    return `<section class="lp-dna" id="lp-dna">
+        <div class="lp-dna-text">
+            <h2 class="landing-tour-title">What your list says about you</h2>
+            <p class="landing-tour-sub">Your Anime DNA, read from your AniList alone. The genres and tags you love grow into petals, your shows become stars. Every petal always points the same way, so two pictures compare at a glance.</p>
+            <div class="lp-dna-tabs" role="tablist" aria-label="Example viewers"></div>
+            <form class="lp-dna-form">
+                <label class="lp-dna-label" for="lp-dna-name">Try your own</label>
+                <div class="lp-dna-field">
+                    <input id="lp-dna-name" name="name" autocomplete="username" spellcheck="false" placeholder="Your AniList name" maxlength="20">
+                    <button class="lp-btn lp-btn-filled" type="submit">Show my DNA</button>
+                </div>
+                <p class="lp-dna-note" aria-live="polite"></p>
+            </form>
+        </div>
+        <div class="lp-dna-stage dna" aria-live="polite"></div>
     </section>`;
 }
 
@@ -270,6 +291,17 @@ export function initLanding(root) {
             scrollTrigger: { trigger: root.querySelector('.lp-colour'), start: 'top 80%', once: true },
         });
         cleanups.push(() => { designs.scrollTrigger?.kill(); designs.kill(); });
+    }
+    // The DNA section loads its code and examples only when it comes near
+    const dnaSection = root.querySelector('.lp-dna');
+    if (dnaSection) {
+        const near = new IntersectionObserver((entries) => {
+            if (!entries.some(e => e.isIntersecting)) return;
+            near.disconnect();
+            import('./landingdna.js?v=188').then(m => m.initDnaTry(/** @type {HTMLElement} */ (dnaSection))).catch(() => {});
+        }, { rootMargin: '400px 0px' });
+        near.observe(dnaSection);
+        cleanups.push(() => near.disconnect());
     }
     cleanups.push(() => { io.disconnect(); cancelAnimationFrame(raf); root.querySelectorAll('video').forEach(v => v.pause()); });
 

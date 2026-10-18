@@ -6130,8 +6130,10 @@ h1[tabindex="-1"]:focus { outline: none; }
 
 /* Ambient light (js/player/ambient.js): only where the picture leaves bars, they glow in its edge colours.
    The canvas holds the frame where the video shows it; the video stays on top at its usual size */
-.pl-ambient { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0;
-    filter: blur(48px) saturate(1.5) brightness(0.65); transform: translateZ(0); transition: opacity .6s ease; }
+/* Sized and scaled up by js/player/ambient.js; the blur is applied at the canvas's small size */
+.pl-ambient { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0;
+    transform-origin: 0 0; will-change: transform; filter: blur(var(--amb-blur, 48px)) saturate(1.5) brightness(0.65);
+    transition: opacity .6s ease; }
 .player.has-ambient.ambient-bars .pl-ambient { opacity: 1; }
 .player.has-ambient.ambient-bars .player-video { background: transparent; }
 

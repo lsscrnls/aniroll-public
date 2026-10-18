@@ -446,6 +446,77 @@ async function anilist(query, variables, userId = null) {
     return body; // { data, errors } — a 404 error just means "no list entry"
 }
 
+// ===== Anime DNA to try on the landing page, without logging in =====
+// The server reads the list (one AniList request, from its own budget), the browser draws the DNA (js/dna.js).
+// Each visitor gets DNA_TRIES per DNA_KEEP_MS. Only a keyed hash of the address is kept, and only that long:
+// the address itself is never written anywhere. Names that do not exist or are private cost nothing.
+// While the server's own calls reach DNA_CLOSE_AT in the last minute (or AniList paused it), trying is off.
+const DNA_TRY_FILE = path.join(DATA_DIR, 'dnatry.json');
+const DNA_KEEP_MS = 36 * 60 * 60 * 1000;
+const DNA_TRIES = 1;
+const DNA_CLOSE_AT = 12;
+const dnaKey = crypto.createHash('sha256').update('dna-try:' + (JF_SECRET || crypto.randomBytes(32).toString('hex'))).digest();
+const DNA_QUERY = `query ($name: String) {
+    MediaListCollection(userName: $name, type: ANIME) {
+        user { name }
+        lists { entries {
+            status score(format: POINT_100) progress repeat
+            startedAt { year month day } completedAt { year month day }
+            media { id title { userPreferred english romaji } coverImage { large } format episodes duration
+                startDate { year month day } meanScore genres popularity tags { name rank }
+                studios(isMain: true) { nodes { name isAnimationStudio } } }
+        } }
+    }
+}`;
+
+const dnaHash = (req) => crypto.createHmac('sha256', dnaKey).update(clientIp(req)).digest('hex').slice(0, 32);
+function dnaTries(now = Date.now()) {
+    const all = readJson(DNA_TRY_FILE);
+    let changed = false;
+    for (const [hash, times] of Object.entries(all)) {
+        const kept = (Array.isArray(times) ? times : []).filter(t => now - t < DNA_KEEP_MS);
+        if (kept.length !== (times || []).length) changed = true;
+        if (kept.length) all[hash] = kept; else delete all[hash];
+    }
+    if (changed) writeJson(DNA_TRY_FILE, all, { mode: 0o600, pretty: false });
+    return all;
+}
+function dnaOpen(now = Date.now()) {
+    return now >= anilistPausedUntil && serverCalls.filter(t => now - t < 60000).length < DNA_CLOSE_AT;
+}
+
+async function handleDnaTry(req, res) {
+    const now = Date.now();
+    const hash = dnaHash(req);
+    const used = (dnaTries(now)[hash] || []);
+    const left = Math.max(0, DNA_TRIES - used.length);
+    const again = used.length ? used[0] + DNA_KEEP_MS : 0;
+    if (req.method === 'GET') return json(res, 200, { open: dnaOpen(now), left, again: left ? 0 : again });
+    if (req.method !== 'POST') return json(res, 405, { error: 'method' });
+    const body = await readBody(req);
+    const name = str(body.name, 40).trim();
+    if (!/^[A-Za-z0-9_-]{2,20}$/.test(name)) return json(res, 400, { error: 'name' });
+    // Typing names in a loop to probe who exists is held back too (in memory, a minute)
+    if (overLimit('dna-try', clientIp(req), 8, 60000)) return json(res, 429, { error: 'slow-down' });
+    if (!left) return json(res, 429, { error: 'used', again });
+    if (!dnaOpen(now)) return json(res, 503, { error: 'busy' });
+    let answer;
+    try {
+        answer = await anilist(DNA_QUERY, { name });
+    } catch (e) {
+        return json(res, 503, { error: 'busy', code: e.code });
+    }
+    const list = answer.data?.MediaListCollection;
+    if (!list) {
+        const text = (answer.errors || []).map(e => e.message || '').join(' ');
+        return json(res, 404, { error: /private/i.test(text) ? 'private' : 'not-found' });
+    }
+    const all = dnaTries(Date.now());
+    all[hash] = [...(all[hash] || []), Date.now()];
+    writeJson(DNA_TRY_FILE, all, { mode: 0o600, pretty: false });
+    json(res, 200, { name: list.user?.name || name, lists: list.lists || [], left: left - 1 });
+}
+
 function fuzzyToday() {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
@@ -1513,6 +1584,7 @@ async function handle(req, res) {
         return;
     }
 
+    if (pathname === '/api/dna/try') return handleDnaTry(req, res);
     if (pathname === '/api/animemap' && req.method === 'POST') return animeMap.handle(req, res);
     if (pathname === '/api/me/jflibrary') return animeMap.handleLibrary(req, res);
     if (pathname.startsWith('/api/sources/')) return sources.handle(req, res, pathname);
