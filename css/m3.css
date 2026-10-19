@@ -663,6 +663,8 @@
     margin-bottom: 8px;
 }
 :root[data-design="m3"] .activity-card:hover { background: var(--md-surface-container-low); }
+:root[data-design="m3"] .activity-group .activity-row { background: transparent !important; padding: 0; margin: 0; border-radius: var(--radius-lg); animation: none; }
+:root[data-design="m3"] .activity-group { background: color-mix(in srgb, var(--md-surface-container-low) 86%, transparent); border-radius: var(--radius-xl); padding: 16px 20px; margin-bottom: 8px; }
 :root[data-design="m3"] .activity-user { font-weight: 600; }
 :root[data-design="m3"] .activity-media, :root[data-design="m3"] .activity-embed { background: var(--md-surface-container-high); border-radius: var(--radius-lg); }
 :root[data-design="m3"] .activity-media:hover { background: var(--md-surface-container-highest); }
@@ -2248,7 +2250,7 @@
 :root[data-design="m3"] :is(.list-chip, .genre-chip, .score-chip, .wp-vote-chip, .pl-menu-chip, .progress-btn):active { transform: scale(.94); }
 
 /* Lists, notifications, schedule rows and posts rise in with the M3 spring (GSAP's reveal is for the other design) */
-:root[data-design="m3"] :is(.list-entry, .notif-item, .schedule-item, .activity-card) { animation: m3Rise .6s var(--m3-gentle) backwards; }
+:root[data-design="m3"] :is(.list-entry, .notif-item, .schedule-item, .activity-card, .activity-group) { animation: m3Rise .6s var(--m3-gentle) backwards; }
 :root[data-design="m3"] :is(.list-entry, .notif-item, .activity-card):nth-child(2) { animation-delay: 30ms; }
 :root[data-design="m3"] :is(.list-entry, .notif-item, .activity-card):nth-child(3) { animation-delay: 60ms; }
 :root[data-design="m3"] :is(.list-entry, .notif-item, .activity-card):nth-child(n+4) { animation-delay: 90ms; }

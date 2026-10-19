@@ -408,6 +408,17 @@ function staticServer() {
     } else {
         check('social: posts have a reply toggle', false);
     }
+    // One person's updates in a row: one post, a row per show, each row with its own likes and replies
+    const grouped = await page.evaluate(() => {
+        const g = document.querySelector('.activity-group');
+        return g && { user: g.querySelector('.activity-user')?.textContent, rows: g.querySelectorAll('.activity-row').length,
+            summary: g.querySelector('.activity-time')?.textContent, likes: g.querySelectorAll('.activity-row .like-btn').length,
+            labels: [...g.querySelectorAll('.activity-row-label')].map(l => l.textContent.trim()) };
+    });
+    if (process.env.E2E_SHOT) await page.locator('#social-content').screenshot({ path: process.env.E2E_SHOT.replace(/\.png$/, '-feed.png') });
+    check('social: one person\'s updates in a row become one post with a row per show, each with its own like',
+        grouped?.user === 'binger' && grouped.rows === 2 && grouped.likes === 2 && /^2 updates|^Watched 2|^Read 2/.test(grouped.summary || '') && grouped.labels.every(Boolean), grouped);
+
     // Your own posts and replies have a bin: asked first, then gone from the page and from AniList
     const ownBins = await page.evaluate(() => ({ posts: document.querySelectorAll('.activity-delete').length, replies: document.querySelectorAll('.activity-reply-delete').length,
         cards: document.querySelectorAll('.activity-card').length }));
@@ -431,11 +442,13 @@ function staticServer() {
     // Follow from someone's profile
     await go('#/user/someone');
     const followBtn = await page.$eval('#profile-follow', b => b.textContent.trim()).catch(() => null);
+    const followsYou = await page.$eval('.profile-name-row .profile-follows-you', b => b.textContent.trim()).catch(() => null);
+    if (process.env.E2E_SHOT) await page.locator('.profile-header').screenshot({ path: process.env.E2E_SHOT });
     const beforeFollow = mutations.length;
     await page.click('#profile-follow').catch(() => {});
     await settle(600);
-    check('profile: Follow on someone else\'s profile asks AniList, none on your own',
-        followBtn === 'Follow' && mutations.slice(beforeFollow).includes('ToggleFollow'), { followBtn, sent: mutations.slice(beforeFollow) });
+    check('profile: Follow back on someone else\'s profile asks AniList, "Follows you" beside the name',
+        followBtn === 'Follow back' && followsYou === 'Follows you' && mutations.slice(beforeFollow).includes('ToggleFollow'), { followBtn, followsYou, sent: mutations.slice(beforeFollow) });
     await go('#/profile');
     check('profile: no Follow button on your own profile', !(await page.$('#profile-follow')));
 
