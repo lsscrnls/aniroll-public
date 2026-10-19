@@ -162,8 +162,10 @@ it passes on only the fields AniRoll uses, within Discord's limits, pictures and
 
 ### No bundler
 
-Plain ES modules, loaded by the browser as they are. Every import carries `?v=N`, raised on each
-release, so a browser never mixes old and new modules. With no bundler and no inline script, the
+Plain ES modules, loaded by the browser as they are. On deploy, `scripts/fingerprint.js` gives every
+import a fingerprint of its content (`?h=…`, covering everything that module imports), so a browser
+never mixes old and new modules, keeps the unchanged ones cached, and an open tab offers a reload
+when a new version is out. With no bundler and no inline script, the
 Content Security Policy can say `script-src 'self'`: only AniRoll's own files run, even if a bug ever
 let markup through the escaping. The one addition is `'wasm-unsafe-eval'`, so the subtitle renderer's
 WebAssembly may compile; it still has to come from AniRoll's own files.

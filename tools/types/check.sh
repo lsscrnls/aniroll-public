@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Type checks of the browser modules that start with // @ts-check (JSDoc types, no build):
 #   bash tools/types/check.sh            (installs TypeScript here on first use)
-# TypeScript can't resolve the cache-busting `?v=N` in our imports, so it checks a copy of js/
-# with those stripped; line numbers stay the same and errors point at the real files.
+# It checks a copy of js/ next to its tsconfig; errors point at the real files.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
@@ -11,7 +10,6 @@ root="$(cd "$here/../.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 cp -r "$root/js" "$tmp/js"
-find "$tmp/js" -name '*.js' -not -path '*/vendor/*' -exec sed -i -E "s/(\.js)\?v=[0-9]+(['\"])/\1\2/g" {} +
 cp "$here/tsconfig.json" "$tmp/tsconfig.json"
 cp "$here/globals.d.ts" "$tmp/globals.d.ts"
 

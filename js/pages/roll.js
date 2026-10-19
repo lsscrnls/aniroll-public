@@ -4,8 +4,6 @@
 
 // The Roll page (#/roll): picks tonight's show from your Planning list, optionally with recommended
 // titles that are not on your list yet, and plays the reel (js/reel.js) to reveal it.
-//
-// Used by: js/app.js
 
 // Draws the page into `content`, like every page (see js/router.js).
 export async function render({ content }) {

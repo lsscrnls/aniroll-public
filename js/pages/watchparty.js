@@ -4,8 +4,6 @@
 
 // Watch Party: the host counts episodes on their AniList, guests follow along and their lists move
 // with them. The server side is api/party.js, reached through /api/party/*.
-//
-// Used by: js/app.js, js/pages/detail.js, js/pages/home.js, js/pages/play.js, js/pages/roll.js
 
 // The party this browser hosts, or null.
 export function getActiveParty() { return null; }

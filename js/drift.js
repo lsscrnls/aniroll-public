@@ -3,8 +3,6 @@
 // What it is for, and what each export promises, is described below; how it works is the part left out.
 
 // Small touches that come and go in Material 3.
-//
-// Used by: js/app.js, js/pages/shelf.js, js/touches.js
 
 // Returns { found: { id: time }, last: time }.
 export function driftState() { return null; }

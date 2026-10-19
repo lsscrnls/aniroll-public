@@ -1,7 +1,7 @@
 // @ts-check
 // The two status lines in the profile menu: saves waiting to be sent, and the Jellyfin connection.
 // Shared by the app shell and the settings page.
-import * as api from './api.js?v=195';
+import * as api from './api.js';
 
 export function refreshPendingStatus() {
     const item = document.getElementById('pending-status-item');
@@ -25,7 +25,7 @@ export async function refreshJellyfinStatus(force = false) {
     refreshPendingStatus();
     const item = document.getElementById('jf-status-item');
     if (!item) return;
-    const { getConfig, getStatus } = await import('./jellyfin.js?v=195');
+    const { getConfig, getStatus } = await import('./jellyfin.js');
     if (!getConfig()) {
         item.hidden = true;
         return;

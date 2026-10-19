@@ -3,8 +3,6 @@
 // What it is for, and what each export promises, is described below; how it works is the part left out.
 
 // Tools only the owner of this instance sees; nothing for anyone else.
-//
-// Used by: js/touches.js
 
 // A byte count as MB/GB/TB.
 export function gb(bytes) { return null; }

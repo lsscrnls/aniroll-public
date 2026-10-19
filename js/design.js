@@ -6,7 +6,7 @@
 // with Google's Material Color Utilities (2025 spec, the one M3 Expressive uses). The scheme is written as a
 // <style> with a light and a dark block, so System/Light/Dark keep working without recomputing; it is cached
 // in localStorage so a reload paints M3 colours before the colour library has even loaded.
-import { BASELINE_TONAL_CSS } from './m3-baseline.js?v=195';
+import { BASELINE_TONAL_CSS } from './m3-baseline.js';
 
 // The switch to the legacy design, from before it was removed: forgotten
 const OLD_DESIGN_KEYS = ['aniroll_design_v2', 'aniroll_design'];
@@ -14,9 +14,9 @@ const VARIANT_KEY = 'aniroll_m3_variant';   // 'tonal' | 'vibrant' | 'expressive
 const SEED_KEY = 'aniroll_m3_seed';         // M3 has its own palette, unrelated to AniRoll's accent colour
 const CACHE_KEY = 'aniroll_m3_scheme3';     // { key, css } — new name when the generated CSS changes
 const SHOW_KEY = 'aniroll_m3_show';         // { color, cover } of the show you're on: the app's "wallpaper" 
-const CSS_HREF = 'css/m3.css?v=43';
+const CSS_HREF = 'css/m3.css';
 // m3.css used to @import these two; as links of their own they load in parallel instead of after it
-const EXTRA_CSS = [['m3-icons-css', 'css/m3-icons.css?v=2'], ['m3-shapes-css', 'css/m3-shapes.css?v=1']];
+const EXTRA_CSS = [['m3-icons-css', 'css/m3-icons.css'], ['m3-shapes-css', 'css/m3-shapes.css']];
 
 // 'show' themes the whole app from the show you're watching, like a desktop themed from its wallpaper
 // (js/m3.js applies it); the others are seeds in the spirit of Google's own M3 palettes
@@ -113,7 +113,7 @@ export async function applyDesign(loggedIn) {
     try { OLD_DESIGN_KEYS.forEach(k => localStorage.removeItem(k)); } catch { /* nothing kept */ }
     // Page additions only M3 has (hero, search bar, rail FAB ...)
     if (enhancer) enhancer.then(m => m.refresh());
-    enhancer ??= import('./m3.js?v=195').then(m => { m.setup(); return m; });
+    enhancer ??= import('./m3.js').then(m => { m.setup(); return m; });
 
     // Stylesheet first; keep the page hidden until it's there, so AniRoll's look never flashes
     let sheet = null;

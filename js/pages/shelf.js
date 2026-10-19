@@ -3,8 +3,6 @@
 // What it is for, and what each export promises, is described below; how it works is the part left out.
 
 // The page at #/shelf.
-//
-// Used by: js/app.js
 
 // Draws the page into `content`, like every page (see js/router.js).
 export function render({ content }) {
