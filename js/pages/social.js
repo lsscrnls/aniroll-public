@@ -1,9 +1,9 @@
-import * as api from '../api.js?v=191';
-import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=191';
-import { getToken, isLoggedIn } from '../auth.js?v=191';
-import { showConfirm } from '../a11y.js?v=191';
-import { matchDna } from '../dna.js?v=191';
-import { freshMatch, keepMatch } from '../dnamatches.js?v=191';
+import * as api from '../api.js?v=194';
+import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=194';
+import { getToken, isLoggedIn } from '../auth.js?v=194';
+import { showConfirm } from '../a11y.js?v=194';
+import { matchDna } from '../dna.js?v=194';
+import { freshMatch, keepMatch } from '../dnamatches.js?v=194';
 
 export async function render({ content }) {
     const token = getToken();
@@ -650,17 +650,18 @@ function collapseRuns(activities) {
     return out;
 }
 
-// Someone updating several shows in a row (one evening's watching) becomes one post with a row per show,
-// instead of a post each: list posts in a row by the same person, each at most GROUP_GAP after the next.
+// Someone active several times in a row (one evening: episodes of two shows, then the Watch Party post)
+// becomes one post with a row each, instead of a post each: list and text posts in a row by the same
+// person, each at most GROUP_GAP after the next. Messages stay alone (two people in them).
 // Every row keeps its own likes, replies and bin (AniList knows only the single posts).
 const GROUP_GAP = 6 * 3600;
 function groupByPerson(activities) {
     const out = [];
-    const isList = (a) => (a.type === 'ANIME_LIST' || a.type === 'MANGA_LIST') && a.user?.id && a.media;
+    const own = (a) => a.user?.id && ((a.type === 'ANIME_LIST' || a.type === 'MANGA_LIST') ? !!a.media : a.type === 'TEXT');
     for (const a of activities) {
         const last = out.at(-1);
         const prev = last?.type === 'GROUP' ? last.items.at(-1) : last;
-        if (prev && isList(a) && isList(prev) && prev.user.id === a.user.id && Math.abs((prev.createdAt || 0) - (a.createdAt || 0)) <= GROUP_GAP) {
+        if (prev && own(a) && own(prev) && prev.user.id === a.user.id && Math.abs((prev.createdAt || 0) - (a.createdAt || 0)) <= GROUP_GAP) {
             if (last.type === 'GROUP') last.items.push(a);
             else out[out.length - 1] = { type: 'GROUP', id: `g${last.id}`, user: last.user, createdAt: last.createdAt, items: [last, a] };
             continue;
@@ -673,7 +674,7 @@ function groupByPerson(activities) {
 // One person's run of updates: who and when once, then a row per show (cover, title, what happened)
 function renderGroup(group) {
     const items = group.items;
-    const plain = items.every(a => /^(watched episode|read chapter)/i.test(a.status || ''));
+    const plain = items.every(a => a.type !== 'TEXT' && /^(watched episode|read chapter)/i.test(a.status || ''));
     const manga = items.every(a => a.type === 'MANGA_LIST');
     const summary = plain ? `${manga ? 'Read' : 'Watched'} ${items.length} ${manga ? 'titles' : 'shows'}` : `${items.length} updates`;
     return `<div class="activity-group">
@@ -684,7 +685,7 @@ function renderGroup(group) {
                 <div class="activity-time">${summary} · ${api.timeAgo(group.createdAt)}</div>
             </div>
         </div>
-        <div class="activity-rows">${items.map(renderRow).join('')}</div>
+        <div class="activity-rows">${items.map(a => renderRow(a, api.timeAgo(group.createdAt))).join('')}</div>
     </div>`;
 }
 
@@ -704,18 +705,33 @@ function rowLabel(a) {
     return units || esc(status);
 }
 
-function renderRow(a) {
+// Every row is built alike, whatever it is: what it is about on the left (a cover, or a speech bubble
+// for a text post), its time and likes, replies and bin on the right, its replies under it. The time
+// shows only where it differs from the post's own
+function renderRow(a, groupTime) {
+    const time = api.timeAgo(a.createdAt);
+    const when = time !== groupTime ? `<span class="activity-row-time">${time}</span>` : '';
+    if (a.type === 'TEXT') {
+        return `<div class="activity-card activity-row is-text">
+            <div class="activity-row-main">
+                <span class="activity-row-lead" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <div class="activity-text">${formatActivityText(a.text || '')}</div>
+            </div>
+            ${when}
+            ${renderActivityActions(a, 'TEXT_ACTIVITY')}
+        </div>`;
+    }
     const ahead = aheadOfYou(a);
     const title = esc(titlePref(a.media.title));
     return `<div class="activity-card activity-row${ahead ? ' is-ahead' : ''}"${ahead ? ` data-ahead="${esc(ahead)}"` : ''}>
         <div class="activity-row-main" data-open="${a.media.id}" role="button" tabindex="0" aria-label="${title}">
-            <img class="activity-row-cover" src="${a.media.coverImage?.large || ''}" alt="" loading="lazy">
+            <img class="activity-row-lead" src="${a.media.coverImage?.large || ''}" alt="" loading="lazy">
             <div class="activity-row-info">
                 <div class="activity-row-title">${title}</div>
                 <div class="activity-row-label">${rowLabel(a)}${a.collapsed ? ` <span class="activity-collapsed">· ${a.collapsed} posts</span>` : ''}</div>
             </div>
-            <span class="activity-row-time">${api.timeAgo(a.createdAt)}</span>
         </div>
+        ${when}
         ${ahead ? `<button type="button" class="activity-ahead" title="You have not got this far yet">${esc(ahead)}</button>` : ''}
         ${renderActivityActions(a, 'ACTIVITY')}
     </div>`;

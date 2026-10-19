@@ -409,8 +409,15 @@ function staticServer() {
         check('social: posts have a reply toggle', false);
     }
     // One person's updates in a row: one post, a row per show, each row with its own likes and replies
-    const grouped = await page.evaluate(() => {
+    const mixed = await page.evaluate(() => {
         const g = document.querySelector('.activity-group');
+        return g && { user: g.querySelector('.activity-user')?.textContent, rows: g.querySelectorAll('.activity-row').length,
+            text: g.querySelectorAll('.activity-row.is-text .activity-text').length };
+    });
+    check('social: an episode and a text post in a row by the same person are one post too (a row each)',
+        mixed?.user === 'tester' && mixed.rows === 2 && mixed.text === 1, mixed);
+    const grouped = await page.evaluate(() => {
+        const g = [...document.querySelectorAll('.activity-group')].find(x => x.querySelector('.activity-user')?.textContent === 'binger');
         return g && { user: g.querySelector('.activity-user')?.textContent, rows: g.querySelectorAll('.activity-row').length,
             summary: g.querySelector('.activity-time')?.textContent, likes: g.querySelectorAll('.activity-row .like-btn').length,
             labels: [...g.querySelectorAll('.activity-row-label')].map(l => l.textContent.trim()) };
@@ -423,11 +430,12 @@ function staticServer() {
     const ownBins = await page.evaluate(() => ({ posts: document.querySelectorAll('.activity-delete').length, replies: document.querySelectorAll('.activity-reply-delete').length,
         cards: document.querySelectorAll('.activity-card').length }));
     const beforeDelete = mutations.length;
-    await page.click('.activity-delete').catch(() => {});
+    // (the last bin: the first one's post holds the replies opened above)
+    await page.locator('.activity-delete').last().click().catch(() => {});
     await page.waitForSelector('#modal-confirm', { timeout: 3000 }).catch(() => {});
     await page.click('#modal-cancel').catch(() => {});
     const keptAfterCancel = mutations.length === beforeDelete;
-    await page.click('.activity-delete').catch(() => {});
+    await page.locator('.activity-delete').last().click().catch(() => {});
     await page.click('#modal-confirm').catch(() => {});
     await page.waitForFunction((n) => document.querySelectorAll('.activity-card').length < n, ownBins.cards, { timeout: 3000 }).catch(() => {});
     await page.click('.activity-reply-delete').catch(() => {});
