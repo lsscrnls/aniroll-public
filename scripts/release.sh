@@ -62,4 +62,6 @@ echo "AniRoll $rel -> $newrel"
 
 left=$(grep -rnoE "\.js\?v=[0-9]+" index.html js | grep -v "v=$next" || true)
 [ -z "$left" ] || { echo "still on another version:" >&2; echo "$left" >&2; exit 1; }
-echo "done; add the changelog entry in js/whatsnew.js if users should hear about it"
+# CHANGELOG.md mirrors "What's new" for GitHub (add the entry in js/whatsnew.js before this script)
+node scripts/changelog.js
+echo "done; a changelog entry added after this needs: node scripts/changelog.js"

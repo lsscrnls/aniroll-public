@@ -663,7 +663,7 @@
     margin-bottom: 8px;
 }
 :root[data-design="m3"] .activity-card:hover { background: var(--md-surface-container-low); }
-:root[data-design="m3"] .activity-group .activity-row { background: transparent !important; padding: 0; margin: 0; border-radius: var(--radius-lg); animation: none; }
+:root[data-design="m3"] .activity-group .activity-row { background: transparent !important; padding: 8px 0; margin: 0; border-radius: 0; animation: none; }
 :root[data-design="m3"] .activity-group { background: color-mix(in srgb, var(--md-surface-container-low) 86%, transparent); border-radius: var(--radius-xl); padding: 16px 20px; margin-bottom: 8px; }
 :root[data-design="m3"] .activity-user { font-weight: 600; }
 :root[data-design="m3"] .activity-media, :root[data-design="m3"] .activity-embed { background: var(--md-surface-container-high); border-radius: var(--radius-lg); }
