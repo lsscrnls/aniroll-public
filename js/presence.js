@@ -1,5 +1,5 @@
 // @ts-check
-import { esc, titlePref, toast } from './store.js?v=194';
+import { esc, titlePref, toast } from './store.js?v=195';
 
 // Discord status: what you do in AniRoll, shown in Discord (Settings → Discord). The page only says what is
 // going on; the AniRoll for Discord extension (discord/extension) passes it to a small helper on this
@@ -319,7 +319,7 @@ export function mountPresenceSettings(box) {
                 <summary>Remove AniRoll for Discord</summary>
                 <ol class="settings-hint dc-list">
                     <li>${os === 'windows'
-                        ? `Remove the helper: <a href="${DL}/aniroll-discord-uninstall.exe" download>download the remover</a> and run it once (close your browser first, it is still using the helper).`
+                        ? `Remove the helper: download the remover and run it once.<br><a class="glass-btn glass-btn-secondary glass-btn-sm dc-remove-dl" href="${DL}/aniroll-discord-uninstall.exe" download>Download the remover</a>`
                         : os === 'mac' || os === 'linux'
                             ? `Remove the helper: paste this into a terminal.${copyLine(uninstallLine)}`
                             : 'Remove the helper on the computer you set it up on: Settings → Discord there shows how.'}</li>

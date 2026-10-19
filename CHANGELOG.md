@@ -1,9 +1,10 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.8.4.3.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.8.4.4.
 
 ## 19 October 2026 – One post per binge
 
+- Coming back to **Home** no longer stutters for a moment. The Discord helper's remover on Windows now works on the first run, even with the browser open.
 - Text posts join in too: an evening of episodes and the Watch Party post after it now show as one post.
 - In **Social**, when someone updates several shows in a row, you now see one post with a row per show: cover, title and what they watched, each with its own likes and replies.
 

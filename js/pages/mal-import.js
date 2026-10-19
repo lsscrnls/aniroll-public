@@ -1,7 +1,7 @@
-import * as api from '../api.js?v=194';
-import { esc, toast, getState, emptyIcon } from '../store.js?v=194';
-import { openDialog } from '../a11y.js?v=194';
-import { getToken, isLoggedIn } from '../auth.js?v=194';
+import * as api from '../api.js?v=195';
+import { esc, toast, getState, emptyIcon } from '../store.js?v=195';
+import { openDialog } from '../a11y.js?v=195';
+import { getToken, isLoggedIn } from '../auth.js?v=195';
 
 // MAL list import works via the official XML export only.
 // (Jikan's user-list endpoints are gone and MAL's own endpoints block CORS.)

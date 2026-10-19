@@ -1,5 +1,5 @@
-import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=194';
-import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=194';
+import { prefersReducedMotion, lenisScrollTo } from './animations.js?v=195';
+import { SEEDS, SHOW_SEED, previewSeed, reveal } from './design.js?v=195';
 
 // The landing page, in Material 3 Expressive (the only design logged out): the headline arrives word by word,
 // a roll to try sits next to it, the feature tour plays one clip after another, and Watch Party shows up as the
@@ -298,7 +298,7 @@ export function initLanding(root) {
         const near = new IntersectionObserver((entries) => {
             if (!entries.some(e => e.isIntersecting)) return;
             near.disconnect();
-            import('./landingdna.js?v=194').then(m => m.initDnaTry(/** @type {HTMLElement} */ (dnaSection))).catch(() => {});
+            import('./landingdna.js?v=195').then(m => m.initDnaTry(/** @type {HTMLElement} */ (dnaSection))).catch(() => {});
         }, { rootMargin: '400px 0px' });
         near.observe(dnaSection);
         cleanups.push(() => near.disconnect());

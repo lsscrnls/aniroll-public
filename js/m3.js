@@ -13,9 +13,9 @@
 // - the detail sheet pushes the page slightly aside instead of covering it
 // - feel: ripples under the finger, and a small burst of shapes whenever an episode is marked watched
 // Everything is removed again by teardown() when switching back to AniRoll's design.
-import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=194';
-import { upNext, glance, DAYS, greeting, playFromHero, heroEntry } from './upnext.js?v=194';
-import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=194';
+import { esc, titlePref, WATCHED_EVENT, GITHUB_URL, GITHUB_ICON } from './store.js?v=195';
+import { upNext, glance, DAYS, greeting, playFromHero, heroEntry } from './upnext.js?v=195';
+import { contentScheme, getSeed, getShowTheme, setShowTheme, SHOW_SEED } from './design.js?v=195';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -235,10 +235,13 @@ export function setup() {
 
 // Side-scrolling rows fade out at an edge with more behind it, so a cut-off card reads as "scroll on"
 const ROWS = '.scroll-row, .detail-studios';
-function markEdges(row) {
+function measureEdges(row) {
     const max = row.scrollWidth - row.clientWidth;
-    row.classList.toggle('has-more-start', max > 1 && row.scrollLeft > 1);
-    row.classList.toggle('has-more-end', max > 1 && row.scrollLeft < max - 1);
+    return [max > 1 && row.scrollLeft > 1, max > 1 && row.scrollLeft < max - 1];
+}
+function markEdges(row, [start, end] = measureEdges(row)) {
+    row.classList.toggle('has-more-start', start);
+    row.classList.toggle('has-more-end', end);
 }
 function setupRowEdges() {
     const content = document.getElementById('content');
@@ -247,7 +250,13 @@ function setupRowEdges() {
     const all = () => {
         if (queued) return;
         queued = true;
-        requestAnimationFrame(() => { queued = false; content.querySelectorAll(ROWS).forEach(markEdges); });
+        requestAnimationFrame(() => {
+            queued = false;
+            // Every row measured before any class changes: measuring after a change lays the page out again, once per row
+            const rows = [...content.querySelectorAll(ROWS)];
+            const edges = rows.map(measureEdges);
+            rows.forEach((row, i) => markEdges(row, edges[i]));
+        });
     };
     const onScroll = (e) => { if (e.target instanceof Element && e.target.matches(ROWS)) markEdges(e.target); };
     const mo = new MutationObserver(all);

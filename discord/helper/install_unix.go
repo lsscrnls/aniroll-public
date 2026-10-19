@@ -11,6 +11,8 @@ import (
 
 func exeName() string { return "aniroll-discord" }
 
+func removeDir(dir string) error { return os.RemoveAll(dir) }
+
 func homeDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

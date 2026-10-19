@@ -60,7 +60,7 @@ func uninstall() error {
 		return err
 	}
 	unregisterHosts()
-	return os.RemoveAll(dir)
+	return removeDir(dir)
 }
 
 func copySelf(to string) error {
