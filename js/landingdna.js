@@ -3,8 +3,8 @@
 // js/dna.js right here, and a visitor's own list by AniList name without logging in. That list is read by the
 // server (POST /api/dna/try), once per visitor every 36 hours, and only while AniList leaves it enough room;
 // GET says whether the form is open. Loaded when the section comes near the screen.
-import { readDna } from './dna.js?v=194';
-import { esc } from './store.js?v=194';
+import { readDna } from './dna.js?v=195';
+import { esc } from './store.js?v=195';
 
 const features = (lists) => new Map(lists.flatMap(l => l.entries).map(e => [e.media.id, e.media]));
 const when = (t) => new Date(t).toLocaleString('en', { weekday: 'long', hour: 'numeric', minute: '2-digit' });
