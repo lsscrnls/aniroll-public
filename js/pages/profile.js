@@ -1,11 +1,11 @@
 // @ts-check
-import * as api from '../api.js?v=195';
-import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref, toast } from '../store.js?v=195';
-import { getToken, isLoggedIn } from '../auth.js?v=195';
-import { readDna, matchDna } from '../dna.js?v=195';
-import { shareDna } from '../dnashare.js?v=195';
-import { knownMatches, keepMatch, matchVerdict } from '../dnamatches.js?v=195';
-import { accountState, saveAccountState } from '../accountstate.js?v=195';
+import * as api from '../api.js';
+import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref, toast } from '../store.js';
+import { getToken, isLoggedIn } from '../auth.js';
+import { readDna, matchDna } from '../dna.js';
+import { shareDna } from '../dnashare.js';
+import { knownMatches, keepMatch, matchVerdict } from '../dnamatches.js';
+import { accountState, saveAccountState } from '../accountstate.js';
 
 export async function render({ params, content }) {
     const token = getToken();

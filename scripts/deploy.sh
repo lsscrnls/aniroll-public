@@ -7,8 +7,8 @@
 #   scripts/deploy.sh --dry-run   run the checks, upload nothing
 #   scripts/deploy.sh --no-e2e    skip the browser checks against the obfuscated build (not recommended)
 #
-# Before uploading it checks that every ?v= import and APP_VERSION agree and that every
-# module parses — both were manual steps that were easy to forget.
+# Every module parses before anything goes up. Cache busting is done here, not by hand: scripts/fingerprint.js
+# gives each module and stylesheet in the uploaded copy a ?h= fingerprint of its content (the repo keeps plain imports).
 # The modules in scripts/protected.txt go up obfuscated (tools/obfuscate, in Docker); the repo keeps them readable.
 set -euo pipefail
 
@@ -37,20 +37,9 @@ step() { printf '\n== %s\n' "$1"; }
 fail() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 
 step "Checks"
-# One JS version everywhere (favicon.svg?v= is versioned separately, style.css has its own)
-js_versions=$(grep -rhoE "\.js\?v=[0-9]+" index.html js | sed 's/.*=//' | sort -u)
-[ "$(echo "$js_versions" | wc -l)" -eq 1 ] || fail "mixed JS versions: $(echo $js_versions)"
-app_version=$(grep -oE "APP_VERSION = '[0-9]+'" js/app.js | grep -oE "[0-9]+")
-[ "$js_versions" = "$app_version" ] || fail "APP_VERSION ($app_version) != import version ($js_versions)"
-css_version=$(grep -oE "style\.css\?v=[0-9]+" index.html | sed 's/.*=//')
-# m3.css is linked in index.html and again by js/design.js: both must name the same version
-m3_index=$(grep -oE "m3\.css\?v=[0-9]+" index.html | sed 's/.*=//')
-m3_design=$(grep -oE "m3\.css\?v=[0-9]+" js/design.js | sed 's/.*=//')
-[ "$m3_index" = "$m3_design" ] || fail "m3.css v$m3_index in index.html but v$m3_design in js/design.js (scripts/release.sh --m3 bumps both)"
-# The browser checks import modules too: an old ?v= there would load a second copy of a module
-stale_tests=$(grep -rnoE "\.js\?v=[0-9]+" tools/e2e/*.js | grep -v "v=$js_versions" || true)
-[ -z "$stale_tests" ] || fail "tools/e2e imports another version: $stale_tests"
-echo "JS v$js_versions, CSS v$css_version, M3 v$m3_index"
+# Plain imports in the repo: a version by hand would sit next to the fingerprint and outlive it
+by_hand=$(grep -rnoE "\.(js|css)\?[vh]=[0-9a-f]+" index.html js tools/e2e/*.js | grep -v "^js/vendor/" || true)
+[ -z "$by_hand" ] || fail "versioned by hand (scripts/fingerprint.js does this now): $by_hand"
 
 tmp_check="$(mktemp -d)"
 # As .mjs so they parse as modules; several at once (one node per file, 1.5 s one after the other)
@@ -90,6 +79,8 @@ done
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 cp -r "${files[@]}" "$stage/"
+# Fingerprints first: the obfuscator would hide the dynamic imports' addresses
+build=$(node scripts/fingerprint.js "$stage" | tee /dev/stderr | grep -oE "[0-9a-f]+$") || fail "fingerprinting failed"
 docker run --rm -v "$PWD/tools/obfuscate:/o:ro" -v "$stage:/s" -w /s node:24-alpine sh -c \
     "cp -r /o /tmp/o && cd /tmp/o && npm ci --silent >/dev/null 2>&1 && cd /s && node /tmp/o/run.js ${PROTECTED[*]} && chown -R $(id -u):$(id -g) /s" \
     || fail "obfuscating ${PROTECTED[*]} failed"
@@ -107,7 +98,11 @@ if [ "$E2E" -eq 1 ]; then
     echo "$(grep -c '^PASS' "$stage.e2e.log") browser checks passed"
     rm -f "$stage.e2e.log"
 fi
-tar -cf - -C "$stage" "${files[@]}" | ssh "$SERVER" "tar -xf - -C '$WEBROOT' && echo uploaded: ${files[*]}"
+# index.html and version.json last: whoever loads the page meanwhile gets the old one, not addresses not up yet
+upload=()
+for f in "${files[@]}"; do [ "$f" = index.html ] || upload+=("$f"); done
+upload+=(index.html version.json)
+tar -cf - -C "$stage" "${upload[@]}" | ssh "$SERVER" "tar -xf - -C '$WEBROOT' && echo uploaded: ${upload[*]}"
 
 # Files that exist on the server but no longer in the repo are left alone — list them instead
 stale=$(ssh "$SERVER" "cd '$WEBROOT' && find js -name '*.js' | sort" | while read -r f; do [ -e "$f" ] || echo "$f"; done)
@@ -175,10 +170,9 @@ if [ "$WITH_NGINX" -eq 1 ]; then
 fi
 
 step "Verify"
-live_js=$(curl -fsS "$SITE/js/app.js" | grep -oE "\?v=[0-9]+" | sed 's/.*=//' | sort -u)
-[ "$live_js" = "$js_versions" ] || fail "live app.js imports v$live_js, expected v$js_versions"
-curl -fsS "$SITE/" | grep -q "style.css?v=$css_version" || fail "live index.html does not load CSS v$css_version"
-echo "live: JS v$live_js, CSS v$css_version"
+curl -fsS "$SITE/" | grep -q "js/app.js?h=$build" || fail "live index.html does not load build $build"
+curl -fsS "$SITE/version.json" | grep -q "\"$build\"" || fail "live version.json is not build $build"
+echo "live: build $build"
 api_status=$(curl -s -o /dev/null -w '%{http_code}' "$SITE/api/maintenance")
 [ "$api_status" = "200" ] || fail "API answered $api_status"
 echo "API: 200"

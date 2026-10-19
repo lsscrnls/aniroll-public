@@ -1,9 +1,9 @@
-import * as api from '../api.js?v=195';
-import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=195';
-import { getToken, isLoggedIn } from '../auth.js?v=195';
-import { showConfirm } from '../a11y.js?v=195';
-import { matchDna } from '../dna.js?v=195';
-import { freshMatch, keepMatch } from '../dnamatches.js?v=195';
+import * as api from '../api.js';
+import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js';
+import { getToken, isLoggedIn } from '../auth.js';
+import { showConfirm } from '../a11y.js';
+import { matchDna } from '../dna.js';
+import { freshMatch, keepMatch } from '../dnamatches.js';
 
 export async function render({ content }) {
     const token = getToken();

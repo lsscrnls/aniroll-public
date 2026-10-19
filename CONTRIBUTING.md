@@ -52,7 +52,7 @@ something is done a certain way, especially where the obvious way failed.
 
 If you propose code, it helps when it reads like the rest:
 
-- English in code, comments and the UI. Plain ES modules; every import carries the current `?v=N`.
+- English in code, comments and the UI. Plain ES modules with plain imports (`./store.js`); the deploy adds the cache fingerprints.
 - Anything from data that goes into markup goes through `esc()` (`js/store.js`). No inline scripts or
   handlers: the Content Security Policy only runs AniRoll's own files.
 - Requests to AniList go through `js/api.js` only, so the request budget sees them. List changes use
