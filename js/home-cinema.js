@@ -2,10 +2,10 @@
 // Home in AniRoll's own design: the show you're on, then a stats box. Same idea as Material 3's hero and widgets
 // (js/m3.js), built from AniRoll's own pieces so it reads like the rest of the app: the detail page's banner,
 // cover and stats box, Roll's red kicker, the usual pill buttons. Material 3 hides this section.
-import * as api from './api.js?v=194';
-import { esc, titlePref } from './store.js?v=194';
-import { prefersReducedMotion } from './animations.js?v=194';
-import { upNext, glance, greeting, playFromHero, heroEntry } from './upnext.js?v=194';
+import * as api from './api.js?v=195';
+import { esc, titlePref } from './store.js?v=195';
+import { prefersReducedMotion } from './animations.js?v=195';
+import { upNext, glance, greeting, playFromHero, heroEntry } from './upnext.js?v=195';
 
 const imgOf = (m) => m?.coverImage?.extraLarge || m?.coverImage?.large || '';
 
@@ -103,13 +103,20 @@ function startClock(section) {
     clockTimer = setInterval(tick, 1000);
 }
 
-// The banner settles, the header and the stats rise in (the same rhythm as the rest of the app)
+// The banner settles, the header and the stats rise in (the same rhythm as the rest of the app). Web Animations
+// rather than GSAP: GSAP reads each element's computed transform first, and with the page just rebuilt that cost
+// a full style pass per element, so coming back to Home stalled for a moment
+const OUT2 = 'cubic-bezier(.5, 1, .89, 1)';
+const OUT3 = 'cubic-bezier(.33, 1, .68, 1)';
 function animateIn(section, before) {
-    if (typeof gsap === 'undefined' || before != null) return;
-    gsap.timeline({ defaults: { ease: 'power3.out' } })
-        .from(section.querySelectorAll('.ar-home-banner-img'), { scale: 1.08, duration: 1.6, ease: 'power2.out', clearProps: 'transform' }, 0)
-        .from(section.querySelectorAll('.ar-home-cover'), { y: 30, opacity: 0, duration: 0.8, clearProps: 'all' }, 0.1)
-        .from(section.querySelectorAll('.ar-home-info > *'), { y: 18, opacity: 0, duration: 0.6, stagger: 0.06, clearProps: 'all' }, 0.2)
-        .from(section.querySelectorAll('.ar-home-progress span'), { width: 0, duration: 1, ease: 'power2.inOut', clearProps: 'width' }, 0.5)
-        .from(section.querySelectorAll('.ar-home-stat, .ar-home-stats > .detail-stat'), { y: 20, opacity: 0, duration: 0.6, stagger: 0.07, clearProps: 'all' }, 0.45);
+    if (before != null || !section.animate) return;
+    const rise = (sel, y, duration, delay, stagger = 0) => section.querySelectorAll(sel).forEach((el, i) => el.animate(
+        [{ transform: `translateY(${y}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }],
+        { duration, delay: delay + i * stagger, easing: OUT3, fill: 'backwards' }));
+    section.querySelectorAll('.ar-home-banner-img').forEach(el => el.animate([{ transform: 'scale(1.08)' }, { transform: 'none' }], { duration: 1600, easing: OUT2 }));
+    rise('.ar-home-cover', 30, 800, 100);
+    rise('.ar-home-info > *', 18, 600, 200, 60);
+    section.querySelectorAll('.ar-home-progress span').forEach(el => el.animate([{ transform: 'scaleX(0)' }, { transform: 'none' }],
+        { duration: 1000, delay: 500, easing: 'cubic-bezier(.45, 0, .55, 1)', fill: 'backwards' }));
+    rise('.ar-home-stat, .ar-home-stats > .detail-stat', 20, 600, 450, 70);
 }

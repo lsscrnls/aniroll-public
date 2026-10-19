@@ -4959,7 +4959,7 @@ html.m3-loading body { visibility: hidden; }
 .ar-home-info .detail-title { font-size: clamp(1.8rem, 3.4vw, 2.6rem); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ar-home-head.no-banner .ar-home-info { padding-top: 0; }
 .ar-home-progress { max-width: 360px; height: 3px; margin: 0 0 var(--space-lg); border-radius: 3px; background: var(--border); overflow: hidden; }
-.ar-home-progress span { display: block; height: 100%; background: var(--user-accent); }
+.ar-home-progress span { display: block; height: 100%; background: var(--user-accent); transform-origin: left; }
 .ar-home .detail-actions { margin-bottom: 0; }
 .ar-home-stats { margin-top: var(--space-xl); padding: var(--space-md) var(--space-lg); align-items: center; gap: var(--space-sm); }
 .ar-home-stats .detail-stat-value { font-size: 1.25rem; }
@@ -6166,8 +6166,11 @@ h1[tabindex="-1"]:focus { outline: none; }
 :root[data-design="m3"] .dc-step.is-done .dc-step-mark { background: var(--md-primary); color: var(--md-on-primary); }
 :root[data-design="m3"] .dc-copy code { background: var(--md-surface-container-highest); }
 .dc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.dc-remove { margin-top: var(--space-md); }
-.dc-remove summary { cursor: pointer; font-size: 0.9rem; color: var(--text-secondary); }
+.dc-remove { margin-top: var(--space-lg); padding: var(--space-sm) var(--space-md); border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+    border-radius: 12px; background: color-mix(in srgb, var(--danger) 7%, transparent); }
+.dc-remove summary { cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--danger); padding: 4px 0; }
+.dc-remove[open] summary { margin-bottom: 2px; }
+.dc-remove .dc-remove-dl { display: inline-flex; margin: 6px 0 2px; color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .dc-remove .dc-list { margin-top: var(--space-sm); display: grid; gap: var(--space-sm); }
 .dc-remove .dc-copy { margin-top: 6px; }
 

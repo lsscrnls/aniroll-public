@@ -2,13 +2,13 @@
 // What changed in AniRoll: a changelog anyone can open ("What's new"), and a pop-up for returning
 // visitors with everything they have not confirmed yet. The tab move of September 2026 also shows a
 // small animation of the old tab bar turning into the new one (until the end of October 2026).
-import { esc } from './store.js?v=194';
-import { openDialog } from './a11y.js?v=194';
-import { prefersReducedMotion } from './animations.js?v=194';
-import { accountState, saveAccountState } from './accountstate.js?v=194';
+import { esc } from './store.js?v=195';
+import { openDialog } from './a11y.js?v=195';
+import { prefersReducedMotion } from './animations.js?v=195';
+import { accountState, saveAccountState } from './accountstate.js?v=195';
 
 // The version people see; scripts/release.sh counts it up (the ?v= numbers only bust caches)
-export const RELEASE = '1.8.4.3';
+export const RELEASE = '1.8.4.4';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -20,9 +20,10 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-19.2',
+        id: '2026-10-19.3',
         title: 'One post per binge',
         items: [
+            { rev: 3, text: 'Coming back to <strong>Home</strong> no longer stutters for a moment. The Discord helper\'s remover on Windows now works on the first run, even with the browser open.' },
             { rev: 2, text: 'Text posts join in too: an evening of episodes and the Watch Party post after it now show as one post.' },
             'In <strong>Social</strong>, when someone updates several shows in a row, you now see one post with a row per show: cover, title and what they watched, each with its own likes and replies.',
         ],
