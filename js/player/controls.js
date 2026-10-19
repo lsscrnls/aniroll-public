@@ -4,9 +4,9 @@
 // flat track after it. The dot on the track marks 90%, where AniList counts the episode.
 //   mountControls(root, video, { watchedAt, runtime, autoSkip }) -> { set...(), act(name), destroy() }
 // Icons: Material Symbols Rounded 400 (Apache-2.0), inline so both designs show them.
-import { esc } from '../store.js?v=189';
-import { endingInfo, upNextAt } from './ending.js?v=189';
-import { mountAmbient } from './ambient.js?v=189';
+import { esc } from '../store.js?v=191';
+import { endingInfo, upNextAt } from './ending.js?v=191';
+import { mountAmbient } from './ambient.js?v=191';
 
 
 const ICON = {

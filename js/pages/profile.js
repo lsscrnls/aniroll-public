@@ -1,11 +1,11 @@
 // @ts-check
-import * as api from '../api.js?v=189';
-import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref, toast } from '../store.js?v=189';
-import { getToken, isLoggedIn } from '../auth.js?v=189';
-import { readDna, matchDna } from '../dna.js?v=189';
-import { shareDna } from '../dnashare.js?v=189';
-import { knownMatches, keepMatch, matchVerdict } from '../dnamatches.js?v=189';
-import { accountState, saveAccountState } from '../accountstate.js?v=189';
+import * as api from '../api.js?v=191';
+import { getState, renderMediaCard, esc, emptyIcon, loginState, titlePref, toast } from '../store.js?v=191';
+import { getToken, isLoggedIn } from '../auth.js?v=191';
+import { readDna, matchDna } from '../dna.js?v=191';
+import { shareDna } from '../dnashare.js?v=191';
+import { knownMatches, keepMatch, matchVerdict } from '../dnamatches.js?v=191';
+import { accountState, saveAccountState } from '../accountstate.js?v=191';
 
 export async function render({ params, content }) {
     const token = getToken();
@@ -41,7 +41,10 @@ export async function render({ params, content }) {
             <div class="profile-info">
                 <img class="profile-avatar" src="${user.avatar?.large || user.avatar?.medium || ''}" alt="${esc(user.name)}">
                 <div>
-                    <h1 class="profile-name">${esc(user.name)}</h1>
+                    <div class="profile-name-row">
+                        <h1 class="profile-name">${esc(user.name)}</h1>
+                        ${!own && user.isFollower ? '<span class="profile-follows-you">Follows you</span>' : ''}
+                    </div>
                     <div class="profile-stats-row">
                         ${animeStats ? `
                             <div class="profile-stat"><div class="profile-stat-num">${animeStats.count}</div><div class="profile-stat-label">Anime</div></div>
@@ -174,8 +177,7 @@ async function noteDna(dna) {
 
 function followButton(user) {
     return `<button type="button" id="profile-follow" class="glass-btn ${user.isFollowing ? 'glass-btn-secondary' : 'glass-btn-primary'}"
-        data-following="${user.isFollowing ? 1 : 0}" aria-pressed="${!!user.isFollowing}">${user.isFollowing ? 'Following' : user.isFollower ? 'Follow back' : 'Follow'}</button>
-        ${user.isFollower ? '<span class="profile-follows-you">Follows you</span>' : ''}`;
+        data-following="${user.isFollowing ? 1 : 0}" data-follower="${user.isFollower ? 1 : 0}" aria-pressed="${!!user.isFollowing}">${user.isFollowing ? 'Following' : user.isFollower ? 'Follow back' : 'Follow'}</button>`;
 }
 
 function setFollow(btn, on) {
@@ -183,7 +185,7 @@ function setFollow(btn, on) {
     btn.setAttribute('aria-pressed', String(on));
     btn.classList.toggle('glass-btn-primary', !on);
     btn.classList.toggle('glass-btn-secondary', on);
-    btn.textContent = on ? 'Following' : btn.nextElementSibling?.classList.contains('profile-follows-you') ? 'Follow back' : 'Follow';
+    btn.textContent = on ? 'Following' : btn.dataset.follower === '1' ? 'Follow back' : 'Follow';
 }
 
 function renderDna(dna, own, before) {

@@ -1,5 +1,5 @@
 // @ts-check
-import { esc, titlePref, toast } from './store.js?v=189';
+import { esc, titlePref, toast } from './store.js?v=191';
 
 // Discord status: what you do in AniRoll, shown in Discord (Settings → Discord). The page only says what is
 // going on; the AniRoll for Discord extension (discord/extension) passes it to a small helper on this
