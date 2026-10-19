@@ -6010,22 +6010,36 @@ button.list-entry-score:hover, button.list-entry-score:focus-visible { backgroun
 .activity-ahead::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .7; }
 .activity-ahead.is-warning { outline: 2px solid currentColor; }
 .activity-collapsed { color: var(--text-tertiary); font-weight: 500; }
-/* Social: one person's run of updates as one post, a row per show (js/pages/social.js groupByPerson) */
+/* Social: one person's run of updates as one post, a row per update (js/pages/social.js groupByPerson).
+   Every row alike: what it is about on the left, time and actions on the right, replies underneath */
 .activity-group { padding: var(--space-md) var(--space-lg); border-radius: var(--radius-xl); margin-bottom: 2px; }
-.activity-rows { display: grid; gap: 4px; }
-.activity-group .activity-row { padding: 0; margin: 0; border-radius: var(--radius-lg); background: transparent !important; animation: none !important; }
-.activity-row-main { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 12px;
-    padding: 6px; border-radius: var(--radius-lg); cursor: pointer; transition: background-color var(--duration-fast) ease; }
-.activity-row-main:hover, .activity-row-main:focus-visible { background: var(--md-surface-container-high, var(--surface-hover)); }
-.activity-row-cover { width: 44px; height: 62px; border-radius: 10px; object-fit: cover; background: var(--md-surface-container-highest, var(--bg-secondary)); }
+.activity-rows { display: grid; }
+.activity-group .activity-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main time" "main actions" "ahead ahead" "replies replies";
+    align-items: center; column-gap: var(--space-md); padding: 8px 0; margin: 0; border-radius: 0;
+    background: transparent !important; animation: none !important;
+}
+.activity-group .activity-row + .activity-row { border-top: 1px solid var(--md-outline-variant, var(--border)); }
+.activity-row-main { grid-area: main; display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 12px;
+    padding: 4px; margin: -4px; border-radius: var(--radius-lg); transition: background-color var(--duration-fast) ease; }
+.activity-row-main[data-open] { cursor: pointer; }
+.activity-row-main[data-open]:hover, .activity-row-main[data-open]:focus-visible { background: var(--md-surface-container-high, var(--surface-hover)); }
+.activity-row-lead { width: 44px; height: 62px; border-radius: 10px; object-fit: cover; background: var(--md-surface-container-highest, var(--bg-secondary)); }
+.is-text .activity-row-lead { align-self: start; height: 44px; display: grid; place-items: center; color: var(--md-on-surface-variant, var(--text-secondary)); }
+.is-text .activity-row-lead svg { width: 20px; height: 20px; }
 .activity-row-title { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .activity-row-label { margin-top: 2px; font-size: 0.8rem; color: var(--text-secondary); }
-.activity-row-time { position: absolute; right: 10px; top: 10px; font-size: 0.7rem; color: var(--text-tertiary); white-space: nowrap; }
-/* Likes and replies of a row sit at its right edge under the time, the likers' faces left out (the post above has room for them) */
-.activity-group .activity-row { position: relative; }
-.activity-row-main { padding-right: 120px; }
-.activity-row .activity-actions { position: absolute; right: 6px; top: 34px; margin: 0; gap: var(--space-sm); }
-.activity-row .liker-avatars { display: none; }
+.activity-row-time { grid-area: time; justify-self: end; align-self: end; font-size: 0.7rem; color: var(--text-tertiary); white-space: nowrap; }
+.activity-row .activity-actions { grid-area: actions; justify-self: end; margin: 0; gap: var(--space-sm); }
+.activity-row:not(:has(.activity-row-time)) .activity-actions { grid-row: 1 / span 2; }
+.activity-row .activity-ahead { grid-area: ahead; justify-self: start; margin: 6px 0 0 56px; }
+.activity-row .activity-replies { grid-area: replies; margin: 8px 0 0 56px; }
+.activity-row.is-text .activity-text { align-self: center; }
+@media (max-width: 560px) {
+    .activity-group .activity-row { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "time" "actions" "ahead" "replies"; }
+    .activity-row-time, .activity-row .activity-actions { justify-self: start; margin-left: 56px; }
+    .activity-row:not(:has(.activity-row-time)) .activity-actions { grid-row: auto; }
+}
 .activity-row .activity-ahead { margin: 2px 0 4px 62px; }
 .activity-row .activity-replies { margin-left: 62px; }
 .notif-body { min-width: 0; flex: 1; }

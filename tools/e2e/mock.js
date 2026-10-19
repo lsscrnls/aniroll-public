@@ -112,7 +112,8 @@ function build(selections, parent, index, path, fragments) {
         }
     }
     // The second post in a feed, and the first reply in a thread, are the viewer's own (they can be deleted)
-    if ((parent === 'user' || parent === 'messenger') && /activities\[1\]\.(user|messenger)$|replies\[0\]\.user$/.test(path)) {
+    // (and the first, an episode, too: the two show as one post, an episode row and a text row)
+    if ((parent === 'user' || parent === 'messenger') && /activities\[[01]\]\.(user|messenger)$|replies\[0\]\.user$/.test(path)) {
         Object.assign(out, 'id' in out ? { id: VIEWER.id } : {}, 'name' in out ? { name: VIEWER.name } : {});
     }
     // The third and fourth posts are one person's, a little apart: the feed shows them as one post with two rows

@@ -1,0 +1,223 @@
+# Changelog
+
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.8.4.3.
+
+## 19 October 2026 – One post per binge
+
+- Text posts join in too: an evening of episodes and the Watch Party post after it now show as one post.
+- In **Social**, when someone updates several shows in a row, you now see one post with a row per show: cover, title and what they watched, each with its own likes and replies.
+
+## 18 October 2026 – Try your Anime DNA
+
+- **Follow** people right from their profile in AniRoll, and delete your own posts and replies in Social, no trip to AniList needed.
+- The start page now shows **Anime DNA**: flip through three example viewers, or type your AniList name to see your own without logging in.
+- The **ambient light** in the player now follows the picture without lagging behind, also on wide 21:9 screens.
+
+## 17 October 2026 – Any list for your party
+
+- Switching the anime of a **Watch Party** now offers every list: Watching, Planning, Paused, Completed and Dropped, one tab each.
+- Your **Discord status** clears itself when AniRoll sits in a background tab for about two minutes with nothing playing, and comes back as soon as you return.
+
+## 15 October 2026 – Back where you were
+
+- In the installed app there is now a **back button** next to the logo, and a swipe from the left edge goes back too.
+- The phone’s back button closes an open panel or dialog first instead of leaving the app.
+
+## 14 October 2026 – Subtitles make room
+
+- Styled and Blu-ray subtitles now move up a little while the player controls show, like plain ones do.
+
+## 13 October 2026 – Your friends’ calendars
+
+- Less about you on the server: error reports keep only the browser and system, Watch Party pictures come only from AniList, and backups are kept for 14 days.
+- Plain subtitles (SRT and the like) now look like proper ones: larger, white with a dark outline, no grey box, and out of the way of the controls.
+- AniRoll opens faster, and sign-in is safer: it only takes a login this browser asked for. The server no longer keeps logs with IP addresses.
+- Fixes: leaving the player while it asks where to continue, changes waiting offline getting lost, the calendar and search showing an older result after quick clicks, and the countdown on Home.
+- The **Calendar** can show what the people you follow are watching: pick **Friends**, and each episode shows who watches it. A tap on a face shows only theirs.
+- Only for people who turned it on: share your own calendar in **Settings → Lists**. It is off until you do.
+
+## 12 October 2026 – Pause the recap
+
+- Styled subtitles in **Firefox** and Zen should blink even less now.
+- **Previously on** can now be paused, switched to full screen and shown with subtitles (Space, F, C). Subtitles switched there stay for the episode after it.
+- Notes in the player, like a saved episode, now appear at the top right instead of over the subtitles.
+- **AniRoll for Discord**: Watch Party guests now show the show, the party’s episode and its cover, like the host. AniRoll also points out when the browser extension has an update.
+
+## 11 October 2026 – Steadier subtitles in Firefox
+
+- Styled subtitles in **Firefox** and Zen should no longer blink away for a moment.
+- What’s new shows every change of a busy day again: the tenth release of a day no longer counts as older than the ninth.
+
+## 10 October 2026 – Your Anime DNA
+
+- The **Watch Party** post now names every show of the evening, also after switching from the player, and says when a show was finished or completed.
+- How well do you **match**? Anyone’s profile now shows it in percent: what you both love, where you part ways, and what they loved that you have not seen. Social shows it next to every friend, your profile your closest tastes.
+- **Share your DNA**: a card with your picture and type, as a link that shows it in Discord & co. Whoever opens it sees how well you match. Your profile also keeps how your DNA changes, month by month.
+- **Anime DNA** on your profile: what kind of viewer you are, quirks you never counted (the episode you usually drop a show at, the studio that never misses), and a picture only your list draws. It changes as you watch, and works on anyone’s profile.
+- **Previously on**: back to a show after two weeks or more, the last minute of the episode before plays first, right up to its ending. It never counts as watched.
+- **Ambient light** in the player: where the picture leaves black bars (a 16:9 episode on a wide screen, a narrow window), they glow in its colours, scene by scene. A switches it, or the player menu.
+- One player menu with pages: audio and subtitles, quality and speed each open their own, so nothing needs scrolling.
+- Home’s countdown shows the next episode your calendar shows, and moves on an hour after it is out.
+- When AniRoll for Discord’s helper has an update, AniRoll tells you once and shows how to get it.
+- The **legacy design** is gone: AniRoll is Material 3 Expressive for everyone now. Settings → Discord also shows how to remove AniRoll for Discord again.
+- AniRoll for Discord now works in **Firefox**, Zen and LibreWolf too.
+- Your **Discord status** can now show what you watch in AniRoll: the episode with the time left, the show you look at, your Watch Party with a button to join. Set it up under Settings → Discord.
+- Pick any episode right in the **player**: the new Episodes button (or E) lists every episode in your Jellyfin, the one playing marked, with the seasons before and after one click away.
+- With live tracking off, the AniRoll server no longer keeps the list of shows in your **Jellyfin** library; turning live tracking off now deletes it, along with episodes still waiting to be saved.
+
+## 9 October 2026 – Up next waits for the story
+
+- AniRoll now finds shows in your **Jellyfin** that Jellyfin names differently from AniList, and later parts that share a season, the moment your server is back online. Watching them in Jellyfin itself counts the right entry too.
+- Your **Watch Party** in the player: starting one says so right there, and the party button then shows who is in and how far, marked when someone's sync fell behind. End the party from there too, with or without a post.
+- In the player, **Up next** now knows where an episode really ends: a scene after the credits plays before it shows up, and credits with story in them can no longer be skipped by accident.
+- Installed on an iPhone, AniRoll no longer hides its top bar under the status bar.
+- Search results can now show the AniRoll logo.
+
+## 8 October 2026 – AniRoll moved to aniroll.app, and a calmer look
+
+- When none of your shows has a new episode yet, the big card on Home says when the next one airs and offers a **Roll** instead of a big number. With nothing left to watch, the small card next to it says you are caught up.
+- Show cards say one thing at a glance: how many episodes are waiting, or when the next one airs. Rows that go on to the side fade out at the edge.
+- Show pages are quieter: the facts read as two short phrases, tags and recommendations drop their extra percentages, and where to watch it sits with the other links at the end.
+- Pages show their outline while they load instead of a spinner.
+- AniRoll now lives at **aniroll.app**. Old links still work and bring you here, and you stay logged in with your Jellyfin and settings.
+- The roll on the front page stops exactly on one cover, without an edge of the next one showing, and every cover is there while it spins.
+- AniRoll can now be found through Google and other search engines.
+
+## 6 October 2026 – A tidier show page and a new front page
+
+- The big card on Home is about a show with an episode **ready to watch**, instead of one that is still waiting for its next episode.
+- Show pages are calmer: the facts under the score are one line of text, the eight most fitting tags come first, and **Remove from list** moved into the status menu.
+- A show that just arrived on your Jellyfin gets its **Play** button after a minute, not ten.
+- Profiles without a banner of their own use the avatar instead of an empty grey block.
+- Show pages are much shorter: the **score** sits right under the title, and Characters, Reviews, Stats and the Trailer each have their own **tab**.
+- When the countdown on Home is already about the show you are on, the clock next to it shows the episode after that.
+- The tools on **My List** no longer get cut off when they wrap onto a second row, and the post you write after a Watch Party has room for its text.
+- The front page lets you **roll a show** right away and shows what a Watch Party invite looks like.
+
+## 5 October 2026 – Premieres in your week
+
+- **Your week** on Home now shows the premieres from your Planning list too, not just the shows you are watching.
+- Planned shows that already started count in **Your week** as well, on the day they air.
+- **What’s new** in the profile menu opens a page of its own now, with a button back to where you were. New features still greet you in a pop-up.
+- Other people’s profiles open faster: AniRoll keeps them for a while instead of asking AniList every time.
+
+## 4 October 2026 – A smarter player, your list at a glance, and a faster start
+
+- The countdown on Home shows the show’s cover, a ring that fills up until it starts, and when it airs. The last hour counts down to the second.
+- AniRoll has a version number now: you find it next to the title of What’s new.
+- **Start a Watch Party right from the player**: one button, and the invite link is in your clipboard. Starting a party anywhere else copies the link too.
+- The player shows the file’s **chapters** on the wave, with their names when you point at them.
+- Skip intro and Skip credits step aside after a few seconds, and Watch credits really means it.
+- **Play the next episode right from Home**: the Up next card has a Play button when your Jellyfin has the episode.
+- Watch Party invites show the show you are on right now in Discord and other chats: copy the link again after switching shows.
+- Watch Parties are live: the host’s next episode, who joined, votes and “Roll together” reach everyone within a second instead of up to half a minute.
+- **Play the next episode right from the Watch Party**, from your own Jellyfin, with every other episode one tap away. The host’s counter follows what you play.
+- The player answers every key: volume, speed (**[** and **]**), subtitle timing (**Z** and **X**), **0–9** to jump, **Shift+N** for the episode before. Speed, subtitle timing and size are in the menus too.
+- **Skip intros automatically**, with Undo: for every show under Settings → Jellyfin → Player, or for one show in the player. Intro and credits show on the wave, and the label above it says when you are in one.
+- Up next shows the episode’s picture and length. After a few episodes in a row it asks whether you are still watching, and **Stop after this episode** waits for you.
+- Finished a show? Rate it right there: on the player’s last card, or when +1 completes it on Home or My List.
+- Media keys, headset buttons and the lock screen control the player; the tab shows the episode.
+- Jellyfin marks only the right season as played now, and only when your progress changed. Files with two episodes count as both. A series AniRoll cannot match can be **linked by hand**, even when its second part starts at episode 13.
+- Invite friends to your Jellyfin with a link: it opens AniRoll with your server filled in.
+- My List: an **All** tab, **Behind** and genre filters, more ways to sort, your score in one tap, an **export** for MyAnimeList, and changes from anywhere show at once.
+- Home tells you what aired since your last visit and how long catching up takes; shows you have not touched in weeks can go to Paused in one tap.
+- **Not interested** on a recommendation keeps it away, on every device.
+- Search finds your own shows from the first letter. Related titles say where they stand on your list and add a sequel with one tap.
+- Social hides posts and replies about episodes you have not seen yet, and a binge shows as one post. Notifications include mentions and messages, and open the thread right there.
+- Watch Party: rate each episode together, edit the post before it goes out, see who else is watching, and invite links show the show in chat apps.
+- Roll: the match for your own Planning shows, **Fits you best**, and a time filter: tonight, a weekend, or a long haul.
+- Calendar: **Add to my calendar** puts the week into your phone’s calendar.
+- AniRoll starts faster, and saving an episode no longer reloads your whole list.
+- Easier to use with a keyboard and a screen reader, and on phones the details slide up as a proper sheet.
+
+## 2 October 2026 – Next episode, and intros to enjoy
+
+- A **Next episode** button sits next to the time in the player; N does the same.
+- **Skip intro** and **Skip credits** step back after a few seconds, so the opening can play on its own. Move the mouse and they are there again.
+- Connected to Jellyfin with an API key? Episodes you finish in AniRoll now count as **played in Jellyfin** too, and it remembers where you stopped.
+- What you confirmed here stays confirmed on every device you sign in on: this list pops up once per change, not once per browser.
+- The player **reconnects by itself** when the stream drops, right where it stopped; Try again continues there too.
+- After the last episode you have, a card says what is next: when the next one airs, whether it is missing from your library, or the **next season** to add to Planning.
+- Offline for a moment? Changes to your list are kept and go out as soon as you are back.
+
+## 1 October 2026 – Browse by tag
+
+- The **tags** on a show’s page open Browse with every show that carries them; tap the tag chip there to switch it off again.
+- The wave on the player’s progress bar moves a little calmer.
+- The **subtitles** you pick stay for the next episode of the show, switched off included.
+- After a Watch Party, its post and your friends’ episodes show in Social right away instead of minutes later.
+- Rewatches in Social say which time it is: **rewatched a 2nd time**, only in AniRoll.
+- Nothing you watch airing right now? The **countdown** on Home counts down to the next show from your Planning list instead.
+
+## 30 September 2026 – Material 3 for everyone, and your Jellyfin right in AniRoll
+
+- **Material 3 Expressive** is AniRoll’s design now, in the colours of the show you watched last. The first design stays under Settings as **Legacy design**.
+- The colour style (Tonal, Vibrant, Expressive) now also shapes the colours taken from your show.
+- Shows in your Jellyfin library get a **Play** button: episodes play in AniRoll, and finishing one ticks it off on AniList.
+- It picks up where you stopped, and Jellyfin only converts what your browser can’t play.
+- **Subtitles** look the way the release made them: styled signs and karaoke with the file’s own fonts, and Blu-ray subtitles too.
+- **Skip intro**, recaps and credits with one press, when your server knows where they are.
+- When the credits roll, **Up next** counts down to the next episode; its subtitles are already waiting. Rather see the credits? **Watch credits**, and it asks again at the very end.
+- Dual audio? Pick the **audio track** next to the subtitles; AniRoll keeps it for the rest of the show.
+- An episode you stopped part-way asks: **Continue** where you left off, or **Start over**. Your place follows you to any device through Jellyfin.
+- The gear sets the **quality**: Auto measures your connection, Maximum plays the original, or pick a bitrate. **Stats for nerds** (I) shows what plays and how.
+- **Episodes** next to Play lists every episode your Jellyfin has, with the seasons before and after: start any of them, for a rewatch or one you skipped.
+- Signing in to Jellyfin works with **Quick Connect**: confirm a code in Jellyfin, no password typed into AniRoll.
+
+## 28 September 2026 – Starting soon, studios, voice actors and a fairer Roll
+
+- Home shows what’s **starting soon** from your Planning list, with how long until its first episode.
+- My List can be **filtered by format**: TV, movies, OVAs, ONAs or specials, one tap on a chip.
+- A show’s **studios** are cards now, and each opens a **studio page** with everything they made.
+- Related shows appear as **covers** you can scroll through, not as a list of names.
+- **Roll** no longer picks the same show again soon: every show gets its turn before one comes back.
+- Every character shows their **voice actor**; tap one to see all the anime they voice, and who they play there.
+- Tags that give away the story stay hidden until you tap **Show spoiler tags**.
+- Material 3: progress runs as a wave up to a round dot, like Android’s media player; after it the line goes on flat.
+- Material 3: the **Watch Party** page got a new look — the show’s banner behind it, a big episode counter, the people and the invite on the side.
+
+## 27 September 2026 – A new Home, and Material 3 follows your pointer
+
+- **Home** opens on the show you’re on: its banner, your progress and **Watched episode N** right there.
+- Below it: a **live countdown** to your next episode, what’s ready to watch, what airs this week.
+- Continue Watching starts with your second show, so nothing appears twice.
+- In Material 3 the **pointer takes the shape** of what it points at: a cookie on buttons, a flower on shows.
+- Material 3: every cover on Home opens its show, and the detail panel pushes the page aside.
+- Material 3: the progress wave ends in a dot, on top or at the bottom, wherever the wave stops.
+- **Fixed:** joining a Watch Party failed with an error for a few hours. It works again.
+- Scores are always **out of 100** in AniRoll. Scores kept as 10 points, 5 stars or smileys on AniList are converted.
+- **Fixed:** with a 10 point, 5 star or smiley format on AniList, My List showed some scores wrong.
+
+## 26 September 2026 – Material 3 Expressive, your own colours, scores your way
+
+- A second design: **Material 3 Expressive**. Switch it on in Settings → Appearance.
+- It wears the colours of the **show you watched last**: its cover becomes a soft wallpaper and every surface follows. Or choose a palette of your own.
+- Home opens on your next episode, with widgets for the next airing, what’s ready to watch and your week.
+- Everything answers your touch: ripples, springy motion and a little burst for every episode you mark.
+- Pick **any colour by hex code** in both designs: type it in or use the colour picker.
+- Scores follow your **AniList score format**: 100 points, 10 with or without decimals, 5 stars or 3 smileys.
+- Jellyfin no longer undoes an episode count you corrected by hand.
+
+## 25 September 2026 – Roll recommendations, tidier settings, a livelier front page
+
+- Roll can include **recommended titles** that are not on your list yet: tick “Include recommended titles”.
+- A recommended pick shows its match and why it was suggested, with **Plan to Watch** right there.
+- The front page shows AniRoll in action: short clips of Roll, My List, the calendar and the taste match.
+- The top bar turns frosted once you scroll, so the page glides softly underneath.
+- **Settings** are sorted into tabs: Appearance, Lists, Watch Party and Jellyfin.
+
+## 22 September 2026 – A roomier calendar week
+
+- The week view uses the full width of big screens; days fill their column.
+- Time first, bigger covers, titles up to three lines.
+- Your shows show where you stand: **Next up**, **N behind**, **Watched** or **Planning**.
+
+## 22 September 2026 – Navigation and calendar
+
+- Five tabs: Home, My List, Roll, Discover, Social. Browse, Season and Calendar now live under **Discover**.
+- The calendar opens on **this week**, with airing times. Month is one click away.
+- My List → Planning: **Roll from this list**.
+- Posts show headings, lists and quotes. **Reply** in a thread mentions that person.
+- Every card and list entry opens with the keyboard; dialogs close with Escape.
+- Respects “Reduce motion” in your system settings.
+- Fonts come from AniRoll itself — nothing is loaded from Google any more.
