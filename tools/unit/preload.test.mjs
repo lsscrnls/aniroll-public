@@ -9,7 +9,7 @@ const root = path.join(import.meta.dirname, '..', '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const preloaded = new Set([...html.matchAll(/<link rel="modulepreload" href="([^"]+)"/g)].map(m => m[1]));
 
-// Every module a file imports statically, and theirs, as the browser would ask for them (with ?v=)
+// Every module a file imports statically, and theirs, as index.html names them
 function staticImports(file, seen = new Map()) {
     const src = fs.readFileSync(path.join(root, file), 'utf8');
     for (const m of src.matchAll(/^\s*(?:import|export)\s[^;]*?from\s+'(\.[^']+)'|^\s*import\s+'(\.[^']+)'/gm)) {
@@ -32,6 +32,6 @@ for (const entry of ['js/app.js', 'js/pages/home.js']) {
 
 test('index.html preloads Home itself', () => {
     const app = fs.readFileSync(path.join(root, 'js', 'app.js'), 'utf8');
-    const home = app.match(/import\('\.\/(pages\/home\.js\?v=\d+)'\)/)[1];
+    const home = app.match(/import\('\.\/(pages\/home\.js)'\)/)[1];
     assert.ok(preloaded.has(`js/${home}`), `js/${home}`);
 });

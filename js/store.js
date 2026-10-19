@@ -1,5 +1,5 @@
 // @ts-check
-import { untilAiring } from './api.js?v=195';
+import { untilAiring } from './api.js';
 const ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export function esc(str) { return str ? String(str).replace(/[&<>"']/g, c => ESC_MAP[c]) : ''; }
 
@@ -123,7 +123,7 @@ export function applyAccentColor(hex) {
 
 // action: { label, run } — a button in the toast (Undo); the toast then stays a little longer.
 // Screen readers hear every toast: errors at once (role="alert"), the rest when they are free.
-export function toast(message, type = 'info', { action = null } = {}) {
+export function toast(message, type = 'info', { action = null, stay = false } = {}) {
     const container = document.getElementById('toast-container');
     if (!container) return;
     const el = document.createElement('div');
@@ -147,7 +147,8 @@ export function toast(message, type = 'info', { action = null } = {}) {
         el.append(btn);
     }
     container.appendChild(el);
-    const timer = setTimeout(leave, action ? 6000 : 3000);
+    // stay: until its action is used (a note that matters later, like a new version)
+    const timer = stay ? 0 : setTimeout(leave, action ? 6000 : 3000);
 }
 
 // `rec` ({ match, because }) turns the card into a recommendation card

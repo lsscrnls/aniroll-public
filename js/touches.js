@@ -3,8 +3,6 @@
 // What it is for, and what each export promises, is described below; how it works is the part left out.
 
 // Small touches that come and go.
-//
-// Used by: js/app.js
 
 // Starts them; js/app.js calls it once on start.
 export function startTouches() { return null; }

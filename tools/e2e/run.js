@@ -13,7 +13,6 @@ const { mockJellyfin, JF_URL, JF_STORAGE } = require('./jellyfin-mock');
 const ROOT = path.join(__dirname, '..', '..');
 // The release under test and the number of changelog entries, read from the code instead of written here,
 // so a release or a new changelog day needs no edit in this file
-const APP_VERSION = fs.readFileSync(path.join(ROOT, 'js', 'app.js'), 'utf8').match(/APP_VERSION = '(\d+)'/)[1];
 const CHANGE_COUNT = (fs.readFileSync(path.join(ROOT, 'js', 'whatsnew.js'), 'utf8').match(/^\s*id: '\d{4}-/gm) || []).length;
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
     '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json' };
@@ -30,6 +29,9 @@ function check(name, ok, detail) {
 // own timers run (debounces, notices that come after a delay, video time).
 const QUIET_MS = 450;
 const TRACK = `(() => {
+    // A module as the page itself loaded it (on the deployed build with its ?h= fingerprint): any other
+    // address would load a second copy, with state of its own
+    window.__module = (name) => performance.getEntriesByType('resource').map(e => e.name).find(n => new URL(n).pathname === '/js/' + name) || '/js/' + name;
     let inFlight = 0, last = Date.now();
     const fetch0 = window.fetch;
     window.fetch = function (...args) { inFlight++; last = Date.now(); return fetch0.apply(this, args).finally(() => { inFlight--; last = Date.now(); }); };
@@ -585,13 +587,13 @@ function staticServer() {
 
     // Profile: where your scores and AniList's differ most
     // The test account carries no statistics: give the cached one some, as AniList's Viewer would
-    await page.evaluate((v) => import(`/js/store.js?v=${v}`).then(st => st.setState({ user: { ...st.getState().user, statistics: { anime: {
+    await page.evaluate((v) => import(window.__module('store.js')).then(st => st.setState({ user: { ...st.getState().user, statistics: { anime: {
         count: 40, minutesWatched: 30000, episodesWatched: 500, meanScore: 78,
         genres: [{ genre: 'Action', count: 20, meanScore: 80 }, { genre: 'Drama', count: 10, meanScore: 70 }],
         tags: [{ tag: { name: 'Isekai' }, count: 8, meanScore: 72 }],
         scores: [{ score: 80, count: 10 }], formats: [{ format: 'TV', count: 30 }],
         releaseYears: [{ releaseYear: 2024, count: 9 }, { releaseYear: 2025, count: 12 }], startYears: [{ startYear: 2025, count: 20 }], studios: [],
-    } } } })), APP_VERSION);
+    } } } })));
     await go('#/profile');
     await settle(600);
     const takes = await page.evaluate(() => ({ title: [...document.querySelectorAll('#hot-takes .section-title')].map(h => h.textContent).join(), rows: document.querySelectorAll('.hot-take').length,
@@ -600,7 +602,7 @@ function staticServer() {
 
     // Login: the page you were on comes back after AniList's login
     const back = await page.evaluate(async (v) => {
-        const auth = await import(`/js/auth.js?v=${v}`);
+        const auth = await import(window.__module('auth.js'));
         const keep = localStorage.getItem('aniroll_token');
         history.replaceState(null, '', '#/watchparty?host=Friend');
         auth.rememberReturn();
@@ -614,7 +616,7 @@ function staticServer() {
         localStorage.setItem('aniroll_token', keep);
         history.replaceState(null, '', '#/');
         return { ok, hash, planted, after };
-    }, APP_VERSION);
+    });
     check('login: back on the page where Log in was pressed (a party invite)', back.ok && back.hash === '#/watchparty?host=Friend', back);
     check('login: a token in a link without a login started here is ignored',
         back.planted === false && back.after.token === 'new-token' && back.after.hash === '#/', back);
@@ -1620,10 +1622,10 @@ function staticServer() {
             return route.fallback();
         });
         const playedBefore = calls.filter(c => c.type === 'played').length;
-        await p.evaluate((v) => import(`/js/api.js?v=${v}`).then(api => api.saveMediaListEntry({ id: 5, progress: 3 }, 'e2e-token')), APP_VERSION);
+        await p.evaluate((v) => import(window.__module('api.js')).then(api => api.saveMediaListEntry({ id: 5, progress: 3 }, 'e2e-token')));
         await p.waitForTimeout(1500);
         const scoreOnly = calls.filter(c => c.type === 'played').length;
-        await p.evaluate((v) => import(`/js/api.js?v=${v}`).then(api => api.saveMediaListEntry({ id: 5, scoreRaw: 80 }, 'e2e-token')), APP_VERSION);
+        await p.evaluate((v) => import(window.__module('api.js')).then(api => api.saveMediaListEntry({ id: 5, scoreRaw: 80 }, 'e2e-token')));
         await p.waitForTimeout(1200);
         const marked = calls.filter(c => c.type === 'played').map(c => c.item);
         check('jellyfin: progress 3 marks episodes 2 and 3 of the right season played, a score change touches nothing',
@@ -1695,7 +1697,7 @@ function staticServer() {
         check('admin: the owner sees tiles, four charts, who is online and who waits, and whether AniList limits AniRoll',
             adminView && adminPage.tiles === 7 && adminPage.charts === 4 && /tester/.test(adminPage.online) && adminPage.letIn
             && /1 browser rate limited/.test(adminPage.anilist) && /A browser/.test(adminPage.anilist), { adminView, ...adminPage });
-        await sq.evaluate((v) => import(`/js/auth.js?v=${v}`).then(m => m.logout()), APP_VERSION);
+        await sq.evaluate((v) => import(window.__module('auth.js')).then(m => m.logout()));
         await sq.waitForTimeout(800);
         check('seats: logout gives the seat back', seatCalls.some(c => c.method === 'DELETE'), seatCalls.map(c => c.method));
         await sq.close();
