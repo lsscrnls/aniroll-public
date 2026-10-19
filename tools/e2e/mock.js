@@ -62,6 +62,7 @@ function scalar(name, parent, index, path) {
     if (n === 'episode') return 3 + index;
     if (n === 'progress') return (index % 4) + 1;
     if (n === 'score' || n === 'meanscore' || n === 'averagescore') return 70 + (index % 20);
+    if (name === 'isFollower') return true; // everyone follows the test account (the profile shows "Follows you")
     if (n === 'rank' || n.startsWith('is') || n.startsWith('has')) return n.startsWith('is') || n.startsWith('has') ? false : 1;
     if (n === 'lastpage' || n === 'currentpage' || n === 'total' || n === 'perpage') return 1;
     return 1 + index; // counts, amounts, durations, repeat, likeCount, replyCount, ...
@@ -113,6 +114,10 @@ function build(selections, parent, index, path, fragments) {
     // The second post in a feed, and the first reply in a thread, are the viewer's own (they can be deleted)
     if ((parent === 'user' || parent === 'messenger') && /activities\[1\]\.(user|messenger)$|replies\[0\]\.user$/.test(path)) {
         Object.assign(out, 'id' in out ? { id: VIEWER.id } : {}, 'name' in out ? { name: VIEWER.name } : {});
+    }
+    // The third and fourth posts are one person's, a little apart: the feed shows them as one post with two rows
+    if (parent === 'user' && /activities\[[23]\]\.user$/.test(path)) {
+        Object.assign(out, 'id' in out ? { id: 4242 } : {}, 'name' in out ? { name: 'binger' } : {});
     }
     // The viewer is always the same test account
     if (parent === 'Viewer') Object.assign(out, 'id' in out ? { id: VIEWER.id } : {}, 'name' in out ? { name: VIEWER.name } : {});

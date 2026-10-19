@@ -1,9 +1,9 @@
-import * as api from '../api.js?v=189';
-import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=189';
-import { getToken, isLoggedIn } from '../auth.js?v=189';
-import { showConfirm } from '../a11y.js?v=189';
-import { matchDna } from '../dna.js?v=189';
-import { freshMatch, keepMatch } from '../dnamatches.js?v=189';
+import * as api from '../api.js?v=191';
+import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js?v=191';
+import { getToken, isLoggedIn } from '../auth.js?v=191';
+import { showConfirm } from '../a11y.js?v=191';
+import { matchDna } from '../dna.js?v=191';
+import { freshMatch, keepMatch } from '../dnamatches.js?v=191';
 
 export async function render({ content }) {
     const token = getToken();
@@ -50,8 +50,8 @@ export async function render({ content }) {
             if (!append) rewatchRuns = new Map();
             await countRewatches(result.activities, rewatchRuns, token);
 
-            const html = collapseRuns(result.activities.filter(a => a))
-                .map(a => renderActivity(a))
+            const html = groupByPerson(collapseRuns(result.activities.filter(a => a)))
+                .map(a => (a.type === 'GROUP' ? renderGroup(a) : renderActivity(a)))
                 .join('');
 
             // Added below, not redrawn: a reply being typed further up stays
@@ -474,7 +474,9 @@ async function removePost(btn, token) {
         } else {
             // A binge card stands for several posts: all of them go
             for (const id of ids) await api.deleteActivity(id, token);
+            const group = btn.closest('.activity-group');
             btn.closest('.activity-card')?.remove();
+            if (group && !group.querySelector('.activity-row')) group.remove();
         }
         toast(reply ? 'Reply deleted' : ids.length > 1 ? 'Posts deleted' : 'Post deleted');
     } catch (e) {
@@ -646,6 +648,77 @@ function collapseRuns(activities) {
         out.push(a);
     }
     return out;
+}
+
+// Someone updating several shows in a row (one evening's watching) becomes one post with a row per show,
+// instead of a post each: list posts in a row by the same person, each at most GROUP_GAP after the next.
+// Every row keeps its own likes, replies and bin (AniList knows only the single posts).
+const GROUP_GAP = 6 * 3600;
+function groupByPerson(activities) {
+    const out = [];
+    const isList = (a) => (a.type === 'ANIME_LIST' || a.type === 'MANGA_LIST') && a.user?.id && a.media;
+    for (const a of activities) {
+        const last = out.at(-1);
+        const prev = last?.type === 'GROUP' ? last.items.at(-1) : last;
+        if (prev && isList(a) && isList(prev) && prev.user.id === a.user.id && Math.abs((prev.createdAt || 0) - (a.createdAt || 0)) <= GROUP_GAP) {
+            if (last.type === 'GROUP') last.items.push(a);
+            else out[out.length - 1] = { type: 'GROUP', id: `g${last.id}`, user: last.user, createdAt: last.createdAt, items: [last, a] };
+            continue;
+        }
+        out.push(a);
+    }
+    return out;
+}
+
+// One person's run of updates: who and when once, then a row per show (cover, title, what happened)
+function renderGroup(group) {
+    const items = group.items;
+    const plain = items.every(a => /^(watched episode|read chapter)/i.test(a.status || ''));
+    const manga = items.every(a => a.type === 'MANGA_LIST');
+    const summary = plain ? `${manga ? 'Read' : 'Watched'} ${items.length} ${manga ? 'titles' : 'shows'}` : `${items.length} updates`;
+    return `<div class="activity-group">
+        <div class="activity-header">
+            <img class="activity-avatar" src="${group.user?.avatar?.medium || ''}" alt="${esc(group.user?.name)}" data-go="/user/${esc(group.user?.name)}">
+            <div>
+                <a href="#/user/${esc(group.user?.name)}" class="activity-user">${esc(group.user?.name)}</a>
+                <div class="activity-time">${summary} · ${api.timeAgo(group.createdAt)}</div>
+            </div>
+        </div>
+        <div class="activity-rows">${items.map(renderRow).join('')}</div>
+    </div>`;
+}
+
+// What happened to one show, in a few words (the title stands beside it)
+function rowLabel(a) {
+    const status = (a.status || '').toLowerCase();
+    const manga = a.type === 'MANGA_LIST';
+    const range = progressRange(a.progress);
+    const units = range ? `${manga ? 'Chapter' : 'Episode'}${range[0] !== range[1] ? 's' : ''} ${esc(a.progress)}` : '';
+    const rewatch = rewatchKind(a.status);
+    if (status.includes('plan')) return `Plans to ${manga ? 'read' : 'watch'}`;
+    if (rewatch === 'done') return `${manga ? 'Reread' : 'Rewatched'}${a.rewatchNo ? ` a ${ordinal(a.rewatchNo)} time` : ''}`;
+    if (rewatch) return `${manga ? 'Rereading' : 'Rewatching'}${a.rewatchNo ? ` (${ordinal(a.rewatchNo)} time)` : ''}${units ? ` · ${units}` : ''}`;
+    if (status.includes('complet')) return 'Completed';
+    if (status.includes('drop')) return `Dropped${units ? ` at ${units.toLowerCase()}` : ''}`;
+    if (status.includes('paus')) return `Paused${units ? ` at ${units.toLowerCase()}` : ''}`;
+    return units || esc(status);
+}
+
+function renderRow(a) {
+    const ahead = aheadOfYou(a);
+    const title = esc(titlePref(a.media.title));
+    return `<div class="activity-card activity-row${ahead ? ' is-ahead' : ''}"${ahead ? ` data-ahead="${esc(ahead)}"` : ''}>
+        <div class="activity-row-main" data-open="${a.media.id}" role="button" tabindex="0" aria-label="${title}">
+            <img class="activity-row-cover" src="${a.media.coverImage?.large || ''}" alt="" loading="lazy">
+            <div class="activity-row-info">
+                <div class="activity-row-title">${title}</div>
+                <div class="activity-row-label">${rowLabel(a)}${a.collapsed ? ` <span class="activity-collapsed">· ${a.collapsed} posts</span>` : ''}</div>
+            </div>
+            <span class="activity-row-time">${api.timeAgo(a.createdAt)}</span>
+        </div>
+        ${ahead ? `<button type="button" class="activity-ahead" title="You have not got this far yet">${esc(ahead)}</button>` : ''}
+        ${renderActivityActions(a, 'ACTIVITY')}
+    </div>`;
 }
 
 // Rewatches, as AniRoll shows them (AniList itself only says "rewatched"): a post either finishes a

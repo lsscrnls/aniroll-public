@@ -4533,9 +4533,12 @@ html.m3-loading body { visibility: hidden; }
 .activity-delete svg, .activity-reply-delete svg { width: 16px; height: 16px; }
 .activity-delete:hover, .activity-delete:focus-visible, .activity-reply-delete:hover, .activity-reply-delete:focus-visible { color: var(--md-error, #e5484d); }
 .activity-reply-delete { display: inline-flex; padding: 0 4px; border: none; background: none; color: var(--text-secondary); cursor: pointer; }
-/* Follow on someone's profile, and whether they follow you */
-.profile-follows-you { align-self: center; padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.8rem;
-    background: var(--md-tertiary-container, var(--surface-2)); color: var(--md-on-tertiary-container, var(--text)); }
+/* Whether someone follows you: a small tonal badge beside their name, like the badges on covers */
+.profile-name-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding-bottom: var(--space-md); }
+.profile-name-row .profile-name { margin: 0; padding-bottom: 0; }
+.profile-follows-you { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--radius-sm);
+    font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+    background: var(--md-surface-container-highest, var(--surface-2)); color: var(--md-on-surface-variant, var(--text-secondary)); }
 
 /* "Reduce motion" in the system settings: transitions and animations finish at once.
    The loading spinner keeps turning, otherwise a loading page looks frozen.
@@ -6007,6 +6010,24 @@ button.list-entry-score:hover, button.list-entry-score:focus-visible { backgroun
 .activity-ahead::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .7; }
 .activity-ahead.is-warning { outline: 2px solid currentColor; }
 .activity-collapsed { color: var(--text-tertiary); font-weight: 500; }
+/* Social: one person's run of updates as one post, a row per show (js/pages/social.js groupByPerson) */
+.activity-group { padding: var(--space-md) var(--space-lg); border-radius: var(--radius-xl); margin-bottom: 2px; }
+.activity-rows { display: grid; gap: 4px; }
+.activity-group .activity-row { padding: 0; margin: 0; border-radius: var(--radius-lg); background: transparent !important; animation: none !important; }
+.activity-row-main { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 12px;
+    padding: 6px; border-radius: var(--radius-lg); cursor: pointer; transition: background-color var(--duration-fast) ease; }
+.activity-row-main:hover, .activity-row-main:focus-visible { background: var(--md-surface-container-high, var(--surface-hover)); }
+.activity-row-cover { width: 44px; height: 62px; border-radius: 10px; object-fit: cover; background: var(--md-surface-container-highest, var(--bg-secondary)); }
+.activity-row-title { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.activity-row-label { margin-top: 2px; font-size: 0.8rem; color: var(--text-secondary); }
+.activity-row-time { position: absolute; right: 10px; top: 10px; font-size: 0.7rem; color: var(--text-tertiary); white-space: nowrap; }
+/* Likes and replies of a row sit at its right edge under the time, the likers' faces left out (the post above has room for them) */
+.activity-group .activity-row { position: relative; }
+.activity-row-main { padding-right: 120px; }
+.activity-row .activity-actions { position: absolute; right: 6px; top: 34px; margin: 0; gap: var(--space-sm); }
+.activity-row .liker-avatars { display: none; }
+.activity-row .activity-ahead { margin: 2px 0 4px 62px; }
+.activity-row .activity-replies { margin-left: 62px; }
 .notif-body { min-width: 0; flex: 1; }
 .notif-thread { margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--md-outline-variant, var(--border)); }
 .notif-thread-link { display: inline-block; margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--md-primary, var(--user-accent)); }
