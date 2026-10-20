@@ -4,14 +4,14 @@ import { CLIENT_ID, getToken, isLoggedIn, handleOAuthCallback, getCachedUser, se
 import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, esc, titlePref, statusLabel } from './store.js';
 import * as api from './api.js';
 import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js';
-import { openDialog, initActivation, addDialogStep, showConfirm } from './a11y.js';
+import { openDialog, initActivation, addDialogStep } from './a11y.js';
 import { initBackNav } from './backnav.js';
 import { noteVisitor, maybeShowMoveNotice, openChangelog, renderChangelog, hasUnread } from './whatsnew.js';
 import { refreshPendingStatus, refreshJellyfinStatus } from './status.js';
 import { applyDesign } from './design.js';
 import { startPresence } from './presence.js';
 import { watchForUpdate } from './update.js';
-import { accounts, rememberAccount, switchAccount, addAccount, resumeAfterCancelledAdd, signOut, dataNoteDue } from './accounts.js';
+import { accounts, rememberAccount, switchAccount, addAccount, finishInPopup, resumeAfterCancelledAdd, signOut, dataNoteDue } from './accounts.js';
 
 // This build's fingerprint, from the address app.js was loaded from (scripts/fingerprint.js); 'dev' on localhost
 const BUILD = new URL(import.meta.url).searchParams.get('h');
@@ -41,6 +41,8 @@ window.addEventListener('error', e => reportError(e.error, e.message, e.filename
 window.addEventListener('unhandledrejection', e => reportError(e.reason));
 
 async function init() {
+    // The "Add account" window back from AniList: hand the token over and close, nothing else starts here
+    if (finishInPopup()) return;
     // Before anything writes to storage: did this browser know the old layout?
     const returning = noteVisitor();
     applyTheme(getTheme());
@@ -529,7 +531,7 @@ function setupNav() {
         const el = /** @type {HTMLElement} */ (e.target);
         const other = /** @type {HTMLElement | null} */ (el.closest('[data-account]'));
         if (other) switchAccount(Number(other.dataset.account));
-        else if (el.closest('[data-add-account]')) confirmAddAccount();
+        else if (el.closest('[data-add-account]')) startAddAccount();
     });
 
     themeToggle?.addEventListener('click', () => {
@@ -709,13 +711,13 @@ function renderMenuHead(user) {
         + `<button type="button" class="dropdown-item um-add" data-add-account><svg data-icon="person_add" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="10" cy="8" r="4"/><path d="M3 20c0-3.6 3.1-6 7-6s7 2.4 7 6M19 8v6M16 11h6"/></svg><span>Add account</span></button>`;
 }
 
-async function confirmAddAccount() {
-    const ok = await showConfirm({
-        title: 'Add another account',
-        message: 'AniList signs in the account that is signed in on anilist.co. To add a different one, sign out there first, then come back and continue.',
-        confirmText: 'Continue to AniList',
-    });
-    if (ok) addAccount(CLIENT_ID);
+async function startAddAccount() {
+    toast('Sign in with the other account in the new window. AniList shows the one you have? Sign out there first.', 'info');
+    try {
+        if (await addAccount(CLIENT_ID) === 'same') toast('That is the account you are signed in with', 'info');
+    } catch (err) {
+        toast(`Could not add the account: ${err.message}`, 'error');
+    }
 }
 
 function setupSlidePanel() {
