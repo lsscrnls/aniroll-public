@@ -1,9 +1,10 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.8.4.10.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.0.
 
-## 20 October 2026 – Your accounts, your data
+## 20 October 2026 – What's this song? And your accounts
 
+- New in the player: **Songs** in the settings menu lists the episode's opening and ending, and the player names them as they start. **What's this song?** listens for a few seconds and tells you what is playing, with links to Shazam, Spotify and YouTube Music. Only a fingerprint of the sound goes out, through AniRoll, never the sound itself.
 - **Add account** now opens AniList in a small window and AniRoll stays where you are. Shows the account you already have? Sign out in that window and sign in with the other one. The note about it stays until you close it.
 - Several AniList accounts in one browser: switch between them from the profile menu, or add one in **Settings → Account**. Each keeps its own settings and Jellyfin connection.
 - **Delete all my AniRoll data** in Settings → Account removes everything AniRoll keeps for your account, on the server and in this browser, in one step. Your AniList list stays as it is.

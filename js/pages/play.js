@@ -10,6 +10,7 @@ import { controlsHtml, mountControls, icon } from '../player/controls.js';
 import { createSubtitles } from '../player/subtitles.js';
 import { neighbours, openEpisodes } from '../player/episodes.js';
 import { maybeRecap, noteWatched } from '../player/recap.js';
+import { loadThemes, themesFor, identify } from '../player/songs.js';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -348,6 +349,12 @@ export async function render({ params, content }) {
         loadSegments(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setSegments(list); });
         if (media.idMal) loadEnding(media.idMal, episode).then(list => { if (!closed && list.length) controls.setEnding(list); });
         loadChapters(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setChapters(list); });
+        loadThemes(mediaId).then(all => {
+            if (closed) return;
+            const here = themesFor(all, episode);
+            controls.setSongs({ list: () => here.list, op: here.op, ed: here.ed,
+                identify: (opts) => identify(video, { media: mediaId, episode, ...opts }) });
+        });
         await reportStart(session, engine);
         if (closed) return cleanup;
         reportTimer = setInterval(report, REPORT_EVERY);
@@ -423,11 +430,13 @@ async function loadSegments(base, cfg, itemId) {
     }
 }
 
-// Where the ending is, from AniSkip (api.aniskip.com: community-voted times by MyAnimeList id and episode):
-// whether story runs on during the ending ("mixed-ed") or after it. Times count from its file's start, so the
+// Where the opening and the ending are, from AniSkip (api.aniskip.com: community-voted times by MyAnimeList id
+// and episode): whether story runs on during the ending ("mixed-ed") or after it, and when the songs start. Times count from its file's start, so the
 // player only uses them for a file of the same length. Kept a week per episode; nothing found: Jellyfin's
-// segments alone. [{ type: 'ed' | 'mixed-ed', start, end, length }] in seconds
-const ENDING_KEY = 'aniroll_endings';
+// segments alone. [{ type: 'op' | 'mixed-op' | 'ed' | 'mixed-ed', start, end, length }] in seconds
+const ENDING_KEY = 'aniroll_skiptimes';
+try { localStorage.removeItem('aniroll_endings'); } catch { /* gone anyway */ }
+const SKIP_TYPES = ['op', 'mixed-op', 'ed', 'mixed-ed'];
 const ENDING_TTL = 7 * 24 * 60 * 60 * 1000;
 async function loadEnding(malId, episode) {
     const key = `${malId}/${episode}`;
@@ -437,13 +446,13 @@ async function loadEnding(malId, episode) {
     let list = [];
     try {
         const res = await fetch(`https://api.aniskip.com/v2/skip-times/${encodeURIComponent(malId)}/${encodeURIComponent(episode)}`
-            + '?types[]=ed&types[]=mixed-ed&episodeLength=0', { signal: AbortSignal.timeout(6000) });
+            + '?' + SKIP_TYPES.map(t => `types[]=${t}`).join('&') + '&episodeLength=0', { signal: AbortSignal.timeout(6000) });
         // 404 means nobody submitted this episode: kept as "nothing", like an answer
         if (!res.ok && res.status !== 404) return [];
         const data = await res.json();
         list = (data?.results || []).map(r => ({ type: r.skipType, start: Number(r.interval?.startTime) || 0,
             end: Number(r.interval?.endTime) || 0, length: Number(r.episodeLength) || 0 }))
-            .filter(r => (r.type === 'ed' || r.type === 'mixed-ed') && r.end > r.start);
+            .filter(r => SKIP_TYPES.includes(r.type) && r.end > r.start);
     } catch { return []; }
     const now = Date.now();
     for (const k of Object.keys(kept)) if (now - kept[k].at >= ENDING_TTL) delete kept[k];

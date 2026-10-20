@@ -111,7 +111,7 @@ stale=$(ssh "$SERVER" "cd '$WEBROOT' && find js -name '*.js' | sort" | while rea
 if [ "$WITH_API" -eq 1 ]; then
     step "API"
     # The Dockerfile too: it pins the Node version the image is built on
-    scp -q api/server.js api/party.js api/animemap.js api/sources.js api/Dockerfile "$SERVER:$API_DIR/"
+    scp -q api/server.js api/party.js api/animemap.js api/sources.js api/songs.js api/Dockerfile "$SERVER:$API_DIR/"
     # docker restart is not enough: server.js and party.js are copied into the image at build time.
     # Build first: if it fails (e.g. the base image cannot be pulled), the old container keeps running.
     # The container runs as uid 10001 (api/Dockerfile): data/ is handed to it after the old container
