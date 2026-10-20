@@ -1,6 +1,7 @@
 // AniRoll for Discord: the small helper between the browser extension (discord/extension) and Discord.
 //
-// Started by hand (double-click, or the install line from Settings → Discord) it sets itself up: it copies
+// For Linux and macOS; Windows has its own (discord/windows). Started by hand (the install line from
+// Settings → Discord) it sets itself up: it copies
 // itself to a fixed place and tells the browsers where to find it. Started by a browser (native messaging)
 // it reads what AniRoll is doing and passes it to the Discord app on this computer.
 //
@@ -9,14 +10,11 @@
 package main
 
 import (
-	"bufio"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -37,8 +35,7 @@ func main() {
 		return
 	}
 	var err error
-	// "uninstall", or a copy named so (Windows: aniroll-discord-uninstall.exe, double-clicked)
-	if (len(os.Args) > 1 && os.Args[1] == "uninstall") || strings.Contains(strings.ToLower(filepath.Base(os.Args[0])), "uninstall") {
+	if len(os.Args) > 1 && os.Args[1] == "uninstall" {
 		err = uninstall()
 		if err == nil {
 			fmt.Println("AniRoll for Discord is removed from this computer. Remove the extension in your browser too.")
@@ -52,7 +49,6 @@ func main() {
 	if err != nil {
 		fmt.Println("Something went wrong:", err)
 	}
-	waitForEnter()
 	if err != nil {
 		os.Exit(1)
 	}
@@ -67,15 +63,6 @@ func startedByBrowser(args []string) bool {
 		}
 	}
 	return false
-}
-
-// A double-clicked window (Windows) would close before anyone could read it; a terminal stays
-func waitForEnter() {
-	if runtime.GOOS != "windows" {
-		return
-	}
-	fmt.Print("Press Enter to close.")
-	bufio.NewReader(os.Stdin).ReadString('\n')
 }
 
 // ===== Native messaging: 4-byte length (native byte order, little endian everywhere we run), then JSON =====

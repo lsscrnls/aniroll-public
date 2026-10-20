@@ -920,6 +920,29 @@ function staticServer() {
         await p.close();
     }
 
+    // Windows: the helper is set up with a line for PowerShell (no .exe any more), and the .exe helper of
+    // 1.0.x counts as old there
+    {
+        const { p, pageErrors } = await playerPage(true);
+        await p.addInitScript(() => {
+            Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36' });
+            window.addEventListener('message', (e) => {
+                if (e.data?.aniroll !== 'presence') return;
+                window.postMessage({ aniroll: 'presence-ext', type: 'status', extension: '1.0.2', helper: true, helperVersion: '1.0.2', discord: true }, location.origin);
+            });
+        });
+        await p.goto(base + '/#/settings?tab=discord');
+        await p.waitForSelector('.dc-step', { timeout: 5000 }).catch(() => {});
+        await p.waitForTimeout(500);
+        const win = await p.evaluate(() => ({ title: document.querySelectorAll('.dc-step-title')[1]?.textContent || '',
+            install: document.querySelectorAll('.dc-step')[1]?.querySelector('code')?.textContent || '',
+            remove: document.querySelector('.dc-remove code')?.textContent || '', exe: !!document.querySelector('a[href$=".exe"]') }));
+        check('discord: Windows sets the helper up with a line for PowerShell and removes it the same way; the .exe helper counts as old',
+            /update for the helper \(1\.0\.2 → 1\.1\.0\)/.test(win.title) && /^irm https:\/\/aniroll\.app\/downloads\/discord\/install\.ps1 \| iex$/.test(win.install)
+            && /uninstall\.ps1 \| iex$/.test(win.remove) && !win.exe && !pageErrors.length, { win, pageErrors });
+        await p.close();
+    }
+
     // Ambient light (A), the menu's pages, and "Previously on": episode 8 was last played weeks ago, so episode 9
     // starts with its last moments up to its ending, in a video of its own: no report to Jellyfin about episode 8,
     // nothing saved to AniList, the episode itself waits and then plays

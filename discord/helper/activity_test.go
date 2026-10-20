@@ -2,61 +2,47 @@ package main
 
 import (
 	"encoding/json"
-	"strings"
+	"os"
+	"reflect"
+	"regexp"
+	"strconv"
 	"testing"
 	"time"
 )
 
+// The cases are shared with the Windows helper (discord/windows/test_helper.py): both have to agree
 func TestSanitize(t *testing.T) {
-	now := time.Now().UnixMilli()
-	in := `{"type":3,"details":"Frieren","state":"x","evil":"field","timestamps":{"start":` + jsonInt(now) + `,"end":` + jsonInt(now+60000) + `},
-		"assets":{"large_image":"file:///etc/passwd","small_image":"https://aniroll.app/icons/icon-512.png","large_text":"` + strings.Repeat("a", 300) + `"},
-		"buttons":[{"label":"A","url":"javascript:alert(1)"},{"label":"View on AniRoll","url":"https://aniroll.app/a/1"},{"label":"B","url":"https://b"},{"label":"C","url":"https://c"}]}`
-	var out map[string]any
-	if err := json.Unmarshal(sanitize(json.RawMessage(in)), &out); err != nil {
+	raw, err := os.ReadFile("testdata/sanitize.json")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := out["evil"]; ok {
-		t.Error("unknown field passed")
+	now := time.Now().UnixMilli()
+	raw = regexp.MustCompile(`"@now([+-]\d+)?"`).ReplaceAllFunc(raw, func(m []byte) []byte {
+		n := now
+		if s := regexp.MustCompile(`[+-]\d+`).Find(m); s != nil {
+			d, _ := strconv.ParseInt(string(s), 10, 64)
+			n += d
+		}
+		return []byte(strconv.FormatInt(n, 10))
+	})
+	var file struct {
+		Cases []struct {
+			Name string          `json:"name"`
+			In   json.RawMessage `json:"in"`
+			Out  json.RawMessage `json:"out"`
+		} `json:"cases"`
 	}
-	if out["state"] != "x " {
-		t.Errorf("state %q not padded to 2", out["state"])
+	if err := json.Unmarshal(raw, &file); err != nil {
+		t.Fatal(err)
 	}
-	a := out["assets"].(map[string]any)
-	if _, ok := a["large_image"]; ok {
-		t.Error("file url passed")
-	}
-	if len([]rune(a["large_text"].(string))) != 128 {
-		t.Error("text not clipped")
-	}
-	if b := out["buttons"].([]any); len(b) != 2 || b[0].(map[string]any)["url"] != "https://aniroll.app/a/1" {
-		t.Errorf("buttons %v", b)
-	}
-	if out["timestamps"] == nil {
-		t.Error("valid timestamps dropped")
-	}
-	if out["status_display_type"] != nil {
-		t.Error("display type set without being asked")
-	}
-	var shown map[string]any
-	json.Unmarshal(sanitize(json.RawMessage(`{"type":3,"details":"xy","status_display_type":2}`)), &shown)
-	if shown["status_display_type"] != float64(2) {
-		t.Errorf("display type %v", shown["status_display_type"])
-	}
-	shown = nil
-	json.Unmarshal(sanitize(json.RawMessage(`{"type":3,"details":"xy","status_display_type":7}`)), &shown)
-	if shown["status_display_type"] != nil {
-		t.Error("unknown display type passed")
-	}
-	if sanitize(json.RawMessage(`{"type":3,"details":"x","timestamps":{"start":-5}}`)) == nil {
-		t.Error("activity with bad time dropped entirely")
-	}
-	if s := string(sanitize(json.RawMessage(`{"type":3,"details":"Ok","timestamps":{"start":-5}}`))); strings.Contains(s, "timestamps") {
-		t.Error("bad timestamps passed")
-	}
-	if sanitize(json.RawMessage(`null`)) != nil || sanitize(json.RawMessage(`{"state":"no details"}`)) != nil || sanitize(json.RawMessage(`[1]`)) != nil {
-		t.Error("unusable activity not cleared")
+	for _, c := range file.Cases {
+		var got, want any
+		if out := sanitize(c.In); out != nil {
+			json.Unmarshal(out, &got)
+		}
+		json.Unmarshal(c.Out, &want)
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s:\n got %v\nwant %v", c.Name, got, want)
+		}
 	}
 }
-
-func jsonInt(n int64) string { b, _ := json.Marshal(n); return string(b) }
