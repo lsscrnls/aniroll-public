@@ -2400,4 +2400,8 @@
 :root[data-design="m3"] .acct-row.current { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
 :root[data-design="m3"] .acct-badge { background: var(--md-primary); color: var(--md-on-primary); }
 :root[data-design="m3"] .glass-btn-danger { background: var(--md-error); color: var(--md-on-error); }
+:root[data-design="m3"] .um-status-icon .jf-dot { box-shadow: 0 0 0 2px var(--md-surface-container); }
+:root[data-design="m3"] .um-menu .jf-status-item > .um-status-icon { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .um-menu .jf-status-item[data-state="off"] > .um-status-icon { color: var(--md-error); }
+:root[data-design="m3"] .um-menu .src-downloads[data-busy] > svg { color: var(--md-primary); }
 :root[data-design="m3"] .um-initial { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }

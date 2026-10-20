@@ -33,9 +33,12 @@ export async function refreshJellyfinStatus(force = false) {
     item.hidden = false;
     const dot = document.getElementById('jf-status-dot');
     const text = document.getElementById('jf-status-text');
+    // The item's state picks its icon (a TV, crossed out when the server does not answer); the dot is its badge
+    item.dataset.state = 'checking';
     dot.className = 'jf-dot jf-dot-checking';
     text.textContent = 'Jellyfin · checking...';
     const status = await getStatus(force);
+    item.dataset.state = status.state === 'connected' ? 'on' : 'off';
     dot.className = `jf-dot jf-dot-${status.state === 'connected' ? 'on' : 'off'}`;
     text.textContent = status.state === 'connected'
         ? `Jellyfin · ${status.serverName}`
