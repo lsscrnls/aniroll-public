@@ -1,9 +1,10 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.8.4.6.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.8.4.7.
 
 ## 20 October 2026 – Your accounts, your data
 
+- **Add account** now opens AniList in a small window and AniRoll stays where you are. Shows the account you already have? Sign out in that window and sign in with the other one.
 - Several AniList accounts in one browser: switch between them from the profile menu, or add one in **Settings → Account**. Each keeps its own settings and Jellyfin connection.
 - **Delete all my AniRoll data** in Settings → Account removes everything AniRoll keeps for your account, on the server and in this browser, in one step. Your AniList list stays as it is.
 - The profile menu is shorter and clearer: you on top, your other accounts below, then just what you need.

@@ -89,8 +89,54 @@ export function switchAccount(id) {
     reloadHome();
 }
 
-// AniList signs in whoever is signed in on anilist.co: the settings say so next to the button
-export function addAccount(clientId) {
+// "Add account" in a small window of its own: AniRoll stays as it is, and if AniList shows the account you
+// are already signed in with, you sign out and in with the other one right there. AniList sends the window
+// back to AniRoll with the token; that page hands it over (finishInPopup) and closes. The account is checked
+// with AniList, joins the list and is switched to. Resolves to 'switched' (the page reloads), 'same' or null.
+export async function addAccount(clientId) {
+    const w = 440, h = 680;
+    const popup = window.open(getLoginUrl(clientId), 'aniroll-add-account',
+        `popup,width=${w},height=${h},left=${Math.max(0, (screen.width - w) / 2)},top=${Math.max(0, (screen.height - h) / 2)}`);
+    if (!popup) { addAccountHere(clientId); return null; }
+    /** @type {any} */ (window).__anirollAdding = true;
+    const token = await new Promise((resolve) => {
+        const done = (value) => { window.removeEventListener('message', onMessage); clearInterval(watch); /** @type {any} */ (window).__anirollAdding = false; resolve(value); };
+        const onMessage = (e) => {
+            if (e.origin !== location.origin || e.source !== popup || e.data?.aniroll !== 'add-account') return;
+            done(typeof e.data.token === 'string' ? e.data.token : null);
+        };
+        const watch = setInterval(() => { if (popup.closed) done(null); }, 500);
+        window.addEventListener('message', onMessage);
+    });
+    if (!token) return null;
+    const viewer = await api.getViewer(token);
+    const entry = { id: viewer.id, name: viewer.name, avatar: viewer.avatar?.medium || '', token };
+    const list = accounts().filter(a => a.id !== viewer.id);
+    saveAccounts([...list, entry]);
+    if (viewer.id === getCachedUser()?.id) {
+        setToken(token);
+        return 'same';
+    }
+    switchAccount(viewer.id);
+    return 'switched';
+}
+
+// In the window "Add account" opened, back from AniList: the token goes to the AniRoll that asked, never into
+// this browser's storage (that would sign the other tab in as well), and the window closes. Only an AniRoll
+// window of the same site that is waiting for it gets the token; a page anyone else opened gets nothing.
+export function finishInPopup() {
+    let opener = null;
+    try { opener = window.opener && window.opener.location.origin === location.origin && window.opener.__anirollAdding ? window.opener : null; } catch { /* another site opened this */ }
+    if (!opener) return false;
+    const token = new URLSearchParams(location.hash.slice(1)).get('access_token');
+    history.replaceState(null, '', location.pathname);
+    opener.postMessage({ aniroll: 'add-account', token }, location.origin);
+    window.close();
+    return true;
+}
+
+// A blocked pop-up: the old way, AniRoll itself goes to AniList and comes back
+function addAccountHere(clientId) {
     const me = getCachedUser()?.id;
     if (me != null) {
         releaseSeat(getToken());
