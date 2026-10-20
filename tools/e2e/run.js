@@ -2020,6 +2020,20 @@ function staticServer() {
         check('accounts: the menu shows who is signed in, the other account and Add account; a one-time note says where to delete your data',
             menu.name && menu.name !== 'Profile' && menu.others.length === 1 && /Alt/.test(menu.others[0]) && menu.add && menu.note, menu);
         const me = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_user')).id);
+        // Add account: AniList in a window of its own, back with a token; the window hands it over and closes.
+        // (The mocked AniList knows one viewer only, so this comes back as the account already signed in)
+        await page.context().route('https://anilist.co/**', route => route.fulfill({ status: 302, headers: { location: `${base}/#access_token=popup-token&token_type=Bearer` } }));
+        const [popup] = await Promise.all([page.waitForEvent('popup'), page.click('#um-accounts [data-add-account]')]);
+        await popup.waitForEvent('close', { timeout: 8000 }).catch(() => {});
+        await page.waitForFunction(() => [...document.querySelectorAll('.toast')].some(t => /the account you are signed in with/.test(t.textContent)), null, { timeout: 8000 }).catch(() => {});
+        const added = await page.evaluate(() => ({
+            closedNote: [...document.querySelectorAll('.toast')].some(t => /the account you are signed in with/.test(t.textContent)),
+            token: localStorage.getItem('aniroll_token'),
+        }));
+        check('accounts: Add account opens AniList in a window that hands the token back and closes, the page stays',
+            popup.isClosed() && added.closedNote && added.token === 'popup-token', { closed: popup.isClosed(), added });
+        await page.evaluate(() => localStorage.setItem('aniroll_token', 'e2e-token'));
+        await page.click('#user-btn');
         await page.click('#um-accounts [data-account="777"]');
         await page.waitForLoadState('load');
         await page.waitForTimeout(800);
