@@ -8,3 +8,7 @@ api/data/
 *.log
 downloads/
 dist/
+
+# Python bytecode (discord/windows tests)
+__pycache__/
+*.pyc
