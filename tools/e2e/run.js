@@ -992,6 +992,52 @@ function staticServer() {
             wide.bars && wide.dx < 2 && wide.dy < 2 && parseFloat(wide.blur) > 0 && parseFloat(wide.blur) < 5, wide);
         await p.close();
     }
+
+    // Songs: the opening named as the intro starts, the episode's songs in the menu, and "What's this song?":
+    // 12 s of the video's sound, only a signature goes to our server, the answer as a card with links
+    {
+        const { p, pageErrors } = await playerPage(true);
+        await p.route(`${base}/api/songs/themes/101`, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ themes: [
+            { type: 'OP', n: 1, title: 'First Song', artist: 'Singer A', episodes: '1-12' },
+            { type: 'OP', n: 2, title: 'Later Song', artist: 'Singer C', episodes: '13-24' },
+            { type: 'ED', n: 1, title: 'End Song', artist: 'Singer B', episodes: null },
+        ] }) }));
+        let asked = null;
+        await p.route(`${base}/api/songs/identify`, route => {
+            asked = { body: route.request().postDataJSON(), auth: route.request().headers().authorization };
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify({ song: { title: 'buddy', artist: 'kensuke ushio',
+                cover: '', shazam: 'https://www.shazam.com/track/1/buddy', youtube: 'https://music.youtube.com/search?q=buddy', spotify: '' } }) });
+        });
+        await p.goto(base + '/#/play/101/3');
+        await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2; }, null, { timeout: 10000 }).catch(() => {});
+        // Episode 3 stopped part-way before: start over
+        await p.click('[data-resume="restart"]', { timeout: 3000 }).catch(() => {});
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.muted = false; v.volume = 1; v.currentTime = 1; return v.play(); }).catch(() => {});
+        await p.waitForFunction(() => !document.querySelector('.pl-song')?.hidden, null, { timeout: 5000 }).catch(() => {});
+        const opening = await p.evaluate(() => document.querySelector('.pl-song')?.innerText.replace(/\s+/g, ' ').trim());
+        await p.mouse.move(640, 400);
+        await p.click('[data-act="settings"]');
+        const row = await p.evaluate(() => document.querySelector('.pl-menu [data-page="songs"]')?.innerText.replace(/\s+/g, ' ').trim());
+        await p.click('.pl-menu [data-page="songs"]');
+        const list = await p.evaluate(() => [...document.querySelectorAll('.pl-menu-song')].map(b => b.innerText.replace(/\s+/g, ' ').trim()));
+        const menuIdentify = await p.evaluate(() => !!document.querySelector('.pl-menu [data-identify]'));
+        await p.keyboard.press('Escape');
+        await p.click('[data-act="identify"]');
+        const listeningNow = await p.evaluate(() => /listening/i.test(document.querySelector('.pl-song')?.innerText || ''));
+        await p.waitForFunction(() => /buddy/.test(document.querySelector('.pl-song')?.innerText || ''), null, { timeout: 20000 }).catch(() => {});
+        const card = await p.evaluate(() => ({ text: document.querySelector('.pl-song')?.innerText.replace(/\s+/g, ' ').trim(),
+            links: [...document.querySelectorAll('.pl-song a.pl-song-link')].map(a => a.textContent) }));
+        check('player songs: the opening named as the intro starts, the episode\'s songs in the menu (not the later opening)',
+            /Opening/i.test(opening || '') && /First Song/.test(opening) && /Singer A/.test(opening)
+            && row === 'Songs OP · ED ›' && list.length === 2 && /^OP First Song Singer A$/.test(list[0]) && /^ED End Song Singer B$/.test(list[1]),
+            { opening, row, list });
+        check('player songs: What\'s this song? (its own button, also in the menu) listens, sends only a signature with the spot, shows the answer with links',
+            menuIdentify && listeningNow && /^data:audio\/vnd\.shazam\.sig;base64,/.test(asked?.body?.uri || '') && asked.body.samplems === 12000
+            && asked.body.media === 101 && asked.body.episode === 3 && asked.body.at >= 1 && asked.auth === 'Bearer e2e-token'
+            && !('audio' in asked.body) && /Recognized/i.test(card.text) && /buddy/.test(card.text) && card.links.join() === 'Shazam,YouTube Music'
+            && !pageErrors.length, { listeningNow, asked: asked && { ...asked.body, uri: asked.body.uri?.slice(0, 50) }, card, pageErrors });
+        await p.close();
+    }
     }, async () => {
 
     // Episodes in the player: E (or the button) lists them, the one playing marked; another one plays right

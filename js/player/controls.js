@@ -5,7 +5,7 @@
 //   mountControls(root, video, { watchedAt, runtime, autoSkip }) -> { set...(), act(name), destroy() }
 // Icons: Material Symbols Rounded 400 (Apache-2.0), inline so both designs show them.
 import { esc } from '../store.js';
-import { endingInfo, upNextAt } from './ending.js';
+import { endingInfo, upNextAt, songSpans } from './ending.js';
 import { mountAmbient } from './ambient.js';
 
 
@@ -26,6 +26,8 @@ const ICON = {
     skipNext: 'M660-280v-400q0-17 11.5-28.5T700-720q17 0 28.5 11.5T740-680v400q0 17-11.5 28.5T700-240q-17 0-28.5-11.5T660-280Zm-440-35v-330q0-18 12-29t28-11q5 0 11 1t11 5l248 166q9 6 13.5 14.5T548-480q0 10-4.5 18.5T530-447L282-281q-5 4-11 5t-11 1q-16 0-28-11t-12-29Z',
     settings: 'M433-80q-27 0-46.5-18T363-142l-9-66q-13-5-24.5-12T307-235l-62 26q-25 11-50 2t-39-32l-47-82q-14-23-8-49t27-43l53-40q-1-7-1-13.5v-27q0-6.5 1-13.5l-53-40q-21-17-27-43t8-49l47-82q14-23 39-32t50 2l62 26q11-8 23-15t24-12l9-66q4-26 23.5-44t46.5-18h94q27 0 46.5 18t23.5 44l9 66q13 5 24.5 12t22.5 15l62-26q25-11 50-2t39 32l47 82q14 23 8 49t-27 43l-53 40q1 7 1 13.5v27q0 6.5-2 13.5l53 40q21 17 27 43t-8 49l-48 82q-14 23-39 32t-50-2l-60-26q-11 8-23 15t-24 12l-9 66q-4 26-23.5 44T527-80h-94Zm49-260q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Z',
     close: 'M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z',
+    music: 'M400-120q-66 0-113-47t-47-113q0-66 47-113t113-47q23 0 42.5 5.5T480-418v-382q0-17 11.5-28.5T520-840h160q17 0 28.5 11.5T720-800v80q0 17-11.5 28.5T680-680H560v400q0 66-47 113t-113 47Z',
+    recognize: 'M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-60q142 0 241-99t99-241q0-142-99-241t-241-99q-142 0-241 99t-99 241q0 142 99 241t241 99ZM340-580a30 30 0 0 1 30 30v140a30 30 0 0 1-60 0v-140a30 30 0 0 1 30-30ZM480-660a30 30 0 0 1 30 30v300a30 30 0 0 1-60 0v-300a30 30 0 0 1 30-30ZM620-580a30 30 0 0 1 30 30v140a30 30 0 0 1-60 0v-140a30 30 0 0 1 30-30Z',
     check: 'm378-332 363-363q9-9 21.5-9t21.5 9q9 9 9 21.5t-9 21.5L399-267q-9 9-21 9t-21-9L175-449q-9-9-8.5-21.5T176-492q9-9 21.5-9t21.5 9l159 160Z',
 };
 
@@ -64,6 +66,7 @@ export function controlsHtml() {
             <div class="pl-stats-body"></div>
         </div>
         <div class="pl-osd" role="status" aria-live="polite" hidden></div>
+        <div class="pl-song" role="status" aria-live="polite" hidden></div>
         <div class="pl-center">
             <button class="pl-btn pl-btn-tonal pl-skip" data-act="back10" aria-label="Back 10 seconds" title="Back 10 s (←)">${icon('back10')}</button>
             <button class="pl-btn pl-play" data-act="play" aria-label="Play" title="Play (Space)">${icon('play')}</button>
@@ -103,6 +106,7 @@ export function controlsHtml() {
                     <button class="pl-btn" data-act="mute" aria-label="Mute" title="Mute (M)">${icon('volume')}</button>
                     <input class="pl-volume-slider" type="range" min="0" max="1" step="0.05" aria-label="Volume">
                 </div>
+                <button class="pl-btn" data-act="identify" aria-label="What's this song?" title="What's this song?" hidden>${icon('recognize')}</button>
                 <div class="pl-menu-wrap">
                     <button class="pl-btn" data-act="subs" aria-label="Audio and subtitles" aria-haspopup="menu" aria-expanded="false" title="Audio & subtitles (C: subtitles on/off)">${icon('subtitles')}</button>
                     <button class="pl-btn" data-act="settings" aria-label="Quality and stats" aria-haspopup="menu" aria-expanded="false" title="Quality & stats for nerds (I)">${icon('settings')}</button>
@@ -283,12 +287,18 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             return (hasSubs ? row('subs', 'Audio & subtitles', subsValue()) : '')
                 + (quality.list().length ? row('quality', 'Quality', q?.label || '') : '')
                 + row('speed', 'Speed', speedLabel(video.playbackRate))
+                + (songs ? row('songs', 'Songs', songs.list().map(t => t.type).join(' · ')) : '')
                 + '<div class="pl-menu-divider" role="separator"></div>'
                 + (autoSkip ? menuItem('Skip intros automatically', 'data-autoskip', '1', !!autoSkip.get(), 'menuitemcheckbox') : '')
                 + menuItem('Ambient light', 'data-ambient', '1', root.classList.contains('has-ambient'), 'menuitemcheckbox')
                 + menuItem('Stop after this episode', 'data-stopafter', '1', stopAfter, 'menuitemcheckbox')
                 + menuItem('Stats for nerds', 'data-stats', '1', !statsBox.hidden, 'menuitemcheckbox');
         },
+        songs: () => backTo('Songs')
+            + `<button class="pl-menu-item" role="menuitem" data-identify="1"><span class="pl-menu-check">${icon('recognize')}</span>What's this song?</button>`
+            + (songs.list().length ? '<div class="pl-menu-divider" role="separator"></div><div class="pl-menu-title">This episode</div>' : '')
+            + songs.list().map((t, i) => `<button class="pl-menu-item pl-menu-song" role="menuitem" data-song="${i}">
+                <span class="pl-menu-check">${esc(themeName(t))}</span><span class="pl-menu-song-text">${esc(t.title)}${t.artist ? `<span class="pl-menu-song-artist">${esc(t.artist)}</span>` : ''}</span></button>`).join(''),
         quality: () => backTo('Quality')
             + quality.list().map(q => menuItem(esc(q.label), 'data-quality', q.id, q.id === quality.current())).join(''),
         speed: () => backTo('Speed')
@@ -371,6 +381,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             else if (act === 'pip') togglePip();
             else if (act === 'fullscreen') toggleFullscreen();
             else if (act === 'skipSegment') skipSegment();
+            else if (act === 'identify') { closeMenu(); listenForSong(); }
             else if (act === 'playNext' || act === 'nextEp') playNext();
             else if (act === 'cancelNext') cancelNext();
             return;
@@ -400,6 +411,13 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             } else if (item.dataset.quality != null) {
                 const q = /^\d+(\.\d+)?$/.test(item.dataset.quality) ? Number(item.dataset.quality) : item.dataset.quality;
                 if (q !== quality.current()) quality.select(q);
+            } else if (item.dataset.identify != null) {
+                closeMenu();
+                listenForSong();
+                return;
+            } else if (item.dataset.song != null) {
+                const t = songs.list()[Number(item.dataset.song)];
+                if (t) showSong(themeSong(t), { kicker: themeKicker(t) });
             } else if (item.dataset.stats != null) {
                 toggleStats();
             } else if (item.dataset.autoskip != null) {
@@ -486,6 +504,95 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
         video.currentTime = Math.min(skipTarget, (duration() || skipTarget) - 0.5);
         paintSegment();
     }
+
+    // ----- Songs: the opening and ending named as they start, "What's this song?" (js/player/songs.js) -----
+    // songs: { list() -> this episode's [{ type, n, title, artist }], op, ed, identify({ onProgress, signal, fresh }) }
+    let songs = null;
+    const songBox = $('.pl-song');
+    let songTimer = 0;
+    let listening = null; // AbortController while it listens
+    const themeName = (t) => `${t.type}${t.n > 1 || songs?.list().filter(x => x.type === t.type).length > 1 ? t.n : ''}`;
+    const themeKicker = (t) => (t.type === 'OP' ? 'Opening' : 'Ending') + (t.n > 1 ? ` ${t.n}` : '');
+    const searchLinks = (title, artist) => {
+        const q = encodeURIComponent(`${title} ${artist || ''}`.trim());
+        return { youtube: `https://music.youtube.com/search?q=${q}`, spotify: `https://open.spotify.com/search/${q}` };
+    };
+    const themeSong = (t) => ({ title: t.title, artist: t.artist, ...searchLinks(t.title, t.artist) });
+    const LINKS = [['shazam', 'Shazam'], ['apple', 'Apple Music'], ['spotify', 'Spotify'], ['youtube', 'YouTube Music']];
+    function hideSong() {
+        clearTimeout(songTimer);
+        songBox.classList.remove('is-in');
+        songTimer = setTimeout(() => { songBox.hidden = true; songBox.innerHTML = ''; }, 250);
+    }
+    // body: the card's inside; stays `ms` (0: until closed)
+    function songCard(body, ms) {
+        clearTimeout(songTimer);
+        songBox.innerHTML = body + `<button type="button" class="pl-btn pl-song-close" data-song-act="close" aria-label="Close">${icon('close')}</button>`;
+        songBox.hidden = false;
+        void songBox.offsetWidth;
+        songBox.classList.add('is-in');
+        if (ms) songTimer = setTimeout(hideSong, ms);
+    }
+    function showSong(song, { kicker = '', ms = 15000, again = false } = {}) {
+        const links = LINKS.filter(([k]) => song[k]).map(([k, label]) =>
+            `<a class="pl-song-link" href="${esc(song[k])}" target="_blank" rel="noopener noreferrer">${label}</a>`).join('');
+        songCard(`<div class="pl-song-art">${song.cover ? `<img src="${esc(song.cover)}" alt="" decoding="async">` : icon('music')}</div>
+            <div class="pl-song-text">
+                ${kicker ? `<span class="pl-song-kicker">${esc(kicker)}</span>` : ''}
+                <span class="pl-song-title">${esc(song.title)}</span>
+                ${song.artist ? `<span class="pl-song-artist">${esc(song.artist)}</span>` : ''}
+                ${links || again ? `<span class="pl-song-links">${links}${again ? '<button type="button" class="pl-song-link" data-song-act="again">Not this one?</button>' : ''}</span>` : ''}
+            </div>`, ms);
+    }
+    function songNote(text, { retry = false } = {}) {
+        songCard(`<div class="pl-song-art">${icon('music')}</div><div class="pl-song-text"><span class="pl-song-title">${esc(text)}</span>
+            ${retry ? '<span class="pl-song-links"><button type="button" class="pl-song-link" data-song-act="again">Try again</button></span>' : ''}</div>`, retry ? 10000 : 6000);
+    }
+    async function listenForSong(fresh = false) {
+        if (!songs) return;
+        listening?.abort();
+        const ctl = new AbortController();
+        listening = ctl;
+        if (video.paused) video.play().catch(() => {});
+        songCard(`<div class="pl-song-art is-listening">${icon('music')}</div><div class="pl-song-text">
+            <span class="pl-song-kicker">Listening…</span><span class="pl-song-title">Keep it playing for a few seconds</span>
+            <span class="pl-song-bar"><span></span></span></div>`, 0);
+        const bar = songBox.querySelector('.pl-song-bar span');
+        let answer;
+        try {
+            answer = await songs.identify({ fresh, signal: ctl.signal, onProgress: (p) => { if (bar) bar.style.width = `${Math.round(p * 100)}%`; } });
+        } catch { return; } // stopped: closed, or a new listen
+        if (listening !== ctl) return;
+        listening = null;
+        if (answer.song) showSong(answer.song, { kicker: 'Recognized', ms: 0, again: true });
+        else if (answer.busy) songNote(`Song recognition is busy, try again in ${Math.max(1, Math.round(answer.retryIn / 60))} min`);
+        else if (answer.error) songNote(answer.error, { retry: true });
+        else songNote('No song recognized', { retry: true });
+    }
+    on(songBox, 'click', (ev) => {
+        ev.stopPropagation();
+        const act = ev.target.closest('[data-song-act]')?.dataset.songAct;
+        if (act === 'close') { listening?.abort(); listening = null; hideSong(); }
+        else if (act === 'again') listenForSong(true);
+    });
+    offs.push(() => { listening?.abort(); clearTimeout(songTimer); });
+    // The opening's card as playback runs into it (not after a jump into the middle), once each
+    const songShown = new Set();
+    let songLastT = 0;
+    function paintThemeCard() {
+        const t = video.currentTime;
+        const last = songLastT;
+        songLastT = t;
+        if (!songs || listening || t - last <= 0 || t - last > 2) return;
+        for (const span of songSpans(duration(), segments, ending)) {
+            const theme = span.type === 'OP' ? songs.op : songs.ed;
+            const key = `${span.type}@${Math.round(span.start)}`;
+            if (!theme || songShown.has(key) || !(last <= span.start + 0.3 && t > span.start && t < span.end)) continue;
+            songShown.add(key);
+            showSong(themeSong(theme), { kicker: themeKicker(theme), ms: 8000 });
+        }
+    }
+    on(video, 'timeupdate', paintThemeCard);
 
     // ----- Up next: from the credits (or the last 30 s) a card counts down to the next episode -----
     let next = null;
@@ -864,6 +971,12 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             ending = (list || []).filter(r => r && r.end > r.start);
             paintNext();
             paintSegment();
+        },
+        // The episode's songs and "What's this song?" (see the Songs section above)
+        setSongs(provider) {
+            songs = provider;
+            $('[data-act="identify"]').hidden = !provider;
+            if (!menu.hidden && menuPage === 'main') showPage('main');
         },
         // [{ name, start }] in seconds, in order; name '' when the file only numbers them
         setChapters(list) {

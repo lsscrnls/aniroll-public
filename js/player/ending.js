@@ -42,3 +42,25 @@ export function upNextAt(d, segments = [], ending = []) {
     if (e.story) return Math.min(last, Math.max(e.storyUntil, e.creditsAt ?? 0));
     return e.creditsAt ?? d - Math.min(30, d * 0.1);
 }
+
+/**
+ * Where the opening and ending songs play (seconds): Jellyfin's intro and credits, else AniSkip's
+ * opening and ending (the ending measured from the end of its file, as above). [{ type: 'OP' | 'ED', start, end }]
+ */
+export function songSpans(d, segments = [], ending = []) {
+    if (!(d > 0)) return [];
+    const fit = ending.filter(r => !r.length || Math.abs(r.length - d) <= LENGTH_FIT_S);
+    const spans = [];
+    const intro = segments.find(g => g.type === 'Intro');
+    const op = fit.find(r => r.type === 'op' || r.type === 'mixed-op');
+    if (intro) spans.push({ type: 'OP', start: intro.start, end: intro.end });
+    else if (op) spans.push({ type: 'OP', start: op.start, end: op.end });
+    const outro = segments.find(g => g.type === 'Outro' && g.end >= d - 120);
+    const ed = fit.find(r => r.type === 'ed' || (r.type === 'mixed-ed' && r.start > d * 0.5));
+    if (outro) spans.push({ type: 'ED', start: outro.start, end: outro.end });
+    else if (ed) {
+        const shift = d - (ed.length || d);
+        spans.push({ type: 'ED', start: ed.start + shift, end: ed.end + shift });
+    }
+    return spans;
+}

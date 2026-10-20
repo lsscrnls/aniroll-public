@@ -1555,6 +1555,7 @@ const animeMap = require('./animemap')({ dataDir: DATA_DIR, writeJson, readJson,
     verifyViewer, refuseAuth, normTitle, splitYear });
 
 // The owner's own tools (api/sources.js); nobody else is answered there
+const songs = require('./songs')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer, refuseAuth });
 const sources = require('./sources')({ dataDir: DATA_DIR, readJson, writeJson, verifyViewer, refuseAuth, json, readBody, str,
     encryptSecret, decryptSecret, isOwner: (viewer) => viewer?.id === ADMIN_ID, animeMap });
 
@@ -1588,6 +1589,7 @@ async function handle(req, res) {
     if (pathname === '/api/animemap' && req.method === 'POST') return animeMap.handle(req, res);
     if (pathname === '/api/me/jflibrary') return animeMap.handleLibrary(req, res);
     if (pathname.startsWith('/api/sources/')) return sources.handle(req, res, pathname);
+    if (pathname.startsWith('/api/songs/')) return songs.handle(req, res, pathname);
 
     if (pathname === '/api/log' && req.method === 'POST') {
         const body = await readBody(req);
