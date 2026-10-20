@@ -1848,6 +1848,38 @@ async function handle(req, res) {
         return json(res, 200, { ok: true, url: `${SITE}/d/${encodeURIComponent(name)}` });
     }
 
+    // "Delete my data" (Settings → Account): everything this server keeps for the AniList account, in one go.
+    // The Jellyfin connection and key, the token for background sync, the live-tracking webhook with its queue
+    // and library, the synced values, the Anime DNA card and its link, Watch Party seats. What lives on AniList
+    // (the list, posts) is AniList's and stays; the browser clears its own copy.
+    if (pathname === '/api/me' && req.method === 'DELETE') {
+        const auth = await verifyViewer(req);
+        if (auth.status !== 'ok') return refuseAuth(res, auth);
+        const userId = auth.viewer.id;
+        const key = String(userId);
+        if (tooManyWrites(res, key)) return;
+        const dropKey = (file, load, save) => { const all = load(file); if (Object.hasOwn(all, key)) { delete all[key]; save(file, all); } };
+        dropKey(JF_FILE, readJson, (f, all) => saveJellyfin(all));
+        dropKey(TOKEN_FILE, loadPrivate, savePrivate);
+        dropKey(JF_PENDING_FILE, loadPrivate, savePrivate);
+        dropKey(USER_STATE_FILE, readJson, (f, all) => writeJson(f, all, { pretty: false, mode: 0o600 }));
+        const hooks = loadPrivate(HOOK_FILE);
+        if (Object.keys(hooks).some(k => hooks[k].userId === userId)) {
+            for (const k of Object.keys(hooks)) if (hooks[k].userId === userId) delete hooks[k];
+            savePrivate(HOOK_FILE, hooks);
+        }
+        animeMap.forgetLibrary(userId);
+        const dna = readJson(DNA_FILE);
+        const cards = Object.keys(dna).filter(k => dna[k].id === key);
+        if (cards.length) { cards.forEach(k => delete dna[k]); writeJson(DNA_FILE, dna, { pretty: false }); }
+        fs.rmSync(path.join(DNA_DIR, `${key}.jpg`), { force: true });
+        party.forgetUser(userId, auth.viewer.name);
+        nowPlaying.delete(userId);
+        jfRecent.delete(userId);
+        hookSeen.delete(userId);
+        return json(res, 200, { ok: true });
+    }
+
     // A few small values that belong to the AniList account rather than one browser, so every device
     // agrees (which changes were confirmed, ...). The browser merges; this only keeps the last word.
     if (pathname === '/api/me/state') {

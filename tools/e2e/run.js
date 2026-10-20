@@ -98,9 +98,12 @@ function staticServer() {
     });
     await page.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
     await page.addInitScript(({ id, name }) => {
-        localStorage.setItem('aniroll_token', 'e2e-token');
-        localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
-        localStorage.setItem('aniroll_user_ts', String(Date.now()));
+        // Signed in as the test account unless a check switched to another one (js/accounts.js)
+        if (!localStorage.getItem('aniroll_token') || localStorage.getItem('aniroll_token') === 'e2e-token') {
+            localStorage.setItem('aniroll_token', 'e2e-token');
+            localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+            localStorage.setItem('aniroll_user_ts', String(Date.now()));
+        }
         // The one-time "things moved" notice is tested on its own below
         localStorage.setItem('aniroll_seen_changes', '9999');
     }, VIEWER);
@@ -158,14 +161,14 @@ function staticServer() {
     await go('#/social');
     check('Discover tab returns to the last view (Calendar)', (await page.getAttribute('.nav-links [data-page="discover"]', 'href')) === '#/calendar');
 
-    // Settings: five tabs, ?tab= opens one, the design switch loads Material 3 Expressive and back
+    // Settings: six tabs, ?tab= opens one, the design switch loads Material 3 Expressive and back
     await go('#/settings?tab=jellyfin');
     const settings = await page.evaluate(() => ({
         tabs: [...document.querySelectorAll('[data-settings-tab]')].map(b => b.textContent).join(','),
         visible: [...document.querySelectorAll('.settings-panel')].filter(p => !p.hidden).map(p => p.id).join(','),
     }));
-    check('settings: tabs Appearance, Lists, Watch Party, Jellyfin, Discord; ?tab= opens one',
-        settings.tabs === 'Appearance,Lists,Watch Party,Jellyfin,Discord' && settings.visible === 'settings-jellyfin', settings);
+    check('settings: tabs Appearance, Lists, Watch Party, Jellyfin, Discord, Account; ?tab= opens one',
+        settings.tabs === 'Appearance,Lists,Watch Party,Jellyfin,Discord,Account' && settings.visible === 'settings-jellyfin', settings);
     await page.click('[data-settings-tab="appearance"]');
     await page.waitForTimeout(800);
     const m3 = await page.evaluate(() => ({
@@ -1877,7 +1880,8 @@ function staticServer() {
     check("a day's entry that grew after going live pops up again", grownHeads[0]?.startsWith('Roll recommendations'), grownHeads);
 
     // Confirmed the first release of a day: the pop-up shows only what the later releases added
-    const today = (fs.readFileSync(path.join(ROOT, 'js', 'whatsnew.js'), 'utf8').match(/id: '(\d{4}-\d\d-\d\d)\.\d+'/) || [])[1];
+    // (the newest day that grew after its first release: a day still on its first one has nothing "since")
+    const today = (fs.readFileSync(path.join(ROOT, 'js', 'whatsnew.js'), 'utf8').match(/id: '(\d{4}-\d\d-\d\d)\.(?:[2-9]|\d{2,})'/) || [])[1];
     if (today) {
         const later = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: today, aniroll_design_v2: 'aniroll' });
         const shown = await later.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-list li')].map(li => li.textContent));
@@ -1990,6 +1994,69 @@ function staticServer() {
     await tab.close();
 
     }];
+
+    // Accounts: the menu names who is signed in and lists the others; switching parks one account's values and
+    // brings the other's back; "Delete all my AniRoll data" asks the server, then clears this browser
+    groups.main.push(async () => {
+        const { page, settle, go } = await mainPage();
+        await page.addInitScript(() => {
+            if (sessionStorage.getItem('e2e_accounts')) return;
+            sessionStorage.setItem('e2e_accounts', '1');
+            localStorage.setItem('aniroll_accounts', JSON.stringify([{ id: 777, name: 'Alt', avatar: '', token: 'alt-token' }]));
+            localStorage.setItem('aniroll_parked_777', JSON.stringify({ aniroll_jf_url: '"alt-url"', aniroll_user: JSON.stringify({ id: 777, name: 'Alt', avatar: {} }), aniroll_user_ts: String(Date.now()) }));
+            localStorage.setItem('aniroll_jf_url', '"main-url"');
+        });
+        let wiped = null;
+        await page.route(`${base}/api/me`, route => { wiped = route.request().method(); route.fulfill({ contentType: 'application/json', body: '{"ok":true}' }); });
+        await page.goto(base + '/#/');
+        await settle(1500);
+        await page.click('#user-btn');
+        const menu = await page.evaluate(() => ({
+            name: document.getElementById('um-name')?.textContent,
+            others: [...document.querySelectorAll('#um-accounts [data-account]')].map(b => b.textContent.replace(/\s+/g, ' ').trim()),
+            add: !!document.querySelector('#um-accounts [data-add-account]'),
+            note: [...document.querySelectorAll('.toast')].some(t => /Settings → Account/.test(t.textContent)),
+        }));
+        check('accounts: the menu shows who is signed in, the other account and Add account; a one-time note says where to delete your data',
+            menu.name && menu.name !== 'Profile' && menu.others.length === 1 && /Alt/.test(menu.others[0]) && menu.add && menu.note, menu);
+        const me = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_user')).id);
+        await page.click('#um-accounts [data-account="777"]');
+        await page.waitForLoadState('load');
+        await page.waitForTimeout(800);
+        const switched = await page.evaluate((me) => ({
+            token: localStorage.getItem('aniroll_token'),
+            url: localStorage.getItem('aniroll_jf_url'),
+            parked: JSON.parse(localStorage.getItem('aniroll_parked_' + me) || '{}'),
+            listed: JSON.parse(localStorage.getItem('aniroll_accounts')).map(a => a.id),
+        }), me);
+        check('accounts: switching brings the other account\'s values and parks this one\'s',
+            switched.token === 'alt-token' && switched.url === '"alt-url"' && switched.parked.aniroll_jf_url === '"main-url"'
+            && switched.parked.aniroll_token === 'e2e-token' && switched.listed.includes(777) && switched.listed.includes(me), switched);
+        // Back to the test account (the mock answers its token), then delete its data
+        await page.evaluate((me) => {
+            localStorage.setItem('aniroll_token', 'e2e-token');
+            const parked = JSON.parse(localStorage.getItem('aniroll_parked_' + me));
+            for (const [k, v] of Object.entries(parked)) localStorage.setItem(k, v);
+            localStorage.removeItem('aniroll_parked_' + me);
+            localStorage.setItem('aniroll_parked_777', JSON.stringify({ aniroll_jf_url: '"alt-url"', aniroll_user: JSON.stringify({ id: 777, name: 'Alt', avatar: {} }), aniroll_user_ts: String(Date.now()) }));
+        }, me);
+        await go('#/settings?tab=account');
+        await page.reload();
+        await settle(1200);
+        await page.click('[data-delete-data]');
+        await page.click('#modal-confirm');
+        await page.waitForLoadState('load');
+        await page.waitForTimeout(1000);
+        const after = await page.evaluate((me) => ({
+            token: localStorage.getItem('aniroll_token'),
+            url: localStorage.getItem('aniroll_jf_url'),
+            listed: JSON.parse(localStorage.getItem('aniroll_accounts') || '[]').map(a => a.id),
+            theme: localStorage.getItem('aniroll_theme'),
+        }), me);
+        check('delete my data: the server is asked, this account\'s values and list entry go, the other account takes over',
+            wiped === 'DELETE' && after.token === 'alt-token' && after.url === '"alt-url"' && !after.listed.includes(me), { wiped, after });
+        await page.close();
+    });
 
     // Checks kept out of the published source, when present
     const extra = path.join(__dirname, 'private.js');

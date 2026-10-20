@@ -1,18 +1,18 @@
 import { route, startRouter, navigate } from './router.js';
 import { takeSeat } from './seat.js';
-import { getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, logout, getLoginUrl, rememberReturn } from './auth.js';
+import { CLIENT_ID, getToken, isLoggedIn, handleOAuthCallback, getCachedUser, setCachedUser, getLoginUrl, rememberReturn } from './auth.js';
 import { getState, setState, applyTheme, getTheme, cycleTheme, toast, applyAccentColor, getAccentColor, esc, titlePref, statusLabel } from './store.js';
 import * as api from './api.js';
 import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js';
-import { openDialog, initActivation, addDialogStep } from './a11y.js';
+import { openDialog, initActivation, addDialogStep, showConfirm } from './a11y.js';
 import { initBackNav } from './backnav.js';
 import { noteVisitor, maybeShowMoveNotice, openChangelog, renderChangelog, hasUnread } from './whatsnew.js';
 import { refreshPendingStatus, refreshJellyfinStatus } from './status.js';
 import { applyDesign } from './design.js';
 import { startPresence } from './presence.js';
 import { watchForUpdate } from './update.js';
+import { accounts, rememberAccount, switchAccount, addAccount, resumeAfterCancelledAdd, signOut, dataNoteDue } from './accounts.js';
 
-const CLIENT_ID = '50643';
 // This build's fingerprint, from the address app.js was loaded from (scripts/fingerprint.js); 'dev' on localhost
 const BUILD = new URL(import.meta.url).searchParams.get('h');
 const APP_VERSION = BUILD || 'dev';
@@ -48,7 +48,8 @@ async function init() {
     initActivation();
     setupSlidePanel();
 
-    handleOAuthCallback();
+    // Back from AniList without signing in after "Add account": the account you had takes over again
+    if (!handleOAuthCallback()) resumeAfterCancelledAdd();
     // After the OAuth callback: a fresh login gets its chosen design right away (logged out: always AniRoll's)
     applyDesign(isLoggedIn());
 
@@ -56,6 +57,7 @@ async function init() {
         const cached = getCachedUser();
         if (cached) {
             setState({ user: cached, token: getToken() });
+            rememberAccount(cached);
             updateUserUI(cached);
         }
         // With a cached user we render right away and refresh the viewer in the background.
@@ -79,6 +81,10 @@ async function init() {
     initBackNav();
     startRouter();
     watchForUpdate(BUILD);
+    if (isLoggedIn() && dataNoteDue()) {
+        toast('Your data, your call: Settings → Account deletes everything AniRoll keeps for your account', 'info',
+            { action: { label: 'Show', run: () => navigate('/settings?tab=account') }, stay: true });
+    }
     initAnimations();
     setupWhatsNew(returning);
 
@@ -277,10 +283,6 @@ async function applyJellyfinPending(jf, items, state) {
 }
 
 // Logging out also forgets what AniRoll cached for this account on this browser
-function signOut() {
-    api.forgetAccountCache().catch(() => {}).finally(logout);
-}
-
 // Returns false when the session is invalid (logout already triggered)
 async function loadViewer() {
     try {
@@ -288,6 +290,8 @@ async function loadViewer() {
         setState({ user, token: getToken() });
         setCachedUser(user);
         localStorage.setItem('aniroll_user_ts', String(Date.now()));
+        // Signed in again as an account this browser had parked: its own values are back, the page starts over
+        if (rememberAccount(user)) { window.location.reload(); return false; }
         updateUserUI(user);
         if (user.unreadNotificationCount > 0) {
             const badge = document.getElementById('notif-badge');
@@ -493,6 +497,13 @@ function setupNav() {
         if (!userDropdown) return;
         userDropdown.hidden = !open;
         userBtn?.setAttribute('aria-expanded', String(open));
+        // On a phone the button sits away from the edge: the menu moves over so it ends 12 px from the right
+        // (position: fixed would not help, the frosted bar around it is its own frame for fixed things)
+        userDropdown.style.right = '';
+        if (open && window.innerWidth <= 600) {
+            const edge = userDropdown.offsetParent?.getBoundingClientRect().right ?? window.innerWidth;
+            userDropdown.style.right = `${edge - (document.documentElement.clientWidth - 12)}px`;
+        }
         if (open) {
             refreshJellyfinStatus();
             if (focus) userDropdown.querySelector('a:not([hidden]), button:not([hidden])')?.focus();
@@ -513,7 +524,13 @@ function setupNav() {
 
     document.addEventListener('click', () => setMenu(false));
 
-    logoutBtn?.addEventListener('click', signOut);
+    logoutBtn?.addEventListener('click', () => signOut());
+    document.getElementById('um-accounts')?.addEventListener('click', (e) => {
+        const el = /** @type {HTMLElement} */ (e.target);
+        const other = /** @type {HTMLElement | null} */ (el.closest('[data-account]'));
+        if (other) switchAccount(Number(other.dataset.account));
+        else if (el.closest('[data-add-account]')) confirmAddAccount();
+    });
 
     themeToggle?.addEventListener('click', () => {
         const next = cycleTheme();
@@ -671,6 +688,34 @@ function updateUserUI(user) {
         }
         if (defaultIcon) defaultIcon.hidden = true;
     }
+    renderMenuHead(user);
+}
+
+// The profile menu's head (who is signed in) and the other accounts of this browser, one tap to switch
+function renderMenuHead(user) {
+    const name = document.getElementById('um-name');
+    const pic = /** @type {HTMLImageElement | null} */ (document.getElementById('um-avatar'));
+    if (name) name.textContent = user.name || 'Profile';
+    const initial = document.getElementById('um-initial');
+    if (pic && (user.avatar?.medium || user.avatar?.large)) { pic.src = user.avatar.medium || user.avatar.large; pic.hidden = false; }
+    if (initial) { initial.textContent = (user.name || '?')[0].toUpperCase(); initial.hidden = !pic?.hidden; }
+    const box = document.getElementById('um-accounts');
+    if (!box) return;
+    const others = accounts().filter(a => a.id !== user.id);
+    box.innerHTML = others.map(a => `<button type="button" class="dropdown-item um-account" data-account="${a.id}">
+            ${a.avatar ? `<img class="um-account-pic" src="${esc(a.avatar)}" alt="">` : `<span class="um-account-pic um-initial" aria-hidden="true">${esc((a.name || '?')[0].toUpperCase())}</span>`}
+            <span class="um-account-name">${esc(a.name)}</span><span class="um-account-hint">Switch</span>
+        </button>`).join('')
+        + `<button type="button" class="dropdown-item um-add" data-add-account><svg data-icon="person_add" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="10" cy="8" r="4"/><path d="M3 20c0-3.6 3.1-6 7-6s7 2.4 7 6M19 8v6M16 11h6"/></svg><span>Add account</span></button>`;
+}
+
+async function confirmAddAccount() {
+    const ok = await showConfirm({
+        title: 'Add another account',
+        message: 'AniList signs in the account that is signed in on anilist.co. To add a different one, sign out there first, then come back and continue.',
+        confirmText: 'Continue to AniList',
+    });
+    if (ok) addAccount(CLIENT_ID);
 }
 
 function setupSlidePanel() {

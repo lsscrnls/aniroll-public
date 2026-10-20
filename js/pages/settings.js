@@ -2,11 +2,12 @@
 // app shell (js/app.js) stays small and a change here only needs the browser checks of this page.
 import * as api from '../api.js';
 import { getState, setState, applyTheme, getTheme, toast, esc } from '../store.js';
-import { getToken, isLoggedIn } from '../auth.js';
+import { CLIENT_ID, getToken, isLoggedIn } from '../auth.js';
 import { showConfirm } from '../a11y.js';
 import { getVariant, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from '../design.js';
 import { refreshJellyfinStatus } from '../status.js';
 import { mountPresenceSettings } from '../presence.js';
+import { accounts, switchAccount, addAccount, deleteMyData } from '../accounts.js';
 import { ambientOn, setAmbient } from '../player/ambient.js';
 import { recapOn, setRecap } from '../player/recap.js';
 import { accountState, saveAccountState } from '../accountstate.js';
@@ -17,6 +18,7 @@ const SETTINGS_TABS = [
     { key: 'party', label: 'Watch Party' },
     { key: 'jellyfin', label: 'Jellyfin' },
     { key: 'discord', label: 'Discord' },
+    { key: 'account', label: 'Account' },
 ];
 
 export async function render({ content, query }) {
@@ -95,7 +97,13 @@ export async function render({ content, query }) {
         <div class="settings-panel" id="settings-discord" role="tabpanel" aria-labelledby="settings-tab-discord" ${tab === 'discord' ? '' : 'hidden'}>
             ${card('Discord', 'Your Discord status shows what you watch in AniRoll', '<div id="discord-settings"></div>')}
         </div>
+
+        <div class="settings-panel" id="settings-account" role="tabpanel" aria-labelledby="settings-tab-account" ${tab === 'account' ? '' : 'hidden'}>
+            ${loggedIn ? accountCards(card) : card('Account', '', '<p class="settings-hint">Log in with AniList to manage your accounts and your data.</p>')}
+        </div>
     </div>`;
+
+    if (loggedIn) initAccountTab(content);
 
     // Tabs: click, arrow keys
     const tabs = [...content.querySelectorAll('[data-settings-tab]')];
@@ -712,5 +720,57 @@ function bindHexField(input, onPick) {
     picker.addEventListener('input', () => {
         setHexField(input, picker.value);
         onPick(picker.value.toLowerCase());
+    });
+}
+
+// ===== Account: the AniList accounts of this browser, and deleting what AniRoll keeps =====
+function accountCards(card) {
+    const me = getState().user;
+    const rows = accounts().map(a => `<div class="acct-row${a.id === me?.id ? ' current' : ''}">
+            ${a.avatar ? `<img class="acct-pic" src="${esc(a.avatar)}" alt="">` : `<span class="acct-pic um-initial" aria-hidden="true">${esc((a.name || '?')[0].toUpperCase())}</span>`}
+            <span class="acct-name">${esc(a.name)}</span>
+            ${a.id === me?.id ? '<span class="acct-badge">Signed in</span>'
+                : `<button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-switch="${a.id}">Switch</button>`}
+        </div>`).join('');
+    return card('Accounts', 'Several AniList accounts in this browser, one tap apart', `
+            <div class="acct-list">${rows}</div>
+            <button class="glass-btn glass-btn-secondary" type="button" data-add-account>Add account</button>
+            <p class="settings-hint">AniList signs in the account that is signed in on anilist.co: to add a different one, sign out there first.</p>`)
+        + card('Your data', 'Everything AniRoll keeps for this account, gone in one step', `
+            <p class="settings-hint">On AniRoll's server: your Jellyfin connection and its key, the token for syncing in the background,
+            live tracking with its queue, the settings that follow your account, your Anime DNA card and its link, your place in
+            Watch Parties. In this browser: everything AniRoll keeps for this account, and changes not yet saved to AniList.</p>
+            <p class="settings-hint">Your list, posts and follows are on AniList and stay there. To also take AniRoll's access away, remove
+            it under <a href="https://anilist.co/settings/apps" target="_blank" rel="noopener">AniList → Settings → Apps</a>.</p>
+            <button class="glass-btn glass-btn-danger" type="button" data-delete-data>Delete all my AniRoll data</button>`,
+            ' id="your-data"');
+}
+
+function initAccountTab(content) {
+    const panel = content.querySelector('#settings-account');
+    panel.addEventListener('click', async (e) => {
+        const el = /** @type {HTMLElement} */ (e.target);
+        const sw = /** @type {HTMLElement | null} */ (el.closest('[data-switch]'));
+        if (sw) return switchAccount(Number(sw.dataset.switch));
+        if (el.closest('[data-add-account]')) return addAccount(CLIENT_ID);
+        const del = /** @type {HTMLButtonElement | null} */ (el.closest('[data-delete-data]'));
+        if (!del) return;
+        const unsaved = api.pendingSaveCount();
+        const ok = await showConfirm({
+            title: 'Delete all your AniRoll data?',
+            message: `Everything AniRoll keeps for ${getState().user?.name || 'this account'} is deleted and you are signed out here.`
+                + (unsaved ? ` ${unsaved} change${unsaved > 1 ? 's' : ''} not yet saved to AniList ${unsaved > 1 ? 'are' : 'is'} lost too.` : '')
+                + ' Your AniList account and list stay as they are. This cannot be undone.',
+            confirmText: 'Delete everything',
+            danger: true,
+        });
+        if (!ok) return;
+        del.disabled = true;
+        try {
+            await deleteMyData();
+        } catch (err) {
+            del.disabled = false;
+            toast(`Could not delete: ${err.message}`, 'error');
+        }
     });
 }

@@ -146,8 +146,17 @@ export function toast(message, type = 'info', { action = null, stay = false } = 
         btn.addEventListener('click', () => { action.run(); clearTimeout(timer); leave(); });
         el.append(btn);
     }
+    if (stay) {
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'toast-close';
+        close.setAttribute('aria-label', 'Dismiss');
+        close.textContent = '×';
+        close.addEventListener('click', leave);
+        el.append(close);
+    }
     container.appendChild(el);
-    // stay: until its action is used (a note that matters later, like a new version)
+    // stay: until its action is used or it is dismissed (a note that matters later, like a new version)
     const timer = stay ? 0 : setTimeout(leave, action ? 6000 : 3000);
 }
 

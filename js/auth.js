@@ -1,4 +1,6 @@
 // @ts-check
+// AniRoll's app at AniList (anilist.co/settings/developer)
+export const CLIENT_ID = '50643';
 const TOKEN_KEY = 'aniroll_token';
 const USER_KEY = 'aniroll_user';
 

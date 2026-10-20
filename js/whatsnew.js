@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.8.4.5';
+export const RELEASE = '1.8.4.6';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -19,6 +19,15 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
+    {
+        id: '2026-10-20.1',
+        title: 'Your accounts, your data',
+        items: [
+            'Several AniList accounts in one browser: switch between them from the profile menu, or add one in <strong>Settings → Account</strong>. Each keeps its own settings and Jellyfin connection.',
+            '<strong>Delete all my AniRoll data</strong> in Settings → Account removes everything AniRoll keeps for your account, on the server and in this browser, in one step. Your AniList list stays as it is.',
+            'The profile menu is shorter and clearer: you on top, your other accounts below, then just what you need.',
+        ],
+    },
     {
         id: '2026-10-19.4',
         title: 'One post per binge',
