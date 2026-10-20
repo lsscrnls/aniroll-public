@@ -117,6 +117,9 @@ function savePending(list) {
 
 export function pendingSaveCount() { return loadPending().length; }
 
+// "Delete my data": this account's changes that never reached AniList go too (other accounts' stay)
+export function forgetPendingSaves() { savePending([]); }
+
 // One queued change per entry — editing the same show again replaces the older one
 function queuePendingSave(variables) {
     const key = String(variables.id || `media-${variables.mediaId}`);

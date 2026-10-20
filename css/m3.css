@@ -2379,3 +2379,25 @@
     :root[data-design="m3"] .nav-back:not([hidden]) + .nav-logo { padding: 0 8px; }
     :root[data-design="m3"] .nav-back:not([hidden]) + .nav-logo .logo-text { display: none; }
 }
+
+/* ----- Profile menu (Expressive): a roomy surface, the account on top, pill items with leading icons ----- */
+:root[data-design="m3"] .um-menu { padding: 8px; border-radius: 28px; background: var(--md-surface-container); }
+:root[data-design="m3"] .um-menu .dropdown-item { min-height: 48px; gap: 14px; padding: 0 16px; border-radius: var(--radius-full); font-size: 0.9rem; font-weight: 500; }
+:root[data-design="m3"] .um-menu .dropdown-item > svg { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .um-menu .dropdown-item.danger > svg { color: inherit; }
+:root[data-design="m3"] .um-head { margin-bottom: 4px; padding: 4px; border-radius: 24px; background: var(--md-surface-container-high); }
+:root[data-design="m3"] .um-me { border-radius: 20px; }
+:root[data-design="m3"] .um-me:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+:root[data-design="m3"] .um-name { color: var(--md-on-surface); }
+:root[data-design="m3"] .um-sub { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .um-icon-btn { width: 44px; height: 44px; background: var(--md-secondary-container); color: var(--md-on-secondary-container); transition: border-radius .25s var(--md-standard, ease); }
+:root[data-design="m3"] .um-icon-btn:hover { border-radius: 14px; }
+:root[data-design="m3"] .um-accounts { border-bottom-color: var(--md-outline-variant); }
+:root[data-design="m3"] .um-accounts:empty { display: none; }
+:root[data-design="m3"] .um-account-hint { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .um-menu #logout-btn { border-top: 0; }
+:root[data-design="m3"] .acct-row { background: var(--md-surface-container-high); }
+:root[data-design="m3"] .acct-row.current { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+:root[data-design="m3"] .acct-badge { background: var(--md-primary); color: var(--md-on-primary); }
+:root[data-design="m3"] .glass-btn-danger { background: var(--md-error); color: var(--md-on-error); }
+:root[data-design="m3"] .um-initial { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }

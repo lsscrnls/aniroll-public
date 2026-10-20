@@ -83,22 +83,31 @@
                             <svg data-icon="person" id="user-icon-default" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="8" r="4.5"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
                             <img id="user-avatar" class="avatar-img" hidden alt="">
                         </button>
-                        <div id="user-dropdown" class="glass-dropdown" hidden>
-                            <a href="#/profile" class="dropdown-item">My Profile</a>
-                            <a href="#/settings" class="dropdown-item">Settings</a>
-                            <a href="#/admin" class="dropdown-item" id="admin-link" hidden>Admin</a>
-                            <a href="#/shelf" class="dropdown-item" id="shelf-link" hidden></a>
-                            <hr class="dropdown-divider">
-                            <div class="dropdown-item jf-status-item" id="pending-status-item" hidden>
-                                <span class="jf-dot" id="pending-status-dot"></span><span id="pending-status-text"></span>
+                        <div id="user-dropdown" class="glass-dropdown um-menu" hidden>
+                            <div class="um-head">
+                                <a href="#/profile" class="um-me" id="um-me">
+                                    <img class="um-avatar" id="um-avatar" alt="" hidden><span class="um-avatar um-initial" id="um-initial" aria-hidden="true"></span>
+                                    <span class="um-who"><span class="um-name" id="um-name">Profile</span><span class="um-sub">View profile</span></span>
+                                </a>
+                                <button id="theme-toggle" class="um-icon-btn" type="button" aria-label="Switch theme" title="Switch theme">
+                                    <svg data-icon="contrast" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 000-17z" fill="currentColor"/></svg>
+                                </button>
                             </div>
-                            <a href="#/settings?tab=jellyfin" class="dropdown-item jf-status-item" id="jf-status-item" hidden>
-                                <span class="jf-dot" id="jf-status-dot"></span><span id="jf-status-text">Jellyfin</span>
-                            </a>
-                            <button type="button" class="dropdown-item whatsnew-link">What's new</button>
-                            <a href="https://github.com/lsscrnls/aniroll-public" class="dropdown-item github-link" target="_blank" rel="noopener"><svg class="github-mark" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg><span>Source on GitHub</span></a>
-                            <button id="theme-toggle" class="dropdown-item">Toggle Theme</button>
-                            <button id="logout-btn" class="dropdown-item danger">Log Out</button>
+                            <div class="um-accounts" id="um-accounts"></div>
+                            <div class="um-list">
+                                <a href="#/settings" class="dropdown-item"><svg data-icon="settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg><span>Settings</span></a>
+                                <a href="#/admin" class="dropdown-item" id="admin-link" hidden><svg data-icon="monitoring" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M5 16l4-5 4 3 6-8"/></svg><span>Admin</span></a>
+                                <a href="#/shelf" class="dropdown-item" id="shelf-link" hidden></a>
+                                <div class="dropdown-item jf-status-item" id="pending-status-item" hidden>
+                                    <span class="jf-dot" id="pending-status-dot"></span><span id="pending-status-text"></span>
+                                </div>
+                                <a href="#/settings?tab=jellyfin" class="dropdown-item jf-status-item" id="jf-status-item" hidden>
+                                    <span class="jf-dot" id="jf-status-dot"></span><span id="jf-status-text">Jellyfin</span>
+                                </a>
+                                <button type="button" class="dropdown-item whatsnew-link"><svg data-icon="campaign" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.7 1 2.7-2.4 1.8-.9 2.9-3-.2L12 21l-2.4-1.8-3 .2-.9-2.9-2.4-1.8 1-2.7-1-2.7 2.4-1.8.9-2.9 3 .2z"/><path d="M12 8v5M12 16h.01"/></svg><span>What's new</span></button>
+                                <a href="https://github.com/lsscrnls/aniroll-public" class="dropdown-item github-link" target="_blank" rel="noopener"><svg class="github-mark" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg><span>Source on GitHub</span></a>
+                            </div>
+                            <button id="logout-btn" class="dropdown-item danger"><svg data-icon="logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9"/></svg><span>Log out</span></button>
                         </div>
                     </div>
                     <button id="login-btn" class="glass-btn glass-btn-primary magnetic" hidden>Log In</button>
@@ -194,6 +203,7 @@
     <link rel="modulepreload" href="js/status.js">
     <link rel="modulepreload" href="js/presence.js">
     <link rel="modulepreload" href="js/update.js">
+    <link rel="modulepreload" href="js/accounts.js">
     <!-- What the first page needs next (Material 3, Home and what Home imports), which app.js only asks for
          once it runs: three round trips fewer before Home shows -->
     <link rel="modulepreload" href="js/m3.js">
