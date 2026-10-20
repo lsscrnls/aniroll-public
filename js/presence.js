@@ -11,8 +11,11 @@ const KEY = 'aniroll_discord';
 const SITE = 'https://aniroll.app';
 const LOGO = `${SITE}/icons/icon-512.png`;
 const DL = `${SITE}/downloads/discord`;
-// The helper's newest version (discord/helper/main.go): an older one is pointed out, once per version
+// The helper's newest version, Linux and macOS (discord/helper/main.go) and Windows (discord/windows/helper.py):
+// an older one is pointed out, once per version
 const HELPER_LATEST = '1.0.2';
+const HELPER_LATEST_WINDOWS = '1.1.0';
+const helperLatest = () => (system() === 'windows' ? HELPER_LATEST_WINDOWS : HELPER_LATEST);
 const NAG_KEY = 'aniroll_discord_nagged';
 // The extension's newest version (discord/extension/manifest.json): an older one is pointed out the same way
 const EXTENSION_LATEST = '1.0.2';
@@ -224,7 +227,7 @@ function older(version, than) {
     }
     return false;
 }
-const helperOutdated = () => !!ext?.helper && older(ext.helperVersion || '', HELPER_LATEST);
+const helperOutdated = () => !!ext?.helper && older(ext.helperVersion || '', helperLatest());
 const extensionOutdated = () => !!ext && older(ext.extension || '', EXTENSION_LATEST);
 
 // Once per new version, and only for people who use it: a note with the way to Settings
@@ -232,7 +235,7 @@ function nagOutdated() {
     if (!presenceOn()) return;
     const nags = [];
     if (extensionOutdated()) nags.push({ key: EXT_NAG_KEY, version: EXTENSION_LATEST, what: 'the browser extension' });
-    if (helperOutdated()) nags.push({ key: NAG_KEY, version: HELPER_LATEST, what: 'its helper' });
+    if (helperOutdated()) nags.push({ key: NAG_KEY, version: helperLatest(), what: 'its helper' });
     const due = nags.filter(n => { try { return localStorage.getItem(n.key) !== n.version; } catch { return false; } });
     if (!due.length) return;
     try { for (const n of due) localStorage.setItem(n.key, n.version); } catch { return; }
@@ -265,8 +268,8 @@ function stepHtml(n, done, title, body) {
 export function mountPresenceSettings(box) {
     startPresence();
     const os = system();
-    const installLine = `curl -fsSL ${DL}/install.sh | sh`;
-    const uninstallLine = `curl -fsSL ${DL}/uninstall.sh | sh`;
+    const installLine = os === 'windows' ? `irm ${DL}/install.ps1 | iex` : `curl -fsSL ${DL}/install.sh | sh`;
+    const uninstallLine = os === 'windows' ? `irm ${DL}/uninstall.ps1 | iex` : `curl -fsSL ${DL}/uninstall.sh | sh`;
     const copyLine = (line) => `<div class="dc-copy"><code>${esc(line)}</code><button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-dc-copy="${esc(line)}">Copy</button></div>`;
 
     const extensionBody = () => {
@@ -289,8 +292,7 @@ export function mountPresenceSettings(box) {
     };
     const helperBody = () => {
         if (os === 'windows') {
-            return `<a class="glass-btn glass-btn-primary glass-btn-sm" href="${DL}/aniroll-discord-windows.exe" download>Download for Windows</a>
-                <p class="settings-hint">Run it once. Windows may warn about an unknown app: <strong>More info</strong> → <strong>Run anyway</strong>.</p>`;
+            return `<p class="settings-hint">Open <strong>PowerShell</strong> (Start menu → type PowerShell), paste this, press Enter, once:</p>${copyLine(installLine)}`;
         }
         if (os === 'mac' || os === 'linux') {
             return `<p class="settings-hint">Paste this into a terminal, once:</p>${copyLine(installLine)}`;
@@ -306,7 +308,7 @@ export function mountPresenceSettings(box) {
         box.innerHTML = `
             <ol class="dc-steps">
                 ${stepHtml(1, hasExt && !extensionOutdated(), extensionOutdated() ? `An update for the extension (${esc(ext?.extension || '')} → ${EXTENSION_LATEST})` : 'The AniRoll for Discord extension', extensionBody())}
-                ${stepHtml(2, hasHelper && !outdated, outdated ? `An update for the helper (${esc(ext?.helperVersion || '')} → ${HELPER_LATEST})` : 'The helper on this computer',
+                ${stepHtml(2, hasHelper && !outdated, outdated ? `An update for the helper (${esc(ext?.helperVersion || '')} → ${helperLatest()})` : 'The helper on this computer',
                     !hasExt ? '<p class="settings-hint">After the extension.</p>'
                         : outdated ? `<p class="settings-hint">Set it up again the same way; it replaces the old one. Reload AniRoll afterwards.</p>${helperBody()}` : helperBody())}
                 ${stepHtml(3, hasHelper && !!ext?.discord, 'The Discord app, running', hasHelper ? '<p class="settings-hint">Open Discord on this computer (the app, not the website).</p>' : '<p class="settings-hint">After the helper.</p>')}
@@ -319,7 +321,7 @@ export function mountPresenceSettings(box) {
                 <summary>Remove AniRoll for Discord</summary>
                 <ol class="settings-hint dc-list">
                     <li>${os === 'windows'
-                        ? `Remove the helper: download the remover and run it once.<br><a class="glass-btn glass-btn-secondary glass-btn-sm dc-remove-dl" href="${DL}/aniroll-discord-uninstall.exe" download>Download the remover</a>`
+                        ? `Remove the helper: paste this into PowerShell.${copyLine(uninstallLine)}`
                         : os === 'mac' || os === 'linux'
                             ? `Remove the helper: paste this into a terminal.${copyLine(uninstallLine)}`
                             : 'Remove the helper on the computer you set it up on: Settings → Discord there shows how.'}</li>

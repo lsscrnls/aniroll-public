@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.0';
+export const RELEASE = '1.9.1';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -20,9 +20,10 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-20.3',
+        id: '2026-10-20.4',
         title: 'What\'s this song? And your accounts',
         items: [
+            { rev: 4, text: 'AniRoll for Discord on Windows: the helper is now set up with one line in PowerShell instead of a program to download, so Windows\' Smart App Control no longer blocks it: it runs on Python, which is signed by the Python Software Foundation, and Windows trusts that. Already have the old one? Settings → Discord shows the update.' },
             { rev: 3, text: 'New in the player: <strong>Songs</strong> in the settings menu lists the episode\'s opening and ending, and the player names them as they start. <strong>What\'s this song?</strong> listens for a few seconds and tells you what is playing, with links to Shazam, Spotify and YouTube Music. Only a fingerprint of the sound goes out, through AniRoll, never the sound itself.' },
             { rev: 2, text: '<strong>Add account</strong> now opens AniList in a small window and AniRoll stays where you are. Shows the account you already have? Sign out in that window and sign in with the other one. The note about it stays until you close it.' },
             'Several AniList accounts in one browser: switch between them from the profile menu, or add one in <strong>Settings → Account</strong>. Each keeps its own settings and Jellyfin connection.',

@@ -6241,7 +6241,6 @@ h1[tabindex="-1"]:focus { outline: none; }
     border-radius: 12px; background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .dc-remove summary { cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--danger); padding: 4px 0; }
 .dc-remove[open] summary { margin-bottom: 2px; }
-.dc-remove .dc-remove-dl { display: inline-flex; margin: 6px 0 2px; color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 .dc-remove .dc-list { margin-top: var(--space-sm); display: grid; gap: var(--space-sm); }
 .dc-remove .dc-copy { margin-top: 6px; }
 

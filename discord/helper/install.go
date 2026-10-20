@@ -26,7 +26,7 @@ type hostManifest struct {
 
 // install copies this program to its own folder (the downloaded file can go), writes one host manifest
 // for the Chromium family and one for the Firefox family there, and registers them (registerHosts:
-// a folder per browser on Linux and macOS, the registry on Windows)
+// a folder per browser)
 func install() error {
 	dir, err := homeDir()
 	if err != nil {

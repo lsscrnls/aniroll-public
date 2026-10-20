@@ -1,9 +1,10 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.0.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.1.
 
 ## 20 October 2026 – What's this song? And your accounts
 
+- AniRoll for Discord on Windows: the helper is now set up with one line in PowerShell instead of a program to download, so Windows' Smart App Control no longer blocks it: it runs on Python, which is signed by the Python Software Foundation, and Windows trusts that. Already have the old one? Settings → Discord shows the update.
 - New in the player: **Songs** in the settings menu lists the episode's opening and ending, and the player names them as they start. **What's this song?** listens for a few seconds and tells you what is playing, with links to Shazam, Spotify and YouTube Music. Only a fingerprint of the sound goes out, through AniRoll, never the sound itself.
 - **Add account** now opens AniList in a small window and AniRoll stays where you are. Shows the account you already have? Sign out in that window and sign in with the other one. The note about it stays until you close it.
 - Several AniList accounts in one browser: switch between them from the profile menu, or add one in **Settings → Account**. Each keeps its own settings and Jellyfin connection.
