@@ -2032,6 +2032,14 @@ function staticServer() {
         }));
         check('accounts: Add account opens AniList in a window that hands the token back and closes, the page stays',
             popup.isClosed() && added.closedNote && added.token === 'popup-token', { closed: popup.isClosed(), added });
+        // The note about the wrong AniList account stays until it is dismissed
+        await page.waitForTimeout(7000);
+        const hint = () => page.evaluate(() => [...document.querySelectorAll('.toast')].filter(t => /Sign out there first/.test(t.textContent)).length);
+        const hintLater = await hint();
+        await page.click('.toast:has-text("Sign out there first") .toast-close');
+        await page.waitForTimeout(500);
+        const hintGone = await hint();
+        check('accounts: the wrong-account note stays (once) until dismissed', hintLater === 1 && hintGone === 0, { hintLater, hintGone });
         await page.evaluate(() => localStorage.setItem('aniroll_token', 'e2e-token'));
         await page.click('#user-btn');
         await page.click('#um-accounts [data-account="777"]');

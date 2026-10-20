@@ -712,7 +712,6 @@ function renderMenuHead(user) {
 }
 
 async function startAddAccount() {
-    toast('Sign in with the other account in the new window. AniList shows the one you have? Sign out there first.', 'info');
     try {
         if (await addAccount(CLIENT_ID) === 'same') toast('That is the account you are signed in with', 'info');
     } catch (err) {

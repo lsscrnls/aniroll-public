@@ -158,6 +158,8 @@ export function toast(message, type = 'info', { action = null, stay = false } = 
     container.appendChild(el);
     // stay: until its action is used or it is dismissed (a note that matters later, like a new version)
     const timer = stay ? 0 : setTimeout(leave, action ? 6000 : 3000);
+    // For a note that ends with something else than a click (js/accounts.js): it can be taken away, and asked about
+    return { close: () => { clearTimeout(timer); if (el.isConnected) leave(); }, get open() { return el.isConnected; } };
 }
 
 // `rec` ({ match, because }) turns the card into a recommendation card

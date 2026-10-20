@@ -8,6 +8,7 @@
 // (js/api.js), and so is the queue of saves that have not reached AniList yet.
 import { getToken, setToken, getCachedUser, getLoginUrl, rememberReturn } from './auth.js';
 import * as api from './api.js';
+import { toast } from './store.js';
 
 const LIST_KEY = 'aniroll_accounts';            // [{ id, name, avatar, token }]
 const PARKED = 'aniroll_parked_';               // + account id
@@ -89,6 +90,8 @@ export function switchAccount(id) {
     reloadHome();
 }
 
+let wrongAccountNote = null;
+
 // "Add account" in a small window of its own: AniRoll stays as it is, and if AniList shows the account you
 // are already signed in with, you sign out and in with the other one right there. AniList sends the window
 // back to AniRoll with the token; that page hands it over (finishInPopup) and closes. The account is checked
@@ -98,6 +101,10 @@ export async function addAccount(clientId) {
     const popup = window.open(getLoginUrl(clientId), 'aniroll-add-account',
         `popup,width=${w},height=${h},left=${Math.max(0, (screen.width - w) / 2)},top=${Math.max(0, (screen.height - h) / 2)}`);
     if (!popup) { addAccountHere(clientId); return null; }
+    // Stays until it is dismissed or the other account is in (the page reloads then); one at a time
+    if (!wrongAccountNote?.open) {
+        wrongAccountNote = toast('Sign in with the other account in the new window. AniList shows the one you already have? Sign out there first, then sign in with the other one.', 'info', { stay: true });
+    }
     /** @type {any} */ (window).__anirollAdding = true;
     const token = await new Promise((resolve) => {
         const done = (value) => { window.removeEventListener('message', onMessage); clearInterval(watch); /** @type {any} */ (window).__anirollAdding = false; resolve(value); };
