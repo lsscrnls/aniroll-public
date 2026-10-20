@@ -50,8 +50,31 @@ function send(res, code, body) {
     res.end(JSON.stringify(body));
 }
 
+let themeAsks = 0;
+let shazamAsks = 0;
+let shazamBusy = false;
 http.createServer((req, res) => {
     if (req.url === '/__state') return send(res, 200, { lists, log });
+    // AnimeThemes and Shazam stand-ins for api/songs.js
+    if (req.url.startsWith('/animethemes/anime?')) {
+        themeAsks++;
+        if (!req.url.includes('external_id]=101&')) return send(res, 200, { anime: [] });
+        return send(res, 200, { anime: [{ animethemes: [
+            { type: 'ED', sequence: 1, song: { title: 'End Song', artists: [{ name: 'Singer B' }] }, animethemeentries: [{ episodes: '1-12' }] },
+            { type: 'OP', sequence: 1, song: { title: 'First Song', artists: [{ name: 'Singer A', artistsong: { as: 'Character' } }] }, animethemeentries: [{ episodes: '1-12' }, { episodes: '1-12' }] },
+            { type: 'IN', sequence: 1, song: { title: 'Insert' }, animethemeentries: [] },
+        ] }] });
+    }
+    if (req.url === '/__themeasks') return send(res, 200, { asks: themeAsks });
+    if (req.url === '/__shazam429') { shazamBusy = true; return send(res, 200, {}); }
+    if (req.url.startsWith('/shazam/discovery/v5/')) {
+        shazamAsks++;
+        if (shazamBusy) { shazamBusy = false; res.writeHead(429, { 'Retry-After': '120' }); return res.end(); }
+        return send(res, 200, { matches: [{}], track: { title: 'buddy', subtitle: 'kensuke ushio', url: 'https://www.shazam.com/track/1/buddy',
+            images: { coverart: 'https://is1-ssl.mzstatic.com/image/a.jpg' },
+            hub: { options: [{ actions: [{ uri: 'intent://music.apple.com/us/album/buddy/1?i=2#Intent;scheme=https;end' }] }] } } });
+    }
+    if (req.url === '/__shazamasks') return send(res, 200, { asks: shazamAsks });
     if (req.url === '/__block') { blocked = true; return send(res, 200, { blocked }); }
     if (req.url === '/__unblock') { blocked = false; return send(res, 200, { blocked }); }
     const chunks = [];
