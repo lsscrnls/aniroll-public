@@ -753,7 +753,6 @@ function initAccountTab(content) {
         const sw = /** @type {HTMLElement | null} */ (el.closest('[data-switch]'));
         if (sw) return switchAccount(Number(sw.dataset.switch));
         if (el.closest('[data-add-account]')) {
-            toast('Sign in with the other account in the new window. AniList shows the one you have? Sign out there first.', 'info');
             const result = await addAccount(CLIENT_ID).catch(err => { toast(`Could not add the account: ${err.message}`, 'error'); return null; });
             if (result === 'same') toast('That is the account you are signed in with', 'info');
             return;
