@@ -6300,6 +6300,17 @@ h1[tabindex="-1"]:focus { outline: none; }
 .um-account-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .um-account-hint { font-size: 0.75rem; color: var(--text-secondary); }
 .um-list { display: grid; gap: 2px; }
+/* The status dots take the place of an icon: centered in the same 20 px, so their labels line up with the others */
+.um-menu .jf-dot { margin: 0 6px; }
+/* Jellyfin: a TV with the dot as its badge, crossed out while the server does not answer */
+.um-status-icon { position: relative; flex: none; width: 20px; height: 20px; display: grid; place-items: center; }
+.um-status-icon svg { grid-area: 1 / 1; width: 20px; height: 20px; }
+.um-status-icon .jf-dot { position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; margin: 0; box-shadow: 0 0 0 2px var(--bg); }
+.jf-status-item .jf-icon-off, .jf-status-item[data-state="off"] .jf-icon-on { display: none; }
+.jf-status-item[data-state="off"] .jf-icon-off { display: block; }
+.jf-status-item[data-state="off"] .um-status-icon { color: var(--danger); }
+/* Downloads while something loads: its own icon, in the accent colour */
+.um-menu .src-downloads[data-busy] > svg { color: var(--user-accent); }
 .um-menu #logout-btn { margin-top: 6px; }
 
 .toast-close { flex: none; width: 28px; height: 28px; border: 0; border-radius: 50%; background: none; color: inherit; font-size: 1.1rem; line-height: 1; cursor: pointer; opacity: .7; }
