@@ -1,9 +1,12 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.2.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.3.
 
 ## 21 October 2026 – Watch Parties that change shows
 
+- When AniList doesn't answer, the start page now says so and offers **Try again** instead of showing empty cards.
+- Small design touches: calmer labels, headings that break more evenly, buttons that react faster on touch, and menus that no longer scroll the page behind them.
+- In Firefox, the edge of a side-scrolling row (like Continue Watching) no longer flickers or disappears while you move over the covers.
 - When the host switches a Watch Party to another show, members are now asked whether they come along. Say no and the new show stays off your list; the one you watched stays where you got to.
 - The party page shows what the party watched earlier and with whom, and **End & Post** says who watched which show when the group changed.
 - The **Watch Party** button on Home now picks from all your lists, like Switch anime: a show from Planning goes on Watching, a completed one becomes a rewatch.

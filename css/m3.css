@@ -93,6 +93,11 @@
 :root[data-design="m3"] ::selection { background: var(--md-primary-container); color: var(--md-on-primary-container); }
 :root[data-design="m3"] :focus-visible { outline: 3px solid var(--md-secondary); outline-offset: 2px; }
 :root[data-design="m3"] h1[tabindex="-1"]:focus-visible { outline: none; }    /* the router moves focus to the heading; it is no control */
+/* Touch: controls answer at once (no double-tap zoom wait), the grey tap flash gives way to M3's own pressed
+   states, and scrolling inside a menu or dialog stops at its end instead of moving the page behind */
+:root[data-design="m3"] { -webkit-tap-highlight-color: transparent; }
+:root[data-design="m3"] :is(button, a, label, summary, input, [role="button"], [role="tab"], .media-card) { touch-action: manipulation; }
+:root[data-design="m3"] :is(.modal-content, .glass-dropdown, .pl-menu, .glass-menu-list) { overscroll-behavior: contain; }
 
 /* ===== Type scale (M3 Expressive: emphasized headlines, calm body) ===== */
 :root[data-design="m3"] .section-title,
@@ -104,6 +109,9 @@
     letter-spacing: 0;
 }
 :root[data-design="m3"] h2.section-title { font-size: 1.75rem; line-height: 2.25rem; }
+/* Headings break into even lines instead of leaving one word behind; running text avoids a lone last word */
+:root[data-design="m3"] :is(h1, h2, h3, .section-title, .page-title, .modal-title, .landing-tour-title, .empty-state-text) { text-wrap: balance; }
+:root[data-design="m3"] :is(p, .empty-state-sub, .landing-tour-sub) { text-wrap: pretty; }
 :root[data-design="m3"] .modal-title { font-size: 1.5rem; line-height: 2rem; font-weight: 500; letter-spacing: 0; }
 :root[data-design="m3"] .logo-text { font-weight: 700; letter-spacing: -0.01em; font-size: 1.375rem; }
 :root[data-design="m3"] .media-card-title { font-weight: 500; letter-spacing: 0.01em; }
@@ -935,7 +943,7 @@
 :root[data-design="m3"] .m3-search-label { font-size: 1rem; white-space: nowrap; }
 @media (max-width: 768px) {
     :root[data-design="m3"] .m3-search-label { display: none; }
-    :root[data-design="m3"] .m3-searchbar { width: 48px; margin-right: 0; padding: 0; justify-content: center; background: none; }
+    :root[data-design="m3"] .m3-searchbar { width: 40px; height: 40px; margin-right: 0; padding: 0; justify-content: center; background: none; }
 }
 
 /* ----- Rail: Roll is the FAB on top ----- */
@@ -1550,15 +1558,18 @@
 :root[data-design="m3"] .nav-logo { padding: 0 18px 0 10px; }
 :root[data-design="m3"] .nav-actions { flex: 0 0 auto; margin-left: auto; gap: 0; }
 :root[data-design="m3"] .nav-actions .nav-icon-btn:not(.m3-searchbar) { width: 40px; height: 40px; }
-:root[data-design="m3"] .m3-searchbar {
-    background: var(--m3-island);
-    -webkit-backdrop-filter: var(--m3-island-blur);
-    backdrop-filter: var(--m3-island-blur);
-    box-shadow: var(--m3-island-shadow);
-    order: 0;
-}
-:root[data-design="m3"] .m3-searchbar:hover { background: color-mix(in srgb, var(--md-surface-container-highest) 80%, transparent); }
 @media (min-width: 769px) {
+    /* Only the wide search bar is an island of its own; on a phone the search icon sits in the actions island
+       like its neighbours, at their size (it had a second shadow and 48 px there) */
+    :root[data-design="m3"] .m3-searchbar {
+        height: 48px;
+        background: var(--m3-island);
+        -webkit-backdrop-filter: var(--m3-island-blur);
+        backdrop-filter: var(--m3-island-blur);
+        box-shadow: var(--m3-island-shadow);
+        order: 0;
+    }
+    :root[data-design="m3"] .m3-searchbar:hover { background: color-mix(in srgb, var(--md-surface-container-highest) 80%, transparent); }
     /* The search island sits between the logo and the actions */
     :root[data-design="m3"] .nav-actions { display: contents; }
     :root[data-design="m3"] .nav-actions > :not(#search-btn) { order: 2; }
@@ -1970,18 +1981,6 @@
     padding: var(--space-2xl) 0;
 }
 :root[data-design="m3"] .lp-hero-text { display: flex; flex-direction: column; align-items: flex-start; }
-:root[data-design="m3"] .lp-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    height: 32px;
-    padding: 0 14px;
-    margin-bottom: var(--space-lg);
-    border-radius: 999px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    background: var(--md-secondary-container);
-    color: var(--md-on-secondary-container);
-}
 :root[data-design="m3"] .lp .landing-title {
     font-size: clamp(3rem, 6.4vw, 5.6rem);
     font-weight: 800;
@@ -2037,6 +2036,19 @@
 :root[data-design="m3"] .lp-machine-window .roll-item { height: auto; aspect-ratio: 2 / 3; }
 :root[data-design="m3"] .lp-machine-window .roll-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 :root[data-design="m3"] .lp-machine-btn { position: relative; z-index: 1; }
+/* The one expressive moment: while the reel spins, the two shapes behind it morph and turn, and spring back
+   when it stops on a show. Only on the roll itself, never on its own */
+:root[data-design="m3"] .lp-tile { transition: rotate .9s var(--m3-bouncy), scale .9s var(--m3-bouncy); }
+:root[data-design="m3"] .lp-machine.is-rolling .lp-tile { animation: m3Morph 2.4s linear infinite; scale: 1.12; }
+:root[data-design="m3"] .lp-machine.is-rolling .lp-tile-a { rotate: 120deg; }
+:root[data-design="m3"] .lp-machine.is-rolling .lp-tile-b { rotate: -90deg; animation-delay: -1.2s; }
+:root[data-design="m3"] .lp-machine.is-offline .lp-machine-btn { display: none; }
+/* The reel's edge shading only over covers: on an empty window it looked like a broken picture */
+:root[data-design="m3"] .lp-machine-window:not(:has(.roll-item))::after { display: none; }
+:root[data-design="m3"] .lp-machine-result .lp-btn { display: flex; margin: var(--space-md) auto 0; }
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] .lp-machine.is-rolling .lp-tile { animation: none; rotate: none; scale: none; }
+}
 :root[data-design="m3"] .lp-machine-btn:disabled { opacity: .6; cursor: default; }
 :root[data-design="m3"] .lp-machine-result { position: relative; z-index: 1; max-width: 34ch; margin: 0; text-align: center; color: var(--md-on-surface-variant); line-height: 1.5; min-height: 3em; }
 :root[data-design="m3"] .lp-machine-result a { color: var(--md-on-surface); font-weight: 700; }
@@ -2337,6 +2349,21 @@
     -webkit-mask-image: linear-gradient(to right, transparent, #000 96px, #000 calc(100% - 96px), transparent);
     mask-image: linear-gradient(to right, transparent, #000 96px, #000 calc(100% - 96px), transparent);
 }
+/* Firefox: the row's mask flickered or dropped out while a card lifted on hover (no layer setting helped).
+   There a dark, blurred strip lies over the edge instead, kept in place by position: sticky */
+@supports (-moz-appearance: none) {
+    :root[data-design="m3"] .scroll-row:is(.has-more-start, .has-more-end) { -webkit-mask-image: none; mask-image: none; }
+    :root[data-design="m3"] .scroll-row::before, :root[data-design="m3"] .scroll-row::after {
+        content: ''; position: sticky; z-index: 2; flex: 0 0 96px; align-self: stretch; pointer-events: none;
+        background: color-mix(in srgb, var(--md-surface) 70%, transparent);
+        backdrop-filter: blur(6px); opacity: 0; transition: opacity .2s;
+    }
+    :root[data-design="m3"] .scroll-row::before { left: 0; margin-right: calc(-96px - var(--space-md));
+        mask-image: linear-gradient(to left, transparent, #000); }
+    :root[data-design="m3"] .scroll-row::after { right: 0; margin-left: calc(-96px - var(--space-md));
+        mask-image: linear-gradient(to right, transparent, #000); }
+    :root[data-design="m3"] .scroll-row.has-more-start::before, :root[data-design="m3"] .scroll-row.has-more-end::after { opacity: 1; }
+}
 
 /* Detail recommendations: the AniList score is the one number on this page already (top), not again on every card */
 :root[data-design="m3"] .detail-recs .media-card-score { display: none; }
@@ -2405,3 +2432,15 @@
 :root[data-design="m3"] .um-menu .jf-status-item[data-state="off"] > .um-status-icon { color: var(--md-error); }
 :root[data-design="m3"] .um-menu .src-downloads[data-busy] > svg { color: var(--md-primary); }
 :root[data-design="m3"] .um-initial { background: var(--md-tertiary-container); color: var(--md-on-tertiary-container); }
+
+/* ===== Labels in sentence case =====
+   M3 sets labels in sentence case with almost no tracking; the tracked-out capitals came from AniRoll's first
+   design. Only the Discord card on the landing page keeps them, because it shows Discord's own look */
+:root[data-design="m3"] :is(.media-card-status, .detail-stat-label, .stat-chart-title, .schedule-day-title,
+    .calendar-header-cell, .dot-label, .roll-result-kicker, .roll-filter-label, .wp-status-badge, .wp-sync-label,
+    .wp-host-badge, .jf-now-kicker, .wp-picker-section, .wp-switch-pill, .calendar-week-name, .whatsnew-kicker,
+    .whatsnew-stage, .detail-related-title, .pl-song-kicker, .pl-next-kicker, .pl-stats-title, .pl-menu-title,
+    .search-group-title, .pl-recap-kicker, .dna-kicker) {
+    text-transform: none;
+    letter-spacing: 0.01em;
+}
