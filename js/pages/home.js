@@ -2,7 +2,7 @@ import * as api from '../api.js';
 import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js';
 import { openDialog, showScorePrompt } from '../a11y.js';
 import { isLoggedIn, getToken } from '../auth.js';
-import { getActiveParty, startParty, openPartyPicker } from './watchparty.js';
+import { getActiveParty, startPartyFromPick, openPartyPicker } from './watchparty.js';
 import { lenisScrollTo, stopLenis, startLenis } from '../animations.js';
 import { renderHeadline, renderTour, renderColour, renderMachine, renderParty, renderDnaTry, fillInvite, initLanding } from '../landing.js';
 import { renderCinema, stop as stopCinema } from '../home-cinema.js';
@@ -126,9 +126,10 @@ function showAnimePickerForParty() {
     if (!user) return;
     openPartyPicker({
         title: 'Start a Watch Party',
-        sub: 'Pick an anime to watch with friends',
+        sub: 'Pick an anime to watch with friends, from any of your lists',
+        allLists: true,
         onPick: async (pick) => {
-            await startParty(pick.mediaId, pick.title, user.name, pick.progress, pick.cover);
+            if (!(await startPartyFromPick(pick))) return;
             toast('Watch Party started! Link copied.', 'success');
             window.location.hash = '#/watchparty';
         },

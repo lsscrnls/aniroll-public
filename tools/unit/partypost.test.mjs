@@ -30,3 +30,19 @@ test('switched to another show: both shows with what was watched, the finished o
     // A show switched away from before an episode was done stays out
     assert.match(buildPartyPost({ shows: [{ ...A, startEp: 3, endEp: 3, episodes: 12 }, { ...B, startEp: 0, endEp: 2, episodes: 13 }] }), /^Watched Show B · Episodes 1–2/);
 });
+
+test('other people for the second show: each show says who watched it, the same people are named once', () => {
+    const post = buildPartyPost({ shows: [{ ...A, startEp: 8, endEp: 10, episodes: 24, members: ['kim'] }, { ...B, startEp: 0, endEp: 1, episodes: 13 }], members: ['kim', 'lu'] });
+    assert.equal(post, [
+        'Watch Party · 2 shows, 3 episodes',
+        '• Show A · Episodes 9–10 with @kim',
+        '• Show B · Episode 1 with @kim and @lu',
+        'https://anilist.co/anime/1',
+        'https://anilist.co/anime/2',
+    ].join('\n'));
+    assert.match(buildPartyPost({ shows: [{ ...A, startEp: 8, endEp: 10, episodes: 24, members: ['lu', 'kim'] }, { ...B, startEp: 0, endEp: 1, episodes: 13 }], members: ['kim', 'lu'] }),
+        /^Watch Party with @kim and @lu · 2 shows/);
+    // Only the first show had episodes: it names its own people
+    assert.equal(buildPartyPost({ shows: [{ ...A, startEp: 8, endEp: 10, episodes: 24, members: ['kim'] }, { ...B, startEp: 0, endEp: 0, episodes: 13 }], members: ['lu'] }),
+        'Watched Show A · Episodes 9–10 in a Watch Party with @kim\nhttps://anilist.co/anime/1');
+});

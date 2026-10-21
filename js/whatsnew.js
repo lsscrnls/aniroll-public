@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.1';
+export const RELEASE = '1.9.2';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -19,6 +19,15 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
+    {
+        id: '2026-10-21.1',
+        title: 'Watch Parties that change shows',
+        items: [
+            'When the host switches a Watch Party to another show, members are now asked whether they come along. Say no and the new show stays off your list; the one you watched stays where you got to.',
+            'The party page shows what the party watched earlier and with whom, and <strong>End & Post</strong> says who watched which show when the group changed.',
+            'The <strong>Watch Party</strong> button on Home now picks from all your lists, like Switch anime: a show from Planning goes on Watching, a completed one becomes a rewatch.',
+        ],
+    },
     {
         id: '2026-10-20.4',
         title: 'What\'s this song? And your accounts',

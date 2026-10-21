@@ -14,6 +14,8 @@ export function createPartyLink(mediaId, hostName, episode = null) { return null
 // Starts a party as its host. With `handOver`, the members of the previous party follow.
 export async function startParty(mediaId, mediaTitle, hostName, startEp, coverImage, { handOver = false } = {}) { return null; }
 
+export async function startPartyFromPick(pick) { return null; }
+
 export async function copyPartyLink(link) { return null; }
 
 export async function partyFromPlayer(media, episode, player = null) { return null; }
