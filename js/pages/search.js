@@ -25,7 +25,7 @@ export async function render({ content, query: params }) {
             <button class="tab-btn ${type === 'MANGA' ? 'active' : ''}" data-type="MANGA">Manga</button>
         </div>
         <div class="filter-row">
-            <input class="glass-input" id="browse-search" type="text" placeholder="Search..." value="${esc(search)}" style="min-width:200px">
+            <input class="glass-input" id="browse-search" type="text" placeholder="Search…" value="${esc(search)}" style="min-width:200px">
             <select class="glass-select" id="browse-sort">
                 <option value="TRENDING_DESC" ${sort === 'TRENDING_DESC' ? 'selected' : ''}>Trending</option>
                 <option value="POPULARITY_DESC" ${sort === 'POPULARITY_DESC' ? 'selected' : ''}>Popularity</option>
