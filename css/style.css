@@ -348,7 +348,7 @@ input, select, textarea { font: inherit; color: inherit; }
     border-radius: var(--radius-full);
     font-weight: 600;
     font-size: 0.9rem;
-    transition: all var(--duration) var(--ease);
+    transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration) var(--ease-out), opacity var(--duration-fast) var(--ease-out), border-radius var(--duration) var(--ease), transform var(--duration) var(--ease);
     white-space: nowrap;
 }
 
@@ -889,7 +889,7 @@ input, select, textarea { font: inherit; color: inherit; }
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--text-secondary);
-    transition: all var(--duration-fast) ease;
+    transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease, border-color var(--duration-fast) ease, border-radius var(--duration-fast) ease, box-shadow var(--duration-fast) ease, transform var(--duration-fast) ease, opacity var(--duration-fast) ease;
     background: transparent;
     border: none;
 }
@@ -967,7 +967,7 @@ input, select, textarea { font: inherit; color: inherit; }
     color: var(--text);
     font-size: 1rem;
     font-weight: 700;
-    transition: all var(--duration-fast) ease;
+    transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease, border-color var(--duration-fast) ease, border-radius var(--duration-fast) ease, box-shadow var(--duration-fast) ease, transform var(--duration-fast) ease, opacity var(--duration-fast) ease;
 }
 
 .progress-btn:hover {
@@ -1560,7 +1560,7 @@ input, select, textarea { font: inherit; color: inherit; }
     align-items: center;
     justify-content: center;
     background: var(--bg-secondary);
-    transition: all var(--duration-fast) ease;
+    transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease, border-color var(--duration-fast) ease, border-radius var(--duration-fast) ease, box-shadow var(--duration-fast) ease, transform var(--duration-fast) ease, opacity var(--duration-fast) ease;
 }
 
 .season-nav-btn:hover { background: var(--surface-hover); }
@@ -1662,7 +1662,7 @@ input, select, textarea { font: inherit; color: inherit; }
     font-size: 0.9rem;
     font-weight: 500;
     color: var(--text-secondary);
-    transition: all var(--duration-fast) ease;
+    transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease, border-color var(--duration-fast) ease, border-radius var(--duration-fast) ease, box-shadow var(--duration-fast) ease, transform var(--duration-fast) ease, opacity var(--duration-fast) ease;
     position: relative;
     border-radius: var(--radius-full);
 }
@@ -1913,7 +1913,7 @@ input, select, textarea { font: inherit; color: inherit; }
     font-size: 0.85rem;
     font-weight: 500;
     background: var(--bg-secondary);
-    transition: all var(--duration-fast) ease;
+    transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease, border-color var(--duration-fast) ease, border-radius var(--duration-fast) ease, box-shadow var(--duration-fast) ease, transform var(--duration-fast) ease, opacity var(--duration-fast) ease;
 }
 
 .genre-chip:hover { background: var(--surface-hover); }

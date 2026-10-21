@@ -176,7 +176,7 @@ export function initLanding(root) {
         const words = root.querySelectorAll('.landing-title .lw > span');
         const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
             .from(words, { yPercent: 60, opacity: 0, filter: 'blur(14px)', duration: 0.9, stagger: 0.09, clearProps: 'all' })
-            .from(root.querySelectorAll('.lp-eyebrow, .landing-sub, .lp-actions > *'), { y: 18, opacity: 0, duration: 0.7, stagger: 0.08, clearProps: 'all' }, '-=0.45')
+            .from(root.querySelectorAll('.landing-sub, .lp-actions > *'), { y: 18, opacity: 0, duration: 0.7, stagger: 0.08, clearProps: 'all' }, '-=0.45')
             // The shaped tiles pop in one after another, a little turned, and spring into place
             // (only its own properties are cleared: the cover is an inline background image)
             .from(root.querySelectorAll('.lp-tile'), { scale: 0.4, rotate: -25, opacity: 0, duration: 0.9, stagger: 0.07, ease: 'back.out(1.8)', clearProps: 'transform,opacity' }, '-=0.9')
@@ -272,26 +272,13 @@ export function initLanding(root) {
             raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
-
-        if (hasGsap && window.ScrollTrigger) {
-            const reveal = gsap.from(root.querySelectorAll('.landing-tour-head > *, .landing-tour-item, .landing-tour-frame'), {
-                y: 40, opacity: 0, filter: 'blur(8px)', duration: 0.8, stagger: 0.08, ease: 'power3.out', clearProps: 'all',
-                scrollTrigger: { trigger: root.querySelector('.landing-tour'), start: 'top 80%', once: true },
-            });
-            cleanups.push(() => { reveal.scrollTrigger?.kill(); reveal.kill(); });
-        }
     }
 
+    // No scroll reveals below the hero: the hero is the one entrance, everything after it is simply there
+    // (hidden-until-scrolled sections showed as blank space in find-in-page, anchors and screenshots)
     if (stageVideo) io.observe(stageVideo);
     if (tourFrame) io.observe(tourFrame);
     designVideos.forEach(v => io.observe(v));
-    if (hasGsap && window.ScrollTrigger && !reduce) {
-        const designs = gsap.from(root.querySelectorAll('.lp-colour-text > *, .lp-colour-frame'), {
-            y: 48, opacity: 0, filter: 'blur(8px)', duration: 0.9, stagger: 0.1, ease: 'power3.out', clearProps: 'all',
-            scrollTrigger: { trigger: root.querySelector('.lp-colour'), start: 'top 80%', once: true },
-        });
-        cleanups.push(() => { designs.scrollTrigger?.kill(); designs.kill(); });
-    }
     // The DNA section loads its code and examples only when it comes near
     const dnaSection = root.querySelector('.lp-dna');
     if (dnaSection) {

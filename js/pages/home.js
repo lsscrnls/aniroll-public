@@ -785,8 +785,7 @@ function renderLanding() {
     return `<div class="page-enter lp">
         <section class="landing-hero lp-hero">
             <div class="lp-hero-text">
-                <span class="lp-eyebrow">For your AniList</span>
-                <h1 class="landing-title">${renderHeadline(['Roll it.', 'Track it.', 'Watch together.'])}</h1>
+                <h1 class="landing-title">${renderHeadline(['Roll it.', 'Track it.', 'Watch together.'], false)}</h1>
                 <p class="landing-sub">Let AniRoll pick tonight’s show from your Planning list, follow every airing, watch with friends and play from your own Jellyfin. Your AniList keeps up by itself.</p>
                 <div class="lp-actions">
                     <button class="lp-btn lp-btn-filled" data-login>Get started with AniList</button>
@@ -816,7 +815,28 @@ export function loadLandingTrending() {
         const el = document.getElementById('landing-trending');
         if (el) el.innerHTML = media.map(m => `<div style="flex:0 0 150px">${renderMediaCard(m)}</div>`).join('');
         setupTryRoll(media);
-    }).catch(() => {});
+    }).catch(landingOffline);
+}
+
+// AniList didn't answer: say so where the shows would be, with a way to ask again, instead of skeletons forever
+function landingOffline() {
+    const retry = '<button type="button" class="lp-btn lp-btn-tonal" data-landing-retry>Try again</button>';
+    const row = document.getElementById('landing-trending');
+    if (row) row.innerHTML = `<div class="empty-state landing-offline"><div class="empty-state-text">AniList isn’t answering right now</div>
+        <div class="empty-state-sub">Trending shows appear here once it’s back.</div>${retry}</div>`;
+    const box = document.getElementById('landing-try');
+    if (box) {
+        box.classList.add('is-offline');
+        const result = box.querySelector('#try-result');
+        if (result) result.innerHTML = `AniList isn’t answering right now, so there’s nothing to roll yet. ${retry}`;
+    }
+    document.querySelectorAll('[data-landing-retry]').forEach(btn => btn.addEventListener('click', () => {
+        box?.classList.remove('is-offline');
+        if (row) row.innerHTML = renderSkeletonCards(6);
+        const result = box?.querySelector('#try-result');
+        if (result) result.textContent = 'Can’t decide? Roll one of this week’s trending shows.';
+        loadLandingTrending();
+    }, { once: true }));
 }
 
 // The hero's roll, from the trending shows the page loaded anyway (no request of its own)
@@ -837,6 +857,7 @@ function setupTryRoll(media) {
         if (rolling) return;
         rolling = true;
         btn.disabled = true;
+        box.classList.add('is-rolling');
         const winner = pool[Math.floor(Math.random() * pool.length)];
         // The reel starts on the cover it shows now, so nothing jumps
         const strip = [shown, ...Array.from({ length: 20 }, () => pool[Math.floor(Math.random() * pool.length)]), winner];
@@ -852,6 +873,7 @@ function setupTryRoll(media) {
             onDone: () => {
                 shown = winner;
                 rolling = false;
+                box.classList.remove('is-rolling');
                 btn.disabled = false;
                 btn.textContent = 'Roll again';
                 box.querySelector('#try-result').innerHTML = `Tonight: <a href="#/anime/${winner.id}">${esc(titlePref(winner.title))}</a>. Logged in, Roll picks from your own Planning list.`;

@@ -141,7 +141,7 @@ export async function render({ params, content }) {
         document.addEventListener('keydown', onEpisodesKey);
         window.addEventListener('hashchange', () => document.removeEventListener('keydown', onEpisodesKey), { once: true });
 
-        status('Finding the episode...');
+        status('Finding the episode…');
         const ep = await findEpisode(avail.base, media, episode);
         if (closed) return cleanup;
         if (!ep) throw new Error(`Episode ${episode} is not in your Jellyfin library`);
@@ -157,7 +157,7 @@ export async function render({ params, content }) {
         const startTime = !ep.played && ep.positionTicks && ep.runTimeTicks && ep.positionTicks < ep.runTimeTicks * WATCHED_AT
             ? ep.positionTicks / TICKS : 0;
 
-        status('Asking Jellyfin how to play it...');
+        status('Asking Jellyfin how to play it…');
         session.quality = savedQuality();
         // Auto: measured once per page (and kept a while); Max: the top step; else the step picked
         let autoBitrate = null;
@@ -249,7 +249,7 @@ export async function render({ params, content }) {
             select: (id) => {
                 if (id === session.audioIndex) return;
                 rememberAudio(mediaId, audioTracks.find(t => t.id === id));
-                restart({ audioIndex: id }, 'Switching the audio...');
+                restart({ audioIndex: id }, 'Switching the audio…');
             },
         });
         controls.setQuality({
@@ -262,12 +262,12 @@ export async function render({ params, content }) {
             select: (q) => {
                 if (q === session.quality) return;
                 saveQuality(q);
-                restart({ quality: q }, 'Changing the quality...');
+                restart({ quality: q }, 'Changing the quality…');
             },
         });
         controls.setStats(() => statsFor({ now, session, engine, video, avail, cfg, subtitles, audioTracks, autoBitrate: () => autoBitrate }));
 
-        status(plan.hls ? 'Starting the stream...' : 'Loading...');
+        status(plan.hls ? 'Starting the stream…' : 'Loading…');
         await engine.load({ url: plan.url, hls: plan.hls, startTime });
         if (closed) return cleanup;
         status('');
@@ -302,11 +302,11 @@ export async function render({ params, content }) {
         // same second before saying anything. A file the browser cannot play, or a converter that failed
         // (the graphics card full), would only fail again: those are shown at once.
         let quietRetry = 0;
-        retryInPlace = () => restart({}, 'Reconnecting...');
+        retryInPlace = () => restart({}, 'Reconnecting…');
         engine.on('error', (err) => {
             if ((err.kind === 'network' || err.kind === 'media') && Date.now() - quietRetry > 2 * 60 * 1000) {
                 quietRetry = Date.now();
-                return restart({}, 'Reconnecting...');
+                return restart({}, 'Reconnecting…');
             }
             status(err.message, { error: true });
         });

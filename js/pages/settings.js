@@ -501,7 +501,7 @@ async function renderJellyfinSettings() {
         btn.addEventListener('click', async () => {
             stopPolling();
             btn.disabled = true;
-            btn.textContent = mode === 'key' ? 'Connecting...' : 'Asking Jellyfin...';
+            btn.textContent = mode === 'key' ? 'Connecting…' : 'Asking Jellyfin…';
             try {
                 if (mode === 'key') {
                     connected(await jf.connect(box.querySelector('#jf-url').value, box.querySelector('#jf-apikey').value, box.querySelector('#jf-user').value));
@@ -513,7 +513,7 @@ async function renderJellyfinSettings() {
                 panel.innerHTML = `
                     <div class="jf-qc-code" aria-label="Quick Connect code">${esc(qc.code)}</div>
                     <p class="jf-qc-how">In a Jellyfin app where you are signed in: your profile, <strong>Quick Connect</strong>, enter this code.</p>
-                    <p class="jf-qc-wait" role="status"><span class="jf-dot jf-dot-checking"></span> Waiting for Jellyfin...</p>`;
+                    <p class="jf-qc-wait" role="status"><span class="jf-dot jf-dot-checking"></span> Waiting for Jellyfin…</p>`;
                 btn.disabled = false;
                 btn.textContent = 'New code';
                 const started = Date.now();
@@ -551,7 +551,7 @@ async function renderJellyfinSettings() {
     const player = await import('../player/availability.js');
     const localUrl = player.getLocalUrl();
     box.innerHTML = `
-        <div class="jf-row"><span class="jf-dot jf-dot-checking" id="jf-settings-dot"></span><span id="jf-settings-state">Checking...</span></div>
+        <div class="jf-row"><span class="jf-dot jf-dot-checking" id="jf-settings-dot"></span><span id="jf-settings-state">Checking…</span></div>
         <div class="jf-meta">${esc(cfg.serverName)} · ${esc(cfg.url)}${cfg.userName ? ` · ${esc(cfg.userName)}` : ''}</div>
         <div class="jf-meta">${scope === 'account'
             ? 'Saved for your AniList account, so it works on all your devices'
@@ -636,7 +636,7 @@ async function renderJellyfinSettings() {
     box.querySelector('#jf-pull-now')?.addEventListener('click', async (ev) => {
         const btn = ev.target;
         btn.disabled = true;
-        btn.textContent = 'Checking Jellyfin...';
+        btn.textContent = 'Checking Jellyfin…';
         try {
             const res = await jf.pullFromJellyfin(getState().user, getToken());
             if (res.skipped === 'rate-limited') toast('AniList is rate limiting right now, try again later', 'error');
