@@ -3704,6 +3704,14 @@ input, select, textarea { font: inherit; color: inherit; }
     object-fit: cover;
 }
 
+/* The shows before the current one in this party, with who watched each */
+.wp-evening { display: grid; gap: var(--space-sm); }
+.wp-evening-show { display: grid; gap: 4px; font-size: 0.85rem; }
+.wp-evening-title { font-weight: 600; }
+.wp-evening-who { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; color: var(--text-secondary); }
+.wp-evening-avatar { width: 20px; height: 20px; border-radius: var(--radius-full); object-fit: cover; }
+.wp-evening-avatar + span { margin-left: 4px; }
+
 .wp-host-card {
     display: flex;
     align-items: center;

@@ -701,6 +701,99 @@ function staticServer() {
     check("watch party: the host's view with its episode counter", /You are the host/.test(hosting) && /EPISODE COUNTER/i.test(hosting), hosting.slice(0, 160));
     await wp.close();
 
+    // The host switches to another show: the guest is asked (not moved along), says yes and lands on the new
+    // show, which tells what the party watched before and with whom
+    {
+        const sw = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+        sw.on('pageerror', e => errors.push(`watch party switch: ${e.message}`));
+        // The mock AniList answers every show with the same media: any id but the new show's is the first show
+        const parties = { first: { ...party, hostName: 'Hosty', hostKey: undefined, active: true, members: [], hostProgress: 3 } };
+        await sw.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
+        await sw.route(`${base}/api/**`, route => {
+            const p = new URL(route.request().url()).pathname;
+            const m = p.match(/^\/api\/party\/[^/]+\/(\d+)/);
+            const at = p.startsWith('/api/party/') ? (m?.[1] === '101' ? parties[101] : parties.first) : null;
+            if (p.endsWith('/events')) return route.fulfill({ contentType: 'text/event-stream', body: `retry: 500\ndata: ${JSON.stringify(at || { active: false })}\n\n` });
+            if (at) return route.fulfill({ contentType: 'application/json', body: JSON.stringify(at) });
+            route.fulfill({ status: p === '/api/maintenance' ? 200 : 404, contentType: 'application/json', body: '{"maintenance":false}' });
+        });
+        await sw.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
+        await sw.addInitScript(({ id, name }) => {
+            localStorage.setItem('aniroll_token', 'e2e-token');
+            localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+            localStorage.setItem('aniroll_user_ts', String(Date.now()));
+            localStorage.setItem('aniroll_seen_changes', '9999');
+        }, VIEWER);
+        await sw.goto(base + '/#/watchparty?host=Hosty&anime=21');
+        await idle(sw, 3000);
+        if (await sw.locator('button:has-text("Join Watch Party")').count()) {
+            await sw.locator('button:has-text("Join Watch Party")').first().click();
+            await sw.waitForTimeout(1000);
+            if (await sw.locator('#wp-bg-open').count()) await sw.click('#wp-bg-open');
+            await sw.waitForFunction(() => !!localStorage.getItem('aniroll_joined_party'), null, { timeout: 8000 }).catch(() => {});
+        }
+        parties[101] = { hostName: 'Hosty', mediaId: 101, mediaTitle: 'Next Show', active: true, members: [], hostProgress: 0, startedAt: Date.now(), startEp: 0,
+            evening: [{ mediaId: 21, mediaTitle: 'One Piece', coverImage: '', members: [{ name: VIEWER.name, avatar: '' }, { name: 'Kim', avatar: '' }] }] };
+        parties.first = { hostName: 'Hosty', mediaId: 21, mediaTitle: 'One Piece', active: false, next: 101, members: [] };
+        await sw.waitForSelector('#modal-confirm', { timeout: 8000 }).catch(() => {});
+        const asked = await sw.evaluate(() => ({ text: document.querySelector('#modal-container')?.innerText.replace(/\s+/g, ' ') || '',
+            stillOld: JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null')?.mediaId }));
+        await sw.click('#modal-confirm').catch(() => {});
+        // The mock AniList gives the new show the same id as the old one: from here on both are the new party
+        await sw.waitForFunction(() => JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null')?.mediaId === 101, null, { timeout: 8000 }).catch(() => {});
+        parties.first = parties[101];
+        await sw.waitForFunction(() => /anime=101/.test(location.hash), null, { timeout: 8000 }).catch(() => {});
+        await sw.waitForFunction(() => /Kim/.test(document.getElementById('wp-guest-evening')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
+        const after = await sw.evaluate(() => ({ hash: location.hash, joined: JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null')?.mediaId,
+            evening: document.getElementById('wp-guest-evening')?.innerText.replace(/\s+/g, ' ') || '' }));
+        check('watch party switch: the guest is asked before moving on, says yes, the new show tells what the party watched before and with whom',
+            /moves on/i.test(asked.text) && /switched from .+ to Next Show/.test(asked.text) && /Come along/.test(asked.text) && asked.stillOld && asked.stillOld !== 101
+            && after.joined === 101 && /anime=101/.test(after.hash) && /Earlier in this party/i.test(after.evening) && /One Piece/.test(after.evening) && /Kim/.test(after.evening),
+            { asked, after });
+        await sw.close();
+    }
+
+    // Home's Watch Party button picks from every list, like Switch anime: a show from Planning goes on Watching
+    {
+        const fp = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+        fp.on('pageerror', e => errors.push(`watch party button: ${e.message}`));
+        const saves = [];
+        let created = null;
+        await fp.route('https://graphql.anilist.co/**', route => {
+            const body = route.request().postDataJSON();
+            if (/SaveMediaListEntry/.test(body?.query || '')) saves.push(body.variables);
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(body)) });
+        });
+        await fp.route(`${base}/api/**`, route => {
+            const p = new URL(route.request().url()).pathname;
+            if (route.request().method() === 'PUT' && /^\/api\/party\/[^/]+\/\d+$/.test(p)) {
+                created = p;
+                return route.fulfill({ contentType: 'application/json', body: '{"hostKey":"k","active":true,"members":[]}' });
+            }
+            route.fulfill({ status: p === '/api/maintenance' ? 200 : 404, contentType: 'application/json', body: '{"maintenance":false}' });
+        });
+        await fp.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
+        await fp.addInitScript(({ id, name }) => {
+            localStorage.setItem('aniroll_token', 'e2e-token');
+            localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+            localStorage.setItem('aniroll_user_ts', String(Date.now()));
+            localStorage.setItem('aniroll_seen_changes', '9999');
+        }, VIEWER);
+        await fp.goto(base + '/#/');
+        await fp.waitForSelector('.wp-fab', { timeout: 8000 }).catch(() => {});
+        // The button floats in with an animation that never settles for Playwright's click: clicked in the page
+        await fp.evaluate(() => document.querySelector('.wp-fab')?.click());
+        await fp.waitForSelector('.wp-picker-tabs .tab-btn', { timeout: 5000 }).catch(() => {});
+        const tabs = await fp.evaluate(() => [...document.querySelectorAll('.wp-picker-tabs .tab-btn')].map(b => b.textContent.replace(/ \(\d+\)$/, '')));
+        await fp.evaluate(() => [...document.querySelectorAll('.wp-picker-tabs .tab-btn')].find(b => /^Planning/.test(b.textContent))?.click());
+        const pickedStatus = await fp.evaluate(() => document.querySelector('.wp-picker-card')?.dataset.status);
+        await fp.evaluate(() => document.querySelector('.wp-picker-card')?.click());
+        await fp.waitForFunction(() => /#\/watchparty/.test(location.hash), null, { timeout: 8000 }).catch(() => {});
+        check('watch party button: picks from every list; a show from Planning goes on Watching and the party starts',
+            tabs[0] === 'Watching' && tabs.includes('Planning') && pickedStatus === 'PLANNING' && saves.some(v => v.status === 'CURRENT') && !!created, { tabs, pickedStatus, saves, created });
+        await fp.close();
+    }
+
     };
 
     groups.discover = async () => {

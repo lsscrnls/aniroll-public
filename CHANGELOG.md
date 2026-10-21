@@ -1,6 +1,12 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.1.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.2.
+
+## 21 October 2026 – Watch Parties that change shows
+
+- When the host switches a Watch Party to another show, members are now asked whether they come along. Say no and the new show stays off your list; the one you watched stays where you got to.
+- The party page shows what the party watched earlier and with whom, and **End & Post** says who watched which show when the group changed.
+- The **Watch Party** button on Home now picks from all your lists, like Switch anime: a show from Planning goes on Watching, a completed one becomes a rewatch.
 
 ## 20 October 2026 – What's this song? And your accounts
 
