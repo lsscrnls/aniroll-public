@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.6.1';
+export const RELEASE = '1.9.7';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -17,8 +17,18 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // live, raise its id ('<date>.2', '.3', ...) and add the new items as { rev: N, text } with that N:
 // people who confirmed the earlier release of the day get a pop-up with only the new items.
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
-// app before, shown until `notifyUntil`; the changelog keeps every entry.
+// app before, shown until `notifyUntil`; the changelog keeps every entry. An entry with `from` (a time with its offset)
+// stays hidden until then: what is live already can be announced at a set time.
 const CHANGES = [
+    {
+        id: '2026-10-23',
+        from: '2026-10-23T00:00:00+02:00',
+        title: 'Your show in Discord, and a helper that updates itself',
+        items: [
+            'While you watch, your <strong>Discord status</strong> says <strong>AniRoll:</strong> and the show, in the member list too. It needs the newest helper: Settings → Discord shows the update.',
+            'AniRoll for Discord\'s helper can <strong>update itself</strong>. Turn it on when you set it up, or later with one line in the terminal; Settings → Discord shows both.',
+        ],
+    },
     {
         id: '2026-10-22.3',
         title: 'Live now, Undo, and double tap in the player',
@@ -404,7 +414,8 @@ const CHANGES = [
         ],
     },
 ];
-const LATEST = CHANGES[0].id;
+const SHOWN = CHANGES.filter(c => !c.from || Date.parse(c.from) <= Date.now());
+const LATEST = SHOWN[0].id;
 const dateOf = (c) => new Date(`${c.id.slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
 const OLD_TABS = [['home', 'Home'], ['roll', 'Roll'], ['search', 'Browse'], ['season', 'Season'], ['calendar', 'Calendar'], ['social', 'Social'], ['list', 'My List']];
@@ -478,7 +489,7 @@ function itemsOf(c) {
     return c.items.filter(item => !sameDay || (item.rev || 1) > revOf(confirmed)).map(itemText);
 }
 function pendingNotices() {
-    return CHANGES.filter(c => isNewer(c.id, seen()) && itemsOf(c).length).reverse();
+    return SHOWN.filter(c => isNewer(c.id, seen()) && itemsOf(c).length).reverse();
 }
 
 // The one-time notice: returning visitors, everything they have not confirmed with "Got it"
@@ -509,10 +520,10 @@ export function renderChangelog({ content }) {
         <a class="glass-btn glass-btn-secondary whatsnew-back" href="${esc(back.hash)}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>${back.label ? `Back to ${esc(back.label)}` : 'Back'}</a>
         <h1 class="section-title">What's new <span class="whatsnew-release">AniRoll ${RELEASE}</span></h1>
         <div class="box whatsnew">
-            ${CHANGES.map((c, i) => `<section class="whatsnew-entry">
+            ${SHOWN.map((c, i) => `<section class="whatsnew-entry">
                 <header class="whatsnew-side"><div class="whatsnew-date">${dateOf(c)}</div><h2 class="whatsnew-title">${esc(c.title)}</h2></header>
                 <div class="whatsnew-body">
-                    ${c.tabs && CHANGES.findIndex(x => x.tabs) === i ? tabBar() : ''}
+                    ${c.tabs && SHOWN.findIndex(x => x.tabs) === i ? tabBar() : ''}
                     ${c.video ? videoTeaser(c.video) : ''}
                     <ul class="whatsnew-list">${c.items.map(item => `<li>${itemText(item)}</li>`).join('')}</ul>
                 </div>
