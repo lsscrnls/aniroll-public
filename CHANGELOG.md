@@ -1,6 +1,12 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.3.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.4.
+
+## 22 October 2026 – When AniList is down
+
+- If AniList doesn't answer, a show you haven't opened before still opens, with its basics from TMDB, and search finds anime there too. Once AniList is back, its own details come back by themselves.
+- Posts, replies, likes, follows and list changes made while AniList is down are kept and sent once it's back, like changes made offline.
+- Jellyfin, Watch Parties and your seat keep working through an AniList outage for accounts AniRoll has seen in the last month.
 
 ## 21 October 2026 – Watch Parties that change shows
 

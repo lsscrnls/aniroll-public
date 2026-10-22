@@ -110,7 +110,7 @@ export async function render({ params, content }) {
         const was = follow.dataset.following === '1';
         setFollow(follow, !was);
         try {
-            const now = await api.toggleFollow(user.id, token);
+            const now = await api.toggleFollow(user.id, token, was);
             setFollow(follow, now);
             toast(now ? `Following ${user.name}` : `Unfollowed ${user.name}`);
         } catch (e) {
