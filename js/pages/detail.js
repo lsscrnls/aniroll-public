@@ -21,6 +21,7 @@ export async function renderPanel(id, container) {
     loadPlayButton(media, container);
     // From TMDB while AniList is down: friends and your match need AniList, so they wait for it
     if (media.fallback) return;
+    loadWatchOrder(media, container);
     loadFriendsStatus(media, token, container);
     loadTasteMatch(media, token, container);
 }
@@ -41,6 +42,7 @@ export async function render({ params, content }) {
     loadPlayButton(media, content);
     // From TMDB while AniList is down: friends and your match need AniList, so they wait for it
     if (media.fallback) return;
+    loadWatchOrder(media, content);
     loadFriendsStatus(media, token, content);
     loadTasteMatch(media, token, content);
 }
@@ -183,6 +185,7 @@ function renderDetailHTML(media) {
 
         ${studiosHtml(media)}
         ${relatedHtml(media)}
+        ${hasParts(media) ? '<section class="detail-order" id="detail-order" aria-label="Watch order" hidden></section>' : ''}
 
         ${media.genres?.length ? `<div style="margin-bottom:var(--space-xl)">
             <div class="genre-chips">${media.genres.map(g => `<a href="#/search?genre=${encodeURIComponent(g)}" class="genre-chip">${esc(g)}</a>`).join('')}</div>
@@ -365,6 +368,67 @@ function relatedHtml(media) {
         </div>`;
         }).join('')}</div>
     </section>`;
+}
+
+// ===== Watch order: the franchise's parts in release order and in story order (api/watchorder.js) =====
+// Only for an anime with a prequel or sequel; when both orders are the same there is one list and it says so.
+// From AniRoll's server, which asks AniList once a week per franchise: no request of your own to AniList.
+const hasParts = (media) => media.type === 'ANIME' && !media.fallback
+    && (media.relations?.edges || []).some(e => ['PREQUEL', 'SEQUEL'].includes(e.relationType) && e.node?.type === 'ANIME');
+
+const ORDER_KEY = 'aniroll_watch_order';
+const FORMATS = { TV: 'TV', TV_SHORT: 'TV short', MOVIE: 'Movie', SPECIAL: 'Special', OVA: 'OVA', ONA: 'ONA' };
+
+async function loadWatchOrder(media, root) {
+    const box = root.querySelector('#detail-order');
+    if (!box) return;
+    let data;
+    try {
+        const res = await fetch(`/api/watchorder/${media.id}`, { signal: AbortSignal.timeout(15000) });
+        data = res.ok ? await res.json() : null;
+    } catch { data = null; }
+    if (!data?.release || data.release.length < 2 || !box.isConnected) return;
+    const me = getState().user;
+    const own = new Map((me ? api.knownMediaList(me.id, 'ANIME') || [] : []).flatMap(l => l.entries || []).map(e => [e.mediaId, e]));
+    let pick = 'release';
+    try { if (!data.same && localStorage.getItem(ORDER_KEY) === 'story') pick = 'story'; } catch { /* release first */ }
+
+    const row = (id, i) => {
+        const m = data.media[id];
+        if (!m) return '';
+        const entry = own.get(id) || (id === media.id ? media.mediaListEntry : null);
+        const facts = [FORMATS[m.format] || m.format, m.startDate?.year || (m.status === 'NOT_YET_RELEASED' ? 'Upcoming' : ''),
+            m.episodes > 1 ? `${m.episodes} episodes` : ''].filter(Boolean).join(' · ');
+        return `<li class="detail-order-item${id === media.id ? ' is-here' : ''}">
+            <button type="button" class="detail-order-open" data-open="${id}"${id === media.id ? ' aria-current="true"' : ''}>
+                <span class="detail-order-n">${i + 1}</span>
+                ${m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy">` : '<span class="detail-order-nocover"></span>'}
+                <span class="detail-order-text"><span class="detail-order-name">${esc(titlePref(m.title))}</span>
+                <span class="detail-order-facts">${esc(facts)}${id === media.id ? ' · <strong>This one</strong>' : ''}${entry?.status ? ` · ${esc(statusLabel(entry.status, 'ANIME'))}` : ''}</span></span>
+            </button>
+        </li>`;
+    };
+    const draw = () => {
+        const ids = data[pick];
+        box.innerHTML = `<h3 class="detail-related-title">Watch order</h3>
+            ${data.same ? '<p class="detail-order-note">Release and story order are the same.</p>'
+                : `<div class="tab-group detail-order-tabs" role="tablist" aria-label="Order">
+                    <button type="button" class="tab-btn${pick === 'release' ? ' active' : ''}" role="tab" aria-selected="${pick === 'release'}" data-order="release">Release order</button>
+                    <button type="button" class="tab-btn${pick === 'story' ? ' active' : ''}" role="tab" aria-selected="${pick === 'story'}" data-order="story">Story order</button>
+                </div>
+                <p class="detail-order-note">${pick === 'release' ? 'As it came out: how most people saw it first.' : 'As the story goes: prequels made later come first.'}</p>`}
+            <ol class="detail-order-list">${ids.map(row).join('')}</ol>`;
+    };
+    draw();
+    box.hidden = false;
+    box.addEventListener('click', (e) => {
+        const btn = /** @type {HTMLElement | null} */ (/** @type {HTMLElement} */ (e.target).closest('[data-order]'));
+        if (!btn || btn.dataset.order === pick) return;
+        pick = btn.dataset.order === 'story' ? 'story' : 'release';
+        try { localStorage.setItem(ORDER_KEY, pick); } catch { /* this page only */ }
+        draw();
+        box.querySelector(`[data-order="${pick}"]`)?.focus();
+    });
 }
 
 // "Remove from list" sits at the end of the status menu instead of as its own red button next to it

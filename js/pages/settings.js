@@ -756,8 +756,8 @@ async function mountPasskeys(panel) {
     if (!info?.vip) return;
     const day = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
     const rows = info.passkeys.map(p => `<div class="acct-row">
-            <span class="acct-name">${esc(p.label)}<span class="settings-hint" style="display:block;margin:0">Made ${day(p.created)}${p.used ? `, last used ${day(p.used)}` : ''}${p.current ? '' : ' · holds an older login'}</span></span>
-            ${p.current ? '' : `<button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-pk-reseal="${esc(p.id)}">Update</button>`}
+            <span class="acct-name">${esc(p.label)}<span class="settings-hint" style="display:block;margin:0">Made ${day(p.created)}${p.used ? `, last used ${day(p.used)}` : ''}${p.sealed === 'server' ? ' · login kept by AniRoll' : ''}${p.current ? '' : ' · holds an older login'}</span></span>
+            ${p.current ? '' : `<button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-pk-reseal="${esc(p.id)}" data-pk-server="${p.sealed === 'server' ? '1' : ''}">Update</button>`}
             <button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-pk-remove="${esc(p.id)}">Remove</button>
         </div>`).join('');
     slot.innerHTML = `<section class="settings-card" id="passkeys">
@@ -765,9 +765,9 @@ async function mountPasskeys(panel) {
             <p class="dot-label settings-card-sub">For VIPs: a way in while AniList’s login is down</p>
             ${rows ? `<div class="acct-list">${rows}</div>` : ''}
             <button class="glass-btn glass-btn-secondary" type="button" data-pk-add>Add a passkey</button>
-            <p class="settings-hint">The passkey keeps your AniList login locked, so AniRoll’s server holds it but can’t read it. On a new device,
-            sign in with it from the start page or at aniroll.app/#/passkey. Needs a passkey that supports this (most phones, Chrome, Safari,
-            Firefox and password managers from 2025 on).</p>
+            <p class="settings-hint">Most passkeys keep your AniList login locked, so AniRoll’s server holds it but can’t read it. Some (Proton Pass,
+            for one) can’t do that; then AniRoll keeps your login encrypted on its server, like your Jellyfin key. On a new device, sign in with
+            it from the start page or at aniroll.app/#/passkey.</p>
             <p class="settings-hint">As a VIP, AniRoll also keeps a copy of your list on its server, so it’s there while AniList is down.
             “Delete all my AniRoll data” removes it with your passkeys.</p>
         </section>`;
@@ -782,7 +782,7 @@ async function mountPasskeys(panel) {
                 await pk.removePasskey(btn.dataset.pkRemove);
                 toast('Passkey removed');
             } else if (btn.dataset.pkReseal) {
-                await pk.resealPasskey(btn.dataset.pkReseal);
+                await pk.resealPasskey(btn.dataset.pkReseal, btn.dataset.pkServer === '1');
                 toast('Passkey updated', 'success');
             } else {
                 await pk.addPasskey();

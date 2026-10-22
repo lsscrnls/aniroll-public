@@ -2,7 +2,8 @@
 // Passkeys for VIPs (api/passkeys.js): signing in while AniList's own login is down.
 // Made while signed in: the passkey seals your AniList token with a key only it can give (WebAuthn PRF), and
 // AniRoll's server keeps the sealed token. Signing in with the passkey later, on any device, opens it again here
-// in the browser; the server never sees the token itself. Shown to VIPs only: the passkey card in Settings,
+// in the browser; the server never sees the token itself. A passkey without PRF (Proton Pass on an iPhone) has
+// the server seal it with its own key instead. Shown to VIPs only: the passkey card in Settings,
 // a one-time note, and the sign-in on the landing page of a browser a VIP used before (or #/passkey).
 import { getToken, setToken, setCachedUser } from './auth.js';
 import { rememberAccount } from './accounts.js';
@@ -50,7 +51,7 @@ async function unseal(prf, blob) {
 }
 
 const prfOf = (cred) => /** @type {any} */ (cred).getClientExtensionResults?.()?.prf;
-const NO_PRF = 'This passkey can’t keep your AniList login (it needs a newer browser or password manager). Try another one, e.g. your phone.';
+const NO_PRF = 'This passkey can’t open your login. Remove it in Settings and make a new one.';
 
 // Asks the passkey once more, for its PRF answer (some only give it when signing in, not when made)
 async function prfFor(rpId, credentialId = null) {
@@ -65,7 +66,7 @@ async function prfFor(rpId, credentialId = null) {
     return { cred, first };
 }
 
-/** @returns {Promise<{ vip: boolean, passkeys: { id: string, label: string, created: number, used: number | null, current: boolean }[] }>} */
+/** @returns {Promise<{ vip: boolean, passkeys: { id: string, label: string, created: number, used: number | null, current: boolean, sealed: 'passkey' | 'server' }[] }>} */
 export function listPasskeys() {
     return call('/api/passkey', { method: 'GET' });
 }
@@ -101,20 +102,26 @@ export async function addPasskey() {
     const response = cred.response;
     const publicKey = response.getPublicKey?.();
     if (!publicKey || !response.getAuthenticatorData) throw new Error('This browser can’t hand over the passkey, try another one');
+    // PRF said yes but gave nothing yet: one more touch for it. Said no, or nothing at all: the server seals it
     const prf = prfOf(cred);
-    if (prf && prf.enabled === false) throw new Error(NO_PRF);
-    const first = prf?.results?.first || (await prfFor(start.rpId, b64u(cred.rawId))).first;
+    let first = prf?.results?.first || null;
+    if (!first && prf?.enabled === true) first = await prfFor(start.rpId, b64u(cred.rawId)).then(r => r.first, err => {
+        if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') throw err;
+        return null;
+    });
     await call('/api/passkey/register', { body: {
         id: b64u(cred.rawId), publicKey: b64u(publicKey), alg: response.getPublicKeyAlgorithm(),
         clientDataJSON: b64u(response.clientDataJSON), authenticatorData: b64u(response.getAuthenticatorData()),
-        blob: await seal(first, token), label: deviceLabel(),
+        ...(first ? { blob: await seal(first, token) } : { serverSeal: true }), label: deviceLabel(),
     } });
 }
 
 // The passkey keeps the login you had when it was made: this puts the current one in instead
-export async function resealPasskey(id) {
+export async function resealPasskey(id, server = false) {
     const token = getToken();
     if (!token) throw new Error('Sign in first');
+    // Sealed by the server: it takes the login you are signed in with, no passkey needed
+    if (server) return void await call('/api/passkey/reseal', { body: { id } });
     const rpId = location.hostname;
     const { first } = await prfFor(rpId, id);
     await call('/api/passkey/reseal', { body: { id, blob: await seal(first, token) } });
@@ -130,13 +137,15 @@ export async function signInWithPasskey() {
     }) }));
     if (!cred) throw new Error('No passkey was chosen');
     const first = prfOf(cred)?.results?.first;
-    if (!first) throw new Error(NO_PRF);
     const answer = await call('/api/passkey/login', { auth: false, body: {
         id: b64u(cred.rawId), clientDataJSON: b64u(cred.response.clientDataJSON),
         authenticatorData: b64u(cred.response.authenticatorData), signature: b64u(cred.response.signature),
     } });
-    let token;
-    try { token = await unseal(first, answer.blob); } catch { throw new Error('The passkey couldn’t open your login. Remove it in Settings and make a new one.'); }
+    let token = answer.token || null;
+    if (!token) {
+        if (!first) throw new Error(NO_PRF);
+        try { token = await unseal(first, answer.blob); } catch { throw new Error(NO_PRF); }
+    }
     setToken(token);
     // What the server knows of the account; AniList fills in the rest once it answers (the cache is "old")
     setCachedUser({ id: answer.viewer.id, name: answer.viewer.name, avatar: { large: answer.viewer.avatar?.medium, medium: answer.viewer.avatar?.medium } });
