@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.7';
+export const RELEASE = '1.9.7.1';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -17,14 +17,17 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // live, raise its id ('<date>.2', '.3', ...) and add the new items as { rev: N, text } with that N:
 // people who confirmed the earlier release of the day get a pop-up with only the new items.
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
-// app before, shown until `notifyUntil`; the changelog keeps every entry. An entry with `from` (a time with its offset)
-// stays hidden until then: what is live already can be announced at a set time.
+// app before, shown until `notifyUntil`; the changelog keeps every entry. An entry or item with `from` (a time with
+// its offset) stays hidden until then: what is live already can be announced at a set time. A later release of the
+// day counts (its id) only once one of its items shows.
 const CHANGES = [
     {
-        id: '2026-10-23',
+        id: '2026-10-23.2',
         from: '2026-10-23T00:00:00+02:00',
         title: 'Your show in Discord, and a helper that updates itself',
         items: [
+            { rev: 2, from: '2026-10-23T08:00:00+02:00', text: 'Buffering again and again away from home? In Auto, the player now steps the quality down by itself and plays on from the same spot. Picking Auto again in the menu starts fresh.' },
+            { rev: 2, from: '2026-10-23T08:00:00+02:00', text: 'Settings → Jellyfin takes your server\'s upload: away from home the player stays below it, and files whose bitrate jumps a lot (Blu-rays) are converted instead of stuttering.' },
             'While you watch, your <strong>Discord status</strong> says <strong>AniRoll:</strong> and the show, in the member list too. It needs the newest helper: Settings → Discord shows the update.',
             'AniRoll for Discord\'s helper can <strong>update itself</strong>. Turn it on when you set it up, or later with one line in the terminal; Settings → Discord shows both.',
         ],
@@ -414,7 +417,12 @@ const CHANGES = [
         ],
     },
 ];
-const SHOWN = CHANGES.filter(c => !c.from || Date.parse(c.from) <= Date.now());
+const due = (x) => !x.from || Date.parse(x.from) <= Date.now();
+const SHOWN = CHANGES.filter(due).map(c => {
+    const items = c.items.filter(item => typeof item === 'string' || due(item));
+    const rev = Math.max(1, ...items.map(item => (typeof item === 'string' ? 1 : item.rev || 1)));
+    return items.length === c.items.length ? c : { ...c, items, id: rev > 1 ? `${c.id.slice(0, 10)}.${rev}` : c.id.slice(0, 10) };
+});
 const LATEST = SHOWN[0].id;
 const dateOf = (c) => new Date(`${c.id.slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
