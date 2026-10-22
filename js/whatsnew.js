@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.3';
+export const RELEASE = '1.9.4';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -19,6 +19,15 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // Every unconfirmed entry pops up for returning visitors on each visit. `notice` is the pop-up for people who knew the
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
+    {
+        id: '2026-10-22',
+        title: 'When AniList is down',
+        items: [
+            'If AniList doesn\'t answer, a show you haven\'t opened before still opens, with its basics from TMDB, and search finds anime there too. Once AniList is back, its own details come back by themselves.',
+            'Posts, replies, likes, follows and list changes made while AniList is down are kept and sent once it\'s back, like changes made offline.',
+            'Jellyfin, Watch Parties and your seat keep working through an AniList outage for accounts AniRoll has seen in the last month.',
+        ],
+    },
     {
         id: '2026-10-21.3',
         title: 'Watch Parties that change shows',

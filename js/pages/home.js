@@ -7,6 +7,7 @@ import { lenisScrollTo, stopLenis, startLenis } from '../animations.js';
 import { renderHeadline, renderTour, renderColour, renderMachine, renderParty, renderDnaTry, fillInvite, initLanding } from '../landing.js';
 import { renderCinema, stop as stopCinema } from '../home-cinema.js';
 import { setDismissed, syncDismissed } from '../dismissed.js';
+import { vipDevice, passkeysSupported } from '../passkeys.js';
 
 export async function render({ content }) {
     if (!isLoggedIn()) {
@@ -790,6 +791,7 @@ function renderLanding() {
                 <div class="lp-actions">
                     <button class="lp-btn lp-btn-filled" data-login>Get started with AniList</button>
                     <button class="lp-btn lp-btn-tonal" type="button" data-scroll-to="lp-tour">See what’s inside</button>
+                    ${vipDevice() && passkeysSupported() ? '<button class="lp-btn lp-btn-tonal" type="button" data-passkey-login>Sign in with a passkey</button>' : ''}
                 </div>
             </div>
             ${renderMachine()}

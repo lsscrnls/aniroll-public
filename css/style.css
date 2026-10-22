@@ -1376,6 +1376,17 @@ input, select, textarea { font: inherit; color: inherit; }
     color: var(--text-secondary);
 }
 
+/* AniList down: the page shows TMDB's basics (js/api.js fallbackMedia) */
+.detail-fallback {
+    padding: var(--space-md) var(--space-lg);
+    margin-bottom: var(--space-xl);
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+.detail-fallback strong { color: var(--text); }
+.detail-fallback a { color: var(--accent); }
+.detail-fallback-credit { display: block; margin-top: 4px; font-size: 0.8rem; opacity: 0.8; }
+
 /* ===== Friends Status ===== */
 /* Compact pills that sit side by side and wrap */
 .friends-status-list {

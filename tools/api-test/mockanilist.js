@@ -75,6 +75,24 @@ http.createServer((req, res) => {
             hub: { options: [{ actions: [{ uri: 'intent://music.apple.com/us/album/buddy/1?i=2#Intent;scheme=https;end' }] }] } } });
     }
     if (req.url === '/__shazamasks') return send(res, 200, { asks: shazamAsks });
+    // TMDB stand-in for api/fallback.js: one show (two AniList parts in season 1, see run.sh), one film
+    if (req.url.startsWith('/tmdb/')) {
+        if (req.headers.authorization !== 'Bearer test-tmdb') return send(res, 401, {});
+        const u = new URL(req.url, 'http://x');
+        const genres = [{ name: 'Animation' }, { name: 'Action & Adventure' }];
+        if (u.pathname === '/tmdb/tv/7001') return send(res, 200, { name: 'Frieren', original_name: '葬送のフリーレン', overview: 'The show', poster_path: '/show.jpg',
+            backdrop_path: '/back.jpg', first_air_date: '2023-09-29', status: 'Ended', genres, vote_average: 8.8, vote_count: 500, episode_run_time: [24] });
+        if (u.pathname === '/tmdb/tv/7001/season/1') return send(res, 200, { name: 'Season 1', overview: '', poster_path: '/s1.jpg', air_date: '2023-09-29',
+            episodes: Array.from({ length: 28 }, (_, i) => ({ episode_number: i + 1, air_date: '2023-10-01', runtime: 24 })) });
+        if (u.pathname === '/tmdb/movie/9001') return send(res, 200, { title: 'Mob Film', original_title: 'モブ', overview: 'A film', poster_path: '/m.jpg',
+            release_date: '2016-07-11', status: 'Released', runtime: 100, genres: [{ name: 'Comedy' }], vote_average: 7, vote_count: 5 });
+        if (u.pathname === '/tmdb/search/multi') return send(res, 200, { results: [
+            { id: 7001, media_type: 'tv', genre_ids: [16, 10759], name: 'Frieren', original_name: '葬送のフリーレン', poster_path: '/show.jpg', first_air_date: '2023-09-29', vote_average: 8.8, vote_count: 500 },
+            { id: 5, media_type: 'tv', genre_ids: [18], name: 'Frieren (live action)' },
+            { id: 6, media_type: 'tv', genre_ids: [16], name: 'Unmapped cartoon' },
+        ] });
+        return send(res, 404, {});
+    }
     if (req.url === '/__block') { blocked = true; return send(res, 200, { blocked }); }
     if (req.url === '/__unblock') { blocked = false; return send(res, 200, { blocked }); }
     const chunks = [];

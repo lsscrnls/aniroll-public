@@ -25,6 +25,13 @@ async function ask() {
             signal: AbortSignal.timeout(8000),
         });
         const answer = res.ok ? await res.json() : null;
+        // VIPs get a list kept on the server and passkeys (js/passkeys.js); the browser keeps whether one was here
+        if (answer?.seat && typeof answer.vip === 'boolean') {
+            try {
+                localStorage.setItem('aniroll_vip', answer.vip ? '1' : '0');
+                if (answer.vip) localStorage.setItem('aniroll_vip_device', '1');
+            } catch { /* asked again next time */ }
+        }
         announce(answer);
         return answer;
     } catch {

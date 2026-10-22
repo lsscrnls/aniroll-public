@@ -67,7 +67,7 @@ export async function render({ content }) {
                     const actId = parseInt(btn.dataset.id);
                     const type = btn.dataset.actType;
                     try {
-                        const result = await api.toggleLike(actId, type, token);
+                        const result = await api.toggleLike(actId, type, token, btn.classList.contains('liked'));
                         const isLiked = result?.isLiked;
                         btn.classList.toggle('liked', isLiked);
                         const heartSvg = btn.querySelector('svg');
@@ -505,7 +505,7 @@ async function sendReply(form, token) {
     button.disabled = true;
     input.disabled = true;
     try {
-        const reply = await api.postActivityReply(Number(form.dataset.id), text, token);
+        const reply = await api.postActivityReply(Number(form.dataset.id), text, token, getState().user);
         form.parentElement.querySelector('.activity-replies-status')?.remove();
         form.insertAdjacentHTML('beforebegin', renderReply(reply));
         hydrateEmbeds(form.parentElement, token);

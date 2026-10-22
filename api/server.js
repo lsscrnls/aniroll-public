@@ -1058,6 +1058,44 @@ function tokenHash(token) {
     return token ? crypto.createHash('sha256').update(token).digest('hex') : '';
 }
 
+// Tokens AniList confirmed before, by hash (never the token itself), kept in data/ for a month: when AniList
+// is down for a day (2026-10-21), Jellyfin, parties and seats keep working for everyone it knew. Only asked
+// when AniList cannot be: a token it refuses is refused as before. A passkey sign-in (api/passkeys.js) puts
+// the token it hands back in here too.
+const KNOWN_FILE = path.join(DATA_DIR, 'known-viewers.json');
+const KNOWN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const KNOWN_MAX = 5000;
+const knownViewers = new Map(Object.entries(readJson(KNOWN_FILE)));
+let knownWrite = null;
+function saveKnownViewers() {
+    // Many confirmations in a row cost one write
+    if (knownWrite) return;
+    knownWrite = setTimeout(() => {
+        knownWrite = null;
+        writeJson(KNOWN_FILE, Object.fromEntries(knownViewers), { pretty: false, mode: 0o600 });
+    }, 5000);
+}
+function rememberViewer(hash, viewer) {
+    if (!hash || !viewer?.id) return;
+    const old = knownViewers.get(hash);
+    const v = { id: viewer.id, name: str(viewer.name, 40), avatar: { medium: str(viewer.avatar?.medium, 500) } };
+    // Written once a day per token at most
+    if (old && old.v.name === v.name && Date.now() - old.at < 24 * 60 * 60 * 1000) return;
+    knownViewers.delete(hash);
+    knownViewers.set(hash, { v, at: Date.now() });
+    while (knownViewers.size > KNOWN_MAX) knownViewers.delete(knownViewers.keys().next().value);
+    saveKnownViewers();
+}
+function knownViewer(hash) {
+    const hit = knownViewers.get(hash);
+    return hit && Date.now() - hit.at < KNOWN_TTL_MS ? hit.v : null;
+}
+function forgetKnownViewers(userId) {
+    let changed = false;
+    for (const [hash, hit] of knownViewers) if (hit.v.id === userId) { knownViewers.delete(hash); changed = true; }
+    if (changed) saveKnownViewers();
+}
+
 let verifyStatus = 0; // the last answer's HTTP status, for the rate-limit log
 async function verifyViewer(req) {
     const auth = String(req.headers['authorization'] || '');
@@ -1072,7 +1110,8 @@ async function verifyViewer(req) {
     const hash = tokenHash(token);
     const rejectedAt = rejectedTokens.get(hash);
     if (rejectedAt && Date.now() - rejectedAt < VIEWER_TTL_MS) return { status: 'invalid' };
-    if (Date.now() < verifyPausedUntil) return { status: 'unreachable' };
+    const known = knownViewer(hash);
+    if (Date.now() < verifyPausedUntil) return known ? { status: 'ok', viewer: known, known: true } : { status: 'unreachable' };
 
     if (overLimit('verify-ip', clientIp(req), VERIFY_PER_IP_PER_MIN, 60000)) return { status: 'limited' };
     if (overLimit('verify', 'all', VERIFY_PER_MIN, 60000)) return { status: 'limited' };
@@ -1094,17 +1133,19 @@ async function verifyViewer(req) {
                 for (const key of [...viewerCache.keys()].slice(0, 100)) viewerCache.delete(key);
             }
             viewerCache.set(token, { viewer, ts: Date.now() });
+            rememberViewer(hash, viewer);
             return { status: 'ok', viewer };
         }
         if (res.status === 400 || res.status === 401) {
             if (rejectedTokens.size > 5000) rejectedTokens.clear();
             rejectedTokens.set(hash, Date.now());
+            if (knownViewers.delete(hash)) saveKnownViewers();
             return { status: 'invalid' };
         }
     } catch { verifyStatus = 0; /* unreachable below */ }
     verifyPausedUntil = Date.now() + VERIFY_PAUSE_MS;
     noteLimit('verify', verifyStatus);
-    return { status: 'unreachable' };
+    return known ? { status: 'ok', viewer: known, known: true } : { status: 'unreachable' };
 }
 
 // ===== Seats: at most seatSettings.max people in the app at once (100 unless changed) =====
@@ -1379,7 +1420,7 @@ function readRaw(req, max) {
     });
 }
 
-function readBody(req) {
+function readBody(req, max = 1e5) {
     return new Promise(function(resolve) {
         // Collect buffers, not strings: a multi-byte character (Japanese titles!) can be
         // split across chunks and would be corrupted by decoding each chunk on its own
@@ -1387,7 +1428,7 @@ function readBody(req) {
         let size = 0;
         req.on('data', function(c) {
             size += c.length;
-            if (size > 1e5) return resolve({});
+            if (size > max) return resolve({});
             chunks.push(c);
         });
         req.on('end', function() {
@@ -1559,6 +1600,12 @@ const songs = require('./songs')({ dataDir: DATA_DIR, readJson, writeJson, json,
 const sources = require('./sources')({ dataDir: DATA_DIR, readJson, writeJson, verifyViewer, refuseAuth, json, readBody, str,
     encryptSecret, decryptSecret, isOwner: (viewer) => viewer?.id === ADMIN_ID, animeMap });
 
+// While AniList is down: passkeys for VIPs (api/passkeys.js), TMDB details and kept lists (api/fallback.js)
+const passkeys = require('./passkeys')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer,
+    refuseAuth, isVip, tokenHash, bearerToken, rememberViewer, allowedOrigin: ALLOWED_ORIGIN, isLocalOrigin, str });
+const fallback = require('./fallback')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer,
+    refuseAuth, isVip, animeMap });
+
 async function handle(req, res) {
     setCors(req, res);
     if (req.method === 'OPTIONS') {
@@ -1590,6 +1637,8 @@ async function handle(req, res) {
     if (pathname === '/api/me/jflibrary') return animeMap.handleLibrary(req, res);
     if (pathname.startsWith('/api/sources/')) return sources.handle(req, res, pathname);
     if (pathname.startsWith('/api/songs/')) return songs.handle(req, res, pathname);
+    if (pathname === '/api/passkey' || pathname.startsWith('/api/passkey/')) return passkeys.handle(req, res, pathname);
+    if (pathname.startsWith('/api/fallback/') || pathname === '/api/me/list') return fallback.handle(req, res, pathname);
 
     if (pathname === '/api/log' && req.method === 'POST') {
         const body = await readBody(req);
@@ -1876,6 +1925,9 @@ async function handle(req, res) {
         if (cards.length) { cards.forEach(k => delete dna[k]); writeJson(DNA_FILE, dna, { pretty: false }); }
         fs.rmSync(path.join(DNA_DIR, `${key}.jpg`), { force: true });
         party.forgetUser(userId, auth.viewer.name);
+        passkeys.forgetUser(userId);
+        fallback.forgetUser(userId);
+        forgetKnownViewers(userId);
         nowPlaying.delete(userId);
         jfRecent.delete(userId);
         hookSeen.delete(userId);

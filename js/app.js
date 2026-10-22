@@ -109,6 +109,7 @@ async function init() {
         });
     }
     if (isLoggedIn()) setupPendingSaveRetry();
+    if (isLoggedIn()) setTimeout(offerPasskey, 4000);
     if (isLoggedIn()) setupJellyfinPull();
     if (isLoggedIn()) import('./drift.js').then(m => m.startDrift()).catch(() => { /* not essential */ });
     import('./touches.js').then(m => m.startTouches()).catch(() => { /* not essential */ });
@@ -117,6 +118,21 @@ async function init() {
 
 // List changes that AniList refused while rate limiting are queued — push them out
 // as soon as it answers again, and tell the user once when the pause starts.
+// Once per account, VIPs only: passkeys exist (js/passkeys.js). Nobody else hears of them
+async function offerPasskey() {
+    const KEY = 'aniroll_passkey_offered';
+    try { if (localStorage.getItem('aniroll_vip') !== '1' || localStorage.getItem(KEY)) return; } catch { return; }
+    const pk = await import('./passkeys.js');
+    if (!pk.passkeysSupported()) return;
+    const info = await pk.listPasskeys().catch(() => null);
+    if (!info?.vip) return;
+    try { localStorage.setItem(KEY, '1'); } catch { /* asked again next visit */ }
+    if (info.passkeys.length) return;
+    toast('New for VIPs: a passkey gets you into AniRoll even while AniList’s login is down', 'info', {
+        stay: true, action: { label: 'Set up', run: () => { window.location.hash = '/settings?tab=account'; } },
+    });
+}
+
 function setupPendingSaveRetry() {
     const flush = async () => {
         const n = await api.flushPendingSaves(getToken());
@@ -128,6 +144,15 @@ function setupPendingSaveRetry() {
     // Back online: what was saved offline goes out now, not in up to 5 minutes
     window.addEventListener('online', () => { refreshPendingStatus(); setTimeout(flush, 1500); });
     window.addEventListener('offline', refreshPendingStatus);
+
+    // A post, reply, like, follow or delete that AniList could not take: one note, not one per click
+    let queuedAt = 0;
+    window.addEventListener(api.QUEUED_EVENT, () => {
+        refreshPendingStatus();
+        if (Date.now() - queuedAt < 60 * 1000) return;
+        queuedAt = Date.now();
+        toast('AniList isn’t answering — AniRoll keeps this and sends it once AniList is back', 'info');
+    });
 
     let noticeAt = 0;
     window.addEventListener('aniroll:rate-limited', () => {
@@ -454,6 +479,18 @@ function setupRoutes() {
     route('/settings', async (ctx) => {
         const { render } = await import('./pages/settings.js');
         await render(ctx);
+    });
+
+    // A VIP's way in on a new device while AniList's login is down (js/passkeys.js); linked nowhere public
+    route('/passkey', async ({ content }) => {
+        const { passkeysSupported } = await import('./passkeys.js');
+        content.innerHTML = `<div class="page-enter empty-state" style="padding-top:15vh">
+            <div class="empty-state-text">Sign in with your passkey</div>
+            <div class="empty-state-sub">${isLoggedIn() ? 'You are signed in already.' : passkeysSupported()
+                ? 'For VIPs who added a passkey in Settings. Your AniList login comes back with it, even while AniList’s own login is down.'
+                : 'This browser can’t use passkeys.'}</div>
+            ${!isLoggedIn() && passkeysSupported() ? '<button class="glass-btn glass-btn-primary empty-state-action" type="button" data-passkey-login>Use passkey</button>' : ''}
+        </div>`;
     });
 
 
