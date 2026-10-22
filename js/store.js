@@ -162,6 +162,18 @@ export function toast(message, type = 'info', { action = null, stay = false } = 
     return { close: () => { clearTimeout(timer); if (el.isConnected) leave(); }, get open() { return el.isConnected; } };
 }
 
+// Undo instead of "Are you sure?": what can't be taken back on AniList happens a few seconds later, and
+// "Undo" in the note keeps it from happening. Leaving the page does it at once. cancel(): dropped silently
+export function undoable(message, { run, undo }) {
+    let done = false;
+    const finish = () => { done = true; clearTimeout(timer); removeEventListener('pagehide', go); };
+    const go = () => { if (done) return; finish(); run(); };
+    const timer = setTimeout(go, 6000);
+    addEventListener('pagehide', go);
+    const note = toast(message, 'success', { action: { label: 'Undo', run: () => { if (done) return; finish(); undo(); } } });
+    return { cancel: () => { if (done) return; finish(); note?.close(); } };
+}
+
 // `rec` ({ match, because }) turns the card into a recommendation card
 // `note` replaces the line under the title (a voice actor's page puts the character there)
 export function renderMediaCard(media, showStatus = false, rec = null, note = null) {

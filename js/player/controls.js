@@ -155,6 +155,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
     // ----- A short word in the middle when a key changed something the controls may not show -----
     const osdBox = $('.pl-osd');
     let osdTimer = 0;
+    const onPicture = (t) => t === video || t.classList?.contains('pl-scrim') || t.classList?.contains('pl-center');
     function osd(text, action = null) {
         clearTimeout(osdTimer);
         osdBox.innerHTML = `<span>${esc(text)}</span>${action ? `<button type="button" class="pl-osd-act">${esc(action.label)}</button>` : ''}`;
@@ -434,13 +435,45 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             return;
         }
         if (!menu.hidden && !ev.target.closest('.pl-menu')) return closeMenu();
-        // A click on the picture: play/pause with a mouse, show the controls with a finger
-        if (ev.target === video || ev.target.classList.contains('pl-scrim') || ev.target.classList.contains('pl-center')) {
-            if (matchMedia('(hover: none)').matches && root.classList.contains('is-idle')) wake();
+        // A click on the picture: play/pause with a mouse, show the controls with a finger. A finger's tap
+        // waits a moment first, in case it is the start of a double tap (below)
+        if (onPicture(ev.target)) {
+            if (Date.now() - lastTouch < 800) {
+                clearTimeout(tapTimer);
+                if (Date.now() - tapSeekAt < 700) return;
+                tapTimer = setTimeout(() => { if (root.classList.contains('is-idle')) wake(); else togglePlay(); }, TAP_WAIT);
+            } else if (matchMedia('(hover: none)').matches && root.classList.contains('is-idle')) wake();
             else togglePlay();
         }
     });
-    on(video, 'dblclick', toggleFullscreen);
+    // The mouse's double click; a finger has its own (below)
+    on(video, 'dblclick', () => { if (Date.now() - lastTouch > 800) toggleFullscreen(); });
+
+    // ----- Double tap with a finger, as on YouTube -----
+    // Left third: back 10 s, right third: forward 10 s (each further quick tap there 10 s more), middle:
+    // fullscreen. The single tap's own action waits TAP_WAIT to see whether a second tap comes.
+    const TAP_WAIT = 280;
+    let lastTouch = 0, tapTimer = 0, tapSeekAt = 0, tapSide = 0, tapTotal = 0;
+    let lastTap = { at: 0, x: 0, y: 0 };
+    on(root, 'pointerup', (ev) => {
+        if (ev.pointerType !== 'touch' || !onPicture(ev.target)) return;
+        const now = Date.now();
+        lastTouch = now;
+        const r = video.getBoundingClientRect();
+        const at = (ev.clientX - r.left) / (r.width || 1);
+        const side = at < 1 / 3 ? -1 : at > 2 / 3 ? 1 : 0;
+        const second = now - lastTap.at < TAP_WAIT + 70 && Math.hypot(ev.clientX - lastTap.x, ev.clientY - lastTap.y) < 80;
+        const more = side !== 0 && side === tapSide && now - tapSeekAt < 700;
+        if (!second && !more) { lastTap = { at: now, x: ev.clientX, y: ev.clientY }; return; }
+        clearTimeout(tapTimer);
+        lastTap = { at: 0, x: 0, y: 0 };
+        tapSeekAt = now;
+        if (side === 0) { tapSide = 0; toggleFullscreen(); return; }
+        tapTotal = more ? tapTotal + STEP : STEP;
+        tapSide = side;
+        jump(side * STEP);
+        osd(`${side < 0 ? '−' : '+'}${tapTotal} s`);
+    });
 
     // ----- Skip intro / recap / credits (Jellyfin media segments, e.g. from the Intro Skipper plugin) -----
     let segments = [];

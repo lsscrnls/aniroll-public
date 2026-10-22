@@ -124,7 +124,14 @@ async function mockJellyfin(page, { anyTitle = false, library = null } = {}) {
         }
         // One item with its chapters, the way newer servers ask for it: a named one at 15 s
         const one = p.match(/^\/Items\/(ep\d+)$/);
-        if (one) return json({ ...episode(Number(one[1].slice(2))), Chapters: [{ Name: 'Chapter 1', StartPositionTicks: 0 }, { Name: 'Part B', StartPositionTicks: 15 * 10_000_000 }] });
+        // ... and its trickplay pictures: one every 10 s, 10 x 10 in a tile, in two widths
+        if (one) return json({ ...episode(Number(one[1].slice(2))), Chapters: [{ Name: 'Chapter 1', StartPositionTicks: 0 }, { Name: 'Part B', StartPositionTicks: 15 * 10_000_000 }],
+            Trickplay: { [one[1]]: { 120: { Width: 120, Height: 68, TileWidth: 10, TileHeight: 10, ThumbnailCount: 3, Interval: 10000 },
+                320: { Width: 320, Height: 180, TileWidth: 10, TileHeight: 10, ThumbnailCount: 3, Interval: 10000 } } } });
+        if (/^\/Videos\/ep\d+\/Trickplay\/\d+\/\d+\.jpg$/.test(p)) {
+            calls.push({ type: 'trickplay', path: p });
+            return route.fulfill({ status: 200, headers: CORS, contentType: 'image/jpeg', body: THUMB });
+        }
         const item = p.match(new RegExp(`^/Users/${JF_USER}/Items/(ep\\d+)$`));
         if (item) return json({ ...episode(Number(item[1].slice(2))), MediaSources: [mediaSource(item[1])] });
         const info = p.match(/^\/Items\/(ep\d+)\/PlaybackInfo$/);
