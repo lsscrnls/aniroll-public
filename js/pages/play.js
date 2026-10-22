@@ -349,6 +349,10 @@ export async function render({ params, content }) {
         loadSegments(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setSegments(list); });
         if (media.idMal) loadEnding(media.idMal, episode).then(list => { if (!closed && list.length) controls.setEnding(list); });
         loadChapters(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setChapters(list); });
+        loadTrickplay(avail.base, cfg, ep.itemId, source.Id).then(tp => {
+            if (!tp || closed) return;
+            $('player').addEventListener('aniroll:player-hover', (ev) => { if (!closed) paintThumb(tp, ev.detail.thumb, ev.detail.time); });
+        });
         loadThemes(mediaId).then(all => {
             if (closed) return;
             const here = themesFor(all, episode);
@@ -481,6 +485,33 @@ async function loadChapters(base, cfg, itemId) {
         return list.length >= 2 && !madeUp ? list : [];
     }
     return [];
+}
+
+// ===== Preview pictures over the seek bar (Jellyfin's trickplay images) =====
+// Jellyfin keeps the pictures in tiles: one image holds TileWidth x TileHeight of them, one every Interval ms.
+// The smallest width at least as wide as the box is used. Nothing made for the episode: no pictures.
+const THUMB_WIDTH = 160;
+async function loadTrickplay(base, cfg, itemId, sourceId) {
+    let item;
+    try { item = await jfGet(base, `/Items/${encodeURIComponent(itemId)}?userId=${encodeURIComponent(cfg.userId || '')}&fields=Trickplay`, cfg.apiKey); } catch { return null; }
+    const sizes = Object.values(item?.Trickplay?.[sourceId] || Object.values(item?.Trickplay || {})[0] || {});
+    const info = sizes.sort((a, b) => a.Width - b.Width).find(x => x.Width >= THUMB_WIDTH) || sizes.at(-1);
+    if (!info?.Width || !info.Interval || !info.TileWidth || !info.TileHeight) return null;
+    const url = (tile) => `${base}/Videos/${encodeURIComponent(itemId)}/Trickplay/${info.Width}/${tile}.jpg?mediaSourceId=${encodeURIComponent(sourceId)}&ApiKey=${encodeURIComponent(cfg.apiKey)}`;
+    return { ...info, url };
+}
+
+function paintThumb(tp, el, time) {
+    if (!el) return;
+    const n = Math.min(Math.max(0, Math.floor((time * 1000) / tp.Interval)), Math.max(0, (tp.ThumbnailCount || Infinity) - 1));
+    const perTile = tp.TileWidth * tp.TileHeight;
+    const k = n % perTile;
+    const h = THUMB_WIDTH * tp.Height / tp.Width;
+    el.style.aspectRatio = `${tp.Width} / ${tp.Height}`;
+    el.style.backgroundImage = `url("${tp.url(Math.floor(n / perTile))}")`;
+    el.style.backgroundSize = `${tp.TileWidth * THUMB_WIDTH}px auto`;
+    el.style.backgroundPosition = `-${(k % tp.TileWidth) * THUMB_WIDTH}px -${Math.floor(k / tp.TileWidth) * h}px`;
+    el.hidden = false;
 }
 
 // ===== Stats for nerds =====

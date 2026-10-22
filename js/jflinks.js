@@ -1,5 +1,5 @@
 // @ts-check
-import { accountState, saveAccountState } from './accountstate.js';
+import { saveShared, syncShared } from './accountstate.js';
 
 // Jellyfin series linked to an AniList entry by hand, for shows the title rules cannot match (another
 // name, a second part filed as episodes 13–24 of season 1). Kept with the account (key "jflinks"),
@@ -8,6 +8,7 @@ import { accountState, saveAccountState } from './accountstate.js';
 // offset: Jellyfin episodes before the entry's first one (Jellyfin 13 = AniList 1 -> 12)
 const KEY = 'aniroll_jf_links';
 const ACCOUNT_KEY = 'jflinks';
+const UNSENT = 'aniroll_jf_links_unsent';
 
 export const linkKey = (series, season) => `${String(series || '').toLowerCase().replace(/\s*\(\d{4}\)\s*$/, '').replace(/[^a-z0-9]+/g, '')}|${season ?? 1}`;
 
@@ -19,11 +20,11 @@ export function links() {
     return readLocal();
 }
 
-// The account's links join the local ones once per page load (the account wins on a conflict)
+// Once per page load: the account's links, or both joined (this browser wins) while a change here has
+// not reached the account yet
 export async function syncLinks() {
-    const state = await accountState();
-    const remote = state[ACCOUNT_KEY] && typeof state[ACCOUNT_KEY] === 'object' ? state[ACCOUNT_KEY] : {};
-    const merged = { ...readLocal(), ...remote };
+    const clean = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : undefined);
+    const merged = await syncShared(ACCOUNT_KEY, UNSENT, readLocal(), clean, (remote, local) => ({ ...remote, ...local }));
     try { localStorage.setItem(KEY, JSON.stringify(merged)); } catch { /* this tab only */ }
     return merged;
 }
@@ -42,7 +43,7 @@ export function removeLink(key) {
 
 function save(all) {
     try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* not kept */ }
-    saveAccountState(ACCOUNT_KEY, all);
+    saveShared(ACCOUNT_KEY, UNSENT, all);
 }
 
 // The link made for this AniList entry, if any: { key, season, offset, seriesId }

@@ -126,6 +126,11 @@ http.createServer((req, res) => {
         if (/relationType\(version: 2\)/.test(text) && Array.isArray(v.ids)) {
             return send(res, 200, { data: { Page: { media: v.ids.filter(id => FRANCHISE[id]).map(id => FRANCHISE[id]) } } });
         }
+        // Whom someone follows (api/server.js followingOf): "me" and "guest" follow each other, "host" nobody
+        if (/following\(userId/.test(text)) {
+            const following = { 1: [{ id: 2, name: 'guest', avatar: { medium: 'https://s4.anilist.co/g.png' } }], 2: [{ id: 1, name: 'me', avatar: { medium: 'https://s4.anilist.co/a.png' } }] }[v.userId] || [];
+            return send(res, 200, { data: { Page: { pageInfo: { hasNextPage: false }, following } } });
+        }
         if (/Viewer/.test(text)) return viewer ? send(res, 200, { data: { Viewer: { ...viewer, avatar: { medium: 'https://s4.anilist.co/a.png' } } } }) : send(res, 400, { errors: [{ message: 'Unauthorized', status: 401 }] });
         if (/SaveMediaListEntry/.test(text)) {
             if (!viewer) return send(res, 400, { errors: [{ message: 'Unauthorized', status: 401 }] });

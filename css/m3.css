@@ -779,6 +779,10 @@
 }
 .calendar-friends img:first-child { margin-left: 0; }
 .calendar-friends em { font-style: normal; font-size: 0.68rem; font-weight: 600; margin-left: 3px; color: var(--md-on-surface-variant); }
+/* The month's cells are small: smaller faces, at most three */
+.calendar-cell .calendar-friends img { width: 14px; height: 14px; border-width: 1px; margin-left: -4px; }
+.calendar-cell .calendar-friends img:first-child { margin-left: 0; }
+.calendar-cell .calendar-friends em { font-size: 0.6rem; margin-left: 2px; }
 .calendar-friend-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .calendar-friend-chip {
     display: inline-flex;

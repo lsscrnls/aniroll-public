@@ -493,11 +493,11 @@ export async function render({ content, query: q }) {
                     if (showImages) {
                         return `<div class="calendar-entry-img ${classes}" data-open="${item.media?.id}" role="button" tabindex="0" title="${title} — ${epLabel(item)}" style="cursor:pointer">
                             <img src="${esc(item.media?.coverImage?.large || '')}" alt="" loading="lazy">
-                            <span>${title}</span>${ep}
+                            <span>${title}</span>${friendFaces(item)}${ep}
                         </div>`;
                     }
                     return `<div class="calendar-entry ${classes}" data-open="${item.media?.id}" role="button" tabindex="0" title="${title} — ${epLabel(item)}">
-                        <span class="calendar-entry-title">${title}</span>${ep}
+                        <span class="calendar-entry-title">${title}</span>${friendFaces(item)}${ep}
                     </div>`;
                 }).join('')}
                 ${entries.length > 8 ? `<button type="button" class="calendar-more" data-week="${day.getTime()}">+${entries.length - 8} more</button>` : ''}
@@ -608,8 +608,19 @@ function downloadIcs(items) {
     if (!list.length) return toast('Nothing in this view to add', 'error');
     const stamp = (sec) => new Date(sec * 1000).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
     const text = (v) => String(v || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-    // Lines longer than 75 octets are folded, as the format asks
-    const fold = (line) => line.length <= 74 ? line : line.match(/.{1,74}/g).join('\r\n ');
+    // Lines of at most 75 bytes (RFC 5545; a continuation's leading space counts), cut between characters
+    const utf8 = new TextEncoder();
+    const fold = (line) => {
+        const out = [];
+        let cur = '', bytes = 0, max = 75;
+        for (const ch of line) {
+            const b = utf8.encode(ch).length;
+            if (bytes + b > max) { out.push(cur); cur = ''; bytes = 0; max = 74; }
+            cur += ch; bytes += b;
+        }
+        out.push(cur);
+        return out.join('\r\n ');
+    };
     const now = stamp(Math.floor(Date.now() / 1000));
     const events = list.map(a => {
         const minutes = a.media.duration || 24;

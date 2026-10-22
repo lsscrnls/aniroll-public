@@ -446,6 +446,29 @@ async function anilist(query, variables, userId = null) {
     return body; // { data, errors } — a 404 error just means "no list entry"
 }
 
+// ===== Whom a viewer follows (for "/api/calendar/shared" and "/api/friends/live") =====
+// Read anonymously from AniList, from the server's own budget, kept FOLLOWING_KEEP_MS per viewer:
+// Map(id -> { name, avatar })
+const FOLLOWING_KEEP_MS = 15 * 60 * 1000;
+const followingCache = new Map(); // viewerId -> { at, users }
+const FOLLOWING_QUERY = `query ($userId: Int!, $page: Int) {
+    Page(page: $page, perPage: 50) { pageInfo { hasNextPage } following(userId: $userId) { id name avatar { medium } } }
+}`;
+async function followingOf(viewerId) {
+    const hit = followingCache.get(viewerId);
+    if (hit && Date.now() - hit.at < FOLLOWING_KEEP_MS) return hit.users;
+    const users = new Map();
+    for (let page = 1; page <= 4; page++) {
+        const body = await anilist(FOLLOWING_QUERY, { userId: viewerId, page });
+        const p = body?.data?.Page;
+        for (const u of p?.following || []) users.set(u.id, { name: str(u.name, 40), avatar: str(u.avatar?.medium, 300) });
+        if (!p?.pageInfo?.hasNextPage) break;
+    }
+    followingCache.set(viewerId, { at: Date.now(), users });
+    if (followingCache.size > 500) followingCache.delete(followingCache.keys().next().value);
+    return users;
+}
+
 // ===== Anime DNA to try on the landing page, without logging in =====
 // The server reads the list (one AniList request, from its own budget), the browser draws the DNA (js/dna.js).
 // Each visitor gets DNA_TRIES per DNA_KEEP_MS. Only a keyed hash of the address is kept, and only that long:
@@ -1772,15 +1795,37 @@ async function handle(req, res) {
         return json(res, 200, { chrome: await chromeStoreVersion() });
     }
 
-    // Which of the given accounts share their calendar (account state "calshare", off unless they turn it on):
+    // Which of the given accounts, among those the viewer follows, share their calendar (account state "calshare", off unless they turn it on):
     // the calendar shows only their shows. The lists themselves come from AniList
     if (pathname === '/api/calendar/shared' && req.method === 'GET') {
         const auth = await verifyViewer(req);
         if (auth.status !== 'ok') return refuseAuth(res, auth);
         const ids = String(new URL(req.url, 'http://x').searchParams.get('ids') || '').split(',').map(Number)
             .filter(n => Number.isInteger(n) && n > 0).slice(0, 200);
+        // Only for accounts the viewer follows: anyone else's choice is none of their business
+        let follows;
+        try { follows = await followingOf(auth.viewer.id); } catch { return json(res, 503, { error: 'AniList isn’t answering right now' }); }
         const all = readJson(USER_STATE_FILE);
-        return json(res, 200, { ids: ids.filter(id => all[String(id)]?.calshare === true) });
+        return json(res, 200, { ids: ids.filter(id => follows.has(id) && all[String(id)]?.calshare === true) });
+    }
+
+    // Who of the people the viewer follows is watching right now (account state "liveshare", off unless they
+    // turn it on). Only a show matched to AniList and its episode, never a file name or a device
+    if (pathname === '/api/friends/live' && req.method === 'GET') {
+        const auth = await verifyViewer(req);
+        if (auth.status !== 'ok') return refuseAuth(res, auth);
+        let follows;
+        try { follows = await followingOf(auth.viewer.id); } catch { return json(res, 503, { error: 'AniList isn’t answering right now' }); }
+        const all = readJson(USER_STATE_FILE);
+        const live = [];
+        for (const [id, who] of follows) {
+            if (all[String(id)]?.liveshare !== true || !nowPlaying.has(id)) continue;
+            const s = [...userSessions(id).values()].filter(x => !x.stoppedAt && x.match?.mediaId).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+            if (!s) continue;
+            live.push({ userId: id, name: who.name, avatar: who.avatar, mediaId: s.match.mediaId, title: s.match.title, cover: s.match.cover,
+                episode: s.type === 'Movie' ? null : s.episode ?? null, paused: !!s.paused });
+        }
+        return json(res, 200, { live });
     }
 
     if (pathname === '/api/maintenance' && req.method === 'GET') {

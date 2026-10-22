@@ -1,9 +1,17 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.5.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.6.
 
-## 22 October 2026 – When AniList is down, and watch orders
+## 22 October 2026 – Live now, Undo, and double tap in the player
 
+- **Live now** on Social: see which of the people you follow are watching something right now, and what. Only for those who turn on *Show when I'm watching* in Settings; it's off unless you do.
+- In the player on a phone, double tap the left or right side to go back or forward 10 seconds (tap again for more), the middle for fullscreen. Moving along the bar shows preview pictures when Jellyfin has made them.
+- Press **?** to see the keyboard shortcuts, in the player too.
+- Calendar → Friends shows their faces in the month view as well.
+- Removing a show from your list or deleting a post or reply no longer asks first: it goes at once, and **Undo** brings it back for a few seconds.
+- On several devices: a short hiccup reaching AniRoll's server can no longer replace what another device saved, and "Not interested" picks and Jellyfin links you remove now stay removed everywhere.
+- Whether you share your calendar is now only visible to people who follow you.
+- Calendar files follow the format exactly now, so long titles in Japanese or with emoji no longer trip up strict calendar apps.
 - Shows with several seasons now have a **Watch order** on their page: in the order they came out and, where it differs, in the order the story goes, with prequels made later first.
 - If AniList doesn't answer, a show you haven't opened before still opens, with its basics from TMDB, and search finds anime there too. Once AniList is back, its own details come back by themselves.
 - Posts, replies, likes, follows and list changes made while AniList is down are kept and sent once it's back, like changes made offline.

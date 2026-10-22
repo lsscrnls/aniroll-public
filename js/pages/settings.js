@@ -67,6 +67,9 @@ export async function render({ content, query }) {
             ${isLoggedIn() ? card('Share my calendar', 'Off unless you turn it on', `
                 <label class="settings-choice"><input type="checkbox" id="toggle-calshare">
                     <span>People who follow you see what you are watching in their calendar (Calendar → Friends)</span></label>`) : ''}
+            ${isLoggedIn() ? card('Show when I\'m watching', 'Off unless you turn it on', `
+                <label class="settings-choice"><input type="checkbox" id="toggle-liveshare">
+                    <span>While you watch in AniRoll or Jellyfin, people who follow you see the show and episode under Live now on Social</span></label>`) : ''}
             ${card('MAL Import', 'Import your MyAnimeList export to AniList', `
                 <div class="settings-choices">
                     <label class="glass-btn glass-btn-primary glass-btn-sm" style="cursor:pointer">
@@ -179,18 +182,23 @@ export async function render({ content, query }) {
         });
     });
 
-    // Kept on the server with the account: a friend's calendar asks whether you share yours
-    const calshare = document.getElementById('toggle-calshare');
-    if (calshare) {
-        // A click before the answer came wins over the stored value
+    // Kept on the server with the account: a friend's calendar asks whether you share yours, Social whether
+    // you show what you are watching. A click before the answer came wins over the stored value
+    const accountSwitch = (id, key, on, off) => {
+        const box = document.getElementById(id);
+        if (!box) return;
         let touched = false;
-        accountState().then(state => { if (!touched) calshare.checked = state.calshare === true; });
-        calshare.addEventListener('change', () => {
+        accountState().then(state => { if (!touched) box.checked = state[key] === true; });
+        box.addEventListener('change', async () => {
             touched = true;
-            saveAccountState('calshare', calshare.checked);
-            toast(calshare.checked ? 'Your calendar is shared with the people who follow you' : 'Your calendar is no longer shared', 'success');
+            const want = box.checked;
+            if (await saveAccountState(key, want)) return toast(want ? on : off, 'success');
+            box.checked = !want;
+            toast('AniRoll\'s server isn\'t answering, try again in a moment', 'error');
         });
-    }
+    };
+    accountSwitch('toggle-calshare', 'calshare', 'Your calendar is shared with the people who follow you', 'Your calendar is no longer shared');
+    accountSwitch('toggle-liveshare', 'liveshare', 'People who follow you see what you are watching', 'What you watch is no longer shown');
 
     document.getElementById('toggle-friends-status')?.addEventListener('change', (e) => {
         localStorage.setItem('aniroll_friends_status', e.target.checked ? 'on' : 'off');

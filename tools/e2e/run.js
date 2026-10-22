@@ -94,6 +94,8 @@ function staticServer() {
     await page.route(`${base}/api/**`, route => {
         const p = new URL(route.request().url()).pathname;
         if (p === '/api/maintenance') return route.fulfill({ contentType: 'application/json', body: '{"maintenance":false}' });
+        // The account's values (js/accountstate.js): nothing kept yet; writes need a read that worked
+        if (p === '/api/me/state') return route.fulfill({ contentType: 'application/json', body: route.request().method() === 'GET' ? '{"state":{}}' : '{"ok":true}' });
         route.fulfill({ status: 404, contentType: 'application/json', body: '{"configured":false,"active":false}' });
     });
     await page.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
@@ -328,6 +330,25 @@ function staticServer() {
         await page.keyboard.press('Enter');
         await settle(800);
         check('My List entry opens with Enter', await panelOpen());
+
+        // Remove from list: the panel offers "Add to list" at once, "Undo" brings the entry back, AniList
+        // deletes only once the note is gone (js/store.js undoable)
+        const inPanel = () => page.evaluate(() => ({ add: !!document.querySelector('#detail-panel-overlay #add-to-list'), status: !!document.querySelector('#detail-panel-overlay #status-select') }));
+        const remove = () => page.evaluate(() => { const s = document.querySelector('#detail-panel-overlay #status-select'); if (!s) return false; s.value = 'REMOVE'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; });
+        const beforeRemove = mutations.length;
+        const removable = await remove();
+        await settle(400);
+        const goneAtOnce = await inPanel();
+        await page.locator('.toast-action', { hasText: 'Undo' }).last().click().catch(() => {});
+        await settle(400);
+        const backAfterUndo = await inPanel();
+        await page.waitForTimeout(6500);
+        const keptAfterUndo = !mutations.slice(beforeRemove).includes('DeleteMediaListEntry');
+        await remove();
+        await page.waitForTimeout(6500);
+        const deletedLater = mutations.slice(beforeRemove).includes('DeleteMediaListEntry');
+        check('detail: Remove from list with Undo instead of asking', removable && goneAtOnce.add && !goneAtOnce.status && backAfterUndo.status && keptAfterUndo && deletedLater,
+            { removable, goneAtOnce, backAfterUndo, keptAfterUndo, deletedLater });
         await closePanel();
     }
 
@@ -431,26 +452,28 @@ function staticServer() {
     check('social: one person\'s updates in a row become one post with a row per show, each with its own like',
         grouped?.user === 'binger' && grouped.rows === 2 && grouped.likes === 2 && /^2 updates|^Watched 2|^Read 2/.test(grouped.summary || '') && grouped.labels.every(Boolean), grouped);
 
-    // Your own posts and replies have a bin: asked first, then gone from the page and from AniList
+    // Your own posts and replies have a bin: gone from the page at once, "Undo" brings them back, AniList
+    // deletes them only once the note is gone (js/store.js undoable)
     const ownBins = await page.evaluate(() => ({ posts: document.querySelectorAll('.activity-delete').length, replies: document.querySelectorAll('.activity-reply-delete').length,
         cards: document.querySelectorAll('.activity-card').length }));
     const beforeDelete = mutations.length;
     // (the last bin: the first one's post holds the replies opened above)
     await page.locator('.activity-delete').last().click().catch(() => {});
-    await page.waitForSelector('#modal-confirm', { timeout: 3000 }).catch(() => {});
-    await page.click('#modal-cancel').catch(() => {});
-    const keptAfterCancel = mutations.length === beforeDelete;
+    const goneAtOnce = await page.evaluate(() => document.querySelectorAll('.activity-card').length);
+    await page.locator('.toast-action', { hasText: 'Undo' }).last().click().catch(() => {});
+    const backAfterUndo = await page.evaluate(() => document.querySelectorAll('.activity-card').length);
+    await page.waitForTimeout(6500);
+    const keptAfterUndo = mutations.length === beforeDelete;
     await page.locator('.activity-delete').last().click().catch(() => {});
-    await page.click('#modal-confirm').catch(() => {});
-    await page.waitForFunction((n) => document.querySelectorAll('.activity-card').length < n, ownBins.cards, { timeout: 3000 }).catch(() => {});
     await page.click('.activity-reply-delete').catch(() => {});
-    await page.click('#modal-confirm').catch(() => {});
-    await settle(600);
+    const askedLater = mutations.length === beforeDelete;
+    await page.waitForTimeout(6500);
     const afterDelete = await page.evaluate(() => ({ cards: document.querySelectorAll('.activity-card').length, replies: document.querySelectorAll('.activity-reply-delete').length }));
     const deleted = mutations.slice(beforeDelete);
-    check('social: own posts and replies can be deleted, after asking (Cancel keeps them)',
-        ownBins.posts >= 1 && ownBins.replies >= 1 && keptAfterCancel && deleted.includes('DeleteActivity') && deleted.includes('DeleteActivityReply')
-        && afterDelete.cards === ownBins.cards - 1 && afterDelete.replies === ownBins.replies - 1, { ownBins, keptAfterCancel, deleted, afterDelete });
+    check('social: own posts and replies can be deleted, with Undo instead of asking',
+        ownBins.posts >= 1 && ownBins.replies >= 1 && goneAtOnce === ownBins.cards - 1 && backAfterUndo === ownBins.cards && keptAfterUndo && askedLater
+        && deleted.includes('DeleteActivity') && deleted.includes('DeleteActivityReply')
+        && afterDelete.cards === ownBins.cards - 1 && afterDelete.replies === ownBins.replies - 1, { ownBins, goneAtOnce, backAfterUndo, keptAfterUndo, askedLater, deleted, afterDelete });
 
     // Follow from someone's profile
     await go('#/user/someone');
@@ -578,6 +601,15 @@ function staticServer() {
         sharedAsked.split(',').length >= 2 && friendsCal.chips === 2 && friendsCal.items > 0 && friendsCal.faces === friendsCal.items, { sharedAsked, ...friendsCal });
     await page.click('.calendar-friend-chip[data-friend]:not([data-friend=""])');
     check('calendar Friends: a chip picks that person', await page.$eval('.calendar-friend-chip.active', b => b.dataset.friend !== ''));
+    // The month shows the faces too, small, in the day cells
+    await page.click('[data-view="month"]').catch(() => {});
+    await settle(400);
+    const monthFaces = await page.evaluate(() => ({ faces: document.querySelectorAll('.calendar-cell .calendar-friends img').length,
+        entries: document.querySelectorAll('.calendar-cell .calendar-entry, .calendar-cell .calendar-entry-img').length,
+        size: document.querySelector('.calendar-cell .calendar-friends img')?.getBoundingClientRect().width }));
+    check('calendar Friends: the month view shows small faces on the shows too', monthFaces.entries > 0 && monthFaces.faces > 0 && monthFaces.size <= 15, monthFaces);
+    await page.click('[data-view="week"]').catch(() => {});
+    await settle(300);
     await page.unroute('https://graphql.anilist.co/**', friendsList);
     await page.unroute(`${base}/api/calendar/shared*`, sharedRoute);
     // Sharing is off until turned on, and kept with the account
@@ -587,6 +619,36 @@ function staticServer() {
     await page.click('#toggle-calshare');
     const shareBody = (await sharePut)?.postDataJSON();
     check('settings: sharing the calendar starts off and is saved with the account', shareOff === true && shareBody?.key === 'calshare' && shareBody.value === true, { shareOff, shareBody });
+    // Showing what you watch: off until turned on, kept with the account
+    const liveOff = await page.$eval('#toggle-liveshare', b => !b.checked).catch(() => null);
+    const livePut = page.waitForRequest(r => r.method() === 'PUT' && r.url().endsWith('/api/me/state'), { timeout: 3000 }).catch(() => null);
+    await page.click('#toggle-liveshare');
+    const liveBody = (await livePut)?.postDataJSON();
+    check('settings: showing what you watch starts off and is saved with the account', liveOff === true && liveBody?.key === 'liveshare' && liveBody.value === true, { liveOff, liveBody });
+
+    // Social → Live now: who you follow is watching right now, a tap opens the show
+    const liveRoute = route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ live: [
+        { userId: 7, name: 'friendly', avatar: '', mediaId: 102, title: 'Show 2', cover: '', episode: 4, paused: false }] }) });
+    await page.route(`${base}/api/friends/live`, liveRoute);
+    await go('#/social');
+    await page.waitForSelector('.social-live-item', { timeout: 4000 }).catch(() => {});
+    const liveNow = await page.evaluate(() => ({ shown: !document.getElementById('social-live')?.hidden, text: document.querySelector('.social-live-item')?.textContent.replace(/\s+/g, ' ').trim(),
+        open: document.querySelector('.social-live-item')?.dataset.open }));
+    await page.click('.social-live-item').catch(() => {});
+    await settle(600);
+    check('social: Live now shows who is watching what, a tap opens the show', liveNow.shown && /friendly/.test(liveNow.text || '') && /Show 2 · E4/.test(liveNow.text || '') && liveNow.open === '102' && await panelOpen(), liveNow);
+    await closePanel();
+    await page.unroute(`${base}/api/friends/live`, liveRoute);
+
+    // "?" shows the keys (not while typing), Escape closes it
+    await page.keyboard.press('?');
+    await settle(300);
+    const keys = await page.evaluate(() => ({ title: document.querySelector('#modal-container .modal-title')?.textContent, rows: document.querySelectorAll('.keyhelp-row').length,
+        player: [...document.querySelectorAll('.keyhelp-head')].some(h => h.textContent === 'Player') }));
+    await page.keyboard.press('Escape');
+    await settle(300);
+    const keysClosed = await page.evaluate(() => document.getElementById('modal-container')?.hidden);
+    check('keys: ? lists the shortcuts (no player ones outside the player), Escape closes', keys.title === 'Keyboard shortcuts' && keys.rows >= 4 && !keys.player && keysClosed, { ...keys, keysClosed });
 
     // Profile: where your scores and AniList's differ most
     // The test account carries no statistics: give the cached one some, as AniList's Viewer would
@@ -899,8 +961,8 @@ function staticServer() {
     };
 
     // Jellyfin player. A page logged in to AniList and to Jellyfin (a friend's sign-in, not an API key)
-    async function playerPage(jellyfinUp, signedIn = true, jfMock = {}) {
-        const p = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    async function playerPage(jellyfinUp, signedIn = true, jfMock = {}, pageOpts = {}) {
+        const p = await browser.newPage({ viewport: { width: 1280, height: 800 }, ...pageOpts });
         const pageErrors = [];
         p.on('pageerror', e => pageErrors.push(e.message));
         p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) pageErrors.push(m.text()); });
@@ -1152,6 +1214,48 @@ function staticServer() {
             && asked.body.media === 101 && asked.body.episode === 3 && asked.body.at >= 1 && asked.auth === 'Bearer e2e-token'
             && !('audio' in asked.body) && /Recognized/i.test(card.text) && /buddy/.test(card.text) && card.links.join() === 'Shazam,YouTube Music'
             && !pageErrors.length, { listeningNow, asked: asked && { ...asked.body, uri: asked.body.uri?.slice(0, 50) }, card, pageErrors });
+        await p.close();
+    }
+
+    // A finger on the picture: a double tap on the right goes 10 s forward, on the left back (a further quick
+    // tap 10 s more), in the middle fullscreen; none of them pauses or plays
+    {
+        const { p, pageErrors } = await playerPage(true, true, {}, { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
+        await p.goto(base + '/#/play/101/3');
+        await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2 && v.duration > 15; }, null, { timeout: 10000 }).catch(() => {});
+        // (episode 3 asks where to go on first)
+        await p.click('[data-resume="continue"]', { timeout: 3000 }).catch(() => {});
+        await p.waitForTimeout(300);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.pause(); v.currentTime = 2; });
+        const box = await p.$eval('#player-video', v => { const r = v.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+        // Taps dispatched in the page, back to back: under load, taps sent one by one from here can arrive
+        // further apart than a person's double tap
+        const taps = async (at, n) => {
+            await p.evaluate(({ at, n }) => {
+                const v = document.getElementById('player-video');
+                const r = v.getBoundingClientRect();
+                const pos = { clientX: r.x + r.width * at, clientY: r.y + r.height / 2, bubbles: true };
+                for (let i = 0; i < n; i++) {
+                    v.dispatchEvent(new PointerEvent('pointerup', { ...pos, pointerType: 'touch' }));
+                    v.dispatchEvent(new MouseEvent('click', pos));
+                }
+            }, { at, n });
+            await p.waitForTimeout(500);
+        };
+        const doubleTap = (at) => taps(at, 2);
+        const state = () => p.evaluate(() => ({ t: Math.round(document.getElementById('player-video').currentTime), paused: document.getElementById('player-video').paused,
+            osd: document.querySelector('.pl-osd:not([hidden])')?.textContent || '', full: !!document.fullscreenElement }));
+        await doubleTap(0.85);
+        const fwd = await state();
+        await doubleTap(0.15);
+        const back = await state();
+        await p.evaluate(() => { document.getElementById('player-video').currentTime = 15; });
+        await p.waitForTimeout(400);
+        await taps(0.15, 3);
+        const more = await state();
+        check('player: double tap with a finger, right +10 s, left −10 s, a third tap 10 s more, without pausing or playing',
+            fwd.t === 12 && /\+10 s/.test(fwd.osd) && back.t === 2 && /−10 s/.test(back.osd) && more.t === 0 && /−20 s/.test(more.osd)
+            && fwd.paused && back.paused && more.paused && !pageErrors.length, { fwd, back, more, pageErrors });
         await p.close();
     }
     }, async () => {
@@ -1742,6 +1846,9 @@ function staticServer() {
         const chap = await p.evaluate(() => ({ marks: document.querySelectorAll('.pl-seek-chapter').length,
             left: document.querySelector('.pl-seek-chapter')?.style.left, label: document.querySelector('.pl-seek-hover-seg')?.textContent }));
         check('player: chapters from the file as marks on the wave, the name when hovering', chap.marks === 1 && /^7[45]/.test(chap.left || '') && chap.label === 'Part B', chap);
+        // Jellyfin's trickplay pictures over the wave: the 320 px set, picture 2 of the first tile at 17 s
+        const thumb = await p.evaluate(() => { const t = document.querySelector('.pl-seek-thumb'); return { hidden: t?.hidden, bg: t?.style.backgroundImage, pos: t?.style.backgroundPosition, size: t?.style.backgroundSize }; });
+        check('player: preview pictures from Jellyfin over the wave', !thumb.hidden && /\/Trickplay\/320\/0\.jpg\?mediaSourceId=/.test(thumb.bg || '') && thumb.pos === '-160px 0px' && thumb.size === '1600px auto', thumb);
 
         // Keys: volume shows its number, ] speeds up, 5 jumps to half
         await p.mouse.move(640, 300);

@@ -348,7 +348,32 @@ export function clearCache(pattern) {
     idbDeleteMatching(pattern);
 }
 
+// Test switch for the outage path: ?anilist=off makes this browser treat AniList as down until
+// ?anilist=on (or a tap on the badge). Only this browser, nothing changes on the server.
+const ANILIST_OFF_KEY = 'aniroll_anilist_off';
+const aniListOff = (() => {
+    try {
+        const p = new URLSearchParams(location.search).get('anilist');
+        if (p === 'off') localStorage.setItem(ANILIST_OFF_KEY, '1');
+        if (p === 'on') localStorage.removeItem(ANILIST_OFF_KEY);
+        if (p) history.replaceState(null, '', location.pathname + location.hash);
+        return localStorage.getItem(ANILIST_OFF_KEY) === '1';
+    } catch { return false; }
+})();
+if (aniListOff) {
+    const badge = () => {
+        const b = document.createElement('button');
+        b.textContent = 'AniList off (test) ✕';
+        b.title = 'Turn AniList back on';
+        b.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;padding:6px 10px;border:0;border-radius:8px;background:#c0392b;color:#fff;font:600 12px system-ui';
+        b.onclick = () => { try { localStorage.removeItem(ANILIST_OFF_KEY); } catch {} location.reload(); };
+        document.body.appendChild(b);
+    };
+    if (document.body) badge(); else addEventListener('DOMContentLoaded', badge);
+}
+
 async function query(q, variables = {}, token = null) {
+    if (aniListOff) throw Object.assign(new Error('AniList isn’t answering right now'), { unavailable: true });
     if (isRateLimited()) throw rateLimitError();
     await takeRequestSlot();
 

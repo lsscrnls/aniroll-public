@@ -1,7 +1,7 @@
 import * as api from '../api.js';
 import { enhanceSelect } from '../select.js';
 import { tasteMatch } from '../taste.js';
-import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js';
+import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, LIST_EVENT, undoable, statusLabel, scoreInputHtml, fmtScore, emitWatched } from '../store.js';
 import { getToken, isLoggedIn } from '../auth.js';
 import { getActiveParty, startParty, createPartyLink } from './watchparty.js';
 import { showConfirm } from '../a11y.js';
@@ -618,21 +618,26 @@ function setupListActions(media, token, root = document) {
         saveScore(scoreRaw);
     });
 
-    async function removeEntry() {
-        const ok = await showConfirm({
-            title: 'Remove from List',
-            message: `Remove "${titlePref(media.title)}" from your list?`,
-            confirmText: 'Remove',
-            danger: true
+    // Gone from the page at once; AniList deletes it once "Undo" is gone. Added again in the meantime
+    // (here or anywhere else): nothing is deleted
+    function removeEntry() {
+        const removed = entry;
+        const back = { mediaId: media.id, status: removed.status, progress: removed.progress };
+        emitListChange({ mediaId: media.id, removed: true });
+        refreshActions(null);
+        const onChange = (ev) => { if (ev.detail?.mediaId === media.id && !ev.detail.removed) pending.cancel(); };
+        const pending = undoable('Removed from list', {
+            run: async () => {
+                removeEventListener(LIST_EVENT, onChange);
+                try { await api.deleteMediaListEntry(removed.id, token); } catch (e) { toast(e.message, 'error'); emitListChange(back); }
+            },
+            undo: () => {
+                removeEventListener(LIST_EVENT, onChange);
+                emitListChange(back);
+                if (root.isConnected && !entry) refreshActions(removed);
+            },
         });
-        // Cancelled: the row is drawn again, so the menu shows the real status instead of "Remove from list"
-        if (!ok) return refreshActions(entry);
-        try {
-            await api.deleteMediaListEntry(entry.id, token);
-            toast('Removed from list', 'success');
-            emitListChange({ mediaId: media.id, removed: true });
-            refreshActions(null);
-        } catch (e) { toast(e.message, 'error'); refreshActions(entry); }
+        addEventListener(LIST_EVENT, onChange);
     }
 
     q('#start-watchparty')?.addEventListener('click', async () => {

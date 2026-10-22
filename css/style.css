@@ -6437,3 +6437,23 @@ h1[tabindex="-1"]:focus { outline: none; }
 @media (max-width: 600px) {
     .um-menu { width: calc(100vw - 24px); max-height: calc(100dvh - 160px); overflow-y: auto; }
 }
+
+/* ===== "?": the keyboard shortcuts (js/keyhelp.js) ===== */
+.keyhelp-head { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-tertiary); margin: var(--space-md) 0 6px; }
+.keyhelp-row { display: flex; align-items: baseline; gap: 12px; padding: 4px 0; font-size: 0.88rem; color: var(--text-secondary); }
+.keyhelp-keys { flex: 0 0 120px; display: flex; gap: 4px; flex-wrap: wrap; color: var(--text-tertiary); }
+.keyhelp kbd { min-width: 22px; padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 6px;
+    font-family: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1.5; text-align: center; color: var(--text-primary); background: var(--surface-hover); }
+
+/* ===== Social → Live now: who you follow is watching right now ===== */
+.social-live { margin-bottom: var(--space-lg); }
+.social-live-title { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px; }
+.social-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 0 var(--danger); animation: social-live-pulse 2s ease-out infinite; }
+@keyframes social-live-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 60%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+@media (prefers-reduced-motion: reduce) { .social-live-dot { animation: none; } }
+.social-live-row { display: flex; gap: var(--space-sm); overflow-x: auto; padding-bottom: 4px; }
+.social-live-item { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; max-width: 320px; padding: 8px 10px; border-radius: var(--radius-md); background: var(--surface-hover); cursor: pointer; }
+.social-live-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.social-live-text { display: flex; flex-direction: column; min-width: 0; font-size: 0.85rem; }
+.social-live-text span { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.social-live-cover { width: 28px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }

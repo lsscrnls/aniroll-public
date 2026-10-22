@@ -1,7 +1,6 @@
 import * as api from '../api.js';
-import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON } from '../store.js';
+import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON, undoable } from '../store.js';
 import { getToken, isLoggedIn } from '../auth.js';
-import { showConfirm } from '../a11y.js';
 import { matchDna } from '../dna.js';
 import { freshMatch, keepMatch } from '../dnamatches.js';
 
@@ -21,11 +20,14 @@ export async function render({ content }) {
             <button class="tab-btn" id="tab-global">Global</button>
             <button class="tab-btn" id="tab-friends">Friends</button>
         </div>
+        <div id="social-live" class="social-live" hidden></div>
         <div id="social-content"></div>
         <div id="load-more-social" style="text-align:center;margin-top:var(--space-xl)" hidden>
             <button class="glass-btn glass-btn-secondary" id="more-activity-btn">Load More</button>
         </div>
     </div>`;
+
+    watchLive(token);
 
     let currentPage = 1;
     // Per person and show, which viewing the next older post belongs to (kept across "Load More")
@@ -450,39 +452,61 @@ export function renderReply(r) {
     </div>`;
 }
 
-// Deletes your post or reply after asking; it goes from the page at once, and a reply's count goes down
-async function removePost(btn, token) {
+// "Live now": the people you follow who are watching something right now and show it (their own choice,
+// api/server.js "/api/friends/live"). Asked again every minute while the page is open and in view.
+function watchLive(token) {
+    const box = document.getElementById('social-live');
+    const paint = (live) => {
+        box.hidden = !live.length;
+        box.innerHTML = live.length ? `<div class="social-live-title"><span class="social-live-dot" aria-hidden="true"></span>Live now</div>
+            <div class="social-live-row">${live.map(l => `<div class="social-live-item" data-open="${Number(l.mediaId)}" role="button" tabindex="0"
+                title="${esc(l.name)} is watching ${esc(l.title || '')}${l.episode ? `, episode ${Number(l.episode)}` : ''}${l.paused ? ' (paused)' : ''}">
+                <img class="social-live-avatar" src="${esc(l.avatar || '')}" alt="" loading="lazy">
+                <span class="social-live-text"><strong>${esc(l.name)}</strong><span>${esc(l.title || '')}${l.episode ? ` · E${Number(l.episode)}` : ''}${l.paused ? ' · paused' : ''}</span></span>
+                ${l.cover ? `<img class="social-live-cover" src="${esc(l.cover)}" alt="" loading="lazy">` : ''}
+            </div>`).join('')}</div>` : '';
+    };
+    const ask = async () => {
+        if (!box.isConnected) return clearInterval(timer);
+        if (document.hidden) return;
+        try {
+            const res = await fetch('/api/friends/live', { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) });
+            if (res.ok) paint((await res.json()).live || []);
+        } catch { /* the last answer stays */ }
+    };
+    const timer = setInterval(ask, 60000);
+    ask();
+}
+
+// Deletes your post or reply: it goes from the page at once, AniList deletes it once "Undo" is gone,
+// and a reply's count goes down
+function removePost(btn, token) {
     const reply = btn.classList.contains('activity-reply-delete');
-    const ok = await showConfirm({
-        title: reply ? 'Delete reply' : btn.dataset.id.includes(',') ? 'Delete posts' : 'Delete post',
-        message: reply ? 'Delete this reply? It is removed on AniList too.'
-            : btn.dataset.id.includes(',') ? `Delete these ${btn.dataset.id.split(',').length} posts? They are removed on AniList too, with their likes and replies.`
-            : 'Delete this post? It is removed on AniList too, with its likes and replies.',
-        confirmText: 'Delete',
-        danger: true,
+    const ids = btn.dataset.id.split(',').map(Number);
+    // A binge card stands for several posts: all of them go
+    const el = reply ? btn.closest('.activity-reply') : btn.closest('.activity-card');
+    const group = reply ? null : btn.closest('.activity-group');
+    const count = reply ? btn.closest('.activity-card')?.querySelector('.reply-toggle .reply-count') : null;
+    if (!el) return;
+    const parent = el.parentNode, next = el.nextSibling;
+    const groupParent = group?.parentNode, groupNext = group?.nextSibling;
+    el.remove();
+    if (group && !group.querySelector('.activity-row')) group.remove();
+    if (count) count.textContent = String(Math.max(0, Number(count.textContent) - 1));
+    const putBack = () => {
+        if (group && !group.isConnected) groupParent?.insertBefore(group, groupNext);
+        parent?.insertBefore(el, next);
+        if (count) count.textContent = String(Number(count.textContent) + 1);
+    };
+    undoable(reply ? 'Reply deleted' : ids.length > 1 ? 'Posts deleted' : 'Post deleted', {
+        run: async () => {
+            try {
+                if (reply) await api.deleteActivityReply(ids[0], token);
+                else for (const id of ids) await api.deleteActivity(id, token);
+            } catch (e) { putBack(); toast(e.message, 'error'); }
+        },
+        undo: putBack,
     });
-    if (!ok) return;
-    btn.disabled = true;
-    try {
-        const ids = btn.dataset.id.split(',').map(Number);
-        if (reply) {
-            await api.deleteActivityReply(ids[0], token);
-            const card = btn.closest('.activity-card');
-            btn.closest('.activity-reply')?.remove();
-            const count = card?.querySelector('.reply-toggle .reply-count');
-            if (count) count.textContent = String(Math.max(0, Number(count.textContent) - 1));
-        } else {
-            // A binge card stands for several posts: all of them go
-            for (const id of ids) await api.deleteActivity(id, token);
-            const group = btn.closest('.activity-group');
-            btn.closest('.activity-card')?.remove();
-            if (group && !group.querySelector('.activity-row')) group.remove();
-        }
-        toast(reply ? 'Reply deleted' : ids.length > 1 ? 'Posts deleted' : 'Post deleted');
-    } catch (e) {
-        btn.disabled = false;
-        toast(e.message, 'error');
-    }
 }
 
 // "Reply" on a reply: starts the answer with @name, so AniList notifies that person too
