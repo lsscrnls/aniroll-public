@@ -6,6 +6,7 @@ import * as api from './api.js';
 import { initAnimations, refreshAnimations, stopLenis, startLenis } from './animations.js';
 import { openDialog, initActivation, addDialogStep } from './a11y.js';
 import { initBackNav } from './backnav.js';
+import { initKeyHelp } from './keyhelp.js';
 import { noteVisitor, maybeShowMoveNotice, openChangelog, renderChangelog, hasUnread } from './whatsnew.js';
 import { refreshPendingStatus, refreshJellyfinStatus } from './status.js';
 import { applyDesign } from './design.js';
@@ -81,6 +82,7 @@ async function init() {
     startPresence();
     // Before the router: the first page is where going back stops
     initBackNav();
+    initKeyHelp();
     startRouter();
     watchForUpdate(BUILD);
     if (isLoggedIn() && dataNoteDue()) {

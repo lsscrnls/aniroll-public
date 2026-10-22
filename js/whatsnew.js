@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.5';
+export const RELEASE = '1.9.6';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -20,9 +20,17 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // app before, shown until `notifyUntil`; the changelog keeps every entry.
 const CHANGES = [
     {
-        id: '2026-10-22.2',
-        title: 'When AniList is down, and watch orders',
+        id: '2026-10-22.3',
+        title: 'Live now, Undo, and double tap in the player',
         items: [
+            { rev: 3, text: '<strong>Live now</strong> on Social: see which of the people you follow are watching something right now, and what. Only for those who turn on <em>Show when I\'m watching</em> in Settings; it\'s off unless you do.' },
+            { rev: 3, text: 'In the player on a phone, double tap the left or right side to go back or forward 10 seconds (tap again for more), the middle for fullscreen. Moving along the bar shows preview pictures when Jellyfin has made them.' },
+            { rev: 3, text: 'Press <strong>?</strong> to see the keyboard shortcuts, in the player too.' },
+            { rev: 3, text: 'Calendar → Friends shows their faces in the month view as well.' },
+            { rev: 3, text: 'Removing a show from your list or deleting a post or reply no longer asks first: it goes at once, and <strong>Undo</strong> brings it back for a few seconds.' },
+            { rev: 3, text: 'On several devices: a short hiccup reaching AniRoll\'s server can no longer replace what another device saved, and "Not interested" picks and Jellyfin links you remove now stay removed everywhere.' },
+            { rev: 3, text: 'Whether you share your calendar is now only visible to people who follow you.' },
+            { rev: 3, text: 'Calendar files follow the format exactly now, so long titles in Japanese or with emoji no longer trip up strict calendar apps.' },
             { rev: 2, text: 'Shows with several seasons now have a <strong>Watch order</strong> on their page: in the order they came out and, where it differs, in the order the story goes, with prequels made later first.' },
             'If AniList doesn\'t answer, a show you haven\'t opened before still opens, with its basics from TMDB, and search finds anime there too. Once AniList is back, its own details come back by themselves.',
             'Posts, replies, likes, follows and list changes made while AniList is down are kept and sent once it\'s back, like changes made offline.',
