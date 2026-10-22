@@ -1,6 +1,11 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.6.1.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.7.
+
+## 23 October 2026 – Your show in Discord, and a helper that updates itself
+
+- While you watch, your **Discord status** says **AniRoll:** and the show, in the member list too. It needs the newest helper: Settings → Discord shows the update.
+- AniRoll for Discord's helper can **update itself**. Turn it on when you set it up, or later with one line in the terminal; Settings → Discord shows both.
 
 ## 22 October 2026 – Live now, Undo, and double tap in the player
 

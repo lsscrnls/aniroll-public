@@ -10,7 +10,9 @@ import (
 // Only what AniRoll sends goes on to Discord, within Discord's limits: the helper is the one part that
 // runs with the user's rights, so it trusts no message blindly, not even one from the extension.
 type activity struct {
-	Type       int         `json:"type"`
+	Type int `json:"type"`
+	// The heading Discord shows instead of the app's name ("AniRoll: Frieren")
+	Name       string      `json:"name,omitempty"`
 	Details    string      `json:"details,omitempty"`
 	State      string      `json:"state,omitempty"`
 	Timestamps *timestamps `json:"timestamps,omitempty"`
@@ -47,6 +49,9 @@ func sanitize(raw json.RawMessage) json.RawMessage {
 		return nil
 	}
 	out := activity{Type: in.Type, Details: text(in.Details), State: text(in.State)}
+	if name := text(in.Name); strings.HasPrefix(name, "AniRoll") {
+		out.Name = name
+	}
 	if out.Type != 0 && out.Type != 3 { // Playing or Watching
 		out.Type = 3
 	}

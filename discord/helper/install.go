@@ -54,6 +54,11 @@ func install() error {
 	return registerHosts(chrome, firefox)
 }
 
+func installedExe() string {
+	dir, _ := homeDir()
+	return filepath.Join(dir, exeName())
+}
+
 func uninstall() error {
 	dir, err := homeDir()
 	if err != nil {

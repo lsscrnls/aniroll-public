@@ -1,6 +1,7 @@
 #!/bin/sh
 # AniRoll for Discord, Linux and macOS: fetches the helper for this computer and sets it up.
 #   curl -fsSL https://aniroll.app/downloads/discord/install.sh | sh
+#   … | sh -s -- --auto-update     the same, and it keeps itself up to date
 set -e
 base="https://aniroll.app/downloads/discord"
 case "$(uname -s)-$(uname -m)" in
@@ -14,4 +15,4 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 curl -fsSL "$base/$file" -o "$tmp/aniroll-discord"
 chmod +x "$tmp/aniroll-discord"
-"$tmp/aniroll-discord" </dev/null
+"$tmp/aniroll-discord" "$@" </dev/null

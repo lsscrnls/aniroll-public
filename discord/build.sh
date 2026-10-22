@@ -58,6 +58,22 @@ for arch, (name, want) in EMBED.items():
 open(f'{out}/install.ps1', 'w', encoding='utf-8', newline='\r\n').write(script)
 PY
 cp discord/windows/uninstall.ps1 "$out/uninstall.ps1"
+# Updating by itself: the newest helper per system, signed with the key that only this computer has
+# (discord/helper/update.go and discord/windows/helper.py hold its public half)
+sign_key="$HOME/.env/aniroll-helper-sign.pem"
+[ -f "$sign_key" ] || { echo "no signing key at $sign_key: helpers that update themselves would not take this build" >&2; exit 1; }
+cp discord/windows/helper.py "$out/helper.py"
+python3 - "$out" "$helper_v" "$win_v" <<'PY'
+import hashlib, json, re, sys
+out, go_v, win_v = sys.argv[1:]
+sha = lambda f: hashlib.sha256(open(f'{out}/{f}', 'rb').read()).hexdigest()
+helpers = {p: {'version': go_v, 'sha256': sha(f'aniroll-discord-{p}')}
+           for p in ('linux-amd64', 'linux-arm64', 'macos-arm64', 'macos-amd64')}
+py_v = re.search(r"PY_V = '([0-9.]+)'", open('discord/build.sh').read()).group(1)  # the Python in the zips
+helpers['windows'] = {'version': win_v, 'sha256': sha('helper.py'), 'python': py_v}
+open(f'{out}/update.json', 'w').write(json.dumps({'helpers': helpers}, indent=1) + '\n')
+PY
+openssl pkeyutl -sign -inkey "$sign_key" -rawin -in "$out/update.json" | base64 -w0 > "$out/update.sig"
 rm -f "$out/aniroll-discord-extension.zip"
 python3 -c "import shutil,sys; shutil.make_archive(sys.argv[1], 'zip', 'discord/extension')" "$out/aniroll-discord-extension"
 touch "$stamp"
