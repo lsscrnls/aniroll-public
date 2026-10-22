@@ -42,6 +42,20 @@ const lists = {
     6: { 300: { status: 'REPEATING', progress: 3, repeat: 1, updatedAt: LONG_AGO } },
     7: { 300: { status: 'CURRENT', progress: 2, repeat: 0, updatedAt: LONG_AGO } },
 };
+// Released A (2010), C (2012), B (2015); the story starts with B, a prequel made later. 804 is a music video,
+// 805 a side story: neither is a part. 811 -> 812 come out in the order they are told
+const part = (id, year, edges) => ({ id, format: id === 804 ? 'MUSIC' : 'TV', status: 'FINISHED', episodes: 12, startDate: { year, month: 4, day: 1 },
+    title: { userPreferred: `Part ${id}`, romaji: `Part ${id}`, english: null, native: null }, coverImage: { medium: '' },
+    relations: { edges: edges.map(([relationType, id2]) => ({ relationType, node: { id: id2, type: 'ANIME', format: id2 === 804 ? 'MUSIC' : 'TV' } })) } });
+const FRANCHISE = {
+    801: part(801, 2010, [['SEQUEL', 803], ['PREQUEL', 802], ['OTHER', 804], ['SIDE_STORY', 805]]),
+    802: part(802, 2015, [['SEQUEL', 801]]),
+    803: part(803, 2012, [['PREQUEL', 801]]),
+    804: part(804, 2011, [['SEQUEL', 801]]),
+    805: part(805, 2011, [['PARENT', 801]]),
+    811: part(811, 2018, [['SEQUEL', 812]]),
+    812: part(812, 2020, [['PREQUEL', 811]]),
+};
 const log = [];
 let blocked = false;
 
@@ -108,6 +122,10 @@ http.createServer((req, res) => {
         log.push({ at: Date.now(), auth: viewer ? viewer.name : null, op: text.match(/(SaveMediaListEntry|MediaListCollection|MediaList|Viewer|Page|Media)\b/)[1], v });
 
         if (token && !viewer) return send(res, 401, { errors: [{ message: 'Invalid token', status: 401 }] });
+        // Watch order (api/watchorder.js): parts of a franchise by id, with their prequel/sequel links
+        if (/relationType\(version: 2\)/.test(text) && Array.isArray(v.ids)) {
+            return send(res, 200, { data: { Page: { media: v.ids.filter(id => FRANCHISE[id]).map(id => FRANCHISE[id]) } } });
+        }
         if (/Viewer/.test(text)) return viewer ? send(res, 200, { data: { Viewer: { ...viewer, avatar: { medium: 'https://s4.anilist.co/a.png' } } } }) : send(res, 400, { errors: [{ message: 'Unauthorized', status: 401 }] });
         if (/SaveMediaListEntry/.test(text)) {
             if (!viewer) return send(res, 400, { errors: [{ message: 'Unauthorized', status: 401 }] });

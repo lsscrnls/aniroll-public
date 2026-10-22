@@ -2255,6 +2255,13 @@ function staticServer() {
             const p = new URL(route.request().url()).pathname;
             if (p.startsWith('/api/fallback/media/')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ media: tmdbMedia }) });
             if (p === '/api/passkey') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ vip, passkeys: [] }) });
+            // The mock names this show by an id of its own: it becomes the middle part
+            if (p.startsWith('/api/watchorder/')) {
+                const me = Number(p.split('/').pop());
+                const part = (id, n, year) => ({ id, title: { userPreferred: `Part ${n}`, romaji: `Part ${n}` }, format: 'TV', episodes: 12, startDate: { year }, cover: null });
+                return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ release: [1, me, 2], story: [2, 1, me], same: false,
+                    media: { 1: part(1, 20, 2010), [me]: part(me, 21, 2012), 2: part(2, 22, 2015) } }) });
+            }
             route.fallback();
         });
         // Down the way it was: a 403 page that is no AniList answer
@@ -2262,6 +2269,17 @@ function staticServer() {
 
         await page.goto(base + '/#/');
         await settle(1500);
+
+        // Watch order: release order first, story order a tab away, this show marked
+        await go('#/anime/21/full');
+        const names = () => page.$$eval('#detail-order .detail-order-name', els => els.map(e => e.textContent));
+        const release = await names();
+        const here = await page.$eval('#detail-order .is-here .detail-order-name', e => e.textContent).catch(() => null);
+        await page.click('#detail-order [data-order="story"]').catch(() => {});
+        const story = await names();
+        check('watch order: release and story order on the anime page, this one marked',
+            release.join() === 'Part 20,Part 21,Part 22' && story.join() === 'Part 22,Part 20,Part 21' && here === 'Part 21', { release, story, here });
+
         await go('#/social');
         const toggle = await page.$('.reply-toggle');
         if (toggle) { await toggle.click(); await settle(800); }

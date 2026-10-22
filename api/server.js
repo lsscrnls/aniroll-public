@@ -1602,7 +1602,9 @@ const sources = require('./sources')({ dataDir: DATA_DIR, readJson, writeJson, v
 
 // While AniList is down: passkeys for VIPs (api/passkeys.js), TMDB details and kept lists (api/fallback.js)
 const passkeys = require('./passkeys')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer,
-    refuseAuth, isVip, tokenHash, bearerToken, rememberViewer, allowedOrigin: ALLOWED_ORIGIN, isLocalOrigin, str });
+    refuseAuth, isVip, tokenHash, bearerToken, rememberViewer, allowedOrigin: ALLOWED_ORIGIN, isLocalOrigin, str, encryptSecret, decryptSecret });
+// Release and story order of a franchise (api/watchorder.js), from the server's own AniList budget
+const watchOrder = require('./watchorder')({ dataDir: DATA_DIR, readJson, writeJson, json, overLimit, clientIp, anilist });
 const fallback = require('./fallback')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer,
     refuseAuth, isVip, animeMap });
 
@@ -1639,6 +1641,7 @@ async function handle(req, res) {
     if (pathname.startsWith('/api/songs/')) return songs.handle(req, res, pathname);
     if (pathname === '/api/passkey' || pathname.startsWith('/api/passkey/')) return passkeys.handle(req, res, pathname);
     if (pathname.startsWith('/api/fallback/') || pathname === '/api/me/list') return fallback.handle(req, res, pathname);
+    if (pathname.startsWith('/api/watchorder/')) return watchOrder.handle(req, res, pathname);
 
     if (pathname === '/api/log' && req.method === 'POST') {
         const body = await readBody(req);

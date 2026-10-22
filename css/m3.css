@@ -1956,6 +1956,11 @@
 :root[data-design="m3"] .detail-studio-role { color: var(--md-on-surface-variant); }
 :root[data-design="m3"] .detail-related-title { text-transform: none; letter-spacing: 0; font-size: 0.875rem; font-weight: 500; color: var(--md-on-surface-variant); }
 :root[data-design="m3"] .detail-related-item img { border-radius: var(--radius-lg); }
+:root[data-design="m3"] .detail-order-open { border-radius: var(--md-shape-lg, 16px); }
+:root[data-design="m3"] .detail-order-open:hover, :root[data-design="m3"] .detail-order-item.is-here .detail-order-open { background: var(--md-surface-container-high); }
+:root[data-design="m3"] .detail-order-item.is-here .detail-order-open { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+:root[data-design="m3"] :is(.detail-order-note, .detail-order-facts, .detail-order-n) { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .detail-order-facts strong { color: var(--md-primary); }
 :root[data-design="m3"] .detail-related-item:hover img { border-radius: var(--md-shape-xxl); }
 :root[data-design="m3"] .studio-kicker { color: var(--md-primary); }
 :root[data-design="m3"] .spoiler-tag { background: var(--md-error-container) !important; color: var(--md-on-error-container) !important; }
