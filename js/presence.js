@@ -13,8 +13,8 @@ const LOGO = `${SITE}/icons/icon-512.png`;
 const DL = `${SITE}/downloads/discord`;
 // The helper's newest version, Linux and macOS (discord/helper/main.go) and Windows (discord/windows/helper.py):
 // an older one is pointed out, once per version
-const HELPER_LATEST = '1.0.2';
-const HELPER_LATEST_WINDOWS = '1.1.0';
+const HELPER_LATEST = '1.0.3';
+const HELPER_LATEST_WINDOWS = '1.1.1';
 const helperLatest = () => (system() === 'windows' ? HELPER_LATEST_WINDOWS : HELPER_LATEST);
 const NAG_KEY = 'aniroll_discord_nagged';
 // The extension's newest version (discord/extension/manifest.json): an older one is pointed out the same way
@@ -71,6 +71,9 @@ function cover(media) {
     return url.startsWith('https://') && url.length <= 256 ? url : LOGO;
 }
 
+// The heading over the status and in the member list: "AniRoll: Frieren" (helper 1.0.3)
+const heading = (title) => line(`AniRoll: ${title}`);
+
 /** What Discord shows now, or null for nothing */
 function activity() {
     if (!presenceOn() || idle) return null;
@@ -84,6 +87,7 @@ function activity() {
         const now = Date.now();
         return {
             type: 3,
+            name: heading(title),
             details: line(title),
             state: line(`Episode ${episode}${total}${party ? ' · Watch Party' : ''}${running ? '' : ' · Paused'}`),
             timestamps: running ? {
@@ -113,6 +117,7 @@ function activity() {
         const host = party.hosting || !party.host ? '' : ` with ${party.host}`;
         return {
             type: 3,
+            name: heading(title),
             details: line(title),
             state: line(`${episode}Watch Party${host}`),
             assets: { large_image: cover({ coverImage: { large: party.cover } }), large_text: line(title), ...small },
@@ -268,7 +273,17 @@ function stepHtml(n, done, title, body) {
 export function mountPresenceSettings(box) {
     startPresence();
     const os = system();
-    const installLine = os === 'windows' ? `irm ${DL}/install.ps1 | iex` : `curl -fsSL ${DL}/install.sh | sh`;
+    // Set up with updating by itself (ticked unless turned off here) or without
+    let auto = true;
+    const installLine = () => os === 'windows'
+        ? `${auto ? "$env:ANIROLL_AUTO_UPDATE='on'; " : ''}irm ${DL}/install.ps1 | iex`
+        : `curl -fsSL ${DL}/install.sh | sh${auto ? ' -s -- --auto-update' : ''}`;
+    // Turning it on or off later, where the helper lives (install.go homeDir, install.ps1 $dir)
+    const autoLine = (state) => os === 'windows'
+        ? `& "$env:LOCALAPPDATA\\AniRoll Discord\\aniroll-discord.bat" auto-update ${state}`
+        : os === 'mac'
+            ? `"$HOME/Library/Application Support/AniRoll Discord/aniroll-discord" auto-update ${state}`
+            : `~/.local/share/aniroll-discord/aniroll-discord auto-update ${state}`;
     const uninstallLine = os === 'windows' ? `irm ${DL}/uninstall.ps1 | iex` : `curl -fsSL ${DL}/uninstall.sh | sh`;
     const copyLine = (line) => `<div class="dc-copy"><code>${esc(line)}</code><button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-dc-copy="${esc(line)}">Copy</button></div>`;
 
@@ -291,11 +306,13 @@ export function mountPresenceSettings(box) {
                </ol>${extensionOutdated() ? '<p class="settings-hint">An update: unzip it over the old folder, then press the reload arrow on AniRoll for Discord in <code>chrome://extensions</code>.</p>' : ''}`;
     };
     const helperBody = () => {
+        const autoBox = `<label class="settings-choice"><input type="checkbox" id="dc-auto" ${auto ? 'checked' : ''}>
+            <span>Keep the helper up to date by itself</span></label>`;
         if (os === 'windows') {
-            return `<p class="settings-hint">Open <strong>PowerShell</strong> (Start menu → type PowerShell), paste this, press Enter, once:</p>${copyLine(installLine)}`;
+            return `<p class="settings-hint">Open <strong>PowerShell</strong> (Start menu → type PowerShell), paste this, press Enter, once:</p>${copyLine(installLine())}${autoBox}`;
         }
         if (os === 'mac' || os === 'linux') {
-            return `<p class="settings-hint">Paste this into a terminal, once:</p>${copyLine(installLine)}`;
+            return `<p class="settings-hint">Paste this into a terminal, once:</p>${copyLine(installLine())}${autoBox}`;
         }
         return '<p class="settings-hint">The helper runs on Windows, macOS and Linux computers.</p>';
     };
@@ -317,6 +334,11 @@ export function mountPresenceSettings(box) {
                 <span>Show what I do in AniRoll in my Discord status</span></label>
             <p class="settings-hint">The episode you watch (with the time left), the show you look at, your Watch Party with a button to join it. Stays on this computer: AniRoll's server never sees it.</p>
             ${hasExt ? '' : '<button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-dc-check>Check again</button>'}
+            ${os === 'windows' || os === 'mac' || os === 'linux' ? `<details class="dc-remove">
+                <summary>Updating the helper by itself</summary>
+                <p class="settings-hint">When it is on, the helper looks for a new version each time AniRoll talks to it and puts it in place in the background. Turn it on or off in ${os === 'windows' ? 'PowerShell' : 'a terminal'}:</p>
+                ${copyLine(autoLine('on'))}${copyLine(autoLine('off'))}
+            </details>` : ''}
             <details class="dc-remove">
                 <summary>Remove AniRoll for Discord</summary>
                 <ol class="settings-hint dc-list">
@@ -333,6 +355,10 @@ export function mountPresenceSettings(box) {
     const hello = () => window.postMessage({ aniroll: 'presence', type: 'hello' }, location.origin);
     box.addEventListener('change', (e) => {
         const input = /** @type {HTMLInputElement} */ (e.target);
+        if (input.id === 'dc-auto') {
+            auto = input.checked;
+            return paint();
+        }
         if (input.id !== 'dc-toggle') return;
         try { input.checked ? localStorage.setItem(KEY, 'on') : localStorage.removeItem(KEY); } catch { /* not kept */ }
         update();

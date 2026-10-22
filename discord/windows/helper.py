@@ -5,15 +5,18 @@ blocks an unsigned program, but not the signed Python from python.org that runs 
 in place and tells the browsers about aniroll-discord.bat, which starts this. Only the standard library.
 Started by a browser (native messaging) it reads what AniRoll is doing and passes it to the Discord app.
 """
+import hashlib
 import json
 import os
+import platform
 import queue
 import struct
 import sys
 import threading
 import time
+import urllib.request
 
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 CLIENT_ID = '1558496660953501827'
 # Discord takes five updates in twenty seconds; one every five keeps clear of that, and in between
 # only the newest one counts
@@ -60,6 +63,7 @@ def sanitize(raw):
             return None
         kind = _get(a, 'type', int)
         details, state = _get(a, 'details', str), _get(a, 'state', str)
+        name = _get(a, 'name', str)
         display = _get(a, 'status_display_type', int)
         ts = _get(a, 'timestamps', dict)
         start, end = _get(ts, 'start', int), _get(ts, 'end', int)
@@ -82,6 +86,9 @@ def sanitize(raw):
         return None
     if text(state):
         out['state'] = text(state)
+    # The heading Discord shows instead of the app's name ("AniRoll: Frieren")
+    if text(name).startswith('AniRoll'):
+        out['name'] = text(name)
     if ts and start:
         # Milliseconds within a day of now, the end after the start
         now = int(time.time() * 1000)
@@ -323,10 +330,151 @@ def run_host(stdin=None, connect=Discord):
             last_sent = now
 
 
+# ===== Updating itself (as discord/helper/update.go) =====
+# When turned on, each start by a browser asks aniroll.app for the newest helper.py and, when it is newer,
+# puts it in place; the next start runs it. update.json only counts with a valid signature from
+# discord/build.sh (the key stays on the build computer). A new Python needs install.ps1 again.
+
+UPDATE_BASE = 'https://aniroll.app/downloads/discord'
+UPDATE_KEY = 'KQq/4EjU2jq2ZFoMGDUq/906uoMOCJEMQnBJsfesTC0='
+HERE = os.path.dirname(os.path.abspath(__file__))
+SETTINGS = os.path.join(HERE, 'settings.json')
+
+# Ed25519 (RFC 8032, verifying only): the standard library has none
+_P = 2 ** 255 - 19
+_Q = 2 ** 252 + 27742317777372353535851937790883648493
+_D = -121665 * pow(121666, _P - 2, _P) % _P
+_SQRT_M1 = pow(2, (_P - 1) // 4, _P)
+
+
+def _add(a, b):
+    x, y = (a[1] - a[0]) * (b[1] - b[0]) % _P, (a[1] + a[0]) * (b[1] + b[0]) % _P
+    c, d = 2 * a[3] * b[3] * _D % _P, 2 * a[2] * b[2] % _P
+    e, f, g, h = y - x, d - c, d + c, y + x
+    return e * f, g * h, f * g, e * h
+
+
+def _mul(s, pt):
+    acc = (0, 1, 1, 0)
+    while s:
+        if s & 1:
+            acc = _add(acc, pt)
+        pt = _add(pt, pt)
+        s >>= 1
+    return acc
+
+
+def _x(y, sign):
+    if y >= _P:
+        return None
+    x2 = (y * y - 1) * pow(_D * y * y + 1, _P - 2, _P) % _P
+    if x2 == 0:
+        return None if sign else 0
+    x = pow(x2, (_P + 3) // 8, _P)
+    if (x * x - x2) % _P:
+        x = x * _SQRT_M1 % _P
+    if (x * x - x2) % _P:
+        return None
+    return _P - x if (x & 1) != sign else x
+
+
+def _point(b):
+    if len(b) != 32:
+        return None
+    y = int.from_bytes(b, 'little')
+    x = _x(y & ((1 << 255) - 1), y >> 255)
+    return None if x is None else (x, y & ((1 << 255) - 1), 1, x * (y & ((1 << 255) - 1)) % _P)
+
+
+_GY = 4 * pow(5, _P - 2, _P) % _P
+_G = (_x(_GY, 0), _GY, 1, _x(_GY, 0) * _GY % _P)
+
+
+def ed25519_ok(public, message, sig):
+    if len(public) != 32 or len(sig) != 64:
+        return False
+    a, r = _point(public), _point(sig[:32])
+    s = int.from_bytes(sig[32:], 'little')
+    if a is None or r is None or s >= _Q:
+        return False
+    h = int.from_bytes(hashlib.sha512(sig[:32] + public + message).digest(), 'little') % _Q
+    left, right = _mul(s, _G), _add(r, _mul(h, a))
+    return (left[0] * right[2] - right[0] * left[2]) % _P == 0 and (left[1] * right[2] - right[1] * left[2]) % _P == 0
+
+
+def load_settings():
+    try:
+        with open(SETTINGS, encoding='utf-8') as f:
+            s = json.load(f)
+        return s if isinstance(s, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def set_auto_update(arg):
+    """aniroll-discord.bat auto-update on|off"""
+    s = load_settings()
+    if arg == '':
+        print('Updating by itself is %s. Turn it on or off with: aniroll-discord.bat auto-update on|off'
+              % ('on' if s.get('auto_update') else 'off'))
+        return 0
+    if arg not in ('on', 'off'):
+        print('Say "on" or "off".')
+        return 1
+    s['auto_update'] = arg == 'on'
+    with open(SETTINGS, 'w', encoding='utf-8') as f:
+        json.dump(s, f)
+    print('AniRoll for Discord now updates by itself.' if s['auto_update'] else 'AniRoll for Discord no longer updates by itself.')
+    return 0
+
+
+def newer(a, b):
+    """Whether version a is above b ("1.1.10" > "1.1.9")"""
+    num = lambda v: [int(p) if p.isdigit() else 0 for p in v.split('.')]
+    x, y = num(a), num(b)
+    n = max(len(x), len(y))
+    return x + [0] * (n - len(x)) > y + [0] * (n - len(y))
+
+
+def _fetch(url, limit):
+    with urllib.request.urlopen(url, timeout=60) as r:
+        data = r.read(limit + 1)
+    if len(data) > limit:
+        raise ValueError(url + ' is too big')
+    return data
+
+
+def self_update():
+    """The newest helper.py in place when updating by itself is on; quiet on any failure, the next start tries again"""
+    if not load_settings().get('auto_update'):
+        return
+    try:
+        import base64
+        body = _fetch(UPDATE_BASE + '/update.json', 64 << 10)
+        sig = base64.b64decode(_fetch(UPDATE_BASE + '/update.sig', 1 << 10).strip())
+        if not ed25519_ok(base64.b64decode(UPDATE_KEY), body, sig):
+            return
+        h = json.loads(body).get('helpers', {}).get('windows', {})
+        if not newer(str(h.get('version', '')), VERSION) or h.get('python') != platform.python_version():
+            return
+        code = _fetch(UPDATE_BASE + '/helper.py', 1 << 20)
+        if hashlib.sha256(code).hexdigest() != h.get('sha256'):
+            return
+        tmp = os.path.join(HERE, 'helper.py.new')
+        with open(tmp, 'wb') as f:
+            f.write(code)
+        os.replace(tmp, os.path.join(HERE, 'helper.py'))
+    except Exception:  # noqa: BLE001 — offline, server away: next time
+        pass
+
+
 if __name__ == '__main__':
     # Chrome & co. pass the extension's origin (chrome-extension://…/), Firefox the path of the host manifest
     # and the extension id. Started any other way there is nothing to do: install.ps1 sets it up.
     if any(a.startswith('chrome-extension://') or a.endswith('.json') for a in sys.argv[1:]):
+        threading.Thread(target=self_update, daemon=True).start()
         run_host()
+    elif sys.argv[1:2] == ['auto-update']:
+        sys.exit(set_auto_update(''.join(sys.argv[2:])))
     else:
         print('AniRoll for Discord %s. Set it up with the line from AniRoll → Settings → Discord.' % VERSION)

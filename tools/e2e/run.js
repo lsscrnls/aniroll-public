@@ -13,7 +13,10 @@ const { mockJellyfin, JF_URL, JF_STORAGE } = require('./jellyfin-mock');
 const ROOT = path.join(__dirname, '..', '..');
 // The release under test and the number of changelog entries, read from the code instead of written here,
 // so a release or a new changelog day needs no edit in this file
-const CHANGE_COUNT = (fs.readFileSync(path.join(ROOT, 'js', 'whatsnew.js'), 'utf8').match(/^\s*id: '\d{4}-/gm) || []).length;
+// (an entry with `from` counts once that time has come, as in the page)
+const changeCount = (at = Date.now()) => [...fs.readFileSync(path.join(ROOT, 'js', 'whatsnew.js'), 'utf8').matchAll(/^\s*id: '\d{4}-[^']*',\n(?:\s*from: '([^']+)',)?/gm)]
+    .filter(m => !m[1] || Date.parse(m[1]) <= at).length;
+const CHANGE_COUNT = changeCount();
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
     '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json' };
 
@@ -1023,7 +1026,7 @@ function staticServer() {
         await p.goto(base + '/#/settings?tab=discord');
         await p.waitForSelector('.dc-step.is-done', { timeout: 5000 }).catch(() => {});
         const steps = await p.evaluate(() => [...document.querySelectorAll('.dc-step')].map(s => s.classList.contains('is-done')));
-        const remove = await p.evaluate(() => document.querySelector('.dc-remove code')?.textContent || '');
+        const remove = await p.evaluate(() => [...document.querySelectorAll('.dc-remove')].at(-1)?.querySelector('code')?.textContent || '');
         await p.click('#dc-toggle').catch(() => {});
         const stored = await p.evaluate(() => localStorage.getItem('aniroll_discord'));
         await p.goto(base + '/#/play/101/3');
@@ -1036,6 +1039,7 @@ function staticServer() {
         const paused = await p.evaluate(() => window.__activities.at(-1));
         check('discord: Settings ticks the steps, tells how to remove it, the switch turns it on; the episode with time left, paused without, a link to the show',
             steps.length === 3 && steps.every(Boolean) && stored === 'on' && /uninstall\.sh \| sh$/.test(remove)
+            && playingNow?.name === `AniRoll: ${playingNow?.details}`
             && playingNow?.type === 3 && /^Episode 3( of \d+)?$/.test(playingNow.state || '') && playingNow.details?.length >= 2
             && playingNow.timestamps.end > playingNow.timestamps.start && /^https:\/\/aniroll\.app\/a\/\d+$/.test(playingNow.buttons?.[0]?.url || '')
             && /Paused$/.test(paused?.state || '') && !paused?.timestamps && !pageErrors.length, { steps, remove, stored, playingNow, paused, pageErrors });
@@ -1091,9 +1095,11 @@ function staticServer() {
         await p.waitForTimeout(500);
         const win = await p.evaluate(() => ({ title: document.querySelectorAll('.dc-step-title')[1]?.textContent || '',
             install: document.querySelectorAll('.dc-step')[1]?.querySelector('code')?.textContent || '',
-            remove: document.querySelector('.dc-remove code')?.textContent || '', exe: !!document.querySelector('a[href$=".exe"]') }));
+            remove: [...document.querySelectorAll('.dc-remove')].at(-1)?.querySelector('code')?.textContent || '',
+            auto: [...document.querySelectorAll('.dc-remove')][0]?.querySelector('code')?.textContent || '', exe: !!document.querySelector('a[href$=".exe"]') }));
         check('discord: Windows sets the helper up with a line for PowerShell and removes it the same way; the .exe helper counts as old',
-            /update for the helper \(1\.0\.2 → 1\.1\.0\)/.test(win.title) && /^irm https:\/\/aniroll\.app\/downloads\/discord\/install\.ps1 \| iex$/.test(win.install)
+            /update for the helper \(1\.0\.2 → 1\.1\.1\)/.test(win.title) && /^\$env:ANIROLL_AUTO_UPDATE='on'; irm https:\/\/aniroll\.app\/downloads\/discord\/install\.ps1 \| iex$/.test(win.install)
+            && win.auto === '& "$env:LOCALAPPDATA\\AniRoll Discord\\aniroll-discord.bat" auto-update on'
             && /uninstall\.ps1 \| iex$/.test(win.remove) && !win.exe && !pageErrors.length, { win, pageErrors });
         await p.close();
     }
@@ -2160,7 +2166,8 @@ function staticServer() {
     check('logged out: always Material 3, even with the old legacy choice kept', await grown.evaluate(() => document.documentElement.dataset.design === 'm3' && !!document.querySelector('#m3-css')));
     await grown.close();
 
-    const late = await visitor({ aniroll_theme: 'dark' }, new Date(2026, 10, 1, 9, 0));
+    const lateAt = new Date(2026, 10, 1, 9, 0);
+    const late = await visitor({ aniroll_theme: 'dark' }, lateAt);
     const lateNotice = await late.evaluate(() => ({ title: document.querySelector('.whatsnew .modal-title')?.textContent, demo: !!document.querySelector('.whatsnew-demo'),
         headings: [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent) }));
     check('from November: still a pop-up, with changelog wording and without the tab animation',
@@ -2173,7 +2180,7 @@ function staticServer() {
     const log = await late.evaluate(() => ({ hash: location.hash, title: document.querySelector('.whatsnew-page h1')?.textContent, entries: document.querySelectorAll('.whatsnew-page .whatsnew-entry').length,
         back: document.querySelector('.whatsnew-back')?.textContent.trim(), dialog: !!document.querySelector('[aria-modal="true"]'), unread: document.documentElement.classList.contains('whatsnew-unread') }));
     check('changelog: still there, marked unread, opens as its own page with all entries and the version',
-        unread && log.hash === '#/whatsnew' && /^What's new AniRoll \d+(\.\d+){2,3}$/.test(log.title || '') && log.entries === CHANGE_COUNT && !log.dialog && !log.unread, { unread, ...log });
+        unread && log.hash === '#/whatsnew' && /^What's new AniRoll \d+(\.\d+){2,3}$/.test(log.title || '') && log.entries === changeCount(lateAt.getTime()) && !log.dialog && !log.unread, { unread, ...log });
     await late.click('.whatsnew-back');
     await late.clock.runFor(500);
     const backTo = await late.evaluate(() => ({ hash: location.hash || '#/', landing: !!document.querySelector('.landing-foot') }));

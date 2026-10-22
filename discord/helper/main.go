@@ -5,8 +5,10 @@
 // itself to a fixed place and tells the browsers where to find it. Started by a browser (native messaging)
 // it reads what AniRoll is doing and passes it to the Discord app on this computer.
 //
-//	aniroll-discord             set up (again)
-//	aniroll-discord uninstall   remove everything it set up
+//	aniroll-discord                      set up (again)
+//	aniroll-discord --auto-update        set up, and keep itself up to date from then on
+//	aniroll-discord auto-update on|off   turn updating by itself on or off
+//	aniroll-discord uninstall            remove everything it set up
 package main
 
 import (
@@ -21,7 +23,7 @@ import (
 )
 
 const (
-	version  = "1.0.2"
+	version  = "1.0.3"
 	hostName = "app.aniroll.discord"
 	clientID = "1558496660953501827"
 	// Discord takes five updates in twenty seconds; one every five keeps clear of that, and in between
@@ -35,15 +37,25 @@ func main() {
 		return
 	}
 	var err error
-	if len(os.Args) > 1 && os.Args[1] == "uninstall" {
+	if len(os.Args) > 1 && os.Args[1] == "auto-update" {
+		err = setAutoUpdate(strings.Join(os.Args[2:], ""))
+	} else if len(os.Args) > 1 && os.Args[1] == "uninstall" {
 		err = uninstall()
 		if err == nil {
 			fmt.Println("AniRoll for Discord is removed from this computer. Remove the extension in your browser too.")
 		}
 	} else {
 		err = install()
+		if err == nil && len(os.Args) > 1 && os.Args[1] == "--auto-update" {
+			s := loadSettings()
+			s.AutoUpdate = true
+			err = saveSettings(s)
+		}
 		if err == nil {
 			fmt.Println("AniRoll for Discord is set up. Reload AniRoll in your browser; Settings → Discord shows it as ready.")
+			if loadSettings().AutoUpdate {
+				fmt.Println("It updates by itself. To stop that: \"" + installedExe() + "\" auto-update off")
+			}
 		}
 	}
 	if err != nil {
@@ -111,6 +123,7 @@ func readMessages(out chan<- message) {
 func runHost() {
 	msgs := make(chan message)
 	go readMessages(msgs)
+	go selfUpdate()
 
 	var (
 		dc       *discord
