@@ -1773,6 +1773,36 @@ function staticServer() {
             && nerd.shown && nerd.titles.join() === 'Playback,Source,Stream,This browser' && nerd.quality === '4 Mbps' && nerdGone,
             { qMenu: qMenu.slice(0, 3), asked7, kept, nerd, nerdGone });
 
+        // Away from home in Auto: with the server's upload set to 20 Mbit/s, a file averaging 18 has no room for its
+        // peaks, so Jellyfin is asked again a step lower (15); buffering three times then steps down once more (10),
+        // kept for this server, and picking Auto again forgets that
+        await p.evaluate((url) => localStorage.setItem('aniroll_jf_upload', JSON.stringify({ url, bps: 20e6 })), JF_URL);
+        const beforeUp = calls.length;
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/6'));
+        await idle(p, 3000);
+        const upAsked = calls.slice(beforeUp).filter(c => c.type === 'PlaybackInfo' && c.item === 'ep6').map(c => c.bitrate);
+        await p.evaluate(() => document.getElementById('player-video').play().catch(() => {}));
+        await p.waitForTimeout(5500);
+        const beforeStall = calls.length;
+        await p.evaluate(() => { const v = document.getElementById('player-video'); for (let i = 0; i < 3; i++) v.dispatchEvent(new Event('waiting')); });
+        await idle(p, 2500);
+        const stallAsked = calls.slice(beforeStall).filter(c => c.type === 'PlaybackInfo' && c.item === 'ep6').map(c => c.bitrate);
+        const fallback = await p.evaluate(() => JSON.parse(localStorage.getItem('aniroll_player_fallback') || '{}'));
+        await p.mouse.move(640, 500);
+        await p.click('[data-act="settings"]').catch(() => {});
+        await p.waitForTimeout(300);
+        await p.click('[data-page="quality"]').catch(() => {});
+        await p.waitForTimeout(200);
+        const autoLabel = await p.$eval('[data-quality="auto"]', e => e.textContent.trim()).catch(() => '');
+        await p.click('[data-quality="auto"]').catch(() => {});
+        await idle(p, 2500);
+        const forgotten = await p.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('aniroll_player_fallback') || '{}')).length);
+        await p.keyboard.press('Escape');
+        await p.evaluate(() => localStorage.removeItem('aniroll_jf_upload'));
+        check('player: away from home Auto leaves room for peaks under the upload set, steps down after buffering, kept per server, Auto again forgets it',
+            upAsked.join() === '20000000,15000000' && stallAsked.join() === '10000000' && Object.values(fallback)[0]?.bps === 10e6
+            && /^Auto \(10 Mbps\)/.test(autoLabel) && forgotten === 0, { upAsked, stallAsked, fallback, autoLabel, forgotten });
+
         // Connected with an API key, Jellyfin keeps nothing for the user by itself: AniRoll writes the spot
         // where it stopped, and "played" from 90 %, for the user
         await p.evaluate(() => localStorage.setItem('aniroll_jf_kind', 'key'));
@@ -2156,7 +2186,10 @@ function staticServer() {
 
     // Confirmed the first release of a day: the pop-up shows only what the later releases added
     // (the newest day that grew after its first release: a day still on its first one has nothing "since")
-    const today = (fs.readFileSync(path.join(ROOT, 'js', 'whatsnew.js'), 'utf8').match(/id: '(\d{4}-\d\d-\d\d)\.(?:[2-9]|\d{2,})'/) || [])[1];
+    // (an entry whose later items still wait for their `from` does not count yet)
+    const today = fs.readFileSync(path.join(ROOT, 'js', 'whatsnew.js'), 'utf8').split(/(?=^\s*id: ')/m)
+        .map(block => [block.match(/^\s*id: '(\d{4}-\d\d-\d\d)\.(?:[2-9]|\d{2,})'/)?.[1], [...block.matchAll(/from: '([^']+)'/g)].every(m => Date.parse(m[1]) <= Date.now())])
+        .find(([id, due]) => id && due)?.[0];
     if (today) {
         const later = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: today, aniroll_design_v2: 'aniroll' });
         const shown = await later.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-list li')].map(li => li.textContent));

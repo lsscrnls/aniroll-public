@@ -2,7 +2,7 @@ import * as api from '../api.js';
 import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js';
 import { getToken, isLoggedIn } from '../auth.js';
 import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js';
-import { availability } from '../player/availability.js';
+import { availability, syncUpload } from '../player/availability.js';
 import { findEpisode, jfGet } from '../player/library.js';
 import { deviceProfile } from '../player/profile.js';
 import { HtmlVideoEngine } from '../player/engine.js';
@@ -23,6 +23,9 @@ const WARM_AT = 0.5;
 // The public address sits behind a home upload of about 30 Mbit/s: leave room, let Jellyfin shrink the rest
 const PUBLIC_BITRATE = 25_000_000;
 const LOCAL_BITRATE = 120_000_000;
+// Over the internet, in Auto, a file goes out as it is only when its average stays below this share of the
+// cap: a Blu-ray can jump to several times its average, so otherwise Jellyfin converts it under the cap
+const HEADROOM = 0.6;
 
 export async function render({ params, content }) {
     const mediaId = parseInt(params.id, 10);
@@ -159,11 +162,31 @@ export async function render({ params, content }) {
 
         status('Asking Jellyfin how to play it…');
         session.quality = savedQuality();
-        // Auto: measured once per page (and kept a while); Max: the top step; else the step picked
+        // Auto: measured once per page (and kept a while), and away from home never above the upload set for
+        // the server or the step the player fell back to after buffering; Max: the top step; else the step picked
         let autoBitrate = null;
-        const bitrateFor = async (q) => (q === 'max' ? MAX_BITRATE : q !== 'auto' ? q
-            : (autoBitrate ??= await measureBitrate(avail, cfg)));
-        let info = await playbackInfo(avail, cfg, ep.itemId, startTime, { maxBitrate: await bitrateFor(session.quality) });
+        let autoNow = null; // what Auto comes to, for the menu and the stats
+        const upload = avail.local ? 0 : await syncUpload();
+        const bitrateFor = async (q) => {
+            if (q === 'max') return MAX_BITRATE;
+            if (q !== 'auto') return q;
+            autoBitrate ??= await measureBitrate(avail, cfg);
+            return (autoNow = Math.min(autoBitrate, upload || Infinity, fallbackFor(avail.base) || Infinity));
+        };
+        // PlaybackInfo under the cap for this quality; session.cap is what it was asked with
+        const infoFor = async (itemId, at, { audioIndex = null, quality = session.quality } = {}) => {
+            const cap = await bitrateFor(quality);
+            session.cap = cap;
+            const got = await playbackInfo(avail, cfg, itemId, at, { audioIndex, maxBitrate: cap });
+            const src = got.MediaSources?.[0];
+            if (quality !== 'auto' || avail.local || !src?.Bitrate || videoConverted(src) || src.Bitrate <= cap * HEADROOM || src.Bitrate > cap) return got;
+            const lower = stepBelow(Math.min(cap, src.Bitrate));
+            const again = lower ? await playbackInfo(avail, cfg, itemId, at, { audioIndex, maxBitrate: lower }).catch(() => null) : null;
+            if (!again?.MediaSources?.[0]) return got;
+            session.cap = lower;
+            return again;
+        };
+        let info = await infoFor(ep.itemId, startTime);
         if (closed) return cleanup;
         let source = info.MediaSources?.[0];
         if (!source) throw new Error(info.ErrorCode ? `Jellyfin cannot play this (${info.ErrorCode})` : 'Jellyfin found no playable file');
@@ -174,7 +197,7 @@ export async function render({ params, content }) {
         const wanted = preferredAudio(mediaId, audioTracks);
         session.audioIndex = source.DefaultAudioStreamIndex ?? audioTracks[0]?.id ?? null;
         if (wanted != null && wanted !== session.audioIndex) {
-            const again = await playbackInfo(avail, cfg, ep.itemId, startTime, { audioIndex: wanted, maxBitrate: await bitrateFor(session.quality) }).catch(() => null);
+            const again = await infoFor(ep.itemId, startTime, { audioIndex: wanted }).catch(() => null);
             if (closed) return cleanup;
             if (again?.MediaSources?.[0]) {
                 info = again;
@@ -214,6 +237,7 @@ export async function render({ params, content }) {
         // Another audio track or quality: the browser cannot switch inside a file, so Jellyfin serves it
         // again (with that track, under that bitrate) from where it is now
         let switching = false;
+        let quietUntil = 0; // buffering right after loading or seeking does not count (see downshift)
         const restart = async ({ audioIndex = session.audioIndex, quality = session.quality }, note) => {
             if (switching || closed) return;
             switching = true;
@@ -223,7 +247,7 @@ export async function render({ params, content }) {
                 engine.pause();
                 status(note);
                 stopSession(session, at);
-                const next = await playbackInfo(avail, cfg, ep.itemId, at, { audioIndex, maxBitrate: await bitrateFor(quality) });
+                const next = await infoFor(ep.itemId, at, { audioIndex, quality });
                 if (closed) return;
                 const src = next.MediaSources?.[0];
                 if (!src) throw new Error('Jellyfin cannot play it this way');
@@ -232,6 +256,7 @@ export async function render({ params, content }) {
                     hls: p.hls, method: p.method, started: false, stopped: false });
                 Object.assign(now, { source: src, plan: p });
                 $('player-method').textContent = p.label;
+                quietUntil = Date.now() + 5000;
                 await engine.load({ url: p.url, hls: p.hls, startTime: at });
                 if (closed) return;
                 status('');
@@ -254,20 +279,48 @@ export async function render({ params, content }) {
         });
         controls.setQuality({
             list: () => [
-                { id: 'auto', label: autoBitrate ? `Auto (${fmtRate(autoBitrate)})` : 'Auto' },
+                { id: 'auto', label: autoNow ? `Auto (${fmtRate(autoNow)})` : 'Auto' },
                 { id: 'max', label: `Maximum (${fmtRate(MAX_BITRATE)})` },
                 ...BITRATES.map(b => ({ id: b, label: fmtRate(b) })),
             ],
             current: () => session.quality,
             select: (q) => {
-                if (q === session.quality) return;
+                // Auto picked again: the step it fell back to after buffering is forgotten, it starts fresh
+                const fresh = q === 'auto' && forgetFallback(avail.base);
+                if (q === session.quality && !fresh) return;
                 saveQuality(q);
                 restart({ quality: q }, 'Changing the quality…');
             },
         });
-        controls.setStats(() => statsFor({ now, session, engine, video, avail, cfg, subtitles, audioTracks, autoBitrate: () => autoBitrate }));
+
+        // Buffering again and again in Auto (three times in a minute and a half, or once for eight seconds):
+        // one step below what streams now, kept for this server a few days. Not right after starting or seeking.
+        let stalls = [];
+        let stallTimer = 0;
+        const downshift = () => {
+            clearTimeout(stallTimer);
+            stalls = [];
+            if (switching || closed || session.quality !== 'auto') return;
+            const streams = videoConverted(now.source) ? session.cap : Math.min(now.source.Bitrate || session.cap, session.cap);
+            const next = stepBelow(streams);
+            if (!next) return;
+            setFallback(avail.base, next);
+            restart({ quality: 'auto' }, `Buffering a lot — switching to ${fmtRate(next)}…`);
+        };
+        video.addEventListener('waiting', () => {
+            if (closed || switching || session.quality !== 'auto' || video.seeking || video.paused || Date.now() < quietUntil) return;
+            const t = Date.now();
+            stalls = stalls.filter(s => t - s < 90_000).concat(t);
+            clearTimeout(stallTimer);
+            if (stalls.length >= 3) return downshift();
+            stallTimer = setTimeout(downshift, 8000);
+        });
+        video.addEventListener('playing', () => clearTimeout(stallTimer));
+        video.addEventListener('seeking', () => { clearTimeout(stallTimer); quietUntil = Date.now() + 3000; });
+        controls.setStats(() => statsFor({ now, session, engine, video, avail, cfg, subtitles, audioTracks, autoBitrate: () => autoNow }));
 
         status(plan.hls ? 'Starting the stream…' : 'Loading…');
+        quietUntil = Date.now() + 5000;
         await engine.load({ url: plan.url, hls: plan.hls, startTime });
         if (closed) return cleanup;
         status('');
@@ -374,7 +427,7 @@ export async function render({ params, content }) {
         if (startTime === 0 && !cameByUpNext) {
             await maybeRecap({
                 root: $('player'), media, episode, avail,
-                playbackInfo: async (itemId, at) => playbackInfo(avail, cfg, itemId, at, { maxBitrate: await bitrateFor(session.quality) }),
+                playbackInfo: (itemId, at) => infoFor(itemId, at),
                 playPlan: (itemId, src) => playPlan(avail.base, cfg, itemId, src),
                 segments: (itemId) => loadSegments(avail.base, cfg, itemId),
                 ending: (n) => loadEnding(media.idMal, n),
@@ -631,6 +684,31 @@ function saveQuality(q) {
     try { q === 'auto' ? localStorage.removeItem(QUALITY_KEY) : localStorage.setItem(QUALITY_KEY, String(q)); } catch { /* not kept */ }
 }
 
+// The next step below a bitrate (a little below counts as the same), or 0 at the bottom
+const stepBelow = (bps) => BITRATES.find(b => b < bps * 0.95) || 0;
+
+// Auto's step after buffering, per server address: { base: { bps, at } }, forgotten after FALLBACK_FOR
+const FALLBACK_KEY = 'aniroll_player_fallback';
+const FALLBACK_FOR = 3 * 24 * 60 * 60 * 1000;
+function fallbacks() {
+    try { return JSON.parse(localStorage.getItem(FALLBACK_KEY) || '{}') || {}; } catch { return {}; }
+}
+function fallbackFor(base) {
+    const f = fallbacks()[base];
+    return f && Number.isFinite(f.bps) && Date.now() - f.at < FALLBACK_FOR ? f.bps : 0;
+}
+function setFallback(base, bps) {
+    try { localStorage.setItem(FALLBACK_KEY, JSON.stringify({ ...fallbacks(), [base]: { bps, at: Date.now() } })); } catch { /* this page only */ }
+}
+// true when there was one
+function forgetFallback(base) {
+    const all = fallbacks();
+    if (!all[base]) return false;
+    delete all[base];
+    try { localStorage.setItem(FALLBACK_KEY, JSON.stringify(all)); } catch { /* kept */ }
+    return true;
+}
+
 // ===== Choices kept per show (audio, subtitles, skipping intros) =====
 // { 'm<anilistId>': value } — a letter first, so the keys keep their order (newest last); the 200 shows
 // chosen for most recently are kept
@@ -722,6 +800,11 @@ async function playbackInfo(avail, cfg, itemId, startTime, { audioIndex = null, 
     return res.json();
 }
 
+const transcodeReasons = (source) => new URLSearchParams(source.TranscodingUrl?.split('?')[1] || '').get('TranscodeReasons') || '';
+// Whether Jellyfin makes a new video (rather than passing the file's own on, as is or repackaged)
+const videoConverted = (source) => !!source.TranscodingUrl
+    && /Video|Bitrate|Resolution|Framerate|Level|Profile|Anamorphic|Interlaced|RefFrames/.test(transcodeReasons(source));
+
 // Direct file, or the HLS stream Jellyfin prepared; and a word on what the server does for it.
 // `audioIndex`: the track asked for; the stream URL carries it, whatever Jellyfin put there
 function playPlan(base, cfg, itemId, source, audioIndex = null) {
@@ -734,9 +817,8 @@ function playPlan(base, cfg, itemId, source, audioIndex = null) {
         }
     }
     if (source.TranscodingUrl) {
-        const reasons = new URLSearchParams(source.TranscodingUrl.split('?')[1] || '').get('TranscodeReasons') || '';
-        const video = /Video|Bitrate|Resolution|Framerate|Level|Profile|Anamorphic|Interlaced|RefFrames/.test(reasons);
-        const audio = /Audio/.test(reasons);
+        const video = videoConverted(source);
+        const audio = /Audio/.test(transcodeReasons(source));
         const label = video ? 'Server converts the video' : audio ? 'Server converts the audio' : 'Server repackages the file';
         return { url: base + source.TranscodingUrl, hls: true, method: 'Transcode', label };
     }

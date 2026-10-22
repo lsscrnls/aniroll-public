@@ -46,7 +46,8 @@ function mediaSource(id) {
             MediaStreams: [] };
     }
     return {
-        Id: id, Container: 'webm', SupportsDirectPlay: true, SupportsDirectStream: true, RunTimeTicks: RUNTIME,
+        // 18 Mbit/s on average, like a Blu-ray episode
+        Id: id, Container: 'webm', SupportsDirectPlay: true, SupportsDirectStream: true, RunTimeTicks: RUNTIME, Bitrate: 18_000_000,
         MediaStreams: [
             { Type: 'Video', Index: 0, Codec: 'vp9' },
             { Type: 'Audio', Index: 1, Codec: 'opus', Language: 'jpn', DisplayTitle: 'Japanese - Opus - Stereo', Title: 'Japanese' },
