@@ -755,17 +755,25 @@ function accountCards(card) {
             ' id="your-data"');
 }
 
-// VIPs only (the server says who is one): passkeys to sign in while AniList's login is down (js/passkeys.js)
-async function mountPasskeys(panel) {
+// VIPs only (the server says who is one): passkeys to sign in while AniList's login is down (js/passkeys.js).
+// Each one has a name of the user's own (Rename, and right after Add); a passkey from before is turned into
+// one that works in every browser as soon as this card sees it
+async function mountPasskeys(panel, renameId = null, migrated = false) {
     const slot = panel.querySelector('#passkey-slot');
     const pk = await import('../passkeys.js');
     if (!slot || !pk.passkeysSupported()) return;
     const info = await pk.listPasskeys().catch(() => null);
     if (!info?.vip) return;
+    const old = info.passkeys.filter(p => p.sealed === 'passkey');
+    if (old.length && !migrated) {
+        const done = await Promise.all(old.map(p => pk.resealPasskey(p.id).then(() => true, () => false)));
+        if (done.some(Boolean)) return mountPasskeys(panel, renameId, true);
+    }
     const day = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    const rows = info.passkeys.map(p => `<div class="acct-row">
-            <span class="acct-name">${esc(p.label)}<span class="settings-hint" style="display:block;margin:0">Made ${day(p.created)}${p.used ? `, last used ${day(p.used)}` : ''}${p.sealed === 'server' ? ' · login kept by AniRoll' : ''}${p.current ? '' : ' · holds an older login'}</span></span>
-            ${p.current ? '' : `<button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-pk-reseal="${esc(p.id)}" data-pk-server="${p.sealed === 'server' ? '1' : ''}">Update</button>`}
+    const rows = info.passkeys.map(p => `<div class="acct-row" data-pk-row="${esc(p.id)}">
+            <span class="acct-name"><span class="pk-label">${esc(p.label)}</span><span class="settings-hint" style="display:block;margin:0">Made ${day(p.created)}${p.used ? `, last used ${day(p.used)}` : ''}${p.current ? '' : ' · holds an older login'}</span></span>
+            ${p.current ? '' : `<button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-pk-reseal="${esc(p.id)}">Update</button>`}
+            <button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-pk-rename="${esc(p.id)}">Rename</button>
             <button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-pk-remove="${esc(p.id)}">Remove</button>
         </div>`).join('');
     slot.innerHTML = `<section class="settings-card" id="passkeys">
@@ -773,30 +781,65 @@ async function mountPasskeys(panel) {
             <p class="dot-label settings-card-sub">For VIPs: a way in while AniList’s login is down</p>
             ${rows ? `<div class="acct-list">${rows}</div>` : ''}
             <button class="glass-btn glass-btn-secondary" type="button" data-pk-add>Add a passkey</button>
-            <p class="settings-hint">Most passkeys keep your AniList login locked, so AniRoll’s server holds it but can’t read it. Some (Proton Pass,
-            for one) can’t do that; then AniRoll keeps your login encrypted on its server, like your Jellyfin key. On a new device, sign in with
-            it from the start page or at aniroll.app/#/passkey.</p>
+            <p class="settings-hint">A passkey works wherever your password manager has it: another browser, your phone, its app. AniRoll keeps
+            your AniList login encrypted on its server for it, like your Jellyfin key. On a new device, sign in with it from the start page
+            or at aniroll.app/#/passkey.</p>
             <p class="settings-hint">As a VIP, AniRoll also keeps a copy of your list on its server, so it’s there while AniList is down.
             “Delete all my AniRoll data” removes it with your passkeys.</p>
         </section>`;
+
+    // The name turns into a field: Enter or leaving it saves, Escape keeps the old one
+    const rename = (id) => {
+        const label = slot.querySelector(`[data-pk-row="${CSS.escape(id)}"] .pk-label`);
+        if (!label) return;
+        const before = label.textContent || '';
+        const input = document.createElement('input');
+        input.className = 'glass-input pk-name-input';
+        input.value = before;
+        input.maxLength = 60;
+        input.setAttribute('aria-label', 'Name of this passkey');
+        label.replaceWith(input);
+        input.focus();
+        input.select();
+        let finished = false;
+        const finish = async (save) => {
+            if (finished) return;
+            finished = true;
+            const name = input.value.trim();
+            if (save && name && name !== before) {
+                try { await pk.renamePasskey(id, name); label.textContent = name; toast('Passkey renamed', 'success'); }
+                catch (err) { toast(err.message, 'error'); }
+            }
+            input.replaceWith(label);
+        };
+        input.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+            if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(false); }
+        });
+        input.addEventListener('blur', () => finish(true));
+    };
+    if (renameId) rename(renameId);
+
     slot.onclick = async (e) => {
         const el = /** @type {HTMLElement} */ (e.target);
-        const btn = /** @type {HTMLButtonElement | null} */ (el.closest('[data-pk-add], [data-pk-remove], [data-pk-reseal]'));
+        const btn = /** @type {HTMLButtonElement | null} */ (el.closest('[data-pk-add], [data-pk-remove], [data-pk-reseal], [data-pk-rename]'));
         if (!btn) return;
+        if (btn.dataset.pkRename) return rename(btn.dataset.pkRename);
         btn.disabled = true;
         try {
+            let added = null;
             if (btn.dataset.pkRemove) {
                 if (!(await showConfirm({ title: 'Remove this passkey?', message: 'You can’t sign in with it any more. Remove it from the device or password manager too.', confirmText: 'Remove', danger: true }))) return;
                 await pk.removePasskey(btn.dataset.pkRemove);
                 toast('Passkey removed');
             } else if (btn.dataset.pkReseal) {
-                await pk.resealPasskey(btn.dataset.pkReseal, btn.dataset.pkServer === '1');
+                await pk.resealPasskey(btn.dataset.pkReseal);
                 toast('Passkey updated', 'success');
             } else {
-                await pk.addPasskey();
-                toast('Passkey added', 'success');
+                added = await pk.addPasskey();
+                toast('Passkey added. Give it a name you’ll recognize', 'success');
             }
-            mountPasskeys(panel);
+            mountPasskeys(panel, added);
         } catch (err) {
             // Closing the browser's own dialog is not an error worth a red toast
             if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') return;
