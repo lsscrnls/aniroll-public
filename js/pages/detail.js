@@ -19,6 +19,8 @@ export async function renderPanel(id, container) {
     setupDetailTabs(container);
     setupRelatedPlan(container, token);
     loadPlayButton(media, container);
+    // From TMDB while AniList is down: friends and your match need AniList, so they wait for it
+    if (media.fallback) return;
     loadFriendsStatus(media, token, container);
     loadTasteMatch(media, token, container);
 }
@@ -37,6 +39,8 @@ export async function render({ params, content }) {
     setupDetailTabs(content);
     setupRelatedPlan(content, token);
     loadPlayButton(media, content);
+    // From TMDB while AniList is down: friends and your match need AniList, so they wait for it
+    if (media.fallback) return;
     loadFriendsStatus(media, token, content);
     loadTasteMatch(media, token, content);
 }
@@ -147,7 +151,7 @@ function renderDetailHTML(media) {
                 <h1 class="detail-title">${esc(titlePref(media.title))}</h1>
                 ${media.title?.english && media.title.english !== titlePref(media.title) ? `<div class="detail-sub">${esc(media.title.english)}</div>` : ''}
                 ${media.title?.native ? `<div class="detail-sub" style="font-size:0.85rem">${esc(media.title.native)}</div>` : ''}
-                ${media.meanScore ? `<div class="detail-score" title="Average score on AniList"><span class="detail-score-value">${media.meanScore}%</span><span class="detail-score-label">score${media.popularity ? ` from ${(media.popularity / 1000).toFixed(1)}K members` : ''}</span></div>` : ''}
+                ${media.meanScore ? `<div class="detail-score" title="${media.fallback === 'tmdb' ? 'Average score on TMDB' : 'Average score on AniList'}"><span class="detail-score-value">${media.meanScore}%</span><span class="detail-score-label">score${media.popularity ? ` from ${(media.popularity / 1000).toFixed(1)}K members` : ''}</span></div>` : ''}
                 ${detailFactsHtml(media)}
                 <div class="taste-match" id="taste-match" hidden></div>
                 <div class="detail-actions">
@@ -164,6 +168,13 @@ function renderDetailHTML(media) {
 
         <div class="detail-tabpanel" id="detail-tab-overview" role="tabpanel" aria-labelledby="detail-tabbtn-overview">
         <div id="friends-status-section"></div>
+
+        ${media.fallback === 'tmdb' ? `<div class="box detail-fallback" role="note">
+            <strong>AniList isn’t answering right now.</strong> These are the basics from
+            <a href="https://www.themoviedb.org/${media.tmdb?.kind === 'movie' ? 'movie' : 'tv'}/${Number(media.tmdb?.id) || ''}" target="_blank" rel="noopener">TMDB</a>
+            until it’s back; changes you make are kept and sent to AniList then.
+            <span class="detail-fallback-credit">This product uses the TMDB API but is not endorsed or certified by TMDB.</span>
+        </div>` : ''}
 
         ${media.description ? `<div class="box" style="padding:var(--space-lg);margin-bottom:var(--space-xl);">
             <h3 style="margin-bottom:var(--space-sm);font-size:1rem">Description</h3>

@@ -736,6 +736,7 @@ function accountCards(card) {
             <div class="acct-list">${rows}</div>
             <button class="glass-btn glass-btn-secondary" type="button" data-add-account>Add account</button>
             <p class="settings-hint">AniList opens in a small window. If it shows the account you already have, sign out there and sign in with the other one.</p>`)
+        + '<div id="passkey-slot"></div>'
         + card('Your data', 'Everything AniRoll keeps for this account, gone in one step', `
             <p class="settings-hint">On AniRoll's server: your Jellyfin connection and its key, the token for syncing in the background,
             live tracking with its queue, the settings that follow your account, your Anime DNA card and its link, your place in
@@ -746,8 +747,61 @@ function accountCards(card) {
             ' id="your-data"');
 }
 
+// VIPs only (the server says who is one): passkeys to sign in while AniList's login is down (js/passkeys.js)
+async function mountPasskeys(panel) {
+    const slot = panel.querySelector('#passkey-slot');
+    const pk = await import('../passkeys.js');
+    if (!slot || !pk.passkeysSupported()) return;
+    const info = await pk.listPasskeys().catch(() => null);
+    if (!info?.vip) return;
+    const day = (t) => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    const rows = info.passkeys.map(p => `<div class="acct-row">
+            <span class="acct-name">${esc(p.label)}<span class="settings-hint" style="display:block;margin:0">Made ${day(p.created)}${p.used ? `, last used ${day(p.used)}` : ''}${p.current ? '' : ' · holds an older login'}</span></span>
+            ${p.current ? '' : `<button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-pk-reseal="${esc(p.id)}">Update</button>`}
+            <button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-pk-remove="${esc(p.id)}">Remove</button>
+        </div>`).join('');
+    slot.innerHTML = `<section class="settings-card" id="passkeys">
+            <h3 class="settings-card-title">Passkeys</h3>
+            <p class="dot-label settings-card-sub">For VIPs: a way in while AniList’s login is down</p>
+            ${rows ? `<div class="acct-list">${rows}</div>` : ''}
+            <button class="glass-btn glass-btn-secondary" type="button" data-pk-add>Add a passkey</button>
+            <p class="settings-hint">The passkey keeps your AniList login locked, so AniRoll’s server holds it but can’t read it. On a new device,
+            sign in with it from the start page or at aniroll.app/#/passkey. Needs a passkey that supports this (most phones, Chrome, Safari,
+            Firefox and password managers from 2025 on).</p>
+            <p class="settings-hint">As a VIP, AniRoll also keeps a copy of your list on its server, so it’s there while AniList is down.
+            “Delete all my AniRoll data” removes it with your passkeys.</p>
+        </section>`;
+    slot.onclick = async (e) => {
+        const el = /** @type {HTMLElement} */ (e.target);
+        const btn = /** @type {HTMLButtonElement | null} */ (el.closest('[data-pk-add], [data-pk-remove], [data-pk-reseal]'));
+        if (!btn) return;
+        btn.disabled = true;
+        try {
+            if (btn.dataset.pkRemove) {
+                if (!(await showConfirm({ title: 'Remove this passkey?', message: 'You can’t sign in with it any more. Remove it from the device or password manager too.', confirmText: 'Remove', danger: true }))) return;
+                await pk.removePasskey(btn.dataset.pkRemove);
+                toast('Passkey removed');
+            } else if (btn.dataset.pkReseal) {
+                await pk.resealPasskey(btn.dataset.pkReseal);
+                toast('Passkey updated', 'success');
+            } else {
+                await pk.addPasskey();
+                toast('Passkey added', 'success');
+            }
+            mountPasskeys(panel);
+        } catch (err) {
+            // Closing the browser's own dialog is not an error worth a red toast
+            if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') return;
+            toast(err?.name === 'InvalidStateError' ? 'This device already has a passkey for AniRoll' : err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    };
+}
+
 function initAccountTab(content) {
     const panel = content.querySelector('#settings-account');
+    mountPasskeys(panel);
     panel.addEventListener('click', async (e) => {
         const el = /** @type {HTMLElement} */ (e.target);
         const sw = /** @type {HTMLElement | null} */ (el.closest('[data-switch]'));

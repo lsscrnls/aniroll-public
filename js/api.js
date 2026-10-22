@@ -128,6 +128,43 @@ function queuePendingSave(variables) {
     savePending(list);
 }
 
+// No answer at all, AniList down, or our own or AniList's limit: the change is kept for later, not lost
+const queueable = (err) => err instanceof TypeError || err instanceof SyntaxError || navigator.onLine === false
+    || err.unavailable || err.rateLimited || err.throttled;
+
+// Posts, replies, likes, follows and deletes wait in the same queue as list changes (kind says which).
+// A like or follow pressed twice before it went out cancels itself instead of going out twice.
+const SOCIAL = {
+    post: `mutation ($text: String) { SaveTextActivity(text: $text) { id } }`,
+    reply: `mutation ($activityId: Int, $text: String) { SaveActivityReply(activityId: $activityId, text: $text) { id } }`,
+    like: `mutation ($id: Int, $type: LikeableType) { ToggleLikeV2(id: $id, type: $type) { ... on ListActivity { id } ... on TextActivity { id } ... on MessageActivity { id } } }`,
+    follow: `mutation ($userId: Int) { ToggleFollow(userId: $userId) { id } }`,
+    deleteActivity: `mutation ($id: Int) { DeleteActivity(id: $id) { deleted } }`,
+    deleteReply: `mutation ($id: Int) { DeleteActivityReply(id: $id) { deleted } }`,
+};
+const TOGGLES = new Set(['like', 'follow']);
+function queueSocial(kind, vars) {
+    const list = loadPending();
+    const key = kind === 'post' || kind === 'reply'
+        ? `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        : `${kind}-${vars.type || ''}${vars.id ?? vars.userId}`;
+    const twice = TOGGLES.has(kind) && list.some(item => item.key === key);
+    savePending(twice ? list.filter(item => item.key !== key) : [...list.filter(item => item.key !== key), { key, user: accountId(), kind, vars, ts: Date.now() }]);
+}
+
+// Runs a social write, or queues it when AniList can't take it now -> { data } | { queued: true }
+async function socialOrQueue(kind, vars, token, mutation = SOCIAL[kind]) {
+    try {
+        return { data: await query(mutation, vars, token) };
+    } catch (err) {
+        if (!queueable(err)) throw err;
+        queueSocial(kind, vars);
+        window.dispatchEvent(new CustomEvent(QUEUED_EVENT, { detail: { kind } }));
+        return { queued: true };
+    }
+}
+export const QUEUED_EVENT = 'aniroll:queued';
+
 let flushing = false;
 
 // Pushes queued changes once AniList answers again; called on start and every few minutes
@@ -144,14 +181,19 @@ export async function flushPendingSaves(token) {
         // which tripped the limit seconds after the page opened
         for (const item of list.slice(0, 5)) {
             try {
-                await saveMediaListEntry(item.vars, token, { queue: false });
+                if (item.kind) {
+                    if (!SOCIAL[item.kind]) throw new Error('unknown change');
+                    await query(SOCIAL[item.kind], item.vars, token);
+                    expireCache('activities(');
+                } else {
+                    await saveMediaListEntry(item.vars, token, { queue: false });
+                }
                 done++;
                 savePending(loadPending().filter(x => x.key !== item.key));
             } catch (err) {
                 // Still limited, our own budget full, or no answer at all (offline, a 5xx page that is
                 // not JSON): keep it and the rest for later. Only a refusal by AniList itself drops it
-                if (err.rateLimited || err.throttled || err instanceof TypeError || err instanceof SyntaxError
-                    || navigator.onLine === false) break;
+                if (queueable(err)) break;
                 savePending(loadPending().filter(x => x.key !== item.key)); // refused (e.g. entry gone), drop it
             }
             await new Promise(r => setTimeout(r, 2000)); // stay under AniList's write limit
@@ -331,10 +373,73 @@ async function query(q, variables = {}, token = null) {
         markRateLimited(res.headers.get('Retry-After'));
         throw rateLimitError();
     }
+    // AniList itself is down (2026-10-21: a 403 "temporarily disabled" page for a day, or a 5xx): not an
+    // answer to this request. Changes wait in the queue, details come from TMDB (see aniListDown)
+    if (res.status === 403 || res.status >= 500) {
+        const body = await res.json().catch(() => null);
+        if (!body?.errors && !body?.data) throw Object.assign(new Error('AniList isn’t answering right now'), { unavailable: true });
+        if (body.errors) throw new Error(body.errors[0]?.message || 'API Error');
+        return body.data;
+    }
 
     const json = await res.json();
     if (json.errors) throw new Error(json.errors[0]?.message || 'API Error');
+    aniListAnsweredAt = Date.now();
     return json.data;
+}
+
+// ===== While AniList is down (api/fallback.js) =====
+// Details and search from TMDB, a VIP's own list from AniRoll's server. Never put in the cache: the next
+// answer from AniList replaces them by itself.
+let aniListAnsweredAt = 0;
+const aniListDown = (err) => !err?.rateLimited && !err?.throttled
+    && (err?.unavailable || err instanceof TypeError || err instanceof SyntaxError);
+const isVip = () => { try { return localStorage.getItem('aniroll_vip') === '1'; } catch { return false; } };
+
+async function fromServer(path, token, opts = {}) {
+    const res = await fetch(path, { ...opts, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(opts.headers || {}) }, signal: AbortSignal.timeout(10000) });
+    return res.ok ? res.json() : null;
+}
+
+// Your own entry for a show, from the list read last (this tab, this browser, or the copy on the server)
+async function ownEntry(mediaId, token) {
+    const me = accountId();
+    if (!token || me === 'new') return null;
+    let lists = knownMediaList(me, 'ANIME');
+    if (!lists) lists = await getMediaList(me, 'ANIME', token).catch(() => null);
+    const e = (lists || []).flatMap(l => l.entries || []).find(x => x.mediaId === mediaId);
+    return e ? { id: e.id, status: e.status, score: e.score, progress: e.progress, repeat: e.repeat, notes: e.notes,
+        updatedAt: e.updatedAt, startedAt: e.startedAt, completedAt: e.completedAt } : null;
+}
+
+async function fallbackMedia(id, token) {
+    const data = await fromServer(`/api/fallback/media/${id}`, null).catch(() => null);
+    if (!data?.media) return null;
+    return { ...data.media, mediaListEntry: await ownEntry(id, token).catch(() => null) };
+}
+
+async function fallbackSearch(search, token) {
+    const data = await fromServer(`/api/fallback/search?q=${encodeURIComponent(search)}`, null).catch(() => null);
+    if (!data?.media) return null;
+    const me = accountId();
+    const own = new Map((knownMediaList(me, 'ANIME') || []).flatMap(l => l.entries || []).map(e => [e.mediaId, e]));
+    data.media = data.media.map(m => {
+        const e = own.get(m.id);
+        return e ? { ...m, mediaListEntry: { id: e.id, status: e.status, score: e.score, progress: e.progress } } : m;
+    });
+    return data;
+}
+
+// After AniList answered with your own list: a copy goes to the server (VIPs), when it changed since the last one
+function keepList(userId, type, lists, token) {
+    if (!token || !isVip() || String(userId) !== String(accountId()) || Date.now() - aniListAnsweredAt > 60000) return;
+    const entries = lists.flatMap(l => l.entries || []);
+    const sig = `${entries.length}:${Math.max(0, ...entries.map(e => e.updatedAt || 0))}`;
+    const key = `aniroll_list_kept_${type}`;
+    try { if (localStorage.getItem(key) === sig) return; } catch { return; }
+    fromServer(`/api/me/list?type=${type}`, token, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lists }) })
+        .then(ok => { if (ok) localStorage.setItem(key, sig); })
+        .catch(() => { /* next time */ });
 }
 
 const MEDIA_FRAGMENT = `
@@ -388,6 +493,17 @@ fragment mediaCard on Media {
 }`;
 
 export async function searchMedia(search, type = null, page = 1, perPage = 20, token = null) {
+    try {
+        return await searchAniList(search, type, page, perPage, token);
+    } catch (err) {
+        // TMDB knows no manga, and has one page of answers
+        const fb = aniListDown(err) && type !== 'MANGA' && page === 1 ? await fallbackSearch(search, token) : null;
+        if (fb) return fb;
+        throw err;
+    }
+}
+
+async function searchAniList(search, type, page, perPage, token) {
     const data = await cachedQuery(`
         ${MEDIA_CARD_FRAGMENT}
         query ($search: String, $type: MediaType, $page: Int, $perPage: Int) {
@@ -442,6 +558,16 @@ export async function getStaff(id, page = 1, token = null) {
 }
 
 export async function getMedia(id, token = null) {
+    try {
+        return await getMediaFromAniList(id, token);
+    } catch (err) {
+        const fb = aniListDown(err) ? await fallbackMedia(id, token) : null;
+        if (fb) return fb;
+        throw err;
+    }
+}
+
+async function getMediaFromAniList(id, token) {
     const data = await cachedQuery(`
         ${MEDIA_FRAGMENT}
         query ($id: Int) {
@@ -626,6 +752,22 @@ export async function getUserProfile(name, token = null) {
 }
 
 export async function getMediaList(userId, type = 'ANIME', token = null) {
+    let lists;
+    try {
+        lists = await listFromAniList(userId, type, token);
+    } catch (err) {
+        // Your own list on a browser that never read it: the copy on the server (VIPs)
+        const own = token && isVip() && String(userId) === String(accountId()) && aniListDown(err);
+        const kept = own ? await fromServer(`/api/me/list?type=${type}`, token).catch(() => null) : null;
+        if (!kept?.lists) throw err;
+        lists = kept.lists;
+    }
+    knownLists.set(`${userId}:${type}`, lists);
+    keepList(userId, type, lists, token);
+    return lists;
+}
+
+async function listFromAniList(userId, type, token) {
     const data = await cachedQuery(`
         query ($userId: Int, $type: MediaType) {
             MediaListCollection(userId: $userId, type: $type, sort: [UPDATED_TIME_DESC]) {
@@ -657,7 +799,6 @@ export async function getMediaList(userId, type = 'ANIME', token = null) {
             }
         }
     `, { userId, type }, token, TTL.lists);
-    knownLists.set(`${userId}:${type}`, data.MediaListCollection.lists);
     return data.MediaListCollection.lists;
 }
 
@@ -776,6 +917,10 @@ async function queryOrQueue(variables, token, queue, mutation) {
         if ((err instanceof TypeError || navigator.onLine === false) && queue) {
             queuePendingSave(variables);
             throw Object.assign(new Error('You are offline — change saved, AniRoll sends it once you are back'), { offline: true, queued: true });
+        }
+        if (err.unavailable && queue) {
+            queuePendingSave(variables);
+            throw Object.assign(new Error('AniList isn’t answering — change saved, AniRoll sends it once it’s back'), { offline: true, queued: true });
         }
         // Throttled by our own budget counts too, or the change would be lost
         if ((err.rateLimited || err.throttled) && queue) {
@@ -1044,14 +1189,16 @@ export async function getFollowing(userId, page = 1, token = null) {
 
 // Replies to an activity. Drops the cached thread (the next open shows the reply) and marks
 // the feeds stale for the new reply count, keeping them as fallback if the refetch fails.
-export async function postActivityReply(activityId, text, token) {
-    const data = await query(`
+// AniList down: the reply waits in the queue and comes back as a stand-in without an id (queued: true)
+export async function postActivityReply(activityId, text, token, me = null) {
+    const { data, queued } = await socialOrQueue('reply', { activityId, text }, token, `
         mutation ($activityId: Int, $text: String) {
             SaveActivityReply(activityId: $activityId, text: $text) {
                 id text createdAt likeCount isLiked user { id name avatar { medium } }
             }
         }
-    `, { activityId, text }, token);
+    `);
+    if (queued) return { id: 0, text, createdAt: Math.floor(Date.now() / 1000), likeCount: 0, isLiked: false, user: me, queued };
     clearCache('on TextActivity { id replies {');
     expireCache('activities(');
     return data.SaveActivityReply;
@@ -1060,30 +1207,33 @@ export async function postActivityReply(activityId, text, token) {
 // Deletes one of your own posts (or a message sent to or by you). The feeds and profile posts are
 // dropped from the cache, not kept as fallback: the deleted post must not come back from there
 export async function deleteActivity(id, token) {
-    const data = await query(`mutation ($id: Int) { DeleteActivity(id: $id) { deleted } }`, { id }, token);
+    const { data, queued } = await socialOrQueue('deleteActivity', { id }, token);
     clearCache('activities(');
-    return !!data.DeleteActivity?.deleted;
+    return queued || !!data.DeleteActivity?.deleted;
 }
 
 export async function deleteActivityReply(id, token) {
-    const data = await query(`mutation ($id: Int) { DeleteActivityReply(id: $id) { deleted } }`, { id }, token);
+    const { data, queued } = await socialOrQueue('deleteReply', { id }, token);
     clearCache('on TextActivity { id replies {');
     expireCache('activities(');
-    return !!data.DeleteActivityReply?.deleted;
+    return queued || !!data.DeleteActivityReply?.deleted;
 }
 
 // Follows or unfollows someone; the answer says which it is now. Their profile and your
 // following list are read again next time
-export async function toggleFollow(userId, token) {
-    const data = await query(`mutation ($userId: Int) { ToggleFollow(userId: $userId) { id isFollowing } }`, { userId }, token);
+// following: whether you follow them now, for the answer while AniList is down (the toggle waits in the queue)
+export async function toggleFollow(userId, token, following = false) {
+    const { data, queued } = await socialOrQueue('follow', { userId }, token, `mutation ($userId: Int) { ToggleFollow(userId: $userId) { id isFollowing } }`);
+    if (queued) return !following;
     clearCache('isFollowing isFollower');
     clearCache('following(userId');
     expireCache('activities(');
     return !!data.ToggleFollow?.isFollowing;
 }
 
-export async function toggleLike(id, type, token) {
-    const data = await query(`
+// liked: whether it is liked now, for the answer while AniList is down (the toggle waits in the queue)
+export async function toggleLike(id, type, token, liked = false) {
+    const { data, queued } = await socialOrQueue('like', { id, type }, token, `
         mutation ($id: Int, $type: LikeableType) {
             ToggleLikeV2(id: $id, type: $type) {
                 ... on ListActivity { id likeCount isLiked }
@@ -1091,7 +1241,8 @@ export async function toggleLike(id, type, token) {
                 ... on MessageActivity { id likeCount isLiked }
             }
         }
-    `, { id, type }, token);
+    `);
+    if (queued) return { id, isLiked: !liked, queued };
     return data.ToggleLikeV2;
 }
 
@@ -1158,12 +1309,10 @@ export async function getNotifications(page = 1, token) {
     return data.Page;
 }
 
+// AniList down: the post waits in the queue -> { id: null, queued: true }
 export async function postTextActivity(text, token) {
-    const data = await query(`
-        mutation ($text: String) {
-            SaveTextActivity(text: $text) { id }
-        }
-    `, { text }, token);
+    const { data, queued } = await socialOrQueue('post', { text }, token);
+    if (queued) return { id: null, queued };
     // The post shows in the feed right away (the Watch Party post leads to Social straight after)
     expireCache('activities(');
     expireCache('mediaList(userId_in');

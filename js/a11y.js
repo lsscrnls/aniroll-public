@@ -133,19 +133,39 @@ document.addEventListener('keydown', (e) => {
 //   data-open="<mediaId>"   opens the detail panel   (render with role="button" tabindex="0")
 //   data-go="/user/<name>"  goes to that route       (render with role="link" tabindex="0")
 //   data-login              starts the AniList login
+//   data-passkey-login      signs in with a VIP's passkey (js/passkeys.js)
 // One listener for the whole document, so it also covers markup rendered later. Controls
 // inside a card (the −/+ buttons, links in a post) keep their own behaviour.
-const ACTIVATE = '[data-open], [data-go], [data-login]';
+const ACTIVATE = '[data-open], [data-go], [data-login], [data-passkey-login]';
 const INNER_CONTROL = 'a, button, input, select, textarea, label, [role="button"], [role="link"]';
 
 function activate(el) {
     if (el.hasAttribute('data-login')) {
         document.getElementById('login-btn')?.click();
+    } else if (el.hasAttribute('data-passkey-login')) {
+        passkeyLogin(el);
     } else if (el.hasAttribute('data-go')) {
         window.location.hash = el.dataset.go;
     } else {
         const id = Number(el.dataset.open);
         if (id) window.__openDetailPanel?.(id);
+    }
+}
+
+async function passkeyLogin(el) {
+    if (el.disabled) return;
+    el.disabled = true;
+    try {
+        const { signInWithPasskey } = await import('./passkeys.js');
+        await signInWithPasskey();
+    } catch (err) {
+        // The browser's own dialog closed: nothing to say
+        if (err?.name !== 'NotAllowedError' && err?.name !== 'AbortError') {
+            const { toast } = await import('./store.js');
+            toast(err.message || 'Signing in with the passkey failed', 'error');
+        }
+    } finally {
+        el.disabled = false;
     }
 }
 

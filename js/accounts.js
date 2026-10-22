@@ -23,7 +23,7 @@ const DEVICE = new Set([LIST_KEY, ADDING, 'aniroll_theme', 'aniroll_accent', 'an
     'aniroll_cal_view', 'aniroll_cal_images', 'aniroll_settings_tab', 'aniroll_discover', 'aniroll_friends_tab',
     'aniroll_discord', 'aniroll_discord_nagged', 'aniroll_discord_ext_nagged', 'aniroll_maint_seen', 'aniroll_visit_from',
     'aniroll_req_times', 'aniroll_login_started', 'aniroll_pending_saves', 'aniroll_dl_hide_done', 'aniroll_jf_device',
-    'aniroll_seen_changes']);
+    'aniroll_seen_changes', 'aniroll_vip_device']);
 const ownKeys = () => Object.keys(localStorage).filter(k => k.startsWith('aniroll_') && !DEVICE.has(k) && !k.startsWith(PARKED));
 
 /** @returns {{ id: number, name: string, avatar: string, token: string }[]} */

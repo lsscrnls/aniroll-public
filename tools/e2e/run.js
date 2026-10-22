@@ -2242,6 +2242,83 @@ function staticServer() {
         await page.close();
     });
 
+    // AniList down for a day (2026-10-21): details from TMDB, replies and likes kept and sent later, VIP-only passkeys
+    groups.main.push(async () => {
+        const { page, settle, go, mutations } = await mainPage();
+        const tmdbMedia = { id: 990001, title: { userPreferred: 'Fallback Show', english: 'Fallback Show', romaji: 'Fallback Show', native: null },
+            coverImage: { large: '', extraLarge: '', color: null }, bannerImage: null, format: 'TV', status: 'FINISHED', episodes: 12, meanScore: 80,
+            genres: ['Action'], startDate: { year: 2020, month: 1, day: 1 }, endDate: {}, description: 'From TMDB', type: 'ANIME', mediaListEntry: null,
+            recommendations: { nodes: [] }, studios: { edges: [] }, relations: { edges: [] }, characters: { edges: [] }, reviews: { nodes: [] },
+            stats: { scoreDistribution: [], statusDistribution: [] }, tags: [], externalLinks: [], fallback: 'tmdb', tmdb: { kind: 'tv', id: 1 } };
+        let vip = true;
+        await page.route(`${base}/api/**`, route => {
+            const p = new URL(route.request().url()).pathname;
+            if (p.startsWith('/api/fallback/media/')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ media: tmdbMedia }) });
+            if (p === '/api/passkey') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ vip, passkeys: [] }) });
+            route.fallback();
+        });
+        // Down the way it was: a 403 page that is no AniList answer
+        const down = (route) => route.fulfill({ status: 403, contentType: 'text/html', headers: { 'Access-Control-Allow-Origin': '*' }, body: '<h1>temporarily disabled</h1>' });
+
+        await page.goto(base + '/#/');
+        await settle(1500);
+        await go('#/social');
+        const toggle = await page.$('.reply-toggle');
+        if (toggle) { await toggle.click(); await settle(800); }
+        await page.route('https://graphql.anilist.co/**', down);
+        const queue = () => page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_pending_saves') || '[]').map(i => i.kind || 'list'));
+        await page.fill('.activity-reply-form input', 'sent later');
+        await page.$eval('.activity-reply-form', f => f.requestSubmit());
+        await settle(800);
+        const standIn = await page.$$eval('.activity-reply .activity-text', els => els.some(e => e.textContent.includes('sent later')));
+        const like = await page.$('.like-btn');
+        await like?.click(); await settle(400);
+        const afterOne = await queue();
+        await like?.click(); await settle(400);
+        const afterTwo = await queue();
+        check('AniList down: a reply is kept and shown, a like pressed twice cancels itself',
+            standIn && afterOne.includes('reply') && afterOne.includes('like') && afterTwo.includes('reply') && !afterTwo.includes('like'), { standIn, afterOne, afterTwo });
+
+        await go('#/anime/990001/full');
+        const fb = await page.evaluate(() => ({ note: !!document.querySelector('.detail-fallback'), title: document.querySelector('.detail-title')?.textContent }));
+        check('AniList down: a show not seen before comes from TMDB, with a note saying so', fb.note && fb.title === 'Fallback Show', fb);
+
+        await page.unroute('https://graphql.anilist.co/**', down);
+        const before = mutations.length;
+        await page.evaluate(() => window.dispatchEvent(new Event('online')));
+        await page.waitForFunction(() => !JSON.parse(localStorage.getItem('aniroll_pending_saves') || '[]').length, null, { timeout: 8000 }).catch(() => {});
+        check('AniList back: the kept reply goes out', mutations.slice(before).includes('SaveActivityReply') && !(await queue()).length,
+            { sent: mutations.slice(before), left: await queue() });
+
+        // Passkeys: a card for VIPs only
+        await go('#/settings?tab=account');
+        await page.waitForSelector('#passkeys', { timeout: 3000 }).catch(() => {});
+        const vipCard = !!(await page.$('#passkeys'));
+        vip = false;
+        await page.reload(); await settle();
+        await go('#/settings?tab=account');
+        await page.waitForTimeout(800);
+        check('passkeys: the Settings card shows for VIPs only', vipCard && !(await page.$('#passkeys')), { vipCard });
+        await page.close();
+
+        // The start page offers the passkey only in a browser a VIP used before
+        const landing = async (storage) => {
+            const p = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+            await p.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
+            await p.route(`${base}/api/**`, route => route.fulfill({ contentType: 'application/json', body: '{"maintenance":false}' }));
+            await p.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
+            await p.addInitScript(entries => { for (const [k, v] of entries) localStorage.setItem(k, v); }, Object.entries({ aniroll_seen_changes: '9999', ...storage }));
+            await p.goto(base + '/#/');
+            await idle(p, 2500);
+            const has = !!(await p.$('[data-passkey-login]'));
+            await p.close();
+            return has;
+        };
+        const vipBrowser = await landing({ aniroll_vip_device: '1' });
+        const anyBrowser = await landing({});
+        check('passkeys: the start page offers one only where a VIP signed in before', vipBrowser && !anyBrowser, { vipBrowser, anyBrowser });
+    });
+
     // Checks kept out of the published source, when present
     const extra = path.join(__dirname, 'private.js');
     if (fs.existsSync(extra)) groups.private = [require(extra)].flat().map(run => () => run({ browser, base, check, respond, VIEWER, errors, idle }));

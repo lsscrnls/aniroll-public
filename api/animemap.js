@@ -140,6 +140,9 @@ module.exports = function animeMap({ dataDir, writeJson, readJson, json, readBod
 
     // The TVDB/TMDB ids of one AniList entry, or null
     const forAnilist = (id) => byAnilist.get(num(id)) || null;
+    // The other way, for the TMDB fallback's search (api/fallback.js): every AniList entry of a TMDB show or film
+    const forTmdb = (id) => byTmdb.get(num(id)) || [];
+    const forMovie = (id) => byMovie.get(num(id)) || [];
 
-    return { handle, handleLibrary, libraryMatch, forgetLibrary, forAnilist, stats: () => ({ entries: entries.length, at: loadedAt }) };
+    return { handle, handleLibrary, libraryMatch, forgetLibrary, forAnilist, forTmdb, forMovie, stats: () => ({ entries: entries.length, at: loadedAt }) };
 };
