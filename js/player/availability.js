@@ -1,6 +1,7 @@
 // @ts-check
 import { getConfig, normalizeUrl } from '../jellyfin.js';
 import { noteStatus } from './animemap.js';
+import { accountState, saveAccountState } from '../accountstate.js';
 
 // Is the user's Jellyfin reachable from this browser right now? AniRoll has to work the same
 // with the whole stack switched off, so this never blocks anything: a short timeout, the answer
@@ -25,6 +26,39 @@ export function setLocalUrl(raw) {
     } catch { /* storage blocked: public address only */ }
     cached = null;
     return url;
+}
+
+// What the user's server can send over the internet (its home line's upload), in bits per second, for the
+// server address it was set for; 0 when not set. Kept with the account, so the phone knows it too.
+const UPLOAD_KEY = 'aniroll_jf_upload';
+const cleanUpload = (v) => (v && typeof v.url === 'string' && Number.isFinite(v.bps) && v.bps > 0 ? { url: v.url, bps: v.bps } : null);
+
+export function getUpload() {
+    const url = getConfig()?.url;
+    try {
+        const v = cleanUpload(JSON.parse(localStorage.getItem(UPLOAD_KEY) || 'null'));
+        return v && v.url === url ? v.bps : 0;
+    } catch { return 0; }
+}
+
+/** @param {number} mbps 0 removes it */
+export function setUpload(mbps) {
+    const url = getConfig()?.url || '';
+    const value = mbps > 0 ? { url, bps: Math.round(mbps * 1e6) } : null;
+    try { value ? localStorage.setItem(UPLOAD_KEY, JSON.stringify(value)) : localStorage.removeItem(UPLOAD_KEY); } catch { /* this page only */ }
+    saveAccountState('upload', value);
+    return value?.bps || 0;
+}
+
+// The account's value replaces this browser's (set on another device); once per page
+let uploadSynced = null;
+export function syncUpload() {
+    uploadSynced ??= accountState().then(state => {
+        if (!Object.hasOwn(state, 'upload')) return;
+        const v = cleanUpload(state.upload);
+        try { v ? localStorage.setItem(UPLOAD_KEY, JSON.stringify(v)) : localStorage.removeItem(UPLOAD_KEY); } catch { /* this page only */ }
+    });
+    return uploadSynced.then(getUpload);
 }
 
 async function ping(base, ms) {

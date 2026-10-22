@@ -411,7 +411,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
                 setSpeed(Number(item.dataset.speed));
             } else if (item.dataset.quality != null) {
                 const q = /^\d+(\.\d+)?$/.test(item.dataset.quality) ? Number(item.dataset.quality) : item.dataset.quality;
-                if (q !== quality.current()) quality.select(q);
+                quality.select(q); // the current one too: Auto again starts fresh
             } else if (item.dataset.identify != null) {
                 closeMenu();
                 listenForSong();

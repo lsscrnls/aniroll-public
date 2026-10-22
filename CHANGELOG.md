@@ -1,9 +1,11 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.7.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.7.1.
 
 ## 23 October 2026 – Your show in Discord, and a helper that updates itself
 
+- Buffering again and again away from home? In Auto, the player now steps the quality down by itself and plays on from the same spot. Picking Auto again in the menu starts fresh.
+- Settings → Jellyfin takes your server's upload: away from home the player stays below it, and files whose bitrate jumps a lot (Blu-rays) are converted instead of stuttering.
 - While you watch, your **Discord status** says **AniRoll:** and the show, in the member list too. It needs the newest helper: Settings → Discord shows the update.
 - AniRoll for Discord's helper can **update itself**. Turn it on when you set it up, or later with one line in the terminal; Settings → Discord shows both.
 

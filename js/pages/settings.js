@@ -558,6 +558,7 @@ async function renderJellyfinSettings() {
     const scope = jf.getScope();
     const player = await import('../player/availability.js');
     const localUrl = player.getLocalUrl();
+    const upload = await player.syncUpload();
     box.innerHTML = `
         <div class="jf-row"><span class="jf-dot jf-dot-checking" id="jf-settings-dot"></span><span id="jf-settings-state">Checking…</span></div>
         <div class="jf-meta">${esc(cfg.serverName)} · ${esc(cfg.url)}${cfg.userName ? ` · ${esc(cfg.userName)}` : ''}</div>
@@ -572,6 +573,14 @@ async function renderJellyfinSettings() {
                 <button class="glass-btn glass-btn-secondary glass-btn-sm" id="jf-local-save">Save</button>
             </div>
             <p class="dot-label jf-hint">The player tries it first — at home it skips the detour through the internet and plays big files at full quality.</p>
+        </div>
+        <div class="jf-local">
+            <label class="jf-local-label" for="jf-upload">Upload of your server's internet line, in Mbps (optional)</label>
+            <div class="jf-local-row">
+                <input type="number" class="glass-input" id="jf-upload" min="0" max="1000" step="1" inputmode="numeric" placeholder="e.g. 20" value="${upload ? +(upload / 1e6).toFixed(1) : ''}">
+                <button class="glass-btn glass-btn-secondary glass-btn-sm" id="jf-upload-save">Save</button>
+            </div>
+            <p class="dot-label jf-hint">Away from home the player stays below it, so a file with big jumps in its bitrate is converted instead of stuttering. Saved for your account.</p>
         </div>
         ${linksHtml()}
         <div class="jf-actions">
@@ -627,6 +636,14 @@ async function renderJellyfinSettings() {
         const avail = await player.availability(true);
         btn.disabled = false;
         toast(avail?.local ? 'Local address works — the player uses it on this device' : 'Saved, but it does not answer right now — the player uses the public address', avail?.local ? 'success' : 'error');
+    });
+
+    box.querySelector('#jf-upload-save').addEventListener('click', () => {
+        const input = /** @type {HTMLInputElement} */ (box.querySelector('#jf-upload'));
+        const mbps = Math.min(1000, Math.max(0, Number(input.value) || 0));
+        const bps = player.setUpload(mbps);
+        input.value = bps ? String(+(bps / 1e6).toFixed(1)) : '';
+        toast(bps ? `Away from home the player stays below ${input.value} Mbps` : 'Upload removed — the player measures the line itself', 'success');
     });
 
     box.querySelector('#jf-recheck').addEventListener('click', async (ev) => {
