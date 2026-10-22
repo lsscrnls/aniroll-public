@@ -6,7 +6,9 @@
 //   POST   /api/passkey/reseal      the same passkey, sealing the token you are signed in with now
 //   DELETE /api/passkey?id=         removes one of yours
 // The token is sealed in the browser with a key only the passkey can give (WebAuthn PRF): this server keeps
-// it and hands it back, but cannot open it. Signing in with the passkey puts that token's hash among the
+// it and hands it back, but cannot open it. A passkey without PRF (Proton Pass on an iPhone, 2026-10-22) gets
+// the token sealed here instead, with the server's own key (like the Jellyfin keys): it works everywhere, but
+// this server could open it. Signing in with the passkey puts that token's hash among the
 // known viewers (server.js), so Jellyfin, parties and seats accept it while AniList cannot be asked.
 // No CBOR: the browser hands over the public key as SPKI (getPublicKey) and the authenticator data as is.
 const crypto = require('crypto');
@@ -18,7 +20,7 @@ const RP_PROD = 'aniroll.app';
 const ALGS = new Set([-7, -8, -257]); // ES256, EdDSA, RS256
 
 module.exports = function passkeys({ dataDir, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer, refuseAuth,
-    isVip, tokenHash, bearerToken, rememberViewer, allowedOrigin, isLocalOrigin, str }) {
+    isVip, tokenHash, bearerToken, rememberViewer, allowedOrigin, isLocalOrigin, str, encryptSecret, decryptSecret }) {
     const file = path.join(dataDir, 'passkeys.json');
     const challenges = new Map(); // challenge -> { mode, userId, rpId, at }
 
@@ -79,7 +81,7 @@ module.exports = function passkeys({ dataDir, readJson, writeJson, json, readBod
     }
 
     const listFor = (all, userId, current) => Object.entries(all).filter(([, c]) => c.userId === userId)
-        .map(([id, c]) => ({ id, label: c.label, created: c.created, used: c.used || null, current: c.tokenHash === current }))
+        .map(([id, c]) => ({ id, label: c.label, created: c.created, used: c.used || null, current: c.tokenHash === current, sealed: c.sealed ? 'server' : 'passkey' }))
         .sort((a, b) => a.created - b.created);
 
     async function handle(req, res, pathname) {
@@ -139,9 +141,9 @@ module.exports = function passkeys({ dataDir, readJson, writeJson, json, readBod
             const rawId = b64u(id);
             const pk = b64u(body.publicKey);
             const alg = Number(body.alg);
-            const blob = sealed(body.blob);
+            const blob = body.serverSeal === true ? null : sealed(body.blob);
             if (!rawId || rawId.length < 16 || rawId.length > 1023 || !pk || pk.length > 2000 || !ALGS.has(alg)) return json(res, 400, { error: 'This passkey cannot be used here' });
-            if (!blob) return json(res, 400, { error: 'The login could not be sealed' });
+            if (!blob && body.serverSeal !== true) return json(res, 400, { error: 'The login could not be sealed' });
             // The credential the authenticator says it made (attested data: AAGUID, id length, id) must be the one sent
             const ad = c.authData;
             if (!(ad[32] & 0x40) || ad.length < 55 || ad.readUInt16BE(53) !== rawId.length || !ad.subarray(55, 55 + rawId.length).equals(rawId)) {
@@ -153,7 +155,8 @@ module.exports = function passkeys({ dataDir, readJson, writeJson, json, readBod
             if (Object.keys(all).filter(k => all[k].userId === auth.viewer.id).length >= MAX_PER_USER) return json(res, 400, { error: `${MAX_PER_USER} passkeys at most, remove one first` });
             all[id] = {
                 userId: auth.viewer.id, name: str(auth.viewer.name, 40), avatar: str(auth.viewer.avatar?.medium, 500),
-                pk: pk.toString('base64'), alg, rpId: rp.rpId, blob, tokenHash: tokenHash(bearerToken(req)),
+                pk: pk.toString('base64'), alg, rpId: rp.rpId, tokenHash: tokenHash(bearerToken(req)),
+                ...(blob ? { blob } : { sealed: encryptSecret(bearerToken(req)) }),
                 label: str(body.label, 60) || 'Passkey', created: Date.now(), used: null,
             };
             save(all);
@@ -166,9 +169,10 @@ module.exports = function passkeys({ dataDir, readJson, writeJson, json, readBod
             const all = load();
             const id = typeof body.id === 'string' ? body.id : '';
             if (!Object.hasOwn(all, id) || all[id].userId !== auth.viewer.id) return json(res, 404, { error: 'No such passkey' });
-            const blob = sealed(body.blob);
-            if (!blob) return json(res, 400, { error: 'The login could not be sealed' });
-            all[id] = { ...all[id], blob, tokenHash: tokenHash(bearerToken(req)) };
+            const { blob: _old, sealed: _oldSealed, ...rest } = all[id];
+            const blob = all[id].sealed ? null : sealed(body.blob);
+            if (!all[id].sealed && !blob) return json(res, 400, { error: 'The login could not be sealed' });
+            all[id] = { ...rest, ...(blob ? { blob } : { sealed: encryptSecret(bearerToken(req)) }), tokenHash: tokenHash(bearerToken(req)) };
             save(all);
             return json(res, 200, { ok: true });
         }
@@ -188,6 +192,11 @@ module.exports = function passkeys({ dataDir, readJson, writeJson, json, readBod
             save(all);
             const viewer = { id: cred.userId, name: cred.name, avatar: { medium: cred.avatar } };
             rememberViewer(cred.tokenHash, viewer);
+            if (cred.sealed) {
+                const token = decryptSecret(cred.sealed);
+                if (!token) return json(res, 500, { error: 'AniRoll can’t open this passkey’s login any more. Remove it and make a new one.' });
+                return json(res, 200, { viewer, token });
+            }
             return json(res, 200, { viewer, blob: cred.blob });
         }
 

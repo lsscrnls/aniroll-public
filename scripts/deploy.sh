@@ -49,7 +49,7 @@ for f in js/*.js js/pages/*.js js/player/*.js; do
 done
 (cd "$tmp_check" && find js -name '*.mjs' -print0 | xargs -0 -n 1 -P 8 node --check) || fail "syntax error in the module named above"
 if [ "$WITH_API" -eq 1 ]; then
-    for f in api/server.js api/party.js api/animemap.js api/sources.js api/songs.js api/passkeys.js api/fallback.js; do node --check "$f" || fail "syntax error in $f"; done
+    for f in api/server.js api/party.js api/animemap.js api/sources.js api/songs.js api/passkeys.js api/fallback.js api/watchorder.js; do node --check "$f" || fail "syntax error in $f"; done
 fi
 rm -rf "$tmp_check"
 echo "all modules parse"
@@ -111,7 +111,7 @@ stale=$(ssh "$SERVER" "cd '$WEBROOT' && find js -name '*.js' | sort" | while rea
 if [ "$WITH_API" -eq 1 ]; then
     step "API"
     # The Dockerfile too: it pins the Node version the image is built on
-    scp -q api/server.js api/party.js api/animemap.js api/sources.js api/songs.js api/passkeys.js api/fallback.js api/Dockerfile "$SERVER:$API_DIR/"
+    scp -q api/server.js api/party.js api/animemap.js api/sources.js api/songs.js api/passkeys.js api/fallback.js api/watchorder.js api/Dockerfile "$SERVER:$API_DIR/"
     # docker restart is not enough: server.js and party.js are copied into the image at build time.
     # Build first: if it fails (e.g. the base image cannot be pulled), the old container keeps running.
     # The container runs as uid 10001 (api/Dockerfile): data/ is handed to it after the old container
