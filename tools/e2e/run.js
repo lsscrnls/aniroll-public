@@ -2358,10 +2358,15 @@ function staticServer() {
             recommendations: { nodes: [] }, studios: { edges: [] }, relations: { edges: [] }, characters: { edges: [] }, reviews: { nodes: [] },
             stats: { scoreDistribution: [], statusDistribution: [] }, tags: [], externalLinks: [], fallback: 'tmdb', tmdb: { kind: 'tv', id: 1 } };
         let vip = true;
+        const pkCalls = [];
+        const keys = [{ id: 'pk1', label: 'Linux, Chrome', created: Date.now() - 86400000, used: null, current: true, sealed: 'passkey' }];
         await page.route(`${base}/api/**`, route => {
             const p = new URL(route.request().url()).pathname;
             if (p.startsWith('/api/fallback/media/')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ media: tmdbMedia }) });
-            if (p === '/api/passkey') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ vip, passkeys: [] }) });
+            // One passkey from before (sealed by its PRF): the card turns it into a server-sealed one at once
+            if (p === '/api/passkey' && route.request().method() === 'PATCH') { pkCalls.push({ rename: route.request().postDataJSON() }); keys[0].label = route.request().postDataJSON().label; return route.fulfill({ contentType: 'application/json', body: '{"ok":true}' }); }
+            if (p === '/api/passkey/reseal') { pkCalls.push({ reseal: route.request().postDataJSON()?.id }); keys[0].sealed = 'server'; return route.fulfill({ contentType: 'application/json', body: '{"ok":true}' }); }
+            if (p === '/api/passkey') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ vip, passkeys: keys }) });
             // The mock names this show by an id of its own: it becomes the middle part
             if (p.startsWith('/api/watchorder/')) {
                 const me = Number(p.split('/').pop());
@@ -2419,6 +2424,14 @@ function staticServer() {
         await go('#/settings?tab=account');
         await page.waitForSelector('#passkeys', { timeout: 3000 }).catch(() => {});
         const vipCard = !!(await page.$('#passkeys'));
+        // Rename: the name becomes a field, Enter saves it
+        await page.click('[data-pk-rename="pk1"]').catch(() => {});
+        await page.fill('.pk-name-input', 'Proton Pass').catch(() => {});
+        await page.keyboard.press('Enter');
+        await settle(300);
+        const pkName = await page.evaluate(() => document.querySelector('[data-pk-row="pk1"] .pk-label')?.textContent);
+        check('passkeys: an old one is made to work everywhere at once; Rename gives it a name of your own',
+            pkCalls.some(c => c.reseal === 'pk1') && pkCalls.some(c => c.rename?.id === 'pk1' && c.rename.label === 'Proton Pass') && pkName === 'Proton Pass', { pkCalls, pkName });
         vip = false;
         await page.reload(); await settle();
         await go('#/settings?tab=account');

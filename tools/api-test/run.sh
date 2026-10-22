@@ -27,9 +27,20 @@ cp "$root/api/server.js" "$root/api/party.js" "$root/api/animemap.js" "$root/api
 # A tiny anime map instead of the real download: two parts of one TVDB season, a movie
 mkdir -p "$work/data"
 echo '{"at":'"$(date +%s)000"',"entries":[{"a":101,"tvdb":5001,"ts":1,"to":0,"tmdb":7001,"ms":1,"mo":0,"movie":[]},{"a":102,"tvdb":5001,"ts":1,"to":12,"tmdb":7001,"ms":1,"mo":12,"movie":[]},{"a":103,"tvdb":null,"ts":null,"to":0,"tmdb":null,"ms":null,"mo":0,"movie":[9001]}]}' > "$work/data/animemap.json"
+# The passkey key: a file of its own outside data/ (as on the VPS); one passkey from before, its login sealed with
+# the Jellyfin key, which the server moves to the passkey key when it starts
+head -c 48 /dev/urandom | base64 > "$work/passkey.key"
+node -e '
+const c = require("crypto");
+const key = c.createHash("sha256").update("local-test-secret-0123456789abcdef").digest();
+const iv = c.randomBytes(12), ci = c.createCipheriv("aes-256-gcm", key, iv);
+const enc = Buffer.concat([ci.update("old-token", "utf8"), ci.final()]);
+const sealed = [iv.toString("base64"), ci.getAuthTag().toString("base64"), enc.toString("base64")].join(".");
+require("fs").writeFileSync(process.argv[1], JSON.stringify({ legacy1: { userId: 4242, sealed, label: "Old", created: 1, pk: "", alg: -7, rpId: "localhost" } }));
+' "$work/data/passkeys.json"
 node "$here/mockanilist.js" > "$work/mock.log" 2>&1 &
 pids+=($!)
-(cd "$work" && exec env ANILIST_URL=http://127.0.0.1:3099 JF_SECRET=local-test-secret-0123456789abcdef \
+(cd "$work" && exec env ANILIST_URL=http://127.0.0.1:3099 JF_SECRET=local-test-secret-0123456789abcdef PASSKEY_KEY_FILE="$work/passkey.key" \
     ANILIST_BUDGET_PER_MIN=200 VERIFY_PAUSE_MS=1000 MAX_SEATS=2 ANIME_MAP_URL= ANIMETHEMES_URL=http://127.0.0.1:3099/animethemes SHAZAM_URL=http://127.0.0.1:3099/shazam TMDB_URL=http://127.0.0.1:3099/tmdb TMDB_TOKEN=test-tmdb node server.js > "$work/server.log" 2>&1) &
 pids+=($!)
 
@@ -38,7 +49,7 @@ for _ in $(seq 50); do
     sleep 0.1
 done
 
-if ! API_DATA="$work/data" node "$here/apitest.js"; then
+if ! API_DATA="$work/data" PASSKEY_KEY_FILE="$work/passkey.key" node "$here/apitest.js"; then
     echo "--- server log ---" >&2
     tail -n 40 "$work/server.log" >&2
     exit 1

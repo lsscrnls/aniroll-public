@@ -116,7 +116,8 @@ if [ "$WITH_API" -eq 1 ]; then
     # Build first: if it fails (e.g. the base image cannot be pulled), the old container keeps running.
     # The container runs as uid 10001 (api/Dockerfile): data/ is handed to it after the old container
     # stopped, so nothing root-owned appears in between. Without it the server cannot read its 0600 files.
-    # JF_SECRET must be passed, otherwise stored Jellyfin keys become unreadable.
+    # JF_SECRET must be passed, otherwise stored Jellyfin keys become unreadable. The passkey key is a mounted file
+    # (read-only), not an environment variable: those show in `docker inspect`.
     # The running image is kept as aniroll-api:prev. If the new server does not answer /api/health
     # (it reads and writes data/) within 20 s, the previous image is started again.
     # --init: Node gets SIGTERM from docker stop and shuts down cleanly. Logs are capped at 3 x 10 MB.
@@ -127,6 +128,7 @@ start() {
         --log-opt max-size=10m --log-opt max-file=3 \
         -e JF_SECRET="$(cat /root/aniroll-jf.secret)" \
         -e TMDB_TOKEN="$(cat /root/aniroll-tmdb.secret 2>/dev/null)" \
+        -v /root/aniroll-secrets/passkey.key:/run/secrets/aniroll-passkey:ro \
         -v "$API_DIR/data:/app/data" -p 127.0.0.1:3001:3001 "$1" >/dev/null
 }
 healthy() {
@@ -136,6 +138,9 @@ healthy() {
     done
     return 1
 }
+# The passkey key (api/server.js passkeySeal): root-only folder, readable in the container by its user alone.
+# Missing: stop here, before the old container goes (docker would mount an empty folder in its place)
+[ -f /root/aniroll-secrets/passkey.key ] || { echo "missing /root/aniroll-secrets/passkey.key - nothing changed"; exit 1; }
 docker image inspect aniroll-api >/dev/null 2>&1 && docker tag aniroll-api aniroll-api:prev
 docker build -q -t aniroll-api "$API_DIR" >/dev/null
 docker stop aniroll-api >/dev/null 2>&1 || true

@@ -6457,3 +6457,6 @@ h1[tabindex="-1"]:focus { outline: none; }
 .social-live-text { display: flex; flex-direction: column; min-width: 0; font-size: 0.85rem; }
 .social-live-text span { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .social-live-cover { width: 28px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+
+/* Settings → Passkeys: the name as a field while renaming */
+.pk-name-input { width: 100%; max-width: 280px; padding: 4px 10px; font-size: 0.9rem; }

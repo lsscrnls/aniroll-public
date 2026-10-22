@@ -296,24 +296,41 @@ if (JF_SECRET.length < 32) {
 const jfKey = crypto.createHash('sha256').update(JF_SECRET).digest();
 const jfSecret = () => jfKey;
 
-function encryptSecret(plain) {
+function sealWith(key, plain) {
     const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', jfSecret(), iv);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
     const enc = Buffer.concat([cipher.update(String(plain), 'utf8'), cipher.final()]);
     return [iv.toString('base64'), cipher.getAuthTag().toString('base64'), enc.toString('base64')].join('.');
 }
 
-function decryptSecret(payload) {
+function openWith(key, payload) {
     const [ivB64, tagB64, dataB64] = String(payload).split('.');
     if (!ivB64 || !tagB64 || !dataB64) return null;
     try {
-        const decipher = crypto.createDecipheriv('aes-256-gcm', jfSecret(), Buffer.from(ivB64, 'base64'));
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivB64, 'base64'));
         decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
         return Buffer.concat([decipher.update(Buffer.from(dataB64, 'base64')), decipher.final()]).toString('utf8');
     } catch {
         return null; // wrong or rotated key
     }
 }
+
+const encryptSecret = (plain) => sealWith(jfSecret(), plain);
+const decryptSecret = (payload) => openWith(jfSecret(), payload);
+
+// The AniList logins kept for passkeys have a key of their own (2026-10-22, the owner's wish): a file on the VPS
+// only root can reach, mounted read-only into the container (never an environment variable, which `docker
+// inspect` shows), and one copy on the owner's PC. Not in the data volume, not in its backups. Without it,
+// passkeys are off; the Jellyfin key never stands in for it.
+const PASSKEY_KEY_FILE = process.env.PASSKEY_KEY_FILE || '/run/secrets/aniroll-passkey';
+let passkeyKey = null;
+try {
+    const raw = fs.readFileSync(PASSKEY_KEY_FILE, 'utf8').trim();
+    if (raw.length >= 32) passkeyKey = crypto.createHash('sha256').update('aniroll passkey logins v1:' + raw).digest();
+} catch { /* no file: passkeys are off */ }
+if (!passkeyKey) console.error(`No passkey key in ${PASSKEY_KEY_FILE}: passkeys are off`);
+const passkeySeal = passkeyKey ? (plain) => sealWith(passkeyKey, plain) : null;
+const passkeyOpen = passkeyKey ? (payload) => openWith(passkeyKey, payload) : null;
 
 // One account's entry with the API key decrypted; older plaintext entries are migrated
 function jfEntry(all, key) {
@@ -1625,7 +1642,7 @@ const sources = require('./sources')({ dataDir: DATA_DIR, readJson, writeJson, v
 
 // While AniList is down: passkeys for VIPs (api/passkeys.js), TMDB details and kept lists (api/fallback.js)
 const passkeys = require('./passkeys')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer,
-    refuseAuth, isVip, tokenHash, bearerToken, rememberViewer, allowedOrigin: ALLOWED_ORIGIN, isLocalOrigin, str, encryptSecret, decryptSecret });
+    refuseAuth, isVip, tokenHash, bearerToken, rememberViewer, allowedOrigin: ALLOWED_ORIGIN, isLocalOrigin, str, passkeySeal, passkeyOpen, decryptSecret });
 // Release and story order of a franchise (api/watchorder.js), from the server's own AniList budget
 const watchOrder = require('./watchorder')({ dataDir: DATA_DIR, readJson, writeJson, json, overLimit, clientIp, anilist });
 const fallback = require('./fallback')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer,
