@@ -125,6 +125,17 @@ async function findShow(base, cfg, media) {
         const hit = (await search(base, cfg, name, 'Series')).find(i => normTitle(splitYear(i.Name).title) === wanted.base);
         if (hit) return { kind: 'series', id: hit.Id, season: wanted.season };
     }
+
+    // A one-episode special or OVA that Radarr filed as a film (Promare: SIDE Galo is "Promare / Side: Galo")
+    if (media.episodes === 1) {
+        for (const raw of titlesOf(media)) {
+            const { title, year: titleYear } = splitYear(raw);
+            const exact = (await search(base, cfg, title, 'Movie')).find(i =>
+                nearYear(titleYear || year, splitYear(i.Name).year || i.ProductionYear)
+                && normTitle(splitYear(i.Name).title) === normTitle(title));
+            if (exact) return { kind: 'movie', id: exact.Id };
+        }
+    }
     return null;
 }
 
