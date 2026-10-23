@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.7.1';
+export const RELEASE = '1.9.7.2';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -22,10 +22,11 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
     {
-        id: '2026-10-23.2',
+        id: '2026-10-23.3',
         from: '2026-10-23T00:00:00+02:00',
         title: 'Your show in Discord, and a helper that updates itself',
         items: [
+            { rev: 3, text: 'Specials and OVAs with a single episode now play when Jellyfin keeps them as a film.' },
             { rev: 2, from: '2026-10-23T08:00:00+02:00', text: 'Buffering again and again away from home? In Auto, the player now steps the quality down by itself and plays on from the same spot. Picking Auto again in the menu starts fresh.' },
             { rev: 2, from: '2026-10-23T08:00:00+02:00', text: 'Settings → Jellyfin takes your server\'s upload: away from home the player stays below it, and files whose bitrate jumps a lot (Blu-rays) are converted instead of stuttering.' },
             'While you watch, your <strong>Discord status</strong> says <strong>AniRoll:</strong> and the show, in the member list too. It needs the newest helper: Settings → Discord shows the update.',
