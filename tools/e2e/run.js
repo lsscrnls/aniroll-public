@@ -737,6 +737,7 @@ function staticServer() {
     if (await joinBtn.count()) {
         await joinBtn.first().click();
         await wp.waitForTimeout(1000);
+        if (process.env.E2E_SHOT) await wp.locator('#modal-container .modal-content').screenshot({ path: process.env.E2E_SHOT.replace(/\.png$/, '-join.png') });
         if (await wp.locator('#wp-bg-open').count()) await wp.click('#wp-bg-open');
         await wp.waitForTimeout(2500);
     }
@@ -815,6 +816,49 @@ function staticServer() {
             /moves on/i.test(asked.text) && /switched from .+ to Next Show/.test(asked.text) && /Come along/.test(asked.text) && asked.stillOld && asked.stillOld !== 101
             && after.joined === 101 && /anime=101/.test(after.hash) && /Earlier in this party/i.test(after.evening) && /One Piece/.test(after.evening) && /Kim/.test(after.evening),
             { asked, after });
+        await sw.close();
+    }
+
+    // Same switch for a guest who ticked "Come along when the host switches shows" when joining: moved at once, no question
+    {
+        const sw = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+        sw.on('pageerror', e => errors.push(`watch party follow: ${e.message}`));
+        // The mock AniList answers every show with the same media: any id but the new show's is the first show
+        const parties = { first: { ...party, hostName: 'Hosty', hostKey: undefined, active: true, members: [], hostProgress: 3 } };
+        await sw.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
+        await sw.route(`${base}/api/**`, route => {
+            const p = new URL(route.request().url()).pathname;
+            const m = p.match(/^\/api\/party\/[^/]+\/(\d+)/);
+            const at = p.startsWith('/api/party/') ? (m?.[1] === '101' ? parties[101] : parties.first) : null;
+            if (p.endsWith('/events')) return route.fulfill({ contentType: 'text/event-stream', body: `retry: 500\ndata: ${JSON.stringify(at || { active: false })}\n\n` });
+            if (at) return route.fulfill({ contentType: 'application/json', body: JSON.stringify(at) });
+            route.fulfill({ status: p === '/api/maintenance' ? 200 : 404, contentType: 'application/json', body: '{"maintenance":false}' });
+        });
+        await sw.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
+        await sw.addInitScript(({ id, name }) => {
+            localStorage.setItem('aniroll_token', 'e2e-token');
+            localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+            localStorage.setItem('aniroll_user_ts', String(Date.now()));
+            localStorage.setItem('aniroll_seen_changes', '9999');
+        }, VIEWER);
+        await sw.goto(base + '/#/watchparty?host=Hosty&anime=21');
+        await idle(sw, 3000);
+        if (await sw.locator('button:has-text("Join Watch Party")').count()) {
+            await sw.locator('button:has-text("Join Watch Party")').first().click();
+            await sw.waitForTimeout(1000);
+            await sw.locator('#wp-follow').check().catch(() => {});
+            if (await sw.locator('#wp-bg-open').count()) await sw.click('#wp-bg-open');
+            await sw.waitForFunction(() => !!localStorage.getItem('aniroll_joined_party'), null, { timeout: 8000 }).catch(() => {});
+        }
+        parties[101] = { hostName: 'Hosty', mediaId: 101, mediaTitle: 'Next Show', active: true, members: [], hostProgress: 0, startedAt: Date.now(), startEp: 0,
+            evening: [{ mediaId: 21, mediaTitle: 'One Piece', coverImage: '', members: [{ name: VIEWER.name, avatar: '' }, { name: 'Kim', avatar: '' }] }] };
+        parties.first = { hostName: 'Hosty', mediaId: 21, mediaTitle: 'One Piece', active: false, next: 101, members: [] };
+        const followSaved = await sw.evaluate(() => JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null')?.follow);
+        await sw.waitForFunction(() => JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null')?.mediaId === 101, null, { timeout: 10000 }).catch(() => {});
+        const moved = await sw.evaluate(() => ({ joined: JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null'),
+            asked: /moves on/i.test(document.querySelector('#modal-container')?.innerText || '') }));
+        check('watch party follow: a guest who ticked "Come along" when joining moves to the next show without being asked',
+            followSaved === true && moved.joined?.mediaId === 101 && moved.joined.follow === true && !moved.asked, { followSaved, moved });
         await sw.close();
     }
 
