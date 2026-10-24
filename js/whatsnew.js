@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.7.3';
+export const RELEASE = '1.9.7.4';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -22,9 +22,10 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
     {
-        id: '2026-10-24',
+        id: '2026-10-24.2',
         title: 'Your Watch Party follows you to the next show',
         items: [
+            { rev: 2, text: 'Joining a Watch Party, tick <strong>Come along when the host switches shows</strong> and you move with the party to every next show, without being asked each time.' },
             'Hosting a <strong>Watch Party</strong>? Start an episode of another show in the player and the party moves there by itself. Your guests are asked whether they come along, the invite link stays the same.',
             'In a Watch Party as a guest, your <strong>Discord status</strong> stays on even when AniRoll is in the background.',
         ],
