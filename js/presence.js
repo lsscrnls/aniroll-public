@@ -147,10 +147,10 @@ function activity() {
 }
 
 // A tab left in the background with nothing playing goes quiet after IDLE_AFTER; back in front, or
-// playing again, it shows up at once
+// playing again, it shows up at once. A Watch Party guest stays: the party goes on in another tab or app
 function watchIdle() {
     clearTimeout(idleTimer);
-    const busy = video && !video.paused && !video.ended;
+    const busy = (video && !video.paused && !video.ended) || (party && !party.hosting);
     if (document.hidden && !busy) {
         idleTimer = window.setTimeout(() => { idle = true; update(); }, IDLE_AFTER);
     } else if (idle) {
@@ -191,6 +191,7 @@ export function startPresence() {
     });
     document.addEventListener('aniroll:party', (e) => {
         party = /** @type {CustomEvent} */ (e).detail || null;
+        watchIdle();
         update();
     });
     // Media events do not bubble, but they pass the document on the way down

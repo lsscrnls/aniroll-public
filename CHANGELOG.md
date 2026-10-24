@@ -1,6 +1,11 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.7.2.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.7.3.
+
+## 24 October 2026 – Your Watch Party follows you to the next show
+
+- Hosting a **Watch Party**? Start an episode of another show in the player and the party moves there by itself. Your guests are asked whether they come along, the invite link stays the same.
+- In a Watch Party as a guest, your **Discord status** stays on even when AniRoll is in the background.
 
 ## 23 October 2026 – Your show in Discord, and a helper that updates itself
 

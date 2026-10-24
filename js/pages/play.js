@@ -398,6 +398,10 @@ export async function render({ params, content }) {
         video.addEventListener('pause', report);
         video.addEventListener('play', report);
         video.addEventListener('seeked', report);
+        // Hosting a party on another show: it follows the host here once the episode plays
+        if (isLoggedIn()) video.addEventListener('playing', () => {
+            import('./watchparty.js').then(m => m.followHostTo(media, { root: $('player') })).catch(() => {});
+        }, { once: true });
 
         loadSegments(avail.base, cfg, ep.itemId).then(list => { if (!closed) controls.setSegments(list); });
         if (media.idMal) loadEnding(media.idMal, episode).then(list => { if (!closed && list.length) controls.setEnding(list); });

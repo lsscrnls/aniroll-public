@@ -1368,6 +1368,40 @@ function staticServer() {
         await p.close();
     }
 
+    // Hosting a party on another show: once an episode here plays, the party follows without a question
+    {
+        const { p, pageErrors } = await playerPage(true);
+        let switched = null;
+        await p.route(`${base}/api/party/**`, route => {
+            const req = route.request();
+            if (req.method() === 'PUT' && /\/switch$/.test(req.url())) switched = { url: new URL(req.url()).pathname, body: req.postDataJSON() };
+            const state = { hostName: VIEWER.name, hostKey: 'k', active: true, mediaId: switched ? switched.body.mediaId : 21, hostProgress: 0, members: [] };
+            if (req.url().endsWith('/events')) return route.fulfill({ contentType: 'text/event-stream', body: `retry: 60000\ndata: ${JSON.stringify(state)}\n\n` });
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify(state) });
+        });
+        await p.addInitScript(n => {
+            if (!sessionStorage.getItem('e2e_party_set')) {
+                sessionStorage.setItem('e2e_party_set', '1');
+                localStorage.setItem('aniroll_watchparty', JSON.stringify({ hostName: n, mediaId: 21, hostKey: 'k', mediaTitle: 'One Piece', startEp: 2 }));
+            }
+        }, VIEWER.name);
+        await p.goto(base + '/#/play/101/3');
+        // Episode 3 asks where to continue first: nothing switches until it plays
+        await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2; }, null, { timeout: 10000 }).catch(() => {});
+        const early = await p.evaluate(() => JSON.parse(localStorage.getItem('aniroll_watchparty') || 'null')?.mediaId);
+        await p.evaluate(() => document.getElementById('player-video').play()).catch(() => {});
+        // The mock AniList answers with its own id for the show: any id but the old show's is the move
+        await p.waitForFunction(() => (JSON.parse(localStorage.getItem('aniroll_watchparty') || 'null')?.mediaId || 21) !== 21, null, { timeout: 12000 }).catch(() => {});
+        await p.waitForSelector('.pl-party-note', { timeout: 3000 }).catch(() => {});
+        const res = await p.evaluate(() => ({ stored: JSON.parse(localStorage.getItem('aniroll_watchparty') || 'null'),
+            note: document.querySelector('.pl-party-note')?.textContent || '', modal: !!document.querySelector('#modal-confirm'), hash: location.hash }));
+        check('player: hosting a party on another show, playing an episode moves the party here by itself, no question, a note says so',
+            early === 21 && /\/api\/party\/[^/]+\/21\/switch$/.test(switched?.url || '') && switched.body.mediaId !== 21 && res.stored?.mediaId === switched.body.mediaId
+            && res.stored.history?.at(-1)?.mediaId === 21 && /Watch Party moved to/.test(res.note) && !res.modal && res.hash === '#/play/101/3' && !pageErrors.length,
+            { early, switched, res, pageErrors });
+        await p.close();
+    }
+
     // Friends connect with a Quick Connect code: no password field, the code shown, connected once confirmed
     {
         const { p, pageErrors, calls } = await playerPage(true, false);
