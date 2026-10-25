@@ -268,8 +268,8 @@ export async function render({ content }) {
                     <div class="friend-tile" data-go="/user/${esc(f.name)}" role="link" tabindex="0">
                         <div style="display:flex;align-items:center;gap:var(--space-md)">
                             <img src="${f.avatar?.medium || ''}" alt="${esc(f.name)}" style="width:48px;height:48px;border-radius:var(--radius-full);object-fit:cover">
-                            <div>
-                                <div style="font-weight:600">${esc(f.name)} <span class="dna-friend-match" data-match-for="${f.id}" hidden></span></div>
+                            <div class="friend-tile-info">
+                                <div class="friend-tile-name"><span>${esc(f.name)}</span><span class="dna-friend-match" data-match-for="${f.id}" hidden></span></div>
                                 <div style="font-size:0.75rem;color:var(--text-secondary)">
                                     ${f.statistics?.anime?.count || 0} Anime · ${f.statistics?.anime?.episodesWatched || 0} Ep · Avg ${f.statistics?.anime?.meanScore || 0}
                                 </div>
@@ -660,22 +660,6 @@ function renderActivity(activity) {
         </div>`;
     }
 
-    if (activity.type === 'MESSAGE') {
-        return `<div class="activity-card">
-            <div class="activity-header">
-                <img class="activity-avatar" src="${activity.messenger?.avatar?.medium || ''}" alt="${esc(activity.messenger?.name)}">
-                <div>
-                    <a href="#/user/${esc(activity.messenger?.name)}" class="activity-user">${esc(activity.messenger?.name)}</a>
-                    <span style="color:var(--text-tertiary);font-size:0.85rem"> → </span>
-                    <a href="#/user/${esc(activity.recipient?.name)}" class="activity-user">${esc(activity.recipient?.name)}</a>
-                    <div class="activity-time">${api.timeAgo(activity.createdAt)}</div>
-                </div>
-            </div>
-            <div class="activity-text">${esc(activity.message)}</div>
-            ${renderActivityActions(activity, 'MESSAGE_ACTIVITY')}
-        </div>`;
-    }
-
     return '';
 }
 
@@ -875,10 +859,10 @@ function getActivityStatusText(activity) {
     return `${esc(status)} ${mediaName}`;
 }
 
-// Yours to delete: your own posts, and messages you sent or got (AniList lets both sides remove them)
+// Yours to delete: your own posts
 function isMine(activity) {
     const me = getState().user?.id;
-    return !!me && [activity.user?.id, activity.messenger?.id, activity.recipient?.id].includes(me);
+    return !!me && activity.user?.id === me;
 }
 
 const TRASH = '<svg data-icon="delete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>';

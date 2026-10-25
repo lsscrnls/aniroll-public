@@ -137,7 +137,7 @@ const queueable = (err) => err instanceof TypeError || err instanceof SyntaxErro
 const SOCIAL = {
     post: `mutation ($text: String) { SaveTextActivity(text: $text) { id } }`,
     reply: `mutation ($activityId: Int, $text: String) { SaveActivityReply(activityId: $activityId, text: $text) { id } }`,
-    like: `mutation ($id: Int, $type: LikeableType) { ToggleLikeV2(id: $id, type: $type) { ... on ListActivity { id } ... on TextActivity { id } ... on MessageActivity { id } } }`,
+    like: `mutation ($id: Int, $type: LikeableType) { ToggleLikeV2(id: $id, type: $type) { ... on ListActivity { id } ... on TextActivity { id } } }`,
     follow: `mutation ($userId: Int) { ToggleFollow(userId: $userId) { id } }`,
     deleteActivity: `mutation ($id: Int) { DeleteActivity(id: $id) { deleted } }`,
     deleteReply: `mutation ($id: Int) { DeleteActivityReply(id: $id) { deleted } }`,
@@ -1098,7 +1098,6 @@ export async function getActivityReplies(id, token = null) {
             Activity(id: $id) {
                 ... on TextActivity { id ${replyFields} }
                 ... on ListActivity { id ${replyFields} }
-                ... on MessageActivity { id ${replyFields} }
             }
         }
     `, { id }, token, 2 * 60 * 1000);
@@ -1120,13 +1119,6 @@ const ACTIVITY_FIELDS = `
                         likes { id name avatar { medium } }
                         likeCount isLiked createdAt replyCount
                     }
-                    ... on MessageActivity {
-                        id type message
-                        messenger { id name avatar { medium } }
-                        recipient { id name avatar { medium } }
-                        likes { id name avatar { medium } }
-                        likeCount isLiked createdAt replyCount
-                    }
 `;
 
 // Other people's 18+ list posts only with "18+ activities" on in AniList; your own always
@@ -1141,7 +1133,7 @@ export async function getActivityFeed(page = 1, isFollowing = true, token = null
         query ($page: Int, $isFollowing: Boolean) {
             Page(page: $page, perPage: 25) {
                 pageInfo { total currentPage lastPage hasNextPage }
-                activities(sort: [ID_DESC], isFollowing: $isFollowing, type_in: [TEXT, ANIME_LIST, MANGA_LIST, MESSAGE]) {${ACTIVITY_FIELDS}                }
+                activities(sort: [ID_DESC], isFollowing: $isFollowing, type_in: [TEXT, ANIME_LIST, MANGA_LIST]) {${ACTIVITY_FIELDS}                }
             }
         }
     `, { page, isFollowing }, token);
@@ -1281,7 +1273,7 @@ export async function postActivityReply(activityId, text, token, me = null) {
     return data.SaveActivityReply;
 }
 
-// Deletes one of your own posts (or a message sent to or by you). The feeds and profile posts are
+// Deletes one of your own posts. The feeds and profile posts are
 // dropped from the cache, not kept as fallback: the deleted post must not come back from there
 export async function deleteActivity(id, token) {
     const { data, queued } = await socialOrQueue('deleteActivity', { id }, token);
@@ -1316,7 +1308,6 @@ export async function toggleLike(id, type, token, liked = false) {
             ToggleLikeV2(id: $id, type: $type) {
                 ... on ListActivity { id likeCount isLiked }
                 ... on TextActivity { id likeCount isLiked }
-                ... on MessageActivity { id likeCount isLiked }
             }
         }
     `);
@@ -1351,11 +1342,6 @@ export async function getNotifications(page = 1, token) {
                         createdAt
                     }
                     ... on ActivityMentionNotification {
-                        id type userId activityId
-                        user { id name avatar { medium } }
-                        createdAt
-                    }
-                    ... on ActivityMessageNotification {
                         id type userId activityId
                         user { id name avatar { medium } }
                         createdAt

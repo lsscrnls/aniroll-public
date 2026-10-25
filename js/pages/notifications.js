@@ -110,7 +110,6 @@ function renderNotification(n) {
         ACTIVITY_LIKE: 'liked your activity',
         ACTIVITY_REPLY: 'replied to your activity',
         ACTIVITY_MENTION: 'mentioned you',
-        ACTIVITY_MESSAGE: 'sent you a message',
         ACTIVITY_REPLY_SUBSCRIBED: 'replied to an activity you follow',
         ACTIVITY_REPLY_LIKE: 'liked your reply',
     };

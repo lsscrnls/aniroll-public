@@ -47,6 +47,11 @@ const taps = new WeakMap();
 // Safari playing HLS itself (iPhone) hands Web Audio nothing but silence, and the video would stay
 // silent after: not tapped at all
 const nativeHls = (video) => /\.m3u8(\?|$)/i.test(video.currentSrc || '');
+// Whether "What's this song?" can work here at all: offered only then
+export function canListen(video) {
+    return !nativeHls(video) && !!(window.AudioContext || window.webkitAudioContext);
+}
+
 function tapFor(video) {
     let tap = taps.get(video);
     if (tap) return tap;

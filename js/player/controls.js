@@ -296,7 +296,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
                 + menuItem('Stats for nerds', 'data-stats', '1', !statsBox.hidden, 'menuitemcheckbox');
         },
         songs: () => backTo('Songs')
-            + `<button class="pl-menu-item" role="menuitem" data-identify="1"><span class="pl-menu-check">${icon('recognize')}</span>What's this song?</button>`
+            + (songs.identify ? `<button class="pl-menu-item" role="menuitem" data-identify="1"><span class="pl-menu-check">${icon('recognize')}</span>What's this song?</button>` : '')
             + (songs.list().length ? '<div class="pl-menu-divider" role="separator"></div><div class="pl-menu-title">This episode</div>' : '')
             + songs.list().map((t, i) => `<button class="pl-menu-item pl-menu-song" role="menuitem" data-song="${i}">
                 <span class="pl-menu-check">${esc(themeName(t))}</span><span class="pl-menu-song-text">${esc(t.title)}${t.artist ? `<span class="pl-menu-song-artist">${esc(t.artist)}</span>` : ''}</span></button>`).join(''),
@@ -539,7 +539,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
     }
 
     // ----- Songs: the opening and ending named as they start, "What's this song?" (js/player/songs.js) -----
-    // songs: { list() -> this episode's [{ type, n, title, artist }], op, ed, identify({ onProgress, signal, fresh }) }
+    // songs: { list() -> this episode's [{ type, n, title, artist }], op, ed, identify({ onProgress, signal, fresh }) | null }
     let songs = null;
     const songBox = $('.pl-song');
     let songTimer = 0;
@@ -1008,7 +1008,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
         // The episode's songs and "What's this song?" (see the Songs section above)
         setSongs(provider) {
             songs = provider;
-            $('[data-act="identify"]').hidden = !provider;
+            // No "What's this song?" where the browser hands over no sound (Safari playing HLS itself: iPhone)
+            $('[data-act="identify"]').hidden = !provider?.identify;
             if (!menu.hidden && menuPage === 'main') showPage('main');
         },
         // [{ name, start }] in seconds, in order; name '' when the file only numbers them
