@@ -153,7 +153,7 @@ function renderDetailHTML(media) {
                 <h1 class="detail-title">${esc(titlePref(media.title))}</h1>
                 ${media.title?.english && media.title.english !== titlePref(media.title) ? `<div class="detail-sub">${esc(media.title.english)}</div>` : ''}
                 ${media.title?.native ? `<div class="detail-sub" style="font-size:0.85rem">${esc(media.title.native)}</div>` : ''}
-                ${media.meanScore ? `<div class="detail-score" title="${media.fallback === 'tmdb' ? 'Average score on TMDB' : 'Average score on AniList'}"><span class="detail-score-value">${media.meanScore}%</span><span class="detail-score-label">score${media.popularity ? ` from ${(media.popularity / 1000).toFixed(1)}K members` : ''}</span></div>` : ''}
+                ${scoreHtml(media)}
                 ${detailFactsHtml(media)}
                 <div class="taste-match" id="taste-match" hidden></div>
                 <div class="detail-actions">
@@ -262,7 +262,7 @@ const ICON_PRODUCER = '<svg data-icon="apartment" class="detail-studio-icon" vie
 const ICON_ARROW = '<svg data-icon="arrow_forward" class="detail-studio-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
 // Tags that give away the story stay hidden until someone asks for them
-const spoilerCount = media => (media.tags || []).filter(t => t.isMediaSpoiler).length;
+const spoilerCount = media => (media.tags || []).filter(t => t.isMediaSpoiler && (!t.isAdult || api.adultOption())).length;
 
 // "+ Plan" under a sequel in Related: one save, the label turns into the list it went to
 function setupRelatedPlan(root, token) {
@@ -286,12 +286,28 @@ function setupRelatedPlan(root, token) {
     });
 }
 
+// AniList's Weighted Score (it leans toward the average of all shows while few have scored, so a
+// handful of votes can't top the charts) with the plain mean next to it; TMDB has only an average
+function scoreHtml(media) {
+    const weighted = media.fallback !== 'tmdb' && media.weightedScore;
+    const value = weighted || media.meanScore;
+    if (!value) return '';
+    const members = media.popularity ? ` from ${(media.popularity / 1000).toFixed(1)}K members` : '';
+    const title = media.fallback === 'tmdb' ? 'Average score on TMDB'
+        : weighted ? `Weighted Score on AniList: the average, weighted toward all shows' average while few have scored it${media.meanScore ? `. Mean score: ${media.meanScore}%` : ''}`
+        : 'Average score on AniList';
+    const mean = weighted && media.meanScore && media.meanScore !== weighted ? ` · mean ${media.meanScore}%` : '';
+    return `<div class="detail-score" title="${esc(title)}"><span class="detail-score-value">${value}%</span><span class="detail-score-label">${weighted ? 'weighted score' : 'score'}${members}${mean}</span></div>`;
+}
+
 // The tags that say most about a show come first (AniList ranks them); the rest wait behind "Show all"
 const TAGS_SHOWN = 8;
 function tagsHtml(media) {
-    if (!media.tags?.length) return '';
+    // 18+ tags only with "18+ content" on in AniList
+    const tags = api.adultOption() ? media.tags : media.tags?.filter(t => !t.isAdult);
+    if (!tags?.length) return '';
     let shown = 0;
-    const chips = media.tags.map(t => {
+    const chips = tags.map(t => {
         const extra = !t.isMediaSpoiler && ++shown > TAGS_SHOWN;
         return `<a href="#/search?type=${media.type}&tag=${encodeURIComponent(t.name)}" class="genre-chip${t.isMediaSpoiler ? ' spoiler-tag' : ''}${extra ? ' tag-extra' : ''}" title="${t.rank}% relevant. Browse by this tag"${t.isMediaSpoiler || extra ? ' hidden' : ''}>${esc(t.name)}</a>`;
     }).join('');

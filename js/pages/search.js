@@ -11,6 +11,9 @@ export async function render({ content, query: params }) {
     // A tag from a show's page: browse everything carrying it, until the chip is switched off
     let tag = params.tag || '';
     const search = params.q || '';
+    // 18+ only with "18+ content" on in AniList; then three ways, starting from the account's search setting
+    const adultShown = api.adultOption();
+    const adult = params.adult || (api.adultOption('includeAdultContentInSearch') ? 'both' : 'none');
 
     let genres = getState().genreCache;
     if (!genres) {
@@ -35,8 +38,13 @@ export async function render({ content, query: params }) {
             </select>
             <select class="glass-select" id="browse-genre">
                 <option value="">All Genres</option>
-                ${genres.filter(g => g !== 'Hentai').map(g => `<option value="${esc(g)}" ${genre === g ? 'selected' : ''}>${esc(g)}</option>`).join('')}
+                ${genres.filter(g => adultShown || g !== 'Hentai').map(g => `<option value="${esc(g)}" ${genre === g ? 'selected' : ''}>${esc(g)}</option>`).join('')}
             </select>
+            ${adultShown ? `<select class="glass-select" id="browse-adult" aria-label="18+ media">
+                <option value="both" ${adult === 'both' ? 'selected' : ''}>18+ included</option>
+                <option value="none" ${adult === 'none' ? 'selected' : ''}>No 18+</option>
+                <option value="only" ${adult === 'only' ? 'selected' : ''}>Only 18+</option>
+            </select>` : ''}
         </div>
         <div class="genre-chips taste-chips" id="taste-chips" hidden></div>
         ${tag ? `<div class="genre-chips" style="margin-bottom:var(--space-lg)">
@@ -100,6 +108,9 @@ export async function render({ content, query: params }) {
         const genreVal = document.getElementById('browse-genre')?.value;
         if (genreVal) vars.genre_in = [genreVal];
         if (tag) vars.tag_in = [tag];
+        const adultVal = document.getElementById('browse-adult')?.value;
+        if (adultVal === 'none') vars.isAdult = false;
+        else if (adultVal === 'only') vars.isAdult = true;
 
         try {
             const result = await api.browseMedia(vars, token);
@@ -144,6 +155,11 @@ export async function render({ content, query: params }) {
 
     enhanceSelect(document.getElementById('browse-sort'));
     enhanceSelect(document.getElementById('browse-genre'));
+    const adultSelect = document.getElementById('browse-adult');
+    if (adultSelect) {
+        enhanceSelect(adultSelect);
+        adultSelect.addEventListener('change', () => loadResults(1));
+    }
     document.getElementById('browse-sort')?.addEventListener('change', () => loadResults(1));
     document.getElementById('browse-genre')?.addEventListener('change', () => loadResults(1));
     document.getElementById('browse-tag')?.addEventListener('click', e => {

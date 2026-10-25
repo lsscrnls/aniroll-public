@@ -18,8 +18,10 @@ export async function render({ content }) {
         <div class="tab-group" style="margin-bottom:var(--space-lg)">
             <button class="tab-btn active" id="tab-following">Following</button>
             <button class="tab-btn" id="tab-global">Global</button>
+            <button class="tab-btn" id="tab-messages">Messages</button>
             <button class="tab-btn" id="tab-friends">Friends</button>
         </div>
+        <div class="genre-chips social-subtabs" id="social-subtabs" hidden></div>
         <div id="social-live" class="social-live" hidden></div>
         <div id="social-content"></div>
         <div id="load-more-social" style="text-align:center;margin-top:var(--space-xl)" hidden>
@@ -33,6 +35,25 @@ export async function render({ content }) {
     // Per person and show, which viewing the next older post belongs to (kept across "Load More")
     let rewatchRuns = new Map();
     let currentTab = 'following';
+    // Messages: received or sent; Friends: following, followers or mutuals
+    const SUBTABS = {
+        messages: [['received', 'Received'], ['sent', 'Sent']],
+        friends: [['following', 'Following'], ['followers', 'Followers'], ['mutuals', 'Mutuals']],
+    };
+    const subTab = { messages: 'received', friends: 'following' };
+    const subtabs = content.querySelector('#social-subtabs');
+    function showSubtabs() {
+        const list = SUBTABS[currentTab];
+        subtabs.hidden = !list;
+        subtabs.innerHTML = (list || []).map(([key, label]) => `<button class="genre-chip${subTab[currentTab] === key ? ' active' : ''}" data-sub="${key}" aria-pressed="${subTab[currentTab] === key}">${label}</button>`).join('');
+    }
+    subtabs.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('[data-sub]');
+        if (!btn || subTab[currentTab] === btn.dataset.sub) return;
+        subTab[currentTab] = btn.dataset.sub;
+        showSubtabs();
+        loadFeed(1);
+    });
 
     async function loadFeed(page = 1, append = false) {
         const socialContent = document.getElementById('social-content');
@@ -47,8 +68,9 @@ export async function render({ content }) {
                 return;
             }
 
-            const isFollowing = currentTab === 'following';
-            const result = await api.getActivityFeed(page, isFollowing, token);
+            const result = currentTab === 'messages'
+                ? await api.getMessages(user.id, subTab.messages === 'sent', page, token)
+                : await api.getActivityFeed(page, currentTab === 'following', token);
             if (!append) rewatchRuns = new Map();
             await countRewatches(result.activities, rewatchRuns, token);
 
@@ -58,7 +80,7 @@ export async function render({ content }) {
 
             // Added below, not redrawn: a reply being typed further up stays
             if (append) socialContent.insertAdjacentHTML('beforeend', html);
-            else socialContent.innerHTML = html || '<div class="empty-state"><div class="empty-state-sub">No activity yet</div></div>';
+            else socialContent.innerHTML = html || `<div class="empty-state"><div class="empty-state-sub">${currentTab !== 'messages' ? 'No activity yet' : subTab.messages === 'sent' ? 'You haven\'t written on anyone\'s profile yet' : 'No messages on your profile yet'}</div></div>`;
 
             document.getElementById('load-more-social').hidden = !result.pageInfo.hasNextPage;
             currentPage = page;
@@ -167,9 +189,13 @@ export async function render({ content }) {
     }
 
     async function loadFriendsList(container, page = 1) {
+        const kind = subTab.friends;
         try {
-            const result = await api.getFollowing(user.id, page, token);
-            const friends = result.following;
+            const result = kind === 'following'
+                ? await api.getFollowing(user.id, page, token).then(r => ({ pageInfo: r.pageInfo, users: r.following }))
+                : await api.getFollowers(user.id, page, token, kind === 'mutuals');
+            if (kind !== subTab.friends || currentTab !== 'friends') return;
+            const friends = result.users;
             if (page > 1) {
                 container.querySelector('.friends-more')?.remove();
                 container.querySelector('.friends-grid')?.insertAdjacentHTML('beforeend', friends.map(friendTile).join(''));
@@ -179,7 +205,8 @@ export async function render({ content }) {
             }
 
             if (!friends?.length) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-sub">You\'re not following anyone yet</div></div>';
+                const empty = { following: 'You\'re not following anyone yet', followers: 'Nobody follows you yet', mutuals: 'Nobody you follow follows you back yet' }[kind];
+                container.innerHTML = `<div class="empty-state"><div class="empty-state-sub">${empty}</div></div>`;
                 return;
             }
 
@@ -190,6 +217,8 @@ export async function render({ content }) {
             if (!container.dataset.friendsMore) {
                 container.dataset.friendsMore = '1';
                 container.addEventListener('click', (ev) => {
+                    const remove = ev.target.closest('[data-remove-follower]');
+                    if (remove) { ev.stopPropagation(); removeFollower(remove); return; }
                     const btn = ev.target.closest('[data-friends-page]');
                     if (!btn) return;
                     btn.disabled = true;
@@ -224,6 +253,20 @@ export async function render({ content }) {
             await new Promise(r => setTimeout(r, 2500));
         }
     }
+    // Off your followers at once; AniList is told once "Undo" is gone
+    function removeFollower(btn) {
+        const tile = btn.closest('.friend-tile');
+        if (!tile) return;
+        const parent = tile.parentNode, next = tile.nextSibling;
+        tile.remove();
+        undoable(`${btn.dataset.name} removed from your followers`, {
+            run: async () => {
+                try { await api.removeFollower(Number(btn.dataset.removeFollower), token); }
+                catch (e) { parent?.insertBefore(tile, next); toast(e.message, 'error'); }
+            },
+            undo: () => parent?.insertBefore(tile, next),
+        });
+    }
     const moreFriends = (next) => `<div class="friends-more" style="text-align:center;margin-top:var(--space-lg)"><button class="glass-btn glass-btn-secondary" data-friends-page="${next}">Show more</button></div>`;
     const friendTile = (f) => `
                     <div class="friend-tile" data-go="/user/${esc(f.name)}" role="link" tabindex="0">
@@ -235,6 +278,7 @@ export async function render({ content }) {
                                     ${f.statistics?.anime?.count || 0} Anime · ${f.statistics?.anime?.episodesWatched || 0} Ep · Avg ${f.statistics?.anime?.meanScore || 0}
                                 </div>
                             </div>
+                            ${subTab.friends === 'following' ? '' : `<button class="glass-btn glass-btn-secondary friend-remove" data-remove-follower="${f.id}" data-name="${esc(f.name)}" title="Remove ${esc(f.name)} from your followers">Remove</button>`}
                         </div>
                     </div>`;
 
@@ -243,6 +287,7 @@ export async function render({ content }) {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentTab = btn.id.replace('tab-', '');
+            showSubtabs();
             loadFeed(1);
         });
     });
@@ -415,7 +460,7 @@ async function toggleReplies(btn, token) {
 
     const id = Number(btn.dataset.id);
     const form = `<form class="activity-reply-form" data-id="${id}">
-        <input class="glass-input" name="text" maxlength="2000" placeholder="Write a reply" aria-label="Write a reply" autocomplete="off" required>
+        <input class="glass-input" name="text" maxlength="2000" placeholder="Write a reply" aria-label="Write a reply" autocomplete="off" data-draft required>
         <button type="submit" class="glass-btn glass-btn-primary glass-btn-sm">Reply</button>
     </form>`;
 
@@ -467,7 +512,7 @@ function watchLive(token) {
             </div>`).join('')}</div>` : '';
     };
     const ask = async () => {
-        if (!box.isConnected) return clearInterval(timer);
+        if (!box?.isConnected) return clearInterval(timer);
         if (document.hidden) return;
         try {
             const res = await fetch('/api/friends/live', { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) });

@@ -11,7 +11,7 @@ const NOW = Math.floor(Date.now() / 1000);
 // Fields that hold lists, and how many items to return
 const LISTS = {
     media: 6, entries: 5, lists: 3, activities: 4, notifications: 4, airingSchedules: 8, nodes: 3, edges: 3,
-    following: 3, followers: 3, genres: 3, tags: 3, replies: 2, likes: 2, studios: 1, characters: 2, recommendations: 3,
+    following: 3, followers: 3, mutualFollowers: 3, genres: 3, tags: 3, replies: 2, likes: 2, studios: 1, characters: 2, recommendations: 3,
     rankings: 1, scores: 3, statuses: 3, synonyms: 1, externalLinks: 1, streamingEpisodes: 0, reviews: 0,
     stats: 1, scoreDistribution: 5, statusDistribution: 4, formats: 2, countries: 1, releaseYears: 2, voiceActors: 1,
     customLists: 0, advancedScores: 0, favourites: 1, users: 2, threads: 0, mediaRecommendations: 0,

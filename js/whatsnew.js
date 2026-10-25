@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.7.4';
+export const RELEASE = '1.9.8';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -21,6 +21,17 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // its offset) stays hidden until then: what is live already can be announced at a set time. A later release of the
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
+    {
+        id: '2026-10-25.1',
+        title: 'Followers, messages and your 18+ settings',
+        items: [
+            '<strong>Social</strong> has a <strong>Messages</strong> tab: what others wrote on your profile, and the messages you wrote on theirs.',
+            'Under <strong>Friends</strong> you now also see your <strong>Followers</strong> and your <strong>Mutuals</strong>, and can remove someone from your followers.',
+            'With <strong>18+ content</strong> on in your AniList settings, AniRoll follows them: Browse, Season and the search include 18+ as you set it there, and Browse can show only 18+ or none. Other people\'s 18+ posts in the feed follow your AniList setting too.',
+            'Show pages give AniList\'s new <strong>Weighted Score</strong>, with the mean score next to it.',
+            'Leaving a page or closing a box with a reply or post you haven\'t sent asks before it\'s lost.',
+        ],
+    },
     {
         id: '2026-10-24.2',
         title: 'Your Watch Party follows you to the next show',
