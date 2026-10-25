@@ -2,6 +2,7 @@ import * as api from '../api.js';
 import { enhanceSelect } from '../select.js';
 import { renderMediaCard, esc, renderPageSwitch, toast } from '../store.js';
 import { getToken } from '../auth.js';
+import { dismissedIds, HIDDEN_EVENT } from '../dismissed.js';
 
 // TV counts TV shorts too, as on My List
 const FORMATS = { TV: ['TV', 'TV_SHORT'], MOVIE: ['MOVIE'], OVA: ['OVA'], ONA: ['ONA'], SPECIAL: ['SPECIAL'] };
@@ -43,7 +44,15 @@ export async function render({ params, content }) {
     let hasNext = false;
     let format = 'ALL';
     let notListed = false;
-    const visible = () => shown.filter(m => (format === 'ALL' || FORMATS[format].includes(m.format)) && (!notListed || !m.mediaListEntry));
+    let hidden = dismissedIds();
+    // Hidden in the panel over this page: the grid follows at once
+    const onHidden = () => {
+        if (!document.getElementById('season-grid')) return document.removeEventListener(HIDDEN_EVENT, onHidden);
+        hidden = dismissedIds();
+        paintGrid();
+    };
+    document.addEventListener(HIDDEN_EVENT, onHidden);
+    const visible = () => shown.filter(m => !hidden.has(m.id) && (format === 'ALL' || FORMATS[format].includes(m.format)) && (!notListed || !m.mediaListEntry));
     function paintGrid() {
         const grid = document.getElementById('season-grid');
         if (!grid) return;

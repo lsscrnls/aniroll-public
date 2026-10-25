@@ -2,6 +2,7 @@ import * as api from '../api.js';
 import { cachedQuery } from '../api.js';
 import { getState, esc, titlePref, renderPageSwitch, toast } from '../store.js';
 import { getToken, isLoggedIn } from '../auth.js';
+import { dismissedIds } from '../dismissed.js';
 
 const VIEW_KEY = 'aniroll_cal_view';
 const ANCHOR_KEY = 'aniroll_cal_anchor';
@@ -369,8 +370,11 @@ export async function render({ content, query: q }) {
             ...generateForecastEntries(),
             ...projectMissingEpisodes(startTs, endTs),
         ];
-        const filtered = filter === 'mylist' ? allData.filter(a => userOnList.has(a.media?.id))
-            : filter === 'friends' ? allData.filter(a => watchersOf(a).length) : allData;
+        // Hidden shows (js/dismissed.js) stay out, whichever view
+        const hidden = dismissedIds();
+        const kept = allData.filter(a => !hidden.has(a.media?.id));
+        const filtered = filter === 'mylist' ? kept.filter(a => userOnList.has(a.media?.id))
+            : filter === 'friends' ? kept.filter(a => watchersOf(a).length) : kept;
         shownEpisodes = filtered;
 
         const byDay = {};

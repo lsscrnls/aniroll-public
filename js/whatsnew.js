@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.8.3';
+export const RELEASE = '1.9.8.4';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -37,6 +37,8 @@ const CHANGES = [
             '<strong>Test speed</strong> in the player\'s Quality menu shows what reaches your device from Jellyfin and what plays smoothly. Stuttering a lot? The player offers the test itself.',
             'The <strong>Previously on</strong> recap has its own menu for audio, subtitles and quality, and the episode after it follows what you pick there.',
             'The audio and subtitles you pick for a show are now kept with your account, so your other devices start with them too.',
+            '<strong>Hide</strong> on a show\'s page keeps it out of Home, Roll, Season, Browse and the calendar. A search still finds it, dimmed. Settings → Lists → Hidden anime shows everything you hid, including what you marked Not interested, and brings it back.',
+            'Watch Party: guests who chose <strong>Come along</strong> stay in the party when the host switches shows, even while they watch in another tab or the Jellyfin app.',
         ],
     },
     {

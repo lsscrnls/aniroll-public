@@ -6,7 +6,7 @@ import { getActiveParty, startPartyFromPick, openPartyPicker } from './watchpart
 import { lenisScrollTo, stopLenis, startLenis } from '../animations.js';
 import { renderHeadline, renderTour, renderColour, renderMachine, renderParty, renderDnaTry, fillInvite, initLanding } from '../landing.js';
 import { renderCinema, stop as stopCinema } from '../home-cinema.js';
-import { setDismissed, syncDismissed } from '../dismissed.js';
+import { setDismissed, syncDismissed, dismissedIds } from '../dismissed.js';
 import { vipDevice, passkeysSupported } from '../passkeys.js';
 
 export async function render({ content }) {
@@ -615,7 +615,9 @@ async function loadFriendAndPopular(token) {
             .filter(a => a && a.type !== 'MESSAGE' && a.user?.id !== userId && !seen.has(a.id) && seen.add(a.id));
 
         const now = Date.now() / 1000;
-        const listActs = acts.filter(a => a.media);
+        // Hidden shows (js/dismissed.js) stay out of these rows too
+        const hidden = dismissedIds();
+        const listActs = acts.filter(a => a.media && !hidden.has(a.media.id));
         let recent = listActs.filter(a => now - a.createdAt < 3 * DAY);
         if (!recent.length) recent = listActs; // quiet friends: show the latest instead of nothing
 

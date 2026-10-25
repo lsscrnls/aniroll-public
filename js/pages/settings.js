@@ -1,7 +1,7 @@
 // Settings (#/settings): appearance, lists, Watch Party and Jellyfin, in tabs. Loaded when opened, so the
 // app shell (js/app.js) stays small and a change here only needs the browser checks of this page.
 import * as api from '../api.js';
-import { getState, setState, applyTheme, getTheme, toast, esc } from '../store.js';
+import { getState, setState, applyTheme, getTheme, toast, esc, titlePref } from '../store.js';
 import { CLIENT_ID, getToken, isLoggedIn } from '../auth.js';
 import { showConfirm } from '../a11y.js';
 import { getVariant, setVariant, VARIANTS, SEEDS, SHOW_SEED, getShowTheme, getSeed, setSeed } from '../design.js';
@@ -11,6 +11,7 @@ import { accounts, switchAccount, addAccount, deleteMyData } from '../accounts.j
 import { ambientOn, setAmbient } from '../player/ambient.js';
 import { recapOn, setRecap } from '../player/recap.js';
 import { accountState, saveAccountState } from '../accountstate.js';
+import { hiddenList, setDismissed, syncDismissed } from '../dismissed.js';
 
 const SETTINGS_TABS = [
     { key: 'appearance', label: 'Appearance' },
@@ -70,6 +71,7 @@ export async function render({ content, query }) {
             ${isLoggedIn() ? card('Show when I\'m watching', 'Off unless you turn it on', `
                 <label class="settings-choice"><input type="checkbox" id="toggle-liveshare">
                     <span>While you watch in AniRoll or Jellyfin, people who follow you see the show and episode under Live now on Social</span></label>`) : ''}
+            ${isLoggedIn() ? card('Hidden anime', 'Hidden on a show\'s page or "Not interested" on Home: kept out of Home, Roll, Season, Browse and the calendar. A search still finds them.', '<div id="hidden-anime"></div>') : ''}
             ${card('MAL Import', 'Import your MyAnimeList export to AniList', `
                 <div class="settings-choices">
                     <label class="glass-btn glass-btn-primary glass-btn-sm" style="cursor:pointer">
@@ -221,6 +223,7 @@ export async function render({ content, query }) {
     renderJellyfinSettings();
     renderPartySyncSettings();
     mountPresenceSettings(/** @type {HTMLElement} */ (document.getElementById('discord-settings')));
+    mountHidden(document.getElementById('hidden-anime'));
     renderJellyfinLive();
 }
 
@@ -899,4 +902,45 @@ function initAccountTab(content) {
             toast(`Could not delete: ${err.message}`, 'error');
         }
     });
+}
+
+// Settings → Lists → Hidden anime: newest first, 50 at a time (one AniList request each), "Show again" per show
+async function mountHidden(box) {
+    if (!box) return;
+    await syncDismissed().catch(() => {});
+    let shown = 0;
+    const row = (m) => `<div class="hidden-anime-row" data-hidden-id="${m.id}">
+            <img src="${esc(m.coverImage?.large || '')}" alt="" loading="lazy">
+            <a href="#/anime/${m.id}" class="hidden-anime-title">${esc(titlePref(m.title))}</a>
+            <button class="glass-btn glass-btn-secondary glass-btn-sm" data-unhide="${m.id}">Show again</button>
+        </div>`;
+    const more = async () => {
+        const ids = hiddenList().slice(shown, shown + 50);
+        box.querySelector('.hidden-anime-more')?.remove();
+        if (!ids.length) {
+            if (!shown) box.innerHTML = '<p class="dot-label">Nothing hidden</p>';
+            return;
+        }
+        let cards;
+        try { cards = await api.getMediaCards(ids, getToken()); } catch (err) {
+            box.insertAdjacentHTML('beforeend', `<p class="dot-label">${esc(err.message)}</p>`);
+            return;
+        }
+        shown += ids.length;
+        box.insertAdjacentHTML('beforeend', ids.map(id => row(cards.get(id) || { id, title: { userPreferred: `Anime ${id}` } })).join(''));
+        if (hiddenList().length > shown) box.insertAdjacentHTML('beforeend', '<button class="glass-btn glass-btn-secondary glass-btn-sm hidden-anime-more">Show more</button>');
+    };
+    box.addEventListener('click', (ev) => {
+        const t = /** @type {HTMLElement} */ (ev.target);
+        if (t.closest('.hidden-anime-more')) { more(); return; }
+        const btn = /** @type {HTMLElement | null} */ (t.closest('[data-unhide]'));
+        if (!btn) return;
+        const id = Number(btn.dataset.unhide);
+        setDismissed(id, false);
+        btn.closest('.hidden-anime-row')?.remove();
+        shown--;
+        if (!box.querySelector('.hidden-anime-row') && !box.querySelector('.hidden-anime-more')) box.innerHTML = '<p class="dot-label">Nothing hidden</p>';
+        toast('It shows up again', 'success');
+    });
+    await more();
 }

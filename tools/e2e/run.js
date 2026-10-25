@@ -616,6 +616,33 @@ function staticServer() {
         notListed: !document.getElementById('season-not-listed').hidden, title: document.title, focus: document.activeElement?.tagName }));
     check('season: format chips and Not on my list; the tab says which page', season.chips >= 1 && season.notListed && /Season · AniRoll/.test(season.title), season);
 
+    // Hide on a show's page (the mock answers every page with one show): the button and the list follow; a show hidden
+    // with Season open leaves its grid at once; Settings → Lists names it and "Show again" brings it back
+    const hideId = await page.evaluate(() => Number(document.querySelector('#season-grid .media-card')?.dataset.id || 0));
+    const beforeHide = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_not_interested') || '[]'));
+    await go(`#/anime/${hideId}`);
+    await page.click('#detail-hide').catch(() => {});
+    await settle(300);
+    const hideBtn = await page.evaluate(() => ({ text: document.getElementById('detail-hide')?.textContent.trim(), pressed: document.getElementById('detail-hide')?.getAttribute('aria-pressed') }));
+    const afterHide = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_not_interested') || '[]'));
+    const pageId = afterHide.find(id => !beforeHide.includes(id));
+    await page.click('#detail-hide').catch(() => {});
+    await page.keyboard.press('Escape');
+    await go('#/season');
+    await page.evaluate(async id => (await import('/js/dismissed.js')).setDismissed(id, true), hideId);
+    await settle(200);
+    const stillInSeason = await page.evaluate(id => !!document.querySelector(`#season-grid .media-card[data-id="${id}"]`), hideId);
+    await go('#/settings');
+    await page.click('[data-settings-tab="lists"]').catch(() => {});
+    await page.waitForSelector(`.hidden-anime-row[data-hidden-id="${hideId}"]`, { timeout: 5000 }).catch(() => {});
+    const listed = await page.evaluate(id => document.querySelector(`.hidden-anime-row[data-hidden-id="${id}"] .hidden-anime-title`)?.textContent.trim() || '', hideId);
+    await page.click(`[data-unhide="${hideId}"]`).catch(() => {});
+    await settle(300);
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_not_interested') || '[]'));
+    check('hide: Hide on a show\'s page keeps it, a click again undoes it; Season drops a hidden show at once; Settings lists it and Show again brings it back',
+        hideId > 0 && hideBtn.text === 'Hidden' && hideBtn.pressed === 'true' && pageId > 0 && !after.includes(pageId)
+        && !stillInSeason && listed.length > 0 && !after.includes(hideId), { hideId, pageId, hideBtn, stillInSeason, listed, after });
+
     // Calendar: the week as a calendar file
     await go('#/calendar');
     const download = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
@@ -867,10 +894,13 @@ function staticServer() {
         await sw.close();
     }
 
-    // Same switch for a guest who ticked "Come along when the host switches shows" when joining: moved at once, no question
+    // Same switch for a guest who ticked "Come along when the host switches shows" when joining: moved at once, no question,
+    // also with the tab hidden and without syncing in the background (watching in the Jellyfin app); the server hears "follow"
     {
         const sw = await browser.newPage({ viewport: { width: 1440, height: 900 } });
         sw.on('pageerror', e => errors.push(`watch party follow: ${e.message}`));
+        const joins = [];
+        sw.on('request', r => { if (r.method() === 'POST' && /\/join$/.test(r.url())) joins.push({ url: r.url(), body: r.postDataJSON() }); });
         // The mock AniList answers every show with the same media: any id but the new show's is the first show
         const parties = { first: { ...party, hostName: 'Hosty', hostKey: undefined, active: true, members: [], hostProgress: 3 } };
         await sw.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
@@ -898,6 +928,12 @@ function staticServer() {
             if (await sw.locator('#wp-bg-open').count()) await sw.click('#wp-bg-open');
             await sw.waitForFunction(() => !!localStorage.getItem('aniroll_joined_party'), null, { timeout: 8000 }).catch(() => {});
         }
+        const bgSync = await sw.evaluate(() => JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null')?.bgSync);
+        await sw.evaluate(() => {
+            Object.defineProperty(document, 'visibilityState', { get: () => 'hidden', configurable: true });
+            Object.defineProperty(document, 'hidden', { get: () => true, configurable: true });
+            document.dispatchEvent(new Event('visibilitychange'));
+        });
         parties[101] = { hostName: 'Hosty', mediaId: 101, mediaTitle: 'Next Show', active: true, members: [], hostProgress: 0, startedAt: Date.now(), startEp: 0,
             evening: [{ mediaId: 21, mediaTitle: 'One Piece', coverImage: '', members: [{ name: VIEWER.name, avatar: '' }, { name: 'Kim', avatar: '' }] }] };
         parties.first = { hostName: 'Hosty', mediaId: 21, mediaTitle: 'One Piece', active: false, next: 101, members: [] };
@@ -905,8 +941,10 @@ function staticServer() {
         await sw.waitForFunction(() => JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null')?.mediaId === 101, null, { timeout: 10000 }).catch(() => {});
         const moved = await sw.evaluate(() => ({ joined: JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null'),
             asked: /moves on/i.test(document.querySelector('#modal-container')?.innerText || '') }));
-        check('watch party follow: a guest who ticked "Come along" when joining moves to the next show without being asked',
-            followSaved === true && moved.joined?.mediaId === 101 && moved.joined.follow === true && !moved.asked, { followSaved, moved });
+        const joinedNext = joins.find(j => /\/101\/join$/.test(j.url));
+        check('watch party follow: a guest who ticked "Come along" moves to the next show without being asked, tab hidden and no background sync too',
+            followSaved === true && bgSync === false && moved.joined?.mediaId === 101 && moved.joined.follow === true && !moved.asked
+            && joins[0]?.body?.follow === true && joinedNext?.body?.follow === true, { followSaved, bgSync, moved, joins: joins.map(j => ({ url: j.url.split('/api/')[1], follow: j.body?.follow })) });
         await sw.close();
     }
 

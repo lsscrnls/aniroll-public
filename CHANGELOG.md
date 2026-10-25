@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.8.3.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.8.4.
 
 ## 25 October 2026 – Followers and your 18+ settings
 
@@ -16,6 +16,8 @@ What changed in AniRoll, newest first: the same as "What's new" in the app. Curr
 - **Test speed** in the player's Quality menu shows what reaches your device from Jellyfin and what plays smoothly. Stuttering a lot? The player offers the test itself.
 - The **Previously on** recap has its own menu for audio, subtitles and quality, and the episode after it follows what you pick there.
 - The audio and subtitles you pick for a show are now kept with your account, so your other devices start with them too.
+- **Hide** on a show's page keeps it out of Home, Roll, Season, Browse and the calendar. A search still finds it, dimmed. Settings → Lists → Hidden anime shows everything you hid, including what you marked Not interested, and brings it back.
+- Watch Party: guests who chose **Come along** stay in the party when the host switches shows, even while they watch in another tab or the Jellyfin app.
 
 ## 24 October 2026 – Your Watch Party follows you to the next show
 
