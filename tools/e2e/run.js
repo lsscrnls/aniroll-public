@@ -471,19 +471,10 @@ function staticServer() {
     check('social: one person\'s updates in a row become one post with a row per show, each with its own like',
         grouped?.user === 'binger' && grouped.rows === 2 && grouped.likes === 2 && /^2 updates|^Watched 2|^Read 2/.test(grouped.summary || '') && grouped.labels.every(Boolean), grouped);
 
-    // Messages: received and sent ones (AniList has no global feed of them any more); Friends: following, followers, mutuals
+    // Friends: following, followers, mutuals
     const socialAsks = [];
     const watchAsk = req => { if (/graphql\.anilist/.test(req.url())) socialAsks.push(req.postDataJSON()); };
     page.on('request', watchAsk);
-    await page.click('#tab-messages');
-    await settle(800);
-    await page.click('#social-subtabs [data-sub="sent"]').catch(() => {});
-    await settle(800);
-    const msgAsks = socialAsks.filter(b => /type: MESSAGE/.test(b.query || '')).map(b => b.variables);
-    const msgs = await page.evaluate(() => ({ subs: [...document.querySelectorAll('#social-subtabs [data-sub]')].map(b => b.dataset.sub).join(','),
-        active: document.querySelector('#social-subtabs .active')?.dataset.sub }));
-    check('social: Messages asks for the ones on your profile, then the ones you sent',
-        msgs.subs === 'received,sent' && msgs.active === 'sent' && msgAsks.some(v => v.userId && !v.messengerId) && msgAsks.some(v => v.messengerId && !v.userId), { msgs, msgAsks });
     await page.click('#tab-friends');
     await settle(800);
     const followingTiles = await page.evaluate(() => ({ tiles: document.querySelectorAll('.friend-tile').length, remove: document.querySelectorAll('.friend-remove').length }));

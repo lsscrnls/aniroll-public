@@ -1,10 +1,9 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.8.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.8.1.
 
-## 25 October 2026 – Followers, messages and your 18+ settings
+## 25 October 2026 – Followers and your 18+ settings
 
-- **Social** has a **Messages** tab: what others wrote on your profile, and the messages you wrote on theirs.
 - Under **Friends** you now also see your **Followers** and your **Mutuals**, and can remove someone from your followers.
 - With **18+ content** on in your AniList settings, AniRoll follows them: Browse, Season and the search include 18+ as you set it there, and Browse can show only 18+ or none. Other people's 18+ posts in the feed follow your AniList setting too.
 - Show pages give AniList's new **Weighted Score**, with the mean score next to it.
