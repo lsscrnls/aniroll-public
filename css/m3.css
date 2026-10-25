@@ -87,8 +87,10 @@
     cursor: auto;
     letter-spacing: 0;
 }
-:root[data-design="m3"] button, :root[data-design="m3"] a, :root[data-design="m3"] .media-card,
-:root[data-design="m3"] .cw-inc, :root[data-design="m3"] .landing-feature-clickable { cursor: pointer; }
+:root[data-design="m3"] button,
+:root[data-design="m3"] a,
+:root[data-design="m3"] .media-card,
+:root[data-design="m3"] .cw-inc { cursor: pointer; }
 :root[data-design="m3"] .cursor { display: none; }
 :root[data-design="m3"] ::selection { background: var(--md-primary-container); color: var(--md-on-primary-container); }
 :root[data-design="m3"] :focus-visible { outline: 3px solid var(--md-secondary); outline-offset: 2px; }
@@ -366,7 +368,6 @@
 :root[data-design="m3"] .dropdown-item:hover, :root[data-design="m3"] .glass-menu-option.active { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
 :root[data-design="m3"] .glass-menu-option.selected { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
 :root[data-design="m3"] .dropdown-item.danger { color: var(--md-error); }
-:root[data-design="m3"] .dropdown-divider { border-top-color: var(--md-outline-variant); margin: 4px 12px; }
 
 /* ===== Dialogs, sheets, snackbars ===== */
 :root[data-design="m3"] .modal-backdrop, :root[data-design="m3"] .overlay-backdrop, :root[data-design="m3"] .detail-panel-backdrop {
@@ -458,15 +459,13 @@
 /* The search bar is the field; no second ring around the input inside it */
 :root[data-design="m3"] .search-container input:focus-visible { outline: none; }
 
-
 /* =====================================================================================================
    Surfaces and pages. M3 has no hairline frames: areas are tonal containers (surface-container-*), lists
    are segmented (small gaps, big outer corners), media sits on cards with the text *below* the image.
    ===================================================================================================== */
 
 /* Framed areas become filled containers */
-:root[data-design="m3"] :is(.box, .stat-chart, .settings-card, .wp-card, .jf-now-card, .roll-filters, .list-content,
-    .friend-tile, .login-card, .friend-status-card, .wp-bg-question, .calendar-week-day, .detail-stats) {
+:root[data-design="m3"] :is(.box, .stat-chart, .settings-card, .wp-card, .jf-now-card, .roll-filters, .list-content, .friend-tile, .friend-status-card, .wp-bg-question, .calendar-week-day, .detail-stats) {
     background: var(--md-surface-container-low) !important;
     border: 0 !important;
     border-radius: var(--radius-xl);
@@ -541,7 +540,7 @@
 
 /* ----- Segmented lists: rows with 2px gaps, big corners only at the ends ----- */
 :root[data-design="m3"] :is(#notif-list, .list-content, #mal-list) { background: transparent !important; padding: 0 !important; display: flex; flex-direction: column; gap: 2px; }
-:root[data-design="m3"] :is(.notif-item, .list-entry, .mal-item, .schedule-item) {
+:root[data-design="m3"] :is(.notif-item, .list-entry, .schedule-item) {
     background: var(--md-surface-container-low);
     border-radius: 4px;
     padding: 12px 16px;
@@ -549,8 +548,8 @@
     align-items: center;
     transition: background-color .2s var(--md-standard), border-radius .4s var(--ease);
 }
-:root[data-design="m3"] :is(.notif-item, .list-entry, .mal-item, .schedule-item):first-child { border-top-left-radius: var(--radius-xl); border-top-right-radius: var(--radius-xl); }
-:root[data-design="m3"] :is(.notif-item, .list-entry, .mal-item, .schedule-item):last-child { border-bottom-left-radius: var(--radius-xl); border-bottom-right-radius: var(--radius-xl); }
+:root[data-design="m3"] :is(.notif-item, .list-entry, .schedule-item):first-child { border-top-left-radius: var(--radius-xl); border-top-right-radius: var(--radius-xl); }
+:root[data-design="m3"] :is(.notif-item, .list-entry, .schedule-item):last-child { border-bottom-left-radius: var(--radius-xl); border-bottom-right-radius: var(--radius-xl); }
 :root[data-design="m3"] :is(.notif-item, .list-entry, .schedule-item):hover { background: var(--md-surface-container-high); border-radius: var(--radius-lg); }
 :root[data-design="m3"] .notif-item img, :root[data-design="m3"] .list-entry img { border-radius: var(--radius-sm); }
 :root[data-design="m3"] .notif-time, :root[data-design="m3"] .activity-time { color: var(--md-on-surface-variant); font-size: 0.75rem; }
@@ -913,7 +912,6 @@
 :root[data-design="m3"] .wp-fab-icon { width: 24px; height: 24px; }
 @media (max-width: 768px) { :root[data-design="m3"] .wp-fab { bottom: 96px; right: 16px; } }
 
-
 /* =====================================================================================================
    Expressive identity: what makes this design its own and not AniRoll in other colours.
    Hero moments, emphasized type, the shape library, contrasting colour roles, wavy progress.
@@ -1205,7 +1203,6 @@
 :root[data-design="m3"] .m3-seed:hover { clip-path: var(--m3-shape-cookie9); }
 :root[data-design="m3"] .m3-seed.active { clip-path: var(--m3-shape-flower); transform: rotate(22deg) scale(1.08); }
 
-
 /* =====================================================================================================
    Colour from content, motion, editorial pages
    ===================================================================================================== */
@@ -1264,7 +1261,6 @@
 @media (prefers-reduced-motion: reduce) {
     :root[data-design="m3"], :root[data-design="m3"] .m3-scope { transition: none; }
 }
-
 
 /* =====================================================================================================
    Feel (v94): the app answers every touch. Ripples, springs that overshoot and settle, cards that deal
@@ -1522,7 +1518,6 @@
     :root[data-design="m3"]:not([data-theme="dark"]) .m3-hero > .m3-hero-glow { filter: blur(72px) saturate(1.5) brightness(1.1); opacity: .7; }
 }
 :root[data-design="m3"][data-theme="light"] .m3-hero > .m3-hero-glow { filter: blur(72px) saturate(1.5) brightness(1.1); opacity: .7; }
-
 
 /* =====================================================================================================
    Desktop feel (v94, after Lucid on Hyprland): the show you're on is the wallpaper, the bars float over
@@ -1834,8 +1829,8 @@
 }
 :root[data-design="m3"] .landing-feature:hover { border-radius: var(--radius-xl); background: var(--md-surface-container); }
 :root[data-design="m3"] .landing-tour-item.active { background: var(--md-surface-container); border-radius: var(--radius-xl); }
-:root[data-design="m3"] :is(.landing-stage-frame, .landing-tour-frame, .landing-design-frame) { border-color: transparent; border-radius: var(--md-shape-xxl); }
-:root[data-design="m3"] .landing-stage-glow { opacity: .6; }
+:root[data-design="m3"] :is(.landing-tour-frame) { border-color: transparent; border-radius: var(--md-shape-xxl); }
+
 /* Hover on widgets only moves things (transform), it never changes layout or corner shapes mid-frame */
 :root[data-design="m3"] .m3-widget { transition: transform .5s var(--m3-bouncy), background-color .2s var(--md-standard); }
 :root[data-design="m3"] .m3-widget:hover { border-radius: var(--radius-2xl); }
@@ -1974,7 +1969,6 @@
 :root[data-design="m3"] .char-va:hover .char-img { clip-path: var(--m3-shape-cookie9); }
 /* The voice actor's photo in an M3 Expressive shape */
 :root[data-design="m3"] .staff-photo { border-radius: 0; clip-path: var(--m3-shape-cookie12); background: var(--md-secondary-container); }
-
 
 /* =====================================================================================================
    Landing (js/landing.js, js/pages/home.js renderLanding): Material 3 is the only design logged out.
@@ -2152,15 +2146,15 @@
 
 /* Stage, tour and colour clips: tonal surfaces, big shapes, no black monitor frame */
 :root[data-design="m3"] .lp .landing-stage { margin-top: 0; }
-:root[data-design="m3"] .lp .landing-stage-glow { display: none; }
-:root[data-design="m3"] .lp :is(.landing-stage-frame, .landing-tour-frame, .lp-colour-frame) {
+
+:root[data-design="m3"] .lp :is(.landing-tour-frame, .lp-colour-frame) {
     border: 0;
     border-radius: var(--md-shape-xxl);
     background: var(--md-surface-container-high);
     padding: 12px;
     box-shadow: none;
 }
-:root[data-design="m3"] .lp :is(.landing-stage-frame, .lp-colour-frame) .landing-video { border-radius: var(--md-shape-xl-plus); }
+:root[data-design="m3"] .lp :is(.lp-colour-frame) .landing-video { border-radius: var(--md-shape-xl-plus); }
 :root[data-design="m3"] .lp .landing-tour-frame video { inset: 12px; width: calc(100% - 24px); height: calc(100% - 24px); border-radius: var(--md-shape-xl-plus); }
 :root[data-design="m3"] .lp .landing-tour-title { font-weight: 800; letter-spacing: -0.03em; }
 :root[data-design="m3"] .lp .landing-tour-item { border-radius: 28px; transition: background-color .25s var(--md-standard), border-radius .45s var(--m3-bouncy); }
@@ -2445,11 +2439,7 @@
 /* ===== Labels in sentence case =====
    M3 sets labels in sentence case with almost no tracking; the tracked-out capitals came from AniRoll's first
    design. Only the Discord card on the landing page keeps them, because it shows Discord's own look */
-:root[data-design="m3"] :is(.media-card-status, .detail-stat-label, .stat-chart-title, .schedule-day-title,
-    .calendar-header-cell, .dot-label, .roll-result-kicker, .roll-filter-label, .wp-status-badge, .wp-sync-label,
-    .wp-host-badge, .jf-now-kicker, .wp-picker-section, .wp-switch-pill, .calendar-week-name, .whatsnew-kicker,
-    .whatsnew-stage, .detail-related-title, .pl-song-kicker, .pl-next-kicker, .pl-stats-title, .pl-menu-title,
-    .search-group-title, .pl-recap-kicker, .dna-kicker) {
+:root[data-design="m3"] :is(.media-card-status, .detail-stat-label, .stat-chart-title, .schedule-day-title, .calendar-header-cell, .dot-label, .roll-result-kicker, .roll-filter-label, .wp-status-badge, .wp-sync-label, .wp-host-badge, .jf-now-kicker, .wp-switch-pill, .calendar-week-name, .whatsnew-kicker, .whatsnew-stage, .detail-related-title, .pl-song-kicker, .pl-next-kicker, .pl-stats-title, .pl-menu-title, .search-group-title, .pl-recap-kicker, .dna-kicker) {
     text-transform: none;
     letter-spacing: 0.01em;
 }

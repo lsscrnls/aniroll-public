@@ -18,7 +18,6 @@ export async function render({ content }) {
         <div class="tab-group" style="margin-bottom:var(--space-lg)">
             <button class="tab-btn active" id="tab-following">Following</button>
             <button class="tab-btn" id="tab-global">Global</button>
-            <button class="tab-btn" id="tab-messages">Messages</button>
             <button class="tab-btn" id="tab-friends">Friends</button>
         </div>
         <div class="genre-chips social-subtabs" id="social-subtabs" hidden></div>
@@ -35,12 +34,11 @@ export async function render({ content }) {
     // Per person and show, which viewing the next older post belongs to (kept across "Load More")
     let rewatchRuns = new Map();
     let currentTab = 'following';
-    // Messages: received or sent; Friends: following, followers or mutuals
+    // Friends: following, followers or mutuals
     const SUBTABS = {
-        messages: [['received', 'Received'], ['sent', 'Sent']],
         friends: [['following', 'Following'], ['followers', 'Followers'], ['mutuals', 'Mutuals']],
     };
-    const subTab = { messages: 'received', friends: 'following' };
+    const subTab = { friends: 'following' };
     const subtabs = content.querySelector('#social-subtabs');
     function showSubtabs() {
         const list = SUBTABS[currentTab];
@@ -68,9 +66,7 @@ export async function render({ content }) {
                 return;
             }
 
-            const result = currentTab === 'messages'
-                ? await api.getMessages(user.id, subTab.messages === 'sent', page, token)
-                : await api.getActivityFeed(page, currentTab === 'following', token);
+            const result = await api.getActivityFeed(page, currentTab === 'following', token);
             if (!append) rewatchRuns = new Map();
             await countRewatches(result.activities, rewatchRuns, token);
 
@@ -80,7 +76,7 @@ export async function render({ content }) {
 
             // Added below, not redrawn: a reply being typed further up stays
             if (append) socialContent.insertAdjacentHTML('beforeend', html);
-            else socialContent.innerHTML = html || `<div class="empty-state"><div class="empty-state-sub">${currentTab !== 'messages' ? 'No activity yet' : subTab.messages === 'sent' ? 'You haven\'t written on anyone\'s profile yet' : 'No messages on your profile yet'}</div></div>`;
+            else socialContent.innerHTML = html || '<div class="empty-state"><div class="empty-state-sub">No activity yet</div></div>';
 
             document.getElementById('load-more-social').hidden = !result.pageInfo.hasNextPage;
             currentPage = page;

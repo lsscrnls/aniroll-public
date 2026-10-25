@@ -1148,20 +1148,6 @@ export async function getActivityFeed(page = 1, isFollowing = true, token = null
     return adultActivities(data.Page);
 }
 
-// Messages on your profile (received) or the ones you wrote on others' (sent). AniList has no global
-// feed of messages any more (2026-10), these two still work
-export async function getMessages(userId, sent = false, page = 1, token = null) {
-    const data = await cachedQuery(`
-        query ($page: Int, $userId: Int, $messengerId: Int) {
-            Page(page: $page, perPage: 25) {
-                pageInfo { total currentPage lastPage hasNextPage }
-                activities(sort: [ID_DESC], type: MESSAGE, userId: $userId, messengerId: $messengerId) {${ACTIVITY_FIELDS}                }
-            }
-        }
-    `, { page, ...(sent ? { messengerId: userId } : { userId }) }, token);
-    return data.Page;
-}
-
 // How often people have rewatched shows, for the rewatch posts of one feed page: one request for
 // every person and show on it (AniList's posts only say "rewatched"). Private lists stay out.
 export async function getRewatchCounts(userIds, mediaIds, token = null) {
