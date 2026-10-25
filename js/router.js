@@ -1,5 +1,6 @@
 // @ts-check
 import { esc, emptyIcon, SKELETON } from './store.js';
+import { hasDraft, mayDiscard } from './drafts.js';
 
 const routes = [];
 let currentCleanup = null;
@@ -115,7 +116,19 @@ function updateActiveNav(path) {
     document.querySelectorAll('[data-page="discover"]').forEach((/** @type {HTMLAnchorElement} */ el) => { el.href = `#/${last}`; });
 }
 
+// Moving on with an unsent reply or post asks first: the old address goes back in place (no new
+// history step) while the question is open, and on "Discard" the move happens after all
 export function startRouter() {
-    window.addEventListener('hashchange', resolve);
+    let shown = location.hash;
+    window.addEventListener('hashchange', async () => {
+        const target = location.hash;
+        if (hasDraft()) {
+            history.replaceState(history.state, '', shown || location.pathname + location.search);
+            if (await mayDiscard()) location.hash = target;
+            return;
+        }
+        shown = target;
+        resolve();
+    });
     resolve();
 }

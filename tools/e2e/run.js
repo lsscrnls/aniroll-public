@@ -433,6 +433,22 @@ function staticServer() {
             await replyTo.click();
             const value = await page.$eval('.activity-reply-form input', i => i.value);
             check('social: Reply puts @name into the field', value.startsWith(`@${name} `), value);
+            // Something typed and not sent: leaving asks first, "Keep writing" stays, "Discard" moves on
+            await page.fill('.activity-reply-form input', `@${name} nice one`);
+            await page.evaluate(() => { location.hash = '#/list'; });
+            await page.waitForSelector('.draft-confirm [data-keep]', { timeout: 10000 }).catch(() => {});
+            const leaveAsk = { dialog: !!(await page.$('.draft-confirm')), hash: await page.evaluate(() => location.hash) };
+            await page.click('.draft-confirm [data-keep]').catch(() => {});
+            await settle(200);
+            const kept = { hash: await page.evaluate(() => location.hash), text: await page.$eval('.activity-reply-form input', i => i.value).catch(() => null) };
+            check('social: leaving with an unsent reply asks first; Keep writing stays on the page with the text',
+                leaveAsk.dialog && leaveAsk.hash === '#/social' && kept.hash === '#/social' && kept.text === `@${name} nice one`, { leaveAsk, kept });
+            await page.evaluate(() => { location.hash = '#/list'; });
+            await page.waitForSelector('.draft-confirm [data-discard]', { timeout: 10000 }).catch(() => {});
+            await page.click('.draft-confirm [data-discard]').catch(() => {});
+            await page.waitForFunction(() => location.hash === '#/list', null, { timeout: 10000 }).catch(() => {});
+            check('social: Discard moves on', await page.evaluate(() => location.hash === '#/list' && !document.querySelector('.draft-confirm')));
+            await go('#/social');
         }
     } else {
         check('social: posts have a reply toggle', false);
@@ -454,6 +470,47 @@ function staticServer() {
     if (process.env.E2E_SHOT) await page.locator('#social-content').screenshot({ path: process.env.E2E_SHOT.replace(/\.png$/, '-feed.png') });
     check('social: one person\'s updates in a row become one post with a row per show, each with its own like',
         grouped?.user === 'binger' && grouped.rows === 2 && grouped.likes === 2 && /^2 updates|^Watched 2|^Read 2/.test(grouped.summary || '') && grouped.labels.every(Boolean), grouped);
+
+    // Messages: received and sent ones (AniList has no global feed of them any more); Friends: following, followers, mutuals
+    const socialAsks = [];
+    const watchAsk = req => { if (/graphql\.anilist/.test(req.url())) socialAsks.push(req.postDataJSON()); };
+    page.on('request', watchAsk);
+    await page.click('#tab-messages');
+    await settle(800);
+    await page.click('#social-subtabs [data-sub="sent"]').catch(() => {});
+    await settle(800);
+    const msgAsks = socialAsks.filter(b => /type: MESSAGE/.test(b.query || '')).map(b => b.variables);
+    const msgs = await page.evaluate(() => ({ subs: [...document.querySelectorAll('#social-subtabs [data-sub]')].map(b => b.dataset.sub).join(','),
+        active: document.querySelector('#social-subtabs .active')?.dataset.sub }));
+    check('social: Messages asks for the ones on your profile, then the ones you sent',
+        msgs.subs === 'received,sent' && msgs.active === 'sent' && msgAsks.some(v => v.userId && !v.messengerId) && msgAsks.some(v => v.messengerId && !v.userId), { msgs, msgAsks });
+    await page.click('#tab-friends');
+    await settle(800);
+    const followingTiles = await page.evaluate(() => ({ tiles: document.querySelectorAll('.friend-tile').length, remove: document.querySelectorAll('.friend-remove').length }));
+    await page.click('#social-subtabs [data-sub="mutuals"]').catch(() => {});
+    await settle(800);
+    const mutuals = await page.evaluate(() => ({ tiles: document.querySelectorAll('.friend-tile').length, remove: document.querySelectorAll('.friend-remove').length }));
+    await page.click('#social-subtabs [data-sub="followers"]').catch(() => {});
+    await settle(800);
+    const mutBefore = mutations.length;
+    const tiles = await page.$$eval('.friend-tile', t => t.length);
+    await page.click('.friend-remove').catch(() => {});
+    await settle(300);
+    const gone = await page.$$eval('.friend-tile', t => t.length);
+    await page.locator('.toast-action', { hasText: 'Undo' }).last().click().catch(() => {});
+    await settle(300);
+    const undone = await page.$$eval('.friend-tile', t => t.length);
+    page.off('request', watchAsk);
+    check('social Friends: Following without Remove, Mutuals and Followers with it; Remove takes the tile off, Undo puts it back, AniList not asked',
+        followingTiles.tiles > 0 && !followingTiles.remove && mutuals.tiles > 0 && mutuals.remove === mutuals.tiles
+            && socialAsks.some(b => /mutualFollowers\(/.test(b.query || '')) && socialAsks.some(b => /\bfollowers\(/.test(b.query || ''))
+            && gone === tiles - 1 && undone === tiles && !mutations.slice(mutBefore).includes('DeleteFollower'),
+        { followingTiles, mutuals, tiles, gone, undone });
+    await page.click('#tab-following');
+    await settle(800);
+    // Back as the checks below expect it: the first post's replies open
+    await page.click('.reply-toggle').catch(() => {});
+    await settle(1000);
 
     // Your own posts and replies have a bin: gone from the page at once, "Undo" brings them back, AniList
     // deletes them only once the note is gone (js/store.js undoable)

@@ -1,7 +1,7 @@
 // @ts-check
 import { buildTasteProfile, tasteMatch } from './taste.js';
 import { dismissedIds } from './dismissed.js';
-import { statusLabel } from './store.js';
+import { statusLabel, getState } from './store.js';
 
 const API_URL = 'https://graphql.anilist.co';
 
@@ -132,7 +132,7 @@ function queuePendingSave(variables) {
 const queueable = (err) => err instanceof TypeError || err instanceof SyntaxError || navigator.onLine === false
     || err.unavailable || err.rateLimited || err.throttled;
 
-// Posts, replies, likes, follows and deletes wait in the same queue as list changes (kind says which).
+// Posts, replies, likes, follows, removed followers and deletes wait in the same queue as list changes (kind says which).
 // A like or follow pressed twice before it went out cancels itself instead of going out twice.
 const SOCIAL = {
     post: `mutation ($text: String) { SaveTextActivity(text: $text) { id } }`,
@@ -141,6 +141,7 @@ const SOCIAL = {
     follow: `mutation ($userId: Int) { ToggleFollow(userId: $userId) { id } }`,
     deleteActivity: `mutation ($id: Int) { DeleteActivity(id: $id) { deleted } }`,
     deleteReply: `mutation ($id: Int) { DeleteActivityReply(id: $id) { deleted } }`,
+    removeFollower: `mutation ($userId: Int) { DeleteFollower(userId: $userId) { id } }`,
 };
 const TOGGLES = new Set(['like', 'follow']);
 function queueSocial(kind, vars) {
@@ -480,7 +481,7 @@ fragment mediaFields on Media {
     chapters
     volumes
     meanScore
-    averageScore
+    weightedScore
     popularity
     genres
     season
@@ -497,6 +498,19 @@ fragment mediaFields on Media {
     isAdult
     trailer { id site }
 }`;
+
+// 18+ follows the account's own AniList settings (Anime & Manga there): nothing adult without "18+ content",
+// then one switch each for search and browse, the quick search, and other people's activities.
+// Logged out (or a viewer cached before these options existed) it stays out
+export function adultOption(option = null) {
+    const o = getState().user?.options;
+    return !!o?.displayAdultContent && (!option || !!o[option]);
+}
+
+// The isAdult filter for a media query: false keeps 18+ out, true shows only 18+, left out shows both
+function adultFilter(option) {
+    return adultOption(option) ? {} : { isAdult: false };
+}
 
 const MEDIA_CARD_FRAGMENT = `
 fragment mediaCard on Media {
@@ -519,7 +533,7 @@ fragment mediaCard on Media {
 
 export async function searchMedia(search, type = null, page = 1, perPage = 20, token = null) {
     try {
-        return await searchAniList(search, type, page, perPage, token);
+        return await searchAniList(search, type, page, perPage, token, adultFilter('includeAdultContentInQuickSearch'));
     } catch (err) {
         // TMDB knows no manga, and has one page of answers
         const fb = aniListDown(err) && type !== 'MANGA' && page === 1 ? await fallbackSearch(search, token) : null;
@@ -528,19 +542,19 @@ export async function searchMedia(search, type = null, page = 1, perPage = 20, t
     }
 }
 
-async function searchAniList(search, type, page, perPage, token) {
+async function searchAniList(search, type, page, perPage, token, adult) {
     const data = await cachedQuery(`
         ${MEDIA_CARD_FRAGMENT}
-        query ($search: String, $type: MediaType, $page: Int, $perPage: Int) {
+        query ($search: String, $type: MediaType, $page: Int, $perPage: Int, $isAdult: Boolean) {
             Page(page: $page, perPage: $perPage) {
                 pageInfo { total currentPage lastPage hasNextPage }
-                media(search: $search, type: $type, sort: [SEARCH_MATCH], isAdult: false) {
+                media(search: $search, type: $type, sort: [SEARCH_MATCH], isAdult: $isAdult) {
                     ...mediaCard
                 }
             }
         }
     `, {
-        search, page, perPage,
+        search, page, perPage, ...adult,
         // Omit an unset type: AniList reads an explicit `type: null` as a filter and returns 0 hits
         ...(type ? { type } : {}),
     }, token);
@@ -625,7 +639,7 @@ async function getMediaFromAniList(id, token) {
                     scoreDistribution { score amount }
                     statusDistribution { status amount }
                 }
-                tags { id name rank isMediaSpoiler }
+                tags { id name rank isMediaSpoiler isAdult }
                 externalLinks { id url site icon color type language }
             }
         }
@@ -649,31 +663,33 @@ export async function getTrending(type = 'ANIME', page = 1, perPage = 20, token 
 export async function getSeason(season, year, sort = 'POPULARITY_DESC', token = null, page = 1) {
     const data = await cachedQuery(`
         ${MEDIA_CARD_FRAGMENT}
-        query ($season: MediaSeason, $year: Int, $sort: [MediaSort], $page: Int) {
+        query ($season: MediaSeason, $year: Int, $sort: [MediaSort], $page: Int, $isAdult: Boolean) {
             Page(page: $page, perPage: 50) {
                 pageInfo { hasNextPage }
-                media(season: $season, seasonYear: $year, type: ANIME, sort: $sort, isAdult: false) { ...mediaCard }
+                media(season: $season, seasonYear: $year, type: ANIME, sort: $sort, isAdult: $isAdult) { ...mediaCard }
             }
         }
-    `, { season, year, sort: [sort], page }, token, TTL.discovery);
+    `, { season, year, sort: [sort], page, ...adultFilter('includeAdultContentInSearch') }, token, TTL.discovery);
     return { media: data.Page.media, hasNext: !!data.Page.pageInfo?.hasNextPage };
 }
 
+// variables.isAdult: true/false/left out (both), the page's 18+ switch; never 18+ without the account's "18+ content"
 export async function browseMedia(variables, token = null) {
+    if (!adultOption()) variables = { ...variables, isAdult: false };
     const data = await cachedQuery(`
         ${MEDIA_CARD_FRAGMENT}
         query (
             $page: Int, $perPage: Int, $type: MediaType, $sort: [MediaSort],
             $genre_in: [String], $tag_in: [String], $season: MediaSeason,
             $seasonYear: Int, $format: MediaFormat, $status: MediaStatus,
-            $search: String, $year: String
+            $search: String, $year: String, $isAdult: Boolean
         ) {
             Page(page: $page, perPage: $perPage) {
                 pageInfo { total currentPage lastPage hasNextPage }
                 media(
                     type: $type, sort: $sort, genre_in: $genre_in, tag_in: $tag_in,
                     season: $season, seasonYear: $seasonYear, format: $format,
-                    status: $status, search: $search, startDate_like: $year, isAdult: false
+                    status: $status, search: $search, startDate_like: $year, isAdult: $isAdult
                 ) { ...mediaCard }
             }
         }
@@ -728,7 +744,7 @@ export async function getViewer(token) {
                         statuses(sort: [COUNT_DESC]) { status count }
                     }
                 }
-                options { titleLanguage displayAdultContent profileColor }
+                options { titleLanguage displayAdultContent includeAdultContentInSearch includeAdultContentInQuickSearch displayAdultActivities profileColor }
                 mediaListOptions {
                     scoreFormat
                     animeList { customLists sectionOrder }
@@ -1089,12 +1105,8 @@ export async function getActivityReplies(id, token = null) {
     return data.Activity?.replies || [];
 }
 
-export async function getActivityFeed(page = 1, isFollowing = true, token = null) {
-    const data = await cachedQuery(`
-        query ($page: Int, $isFollowing: Boolean) {
-            Page(page: $page, perPage: 25) {
-                pageInfo { total currentPage lastPage hasNextPage }
-                activities(sort: [ID_DESC], isFollowing: $isFollowing, type_in: [TEXT, ANIME_LIST, MANGA_LIST, MESSAGE]) {
+// One feed post, whatever its kind
+const ACTIVITY_FIELDS = `
                     ... on TextActivity {
                         id type text userId
                         user { id name avatar { medium } }
@@ -1104,7 +1116,7 @@ export async function getActivityFeed(page = 1, isFollowing = true, token = null
                     ... on ListActivity {
                         id type status progress
                         user { id name avatar { medium } }
-                        media { id title { userPreferred english romaji native } coverImage { large } type format mediaListEntry { status progress } }
+                        media { id title { userPreferred english romaji native } coverImage { large } type format isAdult mediaListEntry { status progress } }
                         likes { id name avatar { medium } }
                         likeCount isLiked createdAt replyCount
                     }
@@ -1115,10 +1127,38 @@ export async function getActivityFeed(page = 1, isFollowing = true, token = null
                         likes { id name avatar { medium } }
                         likeCount isLiked createdAt replyCount
                     }
-                }
+`;
+
+// Other people's 18+ list posts only with "18+ activities" on in AniList; your own always
+function adultActivities(page) {
+    if (adultOption('displayAdultActivities')) return page;
+    const me = getState().user?.id;
+    return { ...page, activities: (page.activities || []).filter(a => !a?.media?.isAdult || a.user?.id === me) };
+}
+
+export async function getActivityFeed(page = 1, isFollowing = true, token = null) {
+    const data = await cachedQuery(`
+        query ($page: Int, $isFollowing: Boolean) {
+            Page(page: $page, perPage: 25) {
+                pageInfo { total currentPage lastPage hasNextPage }
+                activities(sort: [ID_DESC], isFollowing: $isFollowing, type_in: [TEXT, ANIME_LIST, MANGA_LIST, MESSAGE]) {${ACTIVITY_FIELDS}                }
             }
         }
     `, { page, isFollowing }, token);
+    return adultActivities(data.Page);
+}
+
+// Messages on your profile (received) or the ones you wrote on others' (sent). AniList has no global
+// feed of messages any more (2026-10), these two still work
+export async function getMessages(userId, sent = false, page = 1, token = null) {
+    const data = await cachedQuery(`
+        query ($page: Int, $userId: Int, $messengerId: Int) {
+            Page(page: $page, perPage: 25) {
+                pageInfo { total currentPage lastPage hasNextPage }
+                activities(sort: [ID_DESC], type: MESSAGE, userId: $userId, messengerId: $messengerId) {${ACTIVITY_FIELDS}                }
+            }
+        }
+    `, { page, ...(sent ? { messengerId: userId } : { userId }) }, token);
     return data.Page;
 }
 
@@ -1212,6 +1252,32 @@ export async function getFollowing(userId, page = 1, token = null) {
     return data.Page;
 }
 
+// Who follows you, and who of them you follow back (AniList's mutualFollowers)
+export async function getFollowers(userId, page = 1, token = null, mutual = false) {
+    const field = mutual ? 'mutualFollowers' : 'followers';
+    const data = await cachedQuery(`
+        query ($userId: Int!, $page: Int) {
+            Page(page: $page, perPage: 25) {
+                pageInfo { total currentPage lastPage hasNextPage }
+                ${field}(userId: $userId, sort: [USERNAME]) {
+                    id name avatar { medium } bannerImage
+                    statistics { anime { count minutesWatched episodesWatched meanScore } }
+                }
+            }
+        }
+    `, { userId, page }, token, TTL.profile);
+    return { pageInfo: data.Page.pageInfo, users: data.Page[field] };
+}
+
+// Takes someone off your followers (they can follow you again)
+export async function removeFollower(userId, token) {
+    const { queued } = await socialOrQueue('removeFollower', { userId }, token);
+    if (queued) return;
+    clearCache('followers(userId');
+    clearCache('mutualFollowers(userId');
+    clearCache('isFollowing isFollower');
+}
+
 // Replies to an activity. Drops the cached thread (the next open shows the reply) and marks
 // the feeds stale for the new reply count, keeping them as fallback if the refetch fails.
 // AniList down: the reply waits in the queue and comes back as a stand-in without an id (queued: true)
@@ -1252,6 +1318,7 @@ export async function toggleFollow(userId, token, following = false) {
     if (queued) return !following;
     clearCache('isFollowing isFollower');
     clearCache('following(userId');
+    clearCache('mutualFollowers(userId');
     expireCache('activities(');
     return !!data.ToggleFollow?.isFollowing;
 }

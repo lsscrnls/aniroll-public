@@ -4506,6 +4506,8 @@ html.m3-loading body { visibility: hidden; }
     transition: border-color 0.2s ease;
 }
 .friend-tile:hover, .friend-tile:focus-visible { border-color: var(--text-secondary); }
+.friend-tile .friend-remove { margin-left: auto; padding: 6px 14px; font-size: 0.8rem; }
+.social-subtabs { margin-bottom: var(--space-lg); }
 
 /* Cards and rows opened by keyboard (data-open / data-go, js/a11y.js) */
 [data-open]:focus-visible, [data-go]:focus-visible, .landing-feature-clickable:focus-visible {
