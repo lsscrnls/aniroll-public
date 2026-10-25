@@ -1068,6 +1068,8 @@ function staticServer() {
             route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(body)) });
         });
         await p.route(`${base}/api/**`, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"maintenance":false,"configured":false}' }));
+        // An empty account (per-show tracks and the upload go there)
+        await p.route(`${base}/api/me/state`, route => route.fulfill({ contentType: 'application/json', body: route.request().method() === 'GET' ? '{"state":{}}' : '{"ok":true}' }));
         await p.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
         // The stack switched off: every request to Jellyfin fails the way a dead host does
         const calls = jellyfinUp ? await mockJellyfin(p, jfMock) : [];
@@ -1220,6 +1222,17 @@ function staticServer() {
             mainPaused: document.getElementById('player-video').paused }));
         await p.waitForFunction(() => { const v = document.querySelector('.pl-recap-video'); return v && v.currentTime > 2; }, null, { timeout: 8000 }).catch(() => {});
         await p.keyboard.press('ArrowRight'); // the player's keys sleep during the recap
+        // Its menu: subtitles and quality (audio with a choice); a quality picked there asks both episodes again
+        await p.click('.pl-recap-btn[data-act="menu"]').catch(() => {});
+        await p.waitForSelector('.pl-recap-menu:not([hidden])', { timeout: 3000 }).catch(() => {});
+        const recapMenu = await p.$$eval('.pl-recap-menu .pl-menu-title', els => els.map(e => e.textContent.trim()).join());
+        const beforeQ = calls.length;
+        await p.click('.pl-recap-menu [data-quality="4000000"]').catch(() => {});
+        await p.waitForFunction(() => { const v = document.querySelector('.pl-recap-video'); return v && !v.paused && v.currentTime > 1; }, null, { timeout: 8000 }).catch(() => {});
+        await p.waitForTimeout(800);
+        const recapQuality = { asked: calls.slice(beforeQ).filter(c => c.type === 'PlaybackInfo').map(c => `${c.item}:${c.bitrate}`).sort().join(),
+            kept: await p.evaluate(() => localStorage.getItem('aniroll_player_quality')) };
+        await p.evaluate(() => localStorage.removeItem('aniroll_player_quality'));
         // Pause (K) and the buttons for subtitles and full screen
         await p.keyboard.press('k');
         await p.waitForFunction(() => document.querySelector('.pl-recap-btn[data-act="play"]')?.getAttribute('aria-label') === 'Play', null, { timeout: 3000 }).catch(() => {});
@@ -1232,10 +1245,11 @@ function staticServer() {
         await p.waitForFunction(() => !document.getElementById('player-video').paused, null, { timeout: 5000 }).catch(() => {});
         const after = await p.evaluate(() => ({ gone: !document.querySelector('.pl-recap'), playing: !document.getElementById('player-video').paused }));
         const ep8Reports = calls.slice(reportsBefore).filter(c => /^Playing/.test(c.type) && c.body?.ItemId === 'ep8').length;
-        check('player: "Previously on" plays episode 8 up to its ending first, keys asleep, nothing reported or saved for it, then episode 9',
-            recap.kicker === 'Previously on' && paused.paused && paused.label === 'Play' && paused.buttons === 'play,subs,fullscreen' && /^Episode 8 · watched \d+ (days|months) ago$/.test(recap.sub || '') && recap.mainPaused && mainTime < 1
+        check('player: "Previously on" plays episode 8 up to its ending first, keys asleep, its menu picks quality for both, nothing reported or saved for it, then episode 9',
+            recap.kicker === 'Previously on' && paused.paused && paused.label === 'Play' && paused.buttons === 'play,subs,menu,fullscreen' && /Subtitles,Quality$/.test(recapMenu)
+            && recapQuality.asked === 'ep8:4000000,ep9:4000000' && recapQuality.kept === '4000000' && /^Episode 8 · watched \d+ (days|months) ago$/.test(recap.sub || '') && recap.mainPaused && mainTime < 1
             && after.gone && after.playing && ep8Reports === 0 && !saves.some(s => s.progress === 8) && !pageErrors.length,
-            { recap, paused, mainTime, after, ep8Reports, saves, pageErrors });
+            { recap, paused, recapMenu, recapQuality, mainTime, after, ep8Reports, saves, pageErrors });
 
         // Ambient light: on by default, A switches it off and on, and it is kept
         const amb = await p.evaluate(() => ({ on: document.getElementById('player').classList.contains('has-ambient'), canvas: !!document.querySelector('.pl-ambient') }));
@@ -1781,6 +1795,25 @@ function staticServer() {
             ass.canvas && ass.shown && ass.w > 0 && ass.textTracks === 'disabled' && calls.some(c => c.type === 'ass') && calls.some(c => c.type === 'font' && /Token=/.test(c.auth))
             && menuItems.join('|') === 'Off|English|English (Signs & Songs)', { ...ass, menuItems });
 
+        // Firefox (by its user agent) is told once a session that styled subtitles may flicker; Chromium is not
+        const flickerToast = () => [...document.querySelectorAll('#toast-container .toast')].find(t => /flicker in Firefox/.test(t.textContent));
+        const noHint = await p.evaluate(`!(${flickerToast})()`);
+        await p.evaluate(() => Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0', configurable: true }));
+        await p.evaluate(h => { location.hash = h; }, playHash);
+        await idle(p, 1500);
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));
+        await p.waitForFunction(`!!(${flickerToast})()`, null, { timeout: 8000 }).catch(() => {});
+        if (process.env.E2E_SHOT) await p.screenshot({ path: process.env.E2E_SHOT.replace(/\.png$/, '-ff-hint.png') });
+        const ffHint = await p.evaluate(`(() => { const h = (${flickerToast})(); const r = h?.getBoundingClientRect(); h?.querySelector('.toast-close')?.click(); return { shown: !!h, text: h?.textContent || '', right: r ? innerWidth - r.right : -1, top: r?.top ?? -1 }; })()`);
+        await p.evaluate(h => { location.hash = h; }, playHash);
+        await idle(p, 1500);
+        await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));
+        await idle(p, 3000);
+        const ffAgain = await p.evaluate(`!!(${flickerToast})()`);
+        await p.evaluate(() => { delete navigator.userAgent; sessionStorage.removeItem('aniroll_ff_ass_hint'); });
+        check('player: Firefox hears once a session that styled subtitles may flicker, top right; Chromium does not',
+            noHint && ffHint.shown && /flicker in Firefox/.test(ffHint.text) && ffHint.right < 60 && ffHint.top < 200 && !ffAgain, { noHint, ffHint, ffAgain });
+
         // Blu-ray subtitles (PGS): libpgs draws the picture on its own canvas, at the place the disc puts it
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/4'));
         // libpgs draws in a worker (its requests are not the page's): wait for the picture itself
@@ -1816,7 +1849,9 @@ function staticServer() {
         await p.mouse.move(640, 500);
         await p.click('[data-act="subs"]').catch(() => {});
         await p.waitForTimeout(300);
+        const tracksPut = p.waitForRequest(r => r.method() === 'PUT' && r.url().endsWith('/api/me/state') && r.postDataJSON()?.key === 'tracks', { timeout: 3000 }).catch(() => null);
         await p.click('[data-track="2"]').catch(() => {});
+        const sentSubs = Object.values((await tracksPut)?.postDataJSON()?.value?.s || {}).at(-1);
         await p.waitForTimeout(500);
         await p.evaluate(h => { location.hash = h; }, playHash.replace(/\/2$/, '/3'));
         await idle(p, 3000);
@@ -1826,7 +1861,8 @@ function staticServer() {
             pref: Object.values(JSON.parse(localStorage.getItem('aniroll_subs_pref') || '{}'))[0],
         }));
         await p.evaluate(() => localStorage.removeItem('aniroll_subs_pref'));
-        check('player: the subtitles picked carry over to the next episode', keptSubs.text === 'English:hidden' && !keptSubs.pictures && keptSubs.pref?.label === 'English', keptSubs);
+        check('player: the subtitles picked carry over to the next episode and go to the account', keptSubs.text === 'English:hidden' && !keptSubs.pictures && keptSubs.pref?.label === 'English'
+            && sentSubs?.label === 'English', { ...keptSubs, sentSubs });
         if (pageErrors.length) errors.push(...pageErrors.map(e => `player: ${e}`));
         await p.close();
     }
@@ -1928,6 +1964,34 @@ function staticServer() {
         check('player: away from home Auto leaves room for peaks under the upload set, steps down after buffering, kept per server, Auto again forgets it',
             upAsked.join() === '20000000,15000000' && stallAsked.join() === '10000000' && Object.values(fallback)[0]?.bps === 10e6
             && /^Auto \(10 Mbps\)/.test(autoLabel) && forgotten === 0, { upAsked, stallAsked, fallback, autoLabel, forgotten });
+
+        // Test speed in the Quality menu: three downloads from Jellyfin, the result as a note; stuttering five
+        // times in one episode offers the test once a session
+        const toastWith = (re) => p.evaluate(src => [...document.querySelectorAll('#toast-container .toast')].map(t => t.textContent).find(t => new RegExp(src).test(t)) || '', re.source);
+        const beforeTest = calls.length;
+        await p.mouse.move(640, 500);
+        await p.click('[data-act="settings"]').catch(() => {});
+        await p.waitForTimeout(300);
+        await p.click('[data-page="quality"]').catch(() => {});
+        await p.waitForTimeout(200);
+        await p.click('[data-speedtest]').catch(() => {});
+        await p.waitForFunction(() => [...document.querySelectorAll('#toast-container .toast')].some(t => /Jellyfin to this device/.test(t.textContent)), null, { timeout: 8000 }).catch(() => {});
+        const tested = { sizes: calls.slice(beforeTest).filter(c => c.type === 'bitrateTest').map(c => c.size), note: await toastWith(/Jellyfin to this device/) };
+        await p.evaluate(() => document.querySelectorAll('#toast-container .toast').forEach(t => t.remove()));
+        await p.click('[data-act="settings"]').catch(() => {});
+        await p.waitForTimeout(300);
+        await p.click('[data-page="quality"]').catch(() => {});
+        await p.waitForTimeout(200);
+        await p.click('[data-quality="4000000"]').catch(() => {});
+        await idle(p, 2500);
+        await p.waitForTimeout(5500);
+        await p.evaluate(() => { const v = document.getElementById('player-video'); for (let i = 0; i < 5; i++) v.dispatchEvent(new Event('waiting')); });
+        await p.waitForTimeout(300);
+        const stutterNote = await toastWith(/Stuttering\?/);
+        await p.evaluate(() => { document.querySelectorAll('#toast-container .toast').forEach(t => t.remove()); localStorage.removeItem('aniroll_player_quality'); });
+        check('player: Test speed in the Quality menu measures three times and says what plays smoothly; five stutters offer it',
+            tested.sizes.join() === '1000000,8000000,8000000' && /about [\d.]+ Mbps\. Up to [\d.]+ Mbps should play smoothly/.test(tested.note)
+            && /Test speed$/.test(stutterNote), { ...tested, stutterNote });
 
         // Connected with an API key, Jellyfin keeps nothing for the user by itself: AniRoll writes the spot
         // where it stopped, and "played" from 90 %, for the user

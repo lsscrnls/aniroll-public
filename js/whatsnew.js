@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.8.2';
+export const RELEASE = '1.9.8.3';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -32,6 +32,11 @@ const CHANGES = [
             'Private messages are gone from the feed and the notifications as well.',
             'Under <strong>Friends</strong>, a long name no longer pushes the match onto its own line, and there is more room below Following, Followers and Mutuals.',
             '<strong>What\'s this song?</strong> only shows up where your browser lets AniRoll hear the episode, so not on iPhone.',
+            'Big styled subtitles no longer go missing when you watch away from home: the player waits for them longer.',
+            'In Firefox, the player says once that styled subtitles may flicker there, and that a Chromium-based browser shows them smoothly.',
+            '<strong>Test speed</strong> in the player\'s Quality menu shows what reaches your device from Jellyfin and what plays smoothly. Stuttering a lot? The player offers the test itself.',
+            'The <strong>Previously on</strong> recap has its own menu for audio, subtitles and quality, and the episode after it follows what you pick there.',
+            'The audio and subtitles you pick for a show are now kept with your account, so your other devices start with them too.',
         ],
     },
     {

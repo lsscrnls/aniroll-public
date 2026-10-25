@@ -2,7 +2,7 @@ import * as api from '../api.js';
 import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js';
 import { getToken, isLoggedIn } from '../auth.js';
 import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js';
-import { availability, syncUpload } from '../player/availability.js';
+import { availability, syncUpload, bitrateTest } from '../player/availability.js';
 import { findEpisode, jfGet } from '../player/library.js';
 import { deviceProfile } from '../player/profile.js';
 import { HtmlVideoEngine } from '../player/engine.js';
@@ -11,6 +11,10 @@ import { createSubtitles } from '../player/subtitles.js';
 import { neighbours, openEpisodes } from '../player/episodes.js';
 import { maybeRecap, noteWatched } from '../player/recap.js';
 import { loadThemes, themesFor, identify, canListen } from '../player/songs.js';
+import { accountState, saveAccountState } from '../accountstate.js';
+
+const FF_ASS_HINT = 'aniroll_ff_ass_hint';
+const STUTTER_HINT = 'aniroll_stutter_hint';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -167,6 +171,7 @@ export async function render({ params, content }) {
         let autoBitrate = null;
         let autoNow = null; // what Auto comes to, for the menu and the stats
         const upload = avail.local ? 0 : await syncUpload();
+        await syncShowPrefs();
         const bitrateFor = async (q) => {
             if (q === 'max') return MAX_BITRATE;
             if (q !== 'auto') return q;
@@ -224,7 +229,14 @@ export async function render({ params, content }) {
         // The subtitles chosen for this show before (or none), when this file has them
         subtitles = createSubtitles({ video, base: avail.base, cfg, itemId: ep.itemId, source,
             pick: (tracks) => preferredSubs(mediaId, tracks),
-            onLoading: (on) => controls?.setSubtitlesLoading(on) });
+            onLoading: (on) => controls?.setSubtitlesLoading(on),
+            // Firefox (and Zen) composite the libass canvas over the video with a flicker now and then: said once a session
+            onAss: () => {
+                if (!/firefox/i.test(navigator.userAgent)) return;
+                try { if (sessionStorage.getItem(FF_ASS_HINT)) return; sessionStorage.setItem(FF_ASS_HINT, '1'); } catch { /* said every time */ }
+                const note = toast('Styled subtitles may flicker in Firefox. For smooth ones, use a Chromium-based browser (Chrome, Edge, Brave).', 'info', { stay: true });
+                setTimeout(() => note?.close(), 15000);
+            } });
         const subsManager = subtitles;
         controls.setSubtitles({
             ...subsManager,
@@ -277,12 +289,13 @@ export async function render({ params, content }) {
                 restart({ audioIndex: id }, 'Switching the audio…');
             },
         });
+        const qualityList = () => [
+            { id: 'auto', label: autoNow ? `Auto (${fmtRate(autoNow)})` : 'Auto' },
+            { id: 'max', label: `Maximum (${fmtRate(MAX_BITRATE)})` },
+            ...BITRATES.map(b => ({ id: b, label: fmtRate(b) })),
+        ];
         controls.setQuality({
-            list: () => [
-                { id: 'auto', label: autoNow ? `Auto (${fmtRate(autoNow)})` : 'Auto' },
-                { id: 'max', label: `Maximum (${fmtRate(MAX_BITRATE)})` },
-                ...BITRATES.map(b => ({ id: b, label: fmtRate(b) })),
-            ],
+            list: qualityList,
             current: () => session.quality,
             select: (q) => {
                 // Auto picked again: the step it fell back to after buffering is forgotten, it starts fresh
@@ -291,7 +304,36 @@ export async function render({ params, content }) {
                 saveQuality(q);
                 restart({ quality: q }, 'Changing the quality…');
             },
+            test: () => runSpeedTest(),
         });
+        let testing = false;
+        const runSpeedTest = async () => {
+            if (testing || closed) return;
+            testing = true;
+            const wasPaused = engine.paused;
+            engine.pause();
+            const note = toast('Testing the speed to your Jellyfin…', 'info', { stay: true });
+            try {
+                const { bps, smooth } = await speedTest(avail, cfg);
+                note?.close();
+                if (closed) return;
+                const cap = session.quality === 'auto' ? autoNow : session.quality === 'max' ? MAX_BITRATE : session.quality;
+                const text = `Jellyfin to this device: about ${fmtRate(bps)}. Up to ${fmtRate(smooth)} should play smoothly${avail.local ? ' (at home: your upload is not part of this)' : ''}.`;
+                // Above what came through: Auto with this measurement, a step lower
+                const lower = cap && smooth < cap * 0.95;
+                toast(text, 'info', lower ? { action: { label: `Use ${fmtRate(smooth)}`, run: () => {
+                    autoBitrate = keepBitrate(avail.base, bps);
+                    saveQuality('auto');
+                    restart({ quality: 'auto' }, `Switching to ${fmtRate(smooth)}…`);
+                } }, stay: true } : { stay: true });
+            } catch {
+                note?.close();
+                if (!closed) toast('The speed test did not get through: Jellyfin did not answer in time', 'error');
+            } finally {
+                testing = false;
+                if (!wasPaused && !closed) engine.play().catch(() => { /* the controls are there */ });
+            }
+        };
 
         // Buffering again and again in Auto (three times in a minute and a half, or once for eight seconds):
         // one step below what streams now, kept for this server a few days. Not right after starting or seeking.
@@ -314,6 +356,13 @@ export async function render({ params, content }) {
             clearTimeout(stallTimer);
             if (stalls.length >= 3) return downshift();
             stallTimer = setTimeout(downshift, 8000);
+        });
+        // Stuttering five times in one episode, whatever the quality: once a session, a speed test is offered
+        let stutters = 0;
+        video.addEventListener('waiting', () => {
+            if (closed || switching || testing || video.seeking || video.paused || Date.now() < quietUntil || ++stutters !== 5) return;
+            try { if (sessionStorage.getItem(STUTTER_HINT)) return; sessionStorage.setItem(STUTTER_HINT, '1'); } catch { /* said every time */ }
+            toast('Stuttering? A speed test shows what reaches this device from Jellyfin.', 'info', { action: { label: 'Test speed', run: runSpeedTest } });
         });
         video.addEventListener('playing', () => clearTimeout(stallTimer));
         video.addEventListener('seeking', () => { clearTimeout(stallTimer); quietUntil = Date.now() + 3000; });
@@ -431,8 +480,8 @@ export async function render({ params, content }) {
         if (startTime === 0 && !cameByUpNext) {
             await maybeRecap({
                 root: $('player'), media, episode, avail,
-                playbackInfo: (itemId, at) => infoFor(itemId, at),
-                playPlan: (itemId, src) => playPlan(avail.base, cfg, itemId, src),
+                playbackInfo: (itemId, at, opts) => infoFor(itemId, at, opts),
+                playPlan: (itemId, src, audioIndex) => playPlan(avail.base, cfg, itemId, src, audioIndex),
                 segments: (itemId) => loadSegments(avail.base, cfg, itemId),
                 ending: (n) => loadEnding(media.idMal, n),
                 subtitles: (v, itemId, src) => createSubtitles({ video: v, base: avail.base, cfg, itemId, source: src,
@@ -442,6 +491,25 @@ export async function render({ params, content }) {
                     rememberSubs(mediaId, track);
                     const id = preferredSubs(mediaId, subsManager.list());
                     if (id !== undefined) subsManager.select(id);
+                },
+                // Audio and quality switched in the recap: the episode is asked again the same way
+                audio: {
+                    list: audioList,
+                    preferred: (tracks) => preferredAudio(mediaId, tracks),
+                    changed: (track) => {
+                        rememberAudio(mediaId, track);
+                        const id = preferredAudio(mediaId, audioTracks);
+                        if (id != null && id !== session.audioIndex) restart({ audioIndex: id });
+                    },
+                },
+                quality: {
+                    list: qualityList,
+                    current: () => session.quality,
+                    changed: (q) => {
+                        if (q === 'auto') forgetFallback(avail.base);
+                        saveQuality(q);
+                        restart({ quality: q });
+                    },
                 },
                 closed: () => closed,
             });
@@ -666,23 +734,31 @@ async function measureBitrate(avail, cfg) {
         const kept = JSON.parse(sessionStorage.getItem(BITRATE_TEST_KEY) || 'null');
         if (kept?.base === avail.base && Date.now() - kept.at < 10 * 60 * 1000) return kept.bps;
     } catch { /* measure again */ }
-    const once = async (size) => {
-        const t = performance.now();
-        const res = await fetch(`${avail.base}/Playback/BitrateTest?Size=${size}`, { headers: jfAuth(cfg.apiKey), cache: 'no-store', signal: AbortSignal.timeout(6000) });
-        if (!res.ok) throw new Error(`bitrate test ${res.status}`);
-        const bytes = (await res.arrayBuffer()).byteLength;
-        return (bytes * 8) / Math.max(0.05, (performance.now() - t) / 1000);
-    };
     try {
         // A small one first; when that was quick, a bigger one tells more
-        let bps = await once(500_000);
-        if (bps > 10e6) bps = await once(3_000_000);
-        const cap = Math.max(BITRATES.at(-1), Math.min(MAX_BITRATE, Math.round(bps * 0.8)));
-        try { sessionStorage.setItem(BITRATE_TEST_KEY, JSON.stringify({ base: avail.base, at: Date.now(), bps: cap })); } catch { /* measured each time */ }
-        return cap;
+        let bps = await bitrateTest(avail.base, cfg.apiKey, 500_000);
+        if (bps > 10e6) bps = await bitrateTest(avail.base, cfg.apiKey, 3_000_000);
+        return keepBitrate(avail.base, bps);
     } catch {
         return fallback;
     }
+}
+// 80 % of a measured line, as Auto's cap, kept for measureBitrate
+function keepBitrate(base, bps) {
+    const cap = Math.max(BITRATES.at(-1), Math.min(MAX_BITRATE, Math.round(bps * 0.8)));
+    try { sessionStorage.setItem(BITRATE_TEST_KEY, JSON.stringify({ base, at: Date.now(), bps: cap })); } catch { /* measured each time */ }
+    return cap;
+}
+
+// "Test speed" (Quality menu, or the note after stuttering): three downloads, the middle one counts.
+// Paused meanwhile so the episode's own loading takes less of the line; still a guide, not a promise.
+// Returns { bps, smooth }: what came through, and the highest quality step below 80 % of it
+async function speedTest(avail, cfg) {
+    const first = await bitrateTest(avail.base, cfg.apiKey, 1_000_000);
+    const size = first > 10e6 ? 8_000_000 : 1_000_000;
+    const runs = [first, await bitrateTest(avail.base, cfg.apiKey, size), await bitrateTest(avail.base, cfg.apiKey, size)].sort((a, b) => a - b);
+    const bps = runs[1];
+    return { bps, smooth: BITRATES.find(b => b <= bps * 0.8) || BITRATES.at(-1) };
 }
 function saveQuality(q) {
     try { q === 'auto' ? localStorage.removeItem(QUALITY_KEY) : localStorage.setItem(QUALITY_KEY, String(q)); } catch { /* not kept */ }
@@ -715,23 +791,69 @@ function forgetFallback(base) {
 
 // ===== Choices kept per show (audio, subtitles, skipping intros) =====
 // { 'm<anilistId>': value } — a letter first, so the keys keep their order (newest last); the 200 shows
-// chosen for most recently are kept
+// chosen for most recently are kept here. The account (accountstate.js, key "tracks") keeps the newest
+// that fit its 16 KB (about a hundred shows each), so another device starts with the same tracks.
+const SHOW_PREF_KEYS = { a: 'aniroll_audio_pref', s: 'aniroll_subs_pref', k: 'aniroll_autoskip' };
+const SHOW_PREF_ACCOUNT = 'tracks';
+const SHOW_PREF_UNSENT = 'aniroll_tracks_unsent';
+const readPrefs = (key) => { try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { return {}; } };
+function writePrefs(key, all) {
+    const keys = Object.keys(all);
+    for (const k of keys.slice(0, Math.max(0, keys.length - 200))) delete all[k];
+    try { localStorage.setItem(key, JSON.stringify(all)); } catch { /* not kept */ }
+}
 function showPref(key, mediaId) {
-    try { return JSON.parse(localStorage.getItem(key) || '{}')[`m${mediaId}`] ?? null; } catch { return null; }
+    return readPrefs(key)[`m${mediaId}`] ?? null;
 }
 function setShowPref(key, mediaId, value) {
-    try {
-        const all = JSON.parse(localStorage.getItem(key) || '{}');
-        delete all[`m${mediaId}`];
-        if (value != null) all[`m${mediaId}`] = value;
-        const keys = Object.keys(all);
-        for (const k of keys.slice(0, Math.max(0, keys.length - 200))) delete all[k];
-        localStorage.setItem(key, JSON.stringify(all));
-    } catch { /* not kept */ }
+    const all = readPrefs(key);
+    delete all[`m${mediaId}`];
+    if (value != null) all[`m${mediaId}`] = value;
+    writePrefs(key, all);
+    try { localStorage.setItem(SHOW_PREF_UNSENT, '1'); } catch { /* sent again next time */ }
+    sendShowPrefs();
+}
+// Each kind's newest choices, as many as fit a third of what the account takes (api/server.js USER_STATE_MAX_BYTES)
+function sendShowPrefs() {
+    const out = {};
+    for (const [kind, key] of Object.entries(SHOW_PREF_KEYS)) {
+        const entries = Object.entries(readPrefs(key));
+        const kept = [];
+        let size = 2;
+        for (let i = entries.length - 1; i >= 0; i--) {
+            size += JSON.stringify(entries[i]).length;
+            if (size > 5000) break;
+            kept.unshift(entries[i]);
+        }
+        out[kind] = Object.fromEntries(kept);
+    }
+    saveAccountState(SHOW_PREF_ACCOUNT, out).then(ok => {
+        if (ok) try { localStorage.setItem(SHOW_PREF_UNSENT, '0'); } catch { /* sent again next time */ }
+    });
+}
+// Once per page load, before the player picks: the account's choices join this browser's (they count as
+// newer, unless something chosen here has not reached the account yet; then this browser's go up)
+let showPrefsSynced = null;
+function syncShowPrefs() {
+    showPrefsSynced ??= accountState().then(state => {
+        const remote = state?.[SHOW_PREF_ACCOUNT];
+        let unsent = true;
+        try { unsent = localStorage.getItem(SHOW_PREF_UNSENT) !== '0'; } catch { /* as unsent */ }
+        if (remote && typeof remote === 'object') {
+            for (const [kind, key] of Object.entries(SHOW_PREF_KEYS)) {
+                const theirs = remote[kind] && typeof remote[kind] === 'object' ? remote[kind] : {};
+                const mine = readPrefs(key);
+                const clean = Object.fromEntries(Object.entries(theirs).filter(([k, v]) => /^m\d+$/.test(k) && v != null));
+                writePrefs(key, unsent ? { ...clean, ...mine } : { ...mine, ...clean });
+            }
+        }
+        if (unsent) sendShowPrefs();
+    });
+    return showPrefsSynced;
 }
 
 // ===== Audio tracks =====
-const AUDIO_PREF_KEY = 'aniroll_audio_pref';
+const AUDIO_PREF_KEY = SHOW_PREF_KEYS.a;
 
 function audioList(source) {
     return (source.MediaStreams || []).filter(s => s.Type === 'Audio').map(s => ({
@@ -756,7 +878,7 @@ function rememberAudio(mediaId, track) {
 
 // ===== Subtitles =====
 // { 'm<anilistId>': { lang, title, label, forced } or { off: true } } — like the audio, per show
-const SUBS_PREF_KEY = 'aniroll_subs_pref';
+const SUBS_PREF_KEY = SHOW_PREF_KEYS.s;
 
 // The track id to show (null: none), or undefined when nothing was chosen for this show or this file
 // lacks it: then Jellyfin's pick stays
@@ -1013,7 +1135,7 @@ function scorePrompt(media, saved, token) {
 // ===== Intros skipped by themselves, per show =====
 // Settings → Jellyfin → Player switches it on for every show; a choice made in the player for one show
 // (1 on, 0 off) wins over that
-const AUTOSKIP_KEY = 'aniroll_autoskip';
+const AUTOSKIP_KEY = SHOW_PREF_KEYS.k;
 const AUTOSKIP_ALL_KEY = 'aniroll_autoskip_all';
 const autoSkipAll = () => { try { return localStorage.getItem(AUTOSKIP_ALL_KEY) === 'on'; } catch { return false; } };
 const autoSkipFor = (mediaId) => { const v = showPref(AUTOSKIP_KEY, mediaId); return v == null ? autoSkipAll() : !!v; };

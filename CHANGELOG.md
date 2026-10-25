@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.8.2.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.8.3.
 
 ## 25 October 2026 – Followers and your 18+ settings
 
@@ -11,6 +11,11 @@ What changed in AniRoll, newest first: the same as "What's new" in the app. Curr
 - Private messages are gone from the feed and the notifications as well.
 - Under **Friends**, a long name no longer pushes the match onto its own line, and there is more room below Following, Followers and Mutuals.
 - **What's this song?** only shows up where your browser lets AniRoll hear the episode, so not on iPhone.
+- Big styled subtitles no longer go missing when you watch away from home: the player waits for them longer.
+- In Firefox, the player says once that styled subtitles may flicker there, and that a Chromium-based browser shows them smoothly.
+- **Test speed** in the player's Quality menu shows what reaches your device from Jellyfin and what plays smoothly. Stuttering a lot? The player offers the test itself.
+- The **Previously on** recap has its own menu for audio, subtitles and quality, and the episode after it follows what you pick there.
+- The audio and subtitles you pick for a show are now kept with your account, so your other devices start with them too.
 
 ## 24 October 2026 – Your Watch Party follows you to the next show
 

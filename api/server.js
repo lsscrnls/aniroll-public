@@ -275,7 +275,8 @@ const DNA_FILE = path.join(DATA_DIR, 'dna.json');
 const DNA_MAX_BYTES = 600 * 1024;
 const USER_STATE_NAME = /^[a-z]{1,16}$/;
 const USER_STATE_MAX_KEYS = 16;
-const USER_STATE_MAX_BYTES = 4096;
+// 16 KB: the per-show audio and subtitle choices ("tracks", js/pages/play.js) are the biggest value
+const USER_STATE_MAX_BYTES = 16 * 1024;
 
 function loadJellyfin() {
     return readJson(JF_FILE);

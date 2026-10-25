@@ -21,7 +21,7 @@ const kindOf = (codec) => {
     return ASS.has(c) ? 'ass' : PGS.has(c) ? 'pgs' : 'text';
 };
 
-export function createSubtitles({ video, base, cfg, itemId, source, pick = () => undefined, onChange = () => {}, onLoading = () => {} }) {
+export function createSubtitles({ video, base, cfg, itemId, source, pick = () => undefined, onChange = () => {}, onLoading = () => {}, onAss = () => {} }) {
     const streams = (source.MediaStreams || []).filter(s => s.Type === 'Subtitle');
     const url = (s, ext) => `${base}/Videos/${encodeURIComponent(itemId)}/${encodeURIComponent(source.Id)}/Subtitles/${s.Index}/0/Stream.${ext}?ApiKey=${encodeURIComponent(cfg.apiKey)}`;
 
@@ -125,7 +125,8 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         const ticket = ++pending;
         const [{ default: JASSUB }, subContent, fontData] = await Promise.all([
             import(JASSUB_URL),
-            fetch(url(t.stream, 'ass'), { signal: AbortSignal.timeout(20000) }).then(r => {
+            // Typeset tracks reach ~18 MB; away from home they share the upload with the video
+            fetch(url(t.stream, 'ass'), { signal: AbortSignal.timeout(120000) }).then(r => {
                 if (!r.ok) throw new Error(`subtitle ${r.status}`);
                 return r.text();
             }),
@@ -146,6 +147,7 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
             queryFonts: false,
         });
         jassub._canvas.classList.add('pl-subs-canvas');
+        onAss();
     }
 
     function hideAss() {
