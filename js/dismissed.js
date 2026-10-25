@@ -1,8 +1,9 @@
 // @ts-check
 import { saveShared, syncShared } from './accountstate.js';
 
-// Recommendations the user said no to ("Not interested"): kept in this browser and with the account,
-// so Home and Roll never offer them again on any device. Only ids, the newest few hundred.
+// Shows the user hid ("Hide" on a show's page, "Not interested" on a recommendation): kept in this browser
+// and with the account, so Home, Roll, Season, Browse and the calendar leave them out on any device; a search
+// still finds them, marked. Only ids, the newest few hundred.
 const KEY = 'aniroll_not_interested';
 const ACCOUNT_KEY = 'notint';
 const MAX = 400;
@@ -20,6 +21,13 @@ export function dismissedIds() {
     return new Set(readLocal());
 }
 
+// Newest first, for Settings → Hidden anime
+export function hiddenList() {
+    return readLocal().reverse();
+}
+
+export const HIDDEN_EVENT = 'aniroll:hidden-changed';
+
 // Once per page load: the account's list, or both joined while a change here has not reached it yet
 export async function syncDismissed() {
     const clean = (v) => (Array.isArray(v) ? v.filter(Number.isInteger) : undefined);
@@ -34,4 +42,5 @@ export function setDismissed(id, on) {
     if (on) ids.push(id);
     writeLocal(ids);
     saveShared(ACCOUNT_KEY, UNSENT, ids.slice(-MAX));
+    document.dispatchEvent(new CustomEvent(HIDDEN_EVENT, { detail: { id, on } }));
 }

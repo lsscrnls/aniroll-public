@@ -2,6 +2,7 @@ import * as api from '../api.js';
 import { enhanceSelect } from '../select.js';
 import { renderMediaCard, getState, esc, emptyIcon, renderPageSwitch } from '../store.js';
 import { getToken } from '../auth.js';
+import { dismissedIds, HIDDEN_EVENT } from '../dismissed.js';
 
 export async function render({ content, query: params }) {
     const token = getToken();
@@ -118,7 +119,22 @@ export async function render({ content, query: params }) {
             const grid = document.getElementById('browse-grid');
             if (!grid) return;
 
-            const html = result.media.map(m => renderMediaCard(m, true)).join('');
+            // Hidden shows (js/dismissed.js): left out while browsing, marked in a search; hidden in the panel
+            // over this page, the card goes at once (dimmed in a search)
+            if (!grid.dataset.hideWatch) {
+                grid.dataset.hideWatch = '1';
+                const onHidden = (/** @type {any} */ ev) => {
+                    if (!grid.isConnected) return document.removeEventListener(HIDDEN_EVENT, onHidden);
+                    const card = grid.querySelector(`.media-card[data-id="${ev.detail.id}"]`);
+                    if (!card || !ev.detail.on) return card?.classList.remove('is-hidden');
+                    if (document.getElementById('browse-search')?.value?.trim()) card.classList.add('is-hidden');
+                    else card.remove();
+                };
+                document.addEventListener(HIDDEN_EVENT, onHidden);
+            }
+            const hidden = dismissedIds();
+            const html = result.media.filter(m => searchVal || !hidden.has(m.id))
+                .map(m => hidden.has(m.id) ? renderMediaCard(m, true, null, 'Hidden').replace('class="media-card"', 'class="media-card is-hidden"') : renderMediaCard(m, true)).join('');
             if (append) grid.innerHTML += html;
             else grid.innerHTML = html || `<div class="empty-state"><div class="empty-state-icon">${emptyIcon('search')}</div><div class="empty-state-text">No results found</div></div>`;
 

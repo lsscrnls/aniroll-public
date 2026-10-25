@@ -5,6 +5,7 @@ import { getState, toast, renderMediaCard, esc, titlePref, emitListChange, LIST_
 import { getToken, isLoggedIn } from '../auth.js';
 import { getActiveParty, startParty, createPartyLink } from './watchparty.js';
 import { showConfirm } from '../a11y.js';
+import { dismissedIds, setDismissed } from '../dismissed.js';
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -15,6 +16,7 @@ export async function renderPanel(id, container) {
     document.dispatchEvent(new CustomEvent('aniroll:media-shown', { detail: { media, root: container.closest('.detail-panel') || container, where: 'panel' } }));
     setupListActions(media, token, container);
     setupShare(media, container);
+    setupHide(media, container);
     setupSpoilerTags(container);
     setupDetailTabs(container);
     setupRelatedPlan(container, token);
@@ -36,6 +38,7 @@ export async function render({ params, content }) {
     document.dispatchEvent(new CustomEvent('aniroll:media-shown', { detail: { media, root: document.documentElement, where: 'page' } }));
     setupListActions(media, token, content);
     setupShare(media, content);
+    setupHide(media, content);
     setupSpoilerTags(content);
     setupDetailTabs(content);
     setupRelatedPlan(content, token);
@@ -162,6 +165,7 @@ function renderDetailHTML(media) {
                     <button class="glass-btn glass-btn-secondary" id="detail-share" title="Copy a link that previews this title">
                         <svg data-icon="share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Share
                     </button>
+                    ${isLoggedIn() ? hideButtonHtml(media.id) : ''}
                 </div>
             </div>
         </div>
@@ -507,6 +511,33 @@ async function publishShare(media) {
             description: [meta, synopsis].filter(Boolean).join(' — '),
         }),
         signal: AbortSignal.timeout(8000),
+    });
+}
+
+// Hide: the show stays out of Home, Roll, Season, Browse and the calendar (js/dismissed.js); a search still finds it
+const HIDE_ICON = '<svg data-icon="hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:-2px;margin-right:6px"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c5 0 9 4.5 10 7a13 13 0 0 1-3.2 4.3M6.6 6.6A13 13 0 0 0 2 12c1 2.5 5 7 10 7a9.8 9.8 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+const hideLabel = (hidden) => ({
+    text: hidden ? 'Hidden' : 'Hide',
+    title: hidden ? 'Show it again in Home, Roll, Season, Browse and the calendar' : 'Keep it out of Home, Roll, Season, Browse and the calendar',
+});
+function hideButtonHtml(id) {
+    const hidden = dismissedIds().has(id);
+    const { text, title } = hideLabel(hidden);
+    return `<button class="glass-btn glass-btn-secondary" id="detail-hide" aria-pressed="${hidden}" title="${title}">${HIDE_ICON}<span>${text}</span></button>`;
+}
+// Wired once per button: the panel can be filled twice (cached, then fresh), and a second listener would undo the click
+function setupHide(media, root = document) {
+    const btn = /** @type {HTMLButtonElement | null} */ (root.querySelector('#detail-hide'));
+    if (!btn || btn.dataset.wired) return;
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', () => {
+        const on = !dismissedIds().has(media.id);
+        setDismissed(media.id, on);
+        const { text, title } = hideLabel(on);
+        btn.setAttribute('aria-pressed', String(on));
+        btn.title = title;
+        btn.querySelector('span').textContent = text;
+        toast(on ? `${titlePref(media.title)} is hidden. Settings → Lists brings it back.` : `${titlePref(media.title)} shows up again`, 'success');
     });
 }
 
