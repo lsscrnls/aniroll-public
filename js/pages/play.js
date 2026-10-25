@@ -10,7 +10,7 @@ import { controlsHtml, mountControls, icon } from '../player/controls.js';
 import { createSubtitles } from '../player/subtitles.js';
 import { neighbours, openEpisodes } from '../player/episodes.js';
 import { maybeRecap, noteWatched } from '../player/recap.js';
-import { loadThemes, themesFor, identify } from '../player/songs.js';
+import { loadThemes, themesFor, identify, canListen } from '../player/songs.js';
 
 // #/play/<mediaId>/<episode>: plays an episode from the user's own Jellyfin, full screen.
 // Jellyfin gets the usual playback reports (its "continue watching", the webhook, the dashboard),
@@ -414,7 +414,7 @@ export async function render({ params, content }) {
             if (closed) return;
             const here = themesFor(all, episode);
             controls.setSongs({ list: () => here.list, op: here.op, ed: here.ed,
-                identify: (opts) => identify(video, { media: mediaId, episode, ...opts }) });
+                identify: canListen(video) ? (opts) => identify(video, { media: mediaId, episode, ...opts }) : null });
         });
         await reportStart(session, engine);
         if (closed) return cleanup;

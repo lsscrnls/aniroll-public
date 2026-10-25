@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.8.1';
+export const RELEASE = '1.9.8.2';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -29,6 +29,9 @@ const CHANGES = [
             'With <strong>18+ content</strong> on in your AniList settings, AniRoll follows them: Browse, Season and the search include 18+ as you set it there, and Browse can show only 18+ or none. Other people\'s 18+ posts in the feed follow your AniList setting too.',
             'Show pages give AniList\'s new <strong>Weighted Score</strong>, with the mean score next to it.',
             'Leaving a page or closing a box with a reply or post you haven\'t sent asks before it\'s lost.',
+            'Private messages are gone from the feed and the notifications as well.',
+            'Under <strong>Friends</strong>, a long name no longer pushes the match onto its own line, and there is more room below Following, Followers and Mutuals.',
+            '<strong>What\'s this song?</strong> only shows up where your browser lets AniRoll hear the episode, so not on iPhone.',
         ],
     },
     {

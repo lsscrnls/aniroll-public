@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.8.1.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.8.2.
 
 ## 25 October 2026 – Followers and your 18+ settings
 
@@ -8,6 +8,9 @@ What changed in AniRoll, newest first: the same as "What's new" in the app. Curr
 - With **18+ content** on in your AniList settings, AniRoll follows them: Browse, Season and the search include 18+ as you set it there, and Browse can show only 18+ or none. Other people's 18+ posts in the feed follow your AniList setting too.
 - Show pages give AniList's new **Weighted Score**, with the mean score next to it.
 - Leaving a page or closing a box with a reply or post you haven't sent asks before it's lost.
+- Private messages are gone from the feed and the notifications as well.
+- Under **Friends**, a long name no longer pushes the match onto its own line, and there is more room below Following, Followers and Mutuals.
+- **What's this song?** only shows up where your browser lets AniRoll hear the episode, so not on iPhone.
 
 ## 24 October 2026 – Your Watch Party follows you to the next show
 
