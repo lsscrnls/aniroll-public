@@ -5589,6 +5589,8 @@ h1[tabindex="-1"]:focus { outline: none; }
 .pl-recap-btn { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 999px;
     background: rgba(255,255,255,0.14); color: #fff; cursor: pointer; backdrop-filter: blur(12px); }
 .pl-recap-btn[hidden] { display: none; }
+.pl-recap-menuwrap { position: relative; display: inline-flex; }
+.pl-recap-menu { z-index: 3; }
 .pl-recap-btn[aria-pressed="true"] { background: var(--pl-primary); color: var(--pl-on-primary, #000); }
 .pl-recap-btn:hover, .pl-recap-btn:focus-visible { background: rgba(255,255,255,0.26); }
 .pl-recap-btn[aria-pressed="true"]:hover { filter: brightness(1.1); }

@@ -1,5 +1,5 @@
 // @ts-check
-import { getConfig, normalizeUrl } from '../jellyfin.js';
+import { getConfig, normalizeUrl, jfAuth } from '../jellyfin.js';
 import { noteStatus } from './animemap.js';
 import { accountState, saveAccountState } from '../accountstate.js';
 
@@ -95,4 +95,14 @@ export function availability(force = false) {
 
 export function forgetAvailability() {
     cached = null;
+}
+
+// What the way from the server to this browser carries, in bits per second: one download of `size`
+// bytes from /Playback/BitrateTest, as Jellyfin's own player measures it
+export async function bitrateTest(base, apiKey, size) {
+    const t = performance.now();
+    const res = await fetch(`${base}/Playback/BitrateTest?Size=${size}`, { headers: jfAuth(apiKey), cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error(`bitrate test ${res.status}`);
+    const bytes = (await res.arrayBuffer()).byteLength;
+    return (bytes * 8) / Math.max(0.05, (performance.now() - t) / 1000);
 }

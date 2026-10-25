@@ -301,7 +301,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             + songs.list().map((t, i) => `<button class="pl-menu-item pl-menu-song" role="menuitem" data-song="${i}">
                 <span class="pl-menu-check">${esc(themeName(t))}</span><span class="pl-menu-song-text">${esc(t.title)}${t.artist ? `<span class="pl-menu-song-artist">${esc(t.artist)}</span>` : ''}</span></button>`).join(''),
         quality: () => backTo('Quality')
-            + quality.list().map(q => menuItem(esc(q.label), 'data-quality', q.id, q.id === quality.current())).join(''),
+            + quality.list().map(q => menuItem(esc(q.label), 'data-quality', q.id, q.id === quality.current())).join('')
+            + (quality.test ? '<div class="pl-menu-divider" role="separator"></div><button class="pl-menu-item" role="menuitem" data-speedtest="1"><span class="pl-menu-check"></span>Test speed</button>' : ''),
         speed: () => backTo('Speed')
             + SPEEDS.map(r => menuItem(speedLabel(r), 'data-speed', r, r === video.playbackRate)).join(''),
         subs: () => {
@@ -412,6 +413,8 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
             } else if (item.dataset.quality != null) {
                 const q = /^\d+(\.\d+)?$/.test(item.dataset.quality) ? Number(item.dataset.quality) : item.dataset.quality;
                 quality.select(q); // the current one too: Auto again starts fresh
+            } else if (item.dataset.speedtest != null) {
+                quality.test();
             } else if (item.dataset.identify != null) {
                 closeMenu();
                 listenForSong();
@@ -941,7 +944,7 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
                 if (!document.activeElement?.closest?.('.modal-backdrop')) box.querySelector('[data-resume="continue"]').focus();
             });
         },
-        // { list() -> [{ id: 'auto' | 'max' | bps, label }], current(), select(id) }
+        // { list() -> [{ id: 'auto' | 'max' | bps, label }], current(), select(id), test()? } (test: "Test speed" under the steps)
         setQuality(manager) {
             quality = manager;
         },

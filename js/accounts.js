@@ -18,7 +18,7 @@ const NOTE_KEY = 'aniroll_data_note';           // the one-time note where to de
 // The browser's, not an account's: they stay when you switch
 const DEVICE = new Set([LIST_KEY, ADDING, 'aniroll_theme', 'aniroll_accent', 'aniroll_title_lang', 'aniroll_design',
     'aniroll_design_v2', 'aniroll_m3_variant', 'aniroll_m3_seed', 'aniroll_m3_scheme3', 'aniroll_m3_show',
-    'aniroll_player_volume', 'aniroll_player_quality', 'aniroll_sub_size', 'aniroll_subs_pref', 'aniroll_audio_pref',
+    'aniroll_player_volume', 'aniroll_player_quality', 'aniroll_sub_size',
     'aniroll_ambient', 'aniroll_bitrate_test', 'aniroll_list_view', 'aniroll_list_sort', 'aniroll_list_format',
     'aniroll_cal_view', 'aniroll_cal_images', 'aniroll_settings_tab', 'aniroll_discover', 'aniroll_friends_tab',
     'aniroll_discord', 'aniroll_discord_nagged', 'aniroll_discord_ext_nagged', 'aniroll_maint_seen', 'aniroll_visit_from',
