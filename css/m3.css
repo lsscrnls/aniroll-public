@@ -101,6 +101,11 @@
 :root[data-design="m3"] :is(button, a, label, summary, input, [role="button"], [role="tab"], .media-card) { touch-action: manipulation; }
 :root[data-design="m3"] :is(.modal-content, .glass-dropdown, .pl-menu, .glass-menu-list) { overscroll-behavior: contain; }
 
+/* Pills that change shape: "fully round" is 28 px here, not 9999 px. They are 56 px tall at most, so it looks the same,
+   but a spring from 9999 px overshoots far below zero on its way down: the corners went sharp for a moment */
+:root[data-design="m3"] :is(.nav-icon-btn, .glass-btn, .glass-icon-btn, .progress-btn, .detail-panel-action-btn, .season-nav-btn,
+    .hex-swatch, .lp-btn, .um-icon-btn, .m3-btn-lg, .m3-dock-chip) { --radius-full: 28px; }
+
 /* ===== Type scale (M3 Expressive: emphasized headlines, calm body) ===== */
 :root[data-design="m3"] .section-title,
 :root[data-design="m3"] .page-title,

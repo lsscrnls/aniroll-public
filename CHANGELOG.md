@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.1.
 
 ## 26 October 2026 – Covers that colour the app
 
@@ -12,6 +12,7 @@ What changed in AniRoll, newest first: the same as "What's new" in the app. Curr
 - Big titles and numbers have softer, rounder letters.
 - The Roll button in the side rail is a shape that changes when you point at it and turns while a roll runs.
 - On a show, Watch Party leads the actions and Hide stays quiet until it is on. Its icon is back, and the score no longer breaks onto two lines.
+- Round buttons stay round while they change shape: pressing one, or pointing at the episode in the top bar, no longer shows sharp corners for a moment.
 
 ## 25 October 2026 – Followers and your 18+ settings
 
