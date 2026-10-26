@@ -85,6 +85,38 @@ const design = process.env.DESIGN || 'm3';
         });
     } });
     await shot(p, 'list', '#/list');
+    // Scrolled past the hero: its number docks in the app bar
+    // The flight into the chip, frame by frame
+    if (want('dock-flight')) {
+        await p.evaluate(() => { location.hash = '#/'; });
+        await wait(4000);
+        await p.mouse.move(700, 600);
+        await p.mouse.wheel(0, 700);
+        for (const ms of [120, 220, 320, 420, 560, 900]) {
+            await wait(ms === 120 ? 120 : ms === 900 ? 340 : ms === 560 ? 140 : 100);
+            await p.screenshot({ path: path.join(OUT, `${theme}-dock-${ms}.png`), clip: { x: 760, y: 0, width: 680, height: 260 } });
+        }
+        console.log('shot dock-flight');
+    }
+    await shot(p, 'dock', '#/', { ms: 4000, act: async (q) => { await q.mouse.move(700, 600); await q.mouse.wheel(0, 700); await wait(1500); } });
+    // The last episode marked: The End, caught mid-way
+    if (want('finale')) {
+        await p.evaluate(() => document.dispatchEvent(new CustomEvent('aniroll:watched', { detail: { progress: 28, media: {
+            id: 154587, episodes: 28, title: { userPreferred: 'Sousou no Frieren', romaji: 'Sousou no Frieren' },
+            coverImage: { color: '#d6e4a1', large: document.querySelector('.media-card-img')?.src } } } })));
+        await wait(2600);
+        await p.screenshot({ path: path.join(OUT, `${theme}-finale.png`) });
+        console.log('shot finale');
+    }
+    // Holo card: the demo has no top matches on screen, so one Season card is made one
+    await shot(p, 'holo', '#/season', { ms: 6000, act: async (q) => {
+        await q.evaluate(() => document.querySelectorAll('.media-card')[1].classList.add('is-holo'));
+        const b = await q.locator('.media-card.is-holo').first().boundingBox();
+        if (b) { await q.mouse.move(b.x + b.width * .3, b.y + b.height * .2); await q.mouse.move(b.x + b.width * .8, b.y + b.height * .25, { steps: 5 }); }
+    } });
+    await shot(p, 'season-peek', '#/season', { ms: 6000, act: async (q) => { await q.hover('.media-card[data-color] >> nth=4'); await wait(1500); } });
+    // Resting on a card lends the app its cover and colours
+    await shot(p, 'list-peek', '#/list', { act: async (q) => { await q.hover('.list-card[data-color] >> nth=1'); await wait(1500); } });
     await shot(p, 'roll', '#/roll', { ms: 6000, act: async q => { await q.click('#roll-btn'); await wait(300); await settle(q); } });
     await shot(p, 'search', '#/search', { ms: 6000 });
     await shot(p, 'calendar', '#/calendar', { ms: 6000 });

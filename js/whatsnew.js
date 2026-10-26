@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.8.4';
+export const RELEASE = '1.9.9';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -21,6 +21,20 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // its offset) stays hidden until then: what is live already can be announced at a set time. A later release of the
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
+    {
+        id: '2026-10-26.1',
+        title: 'Covers that colour the app',
+        items: [
+            'Rest the pointer on a show\'s card and the whole app takes on its cover and colours for a moment. Move away and your own look comes back.',
+            'Cards wear their cover\'s colour, so My List, Season and Home read as a mosaic of your shows.',
+            'Recommendations that fit your taste really well are <strong>holo cards</strong>: the foil and the light follow your pointer.',
+            'When Roll lands, the pick turns through a few shapes into its card and the app takes on its colours until you leave Roll.',
+            'Scroll past your next episode on Home and its number flies up into the top bar. A click there marks the episode as watched.',
+            'Big titles and numbers have softer, rounder letters.',
+            'The Roll button in the side rail is a shape that changes when you point at it and turns while a roll runs.',
+            'On a show, Watch Party leads the actions and Hide stays quiet until it is on. Its icon is back, and the score no longer breaks onto two lines.',
+        ],
+    },
     {
         id: '2026-10-25.1',
         title: 'Followers and your 18+ settings',

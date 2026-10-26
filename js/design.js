@@ -215,16 +215,17 @@ export async function contentScheme(hex) {
             const Scheme = { vibrant: mcu.SchemeVibrant, expressive: mcu.SchemeExpressive }[variant] || mcu.SchemeContent;
             const { light, dark } = blocks(mcu, hex, Scheme);
             const on = (theme, sel) => `:root[data-design="m3"]${theme}.${sel}, :root[data-design="m3"]${theme} .${sel}`;
-            let style = document.getElementById('m3-content');
+            let style = /** @type {HTMLStyleElement | null} */ (document.getElementById('m3-content'));
             if (!style) {
                 style = document.createElement('style');
                 style.id = 'm3-content';
                 document.head.appendChild(style);
             }
-            style.textContent += `${on('', cls)} { ${light} }
-@media (prefers-color-scheme: dark) { ${on(':not([data-theme="light"])', cls)} { ${dark} } }
-${on('[data-theme="dark"]', cls)} { ${dark} }
-`;
+            // One rule at a time: rewriting the sheet's text re-parsed every colour so far on each new one
+            const sheet = style.sheet;
+            sheet.insertRule(`${on('', cls)} { ${light} }`, sheet.cssRules.length);
+            sheet.insertRule(`@media (prefers-color-scheme: dark) { ${on(':not([data-theme="light"])', cls)} { ${dark} } }`, sheet.cssRules.length);
+            sheet.insertRule(`${on('[data-theme="dark"]', cls)} { ${dark} }`, sheet.cssRules.length);
         }));
     }
     await contentClasses.get(cls);

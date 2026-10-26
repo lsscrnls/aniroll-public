@@ -1,5 +1,5 @@
 import * as api from '../api.js';
-import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, GITHUB_URL, GITHUB_ICON } from '../store.js';
+import { getState, renderMediaCard, renderSkeletonCards, esc, titlePref, toast, LIST_EVENT, emitListChange, emitWatched, tintAttrs, GITHUB_URL, GITHUB_ICON } from '../store.js';
 import { openDialog, showScorePrompt } from '../a11y.js';
 import { isLoggedIn, getToken } from '../auth.js';
 import { getActiveParty, startPartyFromPick, openPartyPicker } from './watchparty.js';
@@ -250,7 +250,7 @@ function renderStartingSoon(planning) {
     row.innerHTML = soon.map(e => {
         const m = e.media;
         const next = m.nextAiringEpisode;
-        return `<div class="media-card starting-soon-card" style="flex:0 0 150px" data-media-id="${m.id}" data-open="${m.id}" role="button" tabindex="0">
+        return `<div class="media-card starting-soon-card"${tintAttrs(m, 'flex:0 0 150px')} data-media-id="${m.id}" data-open="${m.id}" role="button" tabindex="0">
             <img class="media-card-img" src="${esc(m.coverImage?.large || '')}" alt="" loading="lazy">
             <div class="media-card-overlay">
                 <div class="media-card-title">${esc(titlePref(m.title))}</div>
@@ -303,7 +303,7 @@ async function loadContinueWatching(token) {
         el.innerHTML = entries.map((e, i) => {
             const m = e.media;
             return `
-                <div class="media-card" style="flex:0 0 150px" data-media-id="${m.id}" data-open="${m.id}"${i ? '' : ' hidden'}>
+                <div class="media-card"${tintAttrs(m, 'flex:0 0 150px')} data-media-id="${m.id}" data-open="${m.id}"${i ? '' : ' hidden'}>
                     <img class="media-card-img" src="${m.coverImage?.large || ''}" alt="" loading="lazy">
                     ${!m.episodes || e.progress < m.episodes ? `<button class="cw-inc" data-entry-id="${e.id}" title="Mark next episode watched">+1</button>` : ''}
                     ${stalledWeeks(e) ? `<button class="cw-pause" data-pause-id="${e.id}" title="Move to Paused">Pause</button>` : ''}
@@ -482,7 +482,7 @@ function renderFriendCard(g, tab) {
         : `<span class="fr-line-icon fr-${kind}">${KIND_ICON[kind]}</span><span class="fr-line-text"><strong>${esc(lead.user.name)}</strong>${others ? ` +${others}` : ''} · ${esc(text)}</span>`;
 
     // Not a button itself: it holds one (Plan). Its title opens the show, from the keyboard too
-    return `<div class="media-card fr-card" style="flex:0 0 150px" data-media-id="${m.id}" data-open="${m.id}">
+    return `<div class="media-card fr-card"${tintAttrs(m, 'flex:0 0 150px')} data-media-id="${m.id}" data-open="${m.id}">
         <img class="media-card-img" src="${m.coverImage?.large || ''}" alt="" loading="lazy">
         ${mine}
         <div class="media-card-overlay">
