@@ -86,6 +86,19 @@ const design = process.env.DESIGN || 'm3';
     } });
     await shot(p, 'list', '#/list');
     // Scrolled past the hero: its number docks in the app bar
+    // Hovering the docked chip: its corners over time (they must never go sharp on the way)
+    if (want('dock-hover')) {
+        await p.evaluate(() => { location.hash = '#/'; });
+        await wait(4000);
+        await p.mouse.move(700, 600);
+        await p.mouse.wheel(0, 700);
+        await wait(2000);
+        const b = await p.locator('.m3-dock-chip').boundingBox();
+        await p.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+        const r = await p.evaluate(() => new Promise(res => { const out = [], el = document.querySelector('.m3-dock-chip'), t0 = performance.now();
+            const step = () => { out.push(parseFloat(getComputedStyle(el).borderTopLeftRadius)); performance.now() - t0 < 600 ? requestAnimationFrame(step) : res(out); }; step(); }));
+        console.log('radius', r.map(v => Math.round(v)).join(' '));
+    }
     // The flight into the chip, frame by frame
     if (want('dock-flight')) {
         await p.evaluate(() => { location.hash = '#/'; });
