@@ -174,8 +174,19 @@ export function undoable(message, { run, undo }) {
     return { cancel: () => { if (done) return; finish(); note?.close(); } };
 }
 
+// A card's cover colour (AniList's coverImage.color) as attributes: Material 3 tints the card with it, and resting the
+// pointer on the card lends the app that colour (js/m3.js). `style` is whatever inline style the card already has
+export const HOLO_MATCH = 90;
+
+export function tintAttrs(media, style = '') {
+    const c = /^#[0-9a-f]{6}$/i.test(media?.coverImage?.color || '') ? media.coverImage.color : '';
+    const css = [style, c && `--cover:${c}`].filter(Boolean).join(';');
+    return `${c ? ` data-color="${c}"` : ''}${css ? ` style="${css}"` : ''}`;
+}
+
 // `rec` ({ match, because }) turns the card into a recommendation card
 // `note` replaces the line under the title (a voice actor's page puts the character there)
+// A match of HOLO_MATCH or more makes it a holo card in Material 3: foil that follows the pointer (js/m3.js)
 export function renderMediaCard(media, showStatus = false, rec = null, note = null) {
     // Recommendation cards show only the taste match — the AniList score next to it was too much
     const score = media.meanScore && !rec ? `<div class="media-card-score" title="AniList average score">${media.meanScore}%</div>` : '';
@@ -190,7 +201,7 @@ export function renderMediaCard(media, showStatus = false, rec = null, note = nu
     const sub = media.format ? `<div class="media-card-sub">${formatShort(media.format)}${media.episodes ? ` · ${media.episodes} Ep` : ''}${media.chapters ? ` · ${media.chapters} Ch` : ''}</div>` : '';
 
     return `
-        <div class="media-card" data-id="${media.id}" data-type="${media.type || 'ANIME'}" data-open="${media.id}"${rec?.dismissable ? '' : ' role="button" tabindex="0"'}>
+        <div class="media-card${rec?.match >= HOLO_MATCH ? ' is-holo' : ''}" data-id="${media.id}" data-type="${media.type || 'ANIME'}" data-open="${media.id}"${tintAttrs(media)}${rec?.dismissable ? '' : ' role="button" tabindex="0"'}>
             <img class="media-card-img" src="${media.coverImage?.large || media.coverImage?.extraLarge || ''}" alt="" loading="lazy">
             ${score}${status}${match}
             ${rec?.dismissable ? `<button type="button" class="media-card-dismiss" data-dismiss="${media.id}" title="Not interested" aria-label="Not interested in ${esc(titlePref(media.title))}"><svg data-icon="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button>` : ''}

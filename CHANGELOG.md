@@ -1,6 +1,17 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.8.4.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.
+
+## 26 October 2026 – Covers that colour the app
+
+- Rest the pointer on a show's card and the whole app takes on its cover and colours for a moment. Move away and your own look comes back.
+- Cards wear their cover's colour, so My List, Season and Home read as a mosaic of your shows.
+- Recommendations that fit your taste really well are **holo cards**: the foil and the light follow your pointer.
+- When Roll lands, the pick turns through a few shapes into its card and the app takes on its colours until you leave Roll.
+- Scroll past your next episode on Home and its number flies up into the top bar. A click there marks the episode as watched.
+- Big titles and numbers have softer, rounder letters.
+- The Roll button in the side rail is a shape that changes when you point at it and turns while a roll runs.
+- On a show, Watch Party leads the actions and Hide stays quiet until it is on. Its icon is back, and the score no longer breaks onto two lines.
 
 ## 25 October 2026 – Followers and your 18+ settings
 

@@ -1,5 +1,5 @@
 import * as api from '../api.js';
-import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched, emitListChange, LIST_EVENT, loginState, SKELETON } from '../store.js';
+import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched, emitListChange, LIST_EVENT, loginState, SKELETON, tintAttrs } from '../store.js';
 import { getToken, isLoggedIn } from '../auth.js';
 import { enhanceSelect } from '../select.js';
 import { showScorePrompt } from '../a11y.js';
@@ -247,7 +247,7 @@ export async function render({ params, content }) {
         const unitWord = currentType === 'ANIME' ? 'episode' : 'chapter';
         // Not a button itself when it holds −/+1: the title opens the show, from the keyboard too
         const own = isOwn;
-        return `<div class="media-card list-card" data-entry-id="${e.id}" data-media-id="${m.id}" data-open="${m.id}"${own ? '' : ' role="button" tabindex="0"'}>
+        return `<div class="media-card list-card" data-entry-id="${e.id}" data-media-id="${m.id}" data-open="${m.id}"${tintAttrs(m)}${own ? '' : ' role="button" tabindex="0"'}>
             <img class="media-card-img" src="${esc(m.coverImage?.large || '')}" alt="" loading="lazy">
             ${e.score ? `<div class="media-card-score" title="Your score">${fmtScore(e.score)}</div>` : ''}
             ${isOwn ? `<div class="list-card-actions">

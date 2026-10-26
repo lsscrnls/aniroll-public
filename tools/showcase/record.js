@@ -548,7 +548,7 @@ function staticServer(apiPort) {
         for (const [name, [head, sub, url]] of Object.entries(cards)) {
             const end = name === 'card-end';
             await cp.setContent(`<!doctype html><html><head><base href="${base}/"><style>
-                @font-face { font-family: Flex; src: url(fonts/google-sans-flex-latin-wght-5.3.1.woff2) format('woff2'); font-weight: 100 1000; }
+                @font-face { font-family: Flex; src: url(fonts/google-sans-flex-latin-rond-5.3.2.woff2) format('woff2'); font-weight: 100 1000; }
                 html, body { margin: 0; height: 100%; }
                 body { background: radial-gradient(120% 90% at 85% 10%, #4a2b4f 0%, #1d1820 55%, #141218 100%); color: #ece0ee;
                     font-family: Flex, system-ui, sans-serif; display: grid; align-content: center; padding: 0 180px; box-sizing: border-box; }

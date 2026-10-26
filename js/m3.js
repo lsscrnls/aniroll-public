@@ -80,17 +80,106 @@ export function setup() {
     document.addEventListener('aniroll:media-shown', onMediaShown);
     cleanups.push(() => document.removeEventListener('aniroll:media-shown', onMediaShown));
 
+    // The colour peek on cards (below): the card under the pointer and its pending change
+    let peek = null;
+    let peekTimer = 0;
+
     // Page name for the header band; a detail page's colours end when you leave it
     const onRoute = () => {
         const page = (location.hash.slice(2).split(/[/?]/)[0]) || 'home';
         document.body.dataset.m3Page = page;
+        peek = null;
+        clearTimeout(peekTimer);
+        document.documentElement.classList.remove('m3-peek');
+        if (page !== 'home') document.querySelector('.m3-dock-chip')?.setAttribute('hidden', '');
         if (page !== 'anime' && page !== 'manga') applyAppTheme();
     };
     onRoute();
     window.addEventListener('hashchange', onRoute);
     cleanups.push(() => { window.removeEventListener('hashchange', onRoute); delete document.body.dataset.m3Page; setScope(document.documentElement, null); });
 
-    // Container transform: remember which cover was pressed, grow it into the panel
+    // Resting the pointer on a tinted card lends the whole app its cover and colours; off the cards, they go back.
+    // Not on a show's own page: that one already wears its show
+    // Only with a real pointer (a tap opens the show anyway) and only after a short rest, so sweeping across stays calm
+    const onPeek = (e) => {
+        if (isShowPage() || !matchMedia('(hover: hover)').matches) return;
+        const card = /** @type {HTMLElement | null} */ (e.target.closest?.('.media-card[data-color]') || null);
+        if (card === peek) return;
+        clearTimeout(peekTimer);
+        const wasPeeking = !!peek;
+        peek = card;
+        if (!card && !wasPeeking) return;
+        // Work out the colours now, while the pointer settles, so the switch itself costs nothing
+        if (card) contentScheme(card.dataset.color);
+        peekTimer = setTimeout(() => {
+            if (isShowPage()) return;
+            const root = document.documentElement;
+            root.classList.add('m3-peek');
+            snapColours(() => {
+                if (!card) { applyAppTheme(); return; }
+                setWall(card.querySelector('.media-card-img')?.getAttribute('src') || null);
+                return setScope(root, card.dataset.color);
+            });
+            if (!card) setTimeout(() => { if (!peek) root.classList.remove('m3-peek'); }, 500);
+        }, card ? 140 : 350);
+    };
+    // Holo cards: the foil, the glare and the tilt follow the pointer (css: .media-card.is-holo)
+    let holo = null;
+    let holoFrame = 0;
+    const onHoloMove = (e) => {
+        const card = /** @type {HTMLElement | null} */ (e.target.closest?.('.media-card.is-holo') || null);
+        if (holo && holo !== card) {
+            holo.classList.remove('is-tilting');
+            ['--hx', '--hy', '--rx', '--ry'].forEach(v => holo.style.removeProperty(v));
+        }
+        holo = card;
+        if (!card || e.pointerType === 'touch' || holoFrame) return;
+        holoFrame = requestAnimationFrame(() => {
+            holoFrame = 0;
+            if (holo !== card) return;
+            const r = card.getBoundingClientRect();
+            const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+            const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+            card.classList.add('is-tilting');
+            card.style.setProperty('--hx', `${(x * 100).toFixed(1)}%`);
+            card.style.setProperty('--hy', `${(y * 100).toFixed(1)}%`);
+            card.style.setProperty('--rx', `${((x - .5) * 16).toFixed(2)}deg`);
+            card.style.setProperty('--ry', `${((.5 - y) * 16).toFixed(2)}deg`);
+        });
+    };
+    document.addEventListener('pointermove', onHoloMove, { passive: true });
+    cleanups.push(() => { document.removeEventListener('pointermove', onHoloMove); cancelAnimationFrame(holoFrame); });
+
+    // Home: once the hero's big number scrolls under the app bar, it flies up and docks there as a chip;
+    // a click on the chip marks the episode, like the hero's button. Scrolling back up lets it go again
+    const dock = document.createElement('button');
+    dock.className = 'm3-dock-chip';
+    dock.hidden = true;
+    document.getElementById('jf-now-chip')?.after(dock);
+    dock.addEventListener('click', () => {
+        const inc = document.querySelector('.m3-hero [data-hero-inc]');
+        if (inc) inc.click();
+        else window.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' });
+    });
+    const dockObserver = new IntersectionObserver(([entry]) => {
+        const num = /** @type {HTMLElement} */ (entry.target);
+        // A number taken off the page (Home left or redrawn) measures 0 × 0: that is not "scrolled past"
+        const under = num.isConnected && entry.boundingClientRect.height > 0 && !entry.isIntersecting
+            && entry.boundingClientRect.top < (entry.rootBounds?.top ?? 72) + 40;
+        setDocked(dock, num, under && document.body.dataset.m3Page === 'home');
+    }, { rootMargin: '-72px 0px 0px 0px' });
+    watchDock = (num) => {
+        dockObserver.disconnect();
+        if (num) dockObserver.observe(num);
+        else setDocked(dock, null, false);
+    };
+    cleanups.push(() => { dockObserver.disconnect(); dock.remove(); watchDock = () => {}; });
+
+    // Tabbing through the cards does the same as pointing at them
+    document.addEventListener('pointerover', onPeek);
+    document.addEventListener('focusin', onPeek);
+    cleanups.push(() => { document.removeEventListener('pointerover', onPeek); document.removeEventListener('focusin', onPeek); clearTimeout(peekTimer); });
+
     let pressed = null;
     // Every place with a cover that opens the panel: cards, list rows, related titles, posts, friends, notifications
     const SOURCES = '.media-card, .search-result-item, .calendar-week-item, .schedule-item, .list-entry, .detail-related-item, '
@@ -274,6 +363,21 @@ function setupRowEdges() {
     };
 }
 
+// Colours that change in one step instead of fading: a fade of the app's colours restyles the whole page on every
+// frame, which made the peek on cards feel slow. The wallpaper still crossfades, that one is cheap
+async function snapColours(change) {
+    const root = document.documentElement;
+    root.classList.add('m3-snap');
+    try { await change(); } finally {
+        requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('m3-snap')));
+    }
+}
+
+function isShowPage() {
+    const page = document.body.dataset.m3Page;
+    return page === 'anime' || page === 'manga';
+}
+
 // Settings changed the palette: re-apply the show's colours (or drop them)
 export function refresh() {
     const page = document.body.dataset.m3Page;
@@ -299,7 +403,7 @@ function onWatched(e) {
 
 // A cover drawn tiny (48×72) and blurred once into a canvas: stretched to fill the screen it is soft by itself,
 // with no CSS blur at all. A 44–72px CSS blur over the whole window made every larger repaint stall a frame.
-function tinyCover(url, onReady) {
+function tinyCover(url, onReady, saturate = 1) {
     const canvas = document.createElement('canvas');
     canvas.width = 48;
     canvas.height = 72;
@@ -310,7 +414,7 @@ function tinyCover(url, onReady) {
         const ctx = canvas.getContext('2d');
         ctx.imageSmoothingQuality = 'high';
         // Blurred once, here, drawn a little larger than the canvas so the edges don't fade to transparent
-        ctx.filter = 'blur(3px)';
+        ctx.filter = `blur(3px) saturate(${saturate})`;
         ctx.drawImage(img, -8, -12, canvas.width + 16, canvas.height + 24);
         onReady?.(canvas);
     };
@@ -326,7 +430,7 @@ function setWall(url) {
     current?.classList.remove('on');
     [...wall.querySelectorAll('canvas:not(.on)')].slice(0, -1).forEach(el => el.remove());
     if (!url) return;
-    const layer = tinyCover(url, (c) => requestAnimationFrame(() => c.classList.add('on')));
+    const layer = tinyCover(url, (c) => requestAnimationFrame(() => c.classList.add('on')), 1.35);
     layer.dataset.src = url;
     wall.appendChild(layer);
     setTimeout(() => wall.querySelectorAll('canvas:not(.on)').forEach(old => old !== layer && old.remove()), 1600);
@@ -425,6 +529,16 @@ function onMediaShown(e) {
     const cover = media?.coverImage?.extraLarge || media?.coverImage?.large;
     if (where === 'page' && cover) setWall(cover);
     if (where === 'roll' && root) {
+        // The landing is the moment: the window lands through the shapes and the whole app takes the show's look
+        // until you leave Roll (onRoute gives the app its own look back)
+        setScope(document.documentElement, media?.coverImage?.color || null);
+        if (cover) setWall(cover);
+        const win = root.querySelector('.roll-window');
+        if (win) {
+            win.classList.remove('m3-landed');
+            void win.offsetWidth;
+            win.classList.add('m3-landed');
+        }
         let glow = root.querySelector(':scope > .m3-hero-glow');
         if (!glow) {
             glow = document.createElement('div');
@@ -546,9 +660,58 @@ function onContinue(e) {
     const glow = hero.querySelector('.m3-hero-glow[data-cover]');
     if (glow) glow.appendChild(tinyCover(glow.dataset.cover, (c) => c.classList.add('on')));
     const num = hero.querySelector('.m3-hero-ep-num');
+    watchDock(num);
     if (!num || reduceMotion()) return;
     if (before == null) countUp(num);
     else if (before !== num.textContent) num.classList.add('is-pop');
+}
+
+// The hero's number docked in the app bar (setup): what it shows, and the flight up into it
+let watchDock = (_num) => {};
+function setDocked(chip, num, on) {
+    if (!on) {
+        if (!chip.hidden) { chip.classList.remove('is-in'); chip.hidden = true; }
+        return;
+    }
+    const hero = num.closest('.m3-hero');
+    const title = hero?.querySelector('.m3-hero-title')?.textContent?.trim() || '';
+    const canMark = !!hero?.querySelector('[data-hero-inc]');
+    chip.innerHTML = `<span class="m3-dock-num">${esc(num.textContent)}</span><span class="m3-dock-title">${esc(title)}</span>`
+        + (canMark ? '<svg data-icon="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>' : '');
+    chip.setAttribute('aria-label', canMark ? `Watched episode ${num.textContent} of ${title}` : `Back to ${title}`);
+    chip.title = chip.getAttribute('aria-label');
+    if (!chip.hidden) return;
+    chip.hidden = false;
+    if (reduceMotion()) { chip.classList.add('is-in'); return; }
+    // The flight: a copy of the big number, set exactly like the chip's number (same weight and spacing) at the
+    // hero's size, so scaling by the font sizes lands it glyph on glyph. Centres are matched, not corners: the two
+    // boxes have different line heights and paddings
+    const target = chip.querySelector('.m3-dock-num');
+    const to = target.getBoundingClientRect();
+    const from = num.getBoundingClientRect();
+    const fromSize = parseFloat(getComputedStyle(num).fontSize);
+    const scale = parseFloat(getComputedStyle(target).fontSize) / fromSize;
+    const ghost = document.createElement('span');
+    ghost.className = 'm3-dock-num m3-dock-ghost';
+    ghost.textContent = num.textContent;
+    ghost.style.fontSize = `${fromSize}px`;
+    ghost.style.color = getComputedStyle(num).color;
+    document.body.appendChild(ghost);
+    const g = ghost.getBoundingClientRect();
+    const x0 = from.left + from.width / 2 - g.width / 2, y0 = from.top + from.height / 2 - g.height / 2;
+    Object.assign(ghost.style, { left: `${x0}px`, top: `${y0}px` });
+    const dx = to.left + to.width / 2 - (x0 + g.width / 2), dy = to.top + to.height / 2 - (y0 + g.height / 2);
+    chip.classList.add('is-arriving');
+    ghost.animate([
+        { transform: 'translate(0, 0) scale(1)' },
+        { transform: `translate(${dx * .55}px, ${dy * .45 - 40}px) scale(${(1 + scale) / 2}) rotate(-6deg)`, offset: .55 },
+        { transform: `translate(${dx}px, ${dy}px) scale(${scale})` },
+    ], { duration: 560, easing: 'cubic-bezier(0.45, 0, 0.2, 1)' }).finished.then(() => {
+        ghost.remove();
+        chip.classList.remove('is-arriving');
+        chip.classList.add('is-in', 'is-jello');
+        chip.addEventListener('animationend', () => chip.classList.remove('is-jello'), { once: true });
+    }, () => ghost.remove());
 }
 
 // The big number runs up to the episode, fast at first and settling on it

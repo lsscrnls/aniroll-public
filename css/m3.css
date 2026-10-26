@@ -5,14 +5,14 @@
 /* Material 3 Expressive — AniRoll's second design (Settings → Appearance → Design, logged in only).
    Loaded by js/design.js together with a generated colour scheme (--md-*). Everything here is scoped to
    :root[data-design="m3"], so AniRoll's own design in style.css stays untouched.
-   Google Sans Flex 5.3.1 (weight axis) from @fontsource-variable/google-sans-flex, SIL OFL
+   Google Sans Flex 5.3.2 (weight + roundness axes) from @fontsource-variable/google-sans-flex, SIL OFL
    (fonts/LICENSE-google-sans-flex.txt), hosted here like Inter: no request to Google. */
 @font-face {
     font-family: 'Google Sans Flex';
     font-style: normal;
     font-weight: 1 1000;
     font-display: swap;
-    src: url('../fonts/google-sans-flex-latin-wght-5.3.1.woff2') format('woff2');
+    src: url('../fonts/google-sans-flex-latin-rond-5.3.2.woff2') format('woff2');
     unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
 }
 @font-face {
@@ -20,7 +20,7 @@
     font-style: normal;
     font-weight: 1 1000;
     font-display: swap;
-    src: url('../fonts/google-sans-flex-latin-ext-wght-5.3.1.woff2') format('woff2');
+    src: url('../fonts/google-sans-flex-latin-ext-rond-5.3.2.woff2') format('woff2');
     unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
 }
 
@@ -960,11 +960,15 @@
         border-radius: var(--radius-lg);
         background: var(--md-tertiary-container);
         color: var(--md-on-tertiary-container);
-        box-shadow: var(--md-elev-1);
-        transition: border-radius .5s var(--ease), background-color .2s var(--md-standard), transform .5s var(--ease);
+        /* Roll is a die: a shape that turns into another one. Same point count in every shape, so clip-path morphs */
+        clip-path: var(--m3-shape-squircle);
+        transition: clip-path .6s var(--m3-bouncy), background-color .2s var(--md-standard), transform .6s var(--m3-bouncy);
     }
-    :root[data-design="m3"] .m3-rail-fab:hover { border-radius: var(--radius-xl); transform: rotate(-8deg); }
-    :root[data-design="m3"] .m3-rail-fab.active { background: var(--md-tertiary); color: var(--md-on-tertiary); border-radius: var(--radius-xl); }
+    :root[data-design="m3"] .m3-rail-fab:hover { clip-path: var(--m3-shape-cookie9); transform: rotate(-24deg); }
+    :root[data-design="m3"] .m3-rail-fab.active { background: var(--md-tertiary); color: var(--md-on-tertiary); clip-path: var(--m3-shape-sunny); }
+    :root[data-design="m3"] .m3-rail-fab:active { clip-path: var(--m3-shape-burst); }
+    /* While the reel runs, the button rolls along through the shapes */
+    :root[data-design="m3"] body:has(.is-rolling) .m3-rail-fab { animation: m3FabRoll 1.1s linear infinite; }
     :root[data-design="m3"] .m3-rail-fab svg { width: 26px; height: 26px; }
     :root[data-design="m3"] .mobile-tab[data-page="roll"] { display: none; }
     :root[data-design="m3"] .m3-rail-github {
@@ -994,6 +998,95 @@
     :root[data-design="m3"] .dropdown-item.github-link { display: none; }
 }
 
+@keyframes m3FabRoll {
+    0% { clip-path: var(--m3-shape-sunny); transform: rotate(0); }
+    25% { clip-path: var(--m3-shape-cookie9); }
+    50% { clip-path: var(--m3-shape-clover4); }
+    75% { clip-path: var(--m3-shape-flower); }
+    100% { clip-path: var(--m3-shape-sunny); transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] .m3-rail-fab { transition: background-color .2s var(--md-standard); }
+    :root[data-design="m3"] .m3-rail-fab:hover { transform: none; }
+    :root[data-design="m3"] body:has(.is-rolling) .m3-rail-fab { animation: none; }
+}
+
+/* Roll lands (js/m3.js onMediaShown): the window comes in as a circle and turns through the shapes into the card,
+   a ring in the show's colour runs out from it */
+:root[data-design="m3"] .roll-window.m3-landed { animation: m3RollLand .9s var(--m3-bouncy); }
+@keyframes m3RollLand {
+    0% { clip-path: var(--m3-shape-circle); transform: scale(.7) rotate(-20deg); }
+    35% { clip-path: var(--m3-shape-cookie12); transform: scale(1.06) rotate(8deg); }
+    65% { clip-path: var(--m3-shape-flower); transform: scale(.98) rotate(-3deg); }
+    100% { clip-path: var(--m3-shape-squircle); transform: none; }
+}
+:root[data-design="m3"] .roll-machine:has(.m3-landed)::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 120px;
+    aspect-ratio: 1;
+    margin: -60px 0 0 -60px;
+    border-radius: 50%;
+    border: 6px solid var(--md-primary);
+    pointer-events: none;
+    opacity: 0;
+    animation: m3RollRing 1.1s .15s var(--md-standard);
+}
+@keyframes m3RollRing { from { opacity: .9; transform: scale(.4); } to { opacity: 0; transform: scale(9); border-width: 1px; } }
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] .roll-window.m3-landed, :root[data-design="m3"] .roll-machine:has(.m3-landed)::after { animation: none; }
+}
+
+/* Home: the hero's number docked in the app bar (js/m3.js setDocked); the number arrives by flight, the rest grows in */
+:root[data-design="m3"] .m3-dock-chip {
+    order: 1;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 48px;
+    max-width: min(360px, 42vw);
+    padding: 0 18px 0 16px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+    box-shadow: var(--m3-island-shadow);
+    font: inherit;
+    cursor: pointer;
+    transition: transform .4s var(--m3-bouncy), border-radius .4s var(--m3-bouncy);
+}
+:root[data-design="m3"] .m3-dock-chip[hidden] { display: none; }
+:root[data-design="m3"] .m3-dock-chip:hover { border-radius: var(--radius-lg); }
+:root[data-design="m3"] .m3-dock-chip:active { transform: scale(.94); }
+:root[data-design="m3"] #jf-now-chip:not([hidden]) ~ .m3-dock-chip, :root[data-design="m3"] .m3-dock-chip:not([hidden]) ~ #notif-btn { margin-left: 0; }
+:root[data-design="m3"] .m3-dock-num { font-size: 1.5rem; line-height: 1; font-weight: 850; letter-spacing: -0.03em; font-variation-settings: 'ROND' 100; color: var(--md-primary); font-variant-numeric: tabular-nums; opacity: 0; }
+:root[data-design="m3"] .m3-dock-title { font-size: .875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transform: translateX(-8px); transition: opacity .3s var(--md-standard), transform .4s var(--m3-bouncy); }
+:root[data-design="m3"] .m3-dock-chip svg { flex: none; width: 20px; height: 20px; opacity: 0; transform: scale(.4); transition: opacity .3s var(--md-standard) .1s, transform .45s var(--m3-bouncy) .1s; }
+:root[data-design="m3"] .m3-dock-chip.is-in :is(.m3-dock-num, .m3-dock-title) { opacity: 1; transform: none; }
+:root[data-design="m3"] .m3-dock-chip.is-in svg { opacity: 1; transform: none; }
+:root[data-design="m3"] .m3-dock-ghost { position: fixed; z-index: 2000; left: 0; top: 0; opacity: 1; pointer-events: none; white-space: nowrap; transform-origin: 50% 50%; will-change: transform; }
+/* The chip opens up as the number comes in, then wobbles like jelly when it lands */
+:root[data-design="m3"] .m3-dock-chip.is-arriving { animation: m3DockOpen .45s var(--m3-bouncy); }
+@keyframes m3DockOpen { from { transform: scale(.6); opacity: 0; } }
+:root[data-design="m3"] .m3-dock-chip.is-jello { animation: m3Jello .8s both; }
+@keyframes m3Jello {
+    0% { transform: scale(1, 1); }
+    18% { transform: scale(1.18, .82); }
+    32% { transform: scale(.88, 1.12); }
+    46% { transform: scale(1.07, .93); }
+    60% { transform: scale(.97, 1.03); }
+    75% { transform: scale(1.01, .99); }
+    100% { transform: scale(1, 1); }
+}
+@media (prefers-reduced-motion: reduce) { :root[data-design="m3"] .m3-dock-chip { animation: none !important; } }
+@media (max-width: 768px) {
+    :root[data-design="m3"] .m3-dock-chip { padding: 0 14px; gap: 8px; }
+    :root[data-design="m3"] .m3-dock-title { display: none; }
+}
+
 /* ----- Emphasized page titles ----- */
 :root[data-design="m3"] h1.section-title, :root[data-design="m3"] .page-enter > h1:first-child {
     font-size: clamp(2.25rem, 3.6vw, 3.25rem);
@@ -1002,6 +1095,11 @@
     letter-spacing: -0.02em;
 }
 :root[data-design="m3"] .home-section .section-title { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.01em; }
+/* Big type is soft: Google Sans Flex's roundness axis on titles and figures, the body stays crisp.
+   Numbers that change breathe through the axes instead of only scaling (see m3NumPop) */
+:root[data-design="m3"] :is(h1, h2, .section-title, .page-title, .modal-title, .logo-text, .detail-title, .roll-result-title,
+    .wp-title, .wp-host-counter-value, .m3-hero-ep-num, .m3-hero-title, .m3-hero-headline, .landing-title,
+    .m3-widget-big, .m3-widget-clock-num, .m3-widget-empty, .detail-score-value) { font-variation-settings: 'ROND' 100; }
 
 /* ----- Home hero: next episode as a huge number, the cover in a cookie, a sun turning behind it ----- */
 :root[data-design="m3"] .m3-hero {
@@ -1115,6 +1213,14 @@
 :root[data-design="m3"] .media-card > .progress-bar { left: 12px !important; right: 12px !important; bottom: 6px !important; top: auto !important; }
 /* My List cards too: away from the rounded corners, so the dot at the end stays whole */
 :root[data-design="m3"] .list-card-progress { margin-inline: 12px; }
+/* Each card in its cover's colour (store.js tintAttrs): a row reads as a mosaic of its shows, not grey boxes.
+   Mixed towards on-surface, so a near-black or pale cover still gives a wave that shows in both themes */
+:root[data-design="m3"] .media-card[data-color] {
+    --md-primary: color-mix(in oklab, var(--cover) 62%, var(--md-on-surface));
+    --md-secondary-container: color-mix(in oklab, var(--cover) 30%, var(--md-surface-container-highest));
+    background: color-mix(in oklab, var(--cover) 22%, var(--md-surface-container-low));
+}
+:root[data-design="m3"] .media-card[data-color]:hover { background: color-mix(in oklab, var(--cover) 34%, var(--md-surface-container-low)); }
 :root[data-design="m3"] #continue-watching .media-card-overlay { padding-bottom: 20px; }
 
 /* ----- Detail: emphasized title, stats in three colour roles ----- */
@@ -1232,6 +1338,10 @@
 @property --md-outline-variant { syntax: '<color>'; inherits: true; initial-value: transparent; }
 :root[data-design="m3"], :root[data-design="m3"] .m3-scope { transition: --md-surface .7s var(--md-standard), --md-on-surface .7s var(--md-standard), --md-on-surface-variant .7s var(--md-standard), --md-surface-container-lowest .7s var(--md-standard), --md-surface-container-low .7s var(--md-standard), --md-surface-container .7s var(--md-standard), --md-surface-container-high .7s var(--md-standard), --md-surface-container-highest .7s var(--md-standard), --md-primary .7s var(--md-standard), --md-on-primary .7s var(--md-standard), --md-primary-container .7s var(--md-standard), --md-on-primary-container .7s var(--md-standard), --md-secondary .7s var(--md-standard), --md-on-secondary .7s var(--md-standard), --md-secondary-container .7s var(--md-standard), --md-on-secondary-container .7s var(--md-standard), --md-tertiary .7s var(--md-standard), --md-on-tertiary .7s var(--md-standard), --md-tertiary-container .7s var(--md-standard), --md-on-tertiary-container .7s var(--md-standard), --md-outline .7s var(--md-standard), --md-outline-variant .7s var(--md-standard); }
 
+/* The peek on cards (js/m3.js snapColours): colours switch in one step, the wallpaper crossfades fast */
+:root[data-design="m3"].m3-snap { transition: none; }
+:root[data-design="m3"].m3-peek .m3-wall canvas { transition: opacity .35s var(--md-standard), transform .6s var(--m3-gentle); }
+
 /* Inside a coloured part of the page, AniRoll's variables follow that part's palette */
 :root[data-design="m3"] .m3-scope {
     --bg: var(--md-surface);
@@ -1312,6 +1422,47 @@
 :root[data-design="m3"] .media-card:active { transform: scale(.95); border-radius: var(--radius-2xl); transition-duration: .2s, .3s, .15s, .2s; }
 :root[data-design="m3"] .media-card-img { transition: transform .8s var(--m3-gentle); }
 :root[data-design="m3"] .media-card:hover .media-card-img { transform: scale(1.06); }
+
+/* Holo cards (store.js HOLO_MATCH): a top taste match is a foil trading card. The foil and a glare follow the
+   pointer and the card tilts towards it (js/m3.js sets --hx/--hy in % and --rx/--ry in deg); at rest the foil
+   shimmers faintly, so the cards stand out in a row before anyone points at them */
+:root[data-design="m3"] .media-card.is-holo {
+    position: relative;
+    transform: perspective(800px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--cover, var(--md-primary)) 60%, white);
+}
+:root[data-design="m3"] .media-card.is-holo:hover {
+    transform: perspective(800px) translateY(-6px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg)) scale(1.03);
+    box-shadow: 0 18px 40px -12px color-mix(in srgb, var(--cover, var(--md-primary)) 70%, transparent), 0 0 0 1px color-mix(in srgb, var(--cover, var(--md-primary)) 60%, white);
+}
+/* While the pointer moves the tilt follows at once; leaving springs it back */
+:root[data-design="m3"] .media-card.is-holo.is-tilting { transition: background-color .2s var(--md-standard), border-radius .5s var(--m3-bouncy), transform .08s linear, box-shadow .3s var(--md-standard); }
+:root[data-design="m3"] .media-card.is-holo::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    aspect-ratio: 2 / 3;
+    z-index: 1;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at var(--hx, 50%) var(--hy, 30%), rgb(255 255 255 / .28), transparent 34%),
+        repeating-linear-gradient(115deg,
+            hsl(350 95% 55% / .7) 0%, hsl(45 95% 55% / .7) 5%, hsl(120 85% 50% / .7) 10%,
+            hsl(190 95% 55% / .7) 15%, hsl(270 95% 60% / .7) 20%, hsl(350 95% 55% / .7) 25%);
+    background-size: 100% 100%, 240% 240%;
+    background-position: 0 0, var(--hx, 50%) var(--hy, 50%);
+    mix-blend-mode: color-dodge;
+    opacity: .28;
+    transition: opacity .3s var(--md-standard);
+    animation: m3HoloIdle 6s ease-in-out infinite alternate;
+}
+:root[data-design="m3"] .media-card.is-holo:hover::after { opacity: .6; animation: none; }
+:root[data-design="m3"] .media-card.is-holo :is(.media-card-match, .media-card-dismiss, .media-card-score) { z-index: 2; }
+@keyframes m3HoloIdle { to { background-position: 0 0, 100% 100%; } }
+@media (prefers-reduced-motion: reduce) {
+    :root[data-design="m3"] .media-card.is-holo, :root[data-design="m3"] .media-card.is-holo:hover { transform: none; }
+    :root[data-design="m3"] .media-card.is-holo::after { animation: none; }
+}
 
 /* Cards deal themselves in, one after the other */
 :root[data-design="m3"] .media-card { animation: m3Deal .7s var(--m3-bouncy) backwards; }
@@ -1427,7 +1578,7 @@
 /* Long-running shows (episode 1214): four digits at full size would push the title off the card */
 :root[data-design="m3"] .m3-hero-ep-num.is-long { font-size: clamp(4.5rem, 7vw, 6.5rem); }
 :root[data-design="m3"] .m3-hero-ep-num.is-pop { animation: m3NumPop .7s var(--m3-bouncy); }
-@keyframes m3NumPop { 30% { transform: scale(1.18) rotate(-4deg); } }
+@keyframes m3NumPop { 30% { transform: scale(1.18) rotate(-4deg); font-weight: 1000; font-variation-settings: 'ROND' 0; } }
 :root[data-design="m3"] .m3-hero .glass-btn-primary { box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--md-primary) 70%, transparent); }
 @media (max-width: 768px) {
     /* About 60 % of a phone's screen, so the tiles under it peek in */
@@ -1694,6 +1845,11 @@
 :root[data-design="m3"] .m3-widget-big { font-size: 2.75rem; line-height: 1; font-weight: 750; letter-spacing: -0.03em; color: var(--md-tertiary); margin-top: 6px; }
 :root[data-design="m3"] .m3-widget-empty { margin-top: 10px; font-size: 1.375rem; line-height: 1.2; font-weight: 650; letter-spacing: -0.01em; }
 :root[data-design="m3"] .m3-widget-go { color: var(--md-primary); font-weight: 600; }
+/* The queue in the tertiary role: next to the primary clock, the row reads as two colours and a calm week */
+:root[data-design="m3"] .m3-widget-queue { color: var(--md-on-tertiary-container); }
+:root[data-design="m3"] .m3-widget-queue :is(.m3-widget-label, .m3-widget-sub) { color: inherit; opacity: .8; }
+:root[data-design="m3"] .m3-widget-queue :is(.m3-widget-big, .m3-widget-go) { color: inherit; }
+:root[data-design="m3"] .m3-widget-queue .m3-widget-faces img { box-shadow: 0 0 0 3px var(--md-tertiary-container); }
 :root[data-design="m3"] .m3-widget-faces { position: absolute; right: 18px; top: 18px; display: flex; }
 :root[data-design="m3"] .m3-widget-faces img {
     width: 34px; height: 34px; border-radius: 50%; object-fit: cover; margin-left: -10px;
@@ -1811,6 +1967,8 @@
 }
 :root[data-design="m3"] .m3-widget:hover { background: var(--md-surface-container-high); }
 :root[data-design="m3"] .m3-widget-clock, :root[data-design="m3"] .m3-widget-clock:hover { background: var(--md-primary-container); }
+:root[data-design="m3"] .m3-widget-queue { background: var(--md-tertiary-container); }
+:root[data-design="m3"] .m3-widget-queue:hover { background: color-mix(in srgb, var(--md-on-tertiary-container) 8%, var(--md-tertiary-container)); }
 
 /* AniRoll's accent is set inline on <html> (store.js applyAccentColor) and would win over the palette:
    in M3 the accent is always the palette's primary */
@@ -1849,7 +2007,6 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    filter: saturate(1.35);
     opacity: 0;
     transform: scale(1.06);
     transition: opacity 1.4s var(--md-standard), transform 2.4s var(--m3-gentle);
@@ -2335,6 +2492,15 @@
 :root[data-design="m3"] .detail-facts > .detail-fact-next { color: var(--md-primary); }
 :root[data-design="m3"] .detail-entry { background: var(--md-surface-container-high); }
 :root[data-design="m3"] .detail-entry-score { color: var(--md-on-surface-variant); }
+:root[data-design="m3"] .detail-entry { flex-shrink: 0; max-width: 100%; }
+:root[data-design="m3"] .score-scale { white-space: nowrap; }
+/* The actions under a show have an order: Watch Party leads in the show's colour, Share follows tonal,
+   Hide stays quiet until it is on; then it squares up in the error colour, like M3E's toggle buttons */
+:root[data-design="m3"] #start-watchparty { background: var(--md-primary); color: var(--md-on-primary); }
+:root[data-design="m3"] #start-watchparty:hover { background: color-mix(in srgb, var(--md-on-primary) 8%, var(--md-primary)); }
+:root[data-design="m3"] #detail-hide { background: transparent; color: var(--md-on-surface-variant); box-shadow: inset 0 0 0 1px var(--md-outline-variant); }
+:root[data-design="m3"] #detail-hide:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+:root[data-design="m3"] #detail-hide[aria-pressed="true"] { background: var(--md-error-container); color: var(--md-on-error-container); box-shadow: none; border-radius: var(--radius-md); }
 :root[data-design="m3"] .detail-ext-info a { color: var(--md-on-surface-variant); }
 :root[data-design="m3"] .detail-ext-info a:hover { color: var(--md-on-surface); }
 :root[data-design="m3"] .detail-dist .stat-bar-track { background: transparent; }
