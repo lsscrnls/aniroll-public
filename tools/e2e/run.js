@@ -1171,6 +1171,17 @@ function staticServer() {
         await p.evaluate(() => document.getElementById('player-video').pause());
         await p.waitForTimeout(800);
         const paused = await p.evaluate(() => window.__activities.at(-1));
+        // On Home, away from any show: still a link, to the site itself
+        await p.evaluate(() => { location.hash = '#/'; });
+        await p.waitForFunction(() => window.__activities.at(-1)?.details === 'Browsing', null, { timeout: 5000 }).catch(() => {});
+        const browsing = await p.evaluate(() => window.__activities.at(-1));
+        // Rolling: the member list shows "Rolling for an anime" instead of "AniRoll"
+        await p.evaluate(() => { location.hash = '#/roll'; });
+        await p.waitForFunction(() => window.__activities.at(-1)?.details === 'Rolling for an anime', null, { timeout: 5000 }).catch(() => {});
+        const rolling = await p.evaluate(() => window.__activities.at(-1));
+        check('discord: rolling shows in the member list, with a link', rolling?.status_display_type === 2 && rolling.buttons?.length >= 1, rolling);
+        check('discord: on Home, without a show, the status links to the site', browsing?.details === 'Browsing' && browsing.buttons?.length === 1
+            && browsing.buttons[0].url === 'https://aniroll.app' && browsing.buttons[0].label === 'Try AniRoll', browsing);
         check('discord: Settings ticks the steps, tells how to remove it, the switch turns it on; the episode with time left, paused without, a link to the show',
             steps.length === 3 && steps.every(Boolean) && stored === 'on' && /uninstall\.sh \| sh$/.test(remove)
             && playingNow?.name === `AniRoll: ${playingNow?.details}`
