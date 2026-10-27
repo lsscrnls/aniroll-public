@@ -17,6 +17,8 @@ const ROOT = path.join(__dirname, '..', '..');
 const changeCount = (at = Date.now()) => [...fs.readFileSync(path.join(ROOT, 'js', 'whatsnew.js'), 'utf8').matchAll(/^\s*id: '\d{4}-[^']*',\n(?:\s*from: '([^']+)',)?/gm)]
     .filter(m => !m[1] || Date.parse(m[1]) <= at).length;
 const CHANGE_COUNT = changeCount();
+// The Windows helper AniRoll asks for, likewise read from the code (a new helper needs no edit here)
+const HELPER_WINDOWS = /HELPER_LATEST_WINDOWS = '([0-9.]+)'/.exec(fs.readFileSync(path.join(ROOT, 'js', 'presence.js'), 'utf8'))[1];
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
     '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json' };
 
@@ -1230,7 +1232,7 @@ function staticServer() {
             remove: [...document.querySelectorAll('.dc-remove')].at(-1)?.querySelector('code')?.textContent || '',
             auto: [...document.querySelectorAll('.dc-remove')][0]?.querySelector('code')?.textContent || '', exe: !!document.querySelector('a[href$=".exe"]') }));
         check('discord: Windows sets the helper up with a line for PowerShell and removes it the same way; the .exe helper counts as old',
-            /update for the helper \(1\.0\.2 → 1\.1\.1\)/.test(win.title) && /^\$env:ANIROLL_AUTO_UPDATE='on'; irm https:\/\/aniroll\.app\/downloads\/discord\/install\.ps1 \| iex$/.test(win.install)
+            win.title.includes(`update for the helper (1.0.2 → ${HELPER_WINDOWS})`) && /^\$env:ANIROLL_AUTO_UPDATE='on'; irm https:\/\/aniroll\.app\/downloads\/discord\/install\.ps1 \| iex$/.test(win.install)
             && win.auto === '& "$env:LOCALAPPDATA\\AniRoll Discord\\aniroll-discord.bat" auto-update on'
             && /uninstall\.ps1 \| iex$/.test(win.remove) && !win.exe && !pageErrors.length, { win, pageErrors });
         await p.close();

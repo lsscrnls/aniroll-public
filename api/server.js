@@ -1639,7 +1639,8 @@ const animeMap = require('./animemap')({ dataDir: DATA_DIR, writeJson, readJson,
 // The owner's own tools (api/sources.js); nobody else is answered there
 const songs = require('./songs')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer, refuseAuth });
 const sources = require('./sources')({ dataDir: DATA_DIR, readJson, writeJson, verifyViewer, refuseAuth, json, readBody, str,
-    encryptSecret, decryptSecret, isOwner: (viewer) => viewer?.id === ADMIN_ID, animeMap });
+    encryptSecret, decryptSecret, isOwner: (viewer) => viewer?.id === ADMIN_ID, animeMap,
+    site: process.env.PYTHON_WATCH_SITE ?? SITE });  // empty: no daily Python check (tests)
 
 // While AniList is down: passkeys for VIPs (api/passkeys.js), TMDB details and kept lists (api/fallback.js)
 const passkeys = require('./passkeys')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer,

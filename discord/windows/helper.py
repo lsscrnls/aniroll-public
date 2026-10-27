@@ -16,7 +16,7 @@ import threading
 import time
 import urllib.request
 
-VERSION = '1.1.1'
+VERSION = '1.1.2'
 CLIENT_ID = '1558496660953501827'
 # Discord takes five updates in twenty seconds; one every five keeps clear of that, and in between
 # only the newest one counts
