@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.3.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.4.
 
 ## 27 October 2026 – Your Jellyfin in My List
 
@@ -8,6 +8,7 @@ What changed in AniRoll, newest first: the same as "What's new" in the app. Curr
 - With Jellyfin connected, My List marks the shows your Jellyfin has, keeps only those with **On Jellyfin** and sorts by **Recently downloaded**. It counts per season: the first season on disk does not make the second one count.
 - With On Jellyfin on, your list also shows what your Jellyfin has that is not on your list yet.
 - My List filters by **tag** too, next to the genres: the AniList tags your shows share.
+- Your Discord status always has a link to AniRoll now, on Home too, and while you roll, the member list says so.
 
 ## 26 October 2026 – Covers that colour the app
 

@@ -59,11 +59,13 @@ const line = (s) => {
     return t.length >= 2 ? t : t ? `${t} ` : '';
 };
 
+// Every status links to AniRoll (Discord shows the buttons to the others, never on your own profile):
+// the show when there is one, else the site itself
 function showButtons(media) {
     const buttons = [];
     if (party?.link?.startsWith(SITE)) buttons.push({ label: 'Join the Watch Party', url: party.link });
-    if (media?.id) buttons.push({ label: 'View on AniRoll', url: `${SITE}/a/${media.id}` });
-    return buttons.length ? buttons : undefined;
+    buttons.push(media?.id ? { label: 'View on AniRoll', url: `${SITE}/a/${media.id}` } : { label: 'Try AniRoll', url: SITE });
+    return buttons;
 }
 
 function cover(media) {
@@ -130,7 +132,9 @@ function activity() {
             details: 'Rolling for an anime',
             state: looking ? line(`Rolled ${titlePref(looking.title)}`) : undefined,
             assets: { large_image: looking ? cover(looking) : LOGO, large_text: looking ? line(titlePref(looking.title)) : 'AniRoll', ...small },
-            buttons: looking ? showButtons(looking) : undefined,
+            buttons: showButtons(looking),
+            // The member list says "Rolling for an anime" instead of just "AniRoll" (helper 1.0.2)
+            status_display_type: 2,
         };
     }
     if (looking) {
@@ -143,7 +147,7 @@ function activity() {
             buttons: showButtons(looking),
         };
     }
-    return { type: 3, details: 'Browsing', assets: { large_image: LOGO, large_text: 'AniRoll' } };
+    return { type: 3, details: 'Browsing', assets: { large_image: LOGO, large_text: 'AniRoll' }, buttons: showButtons(null) };
 }
 
 // A tab left in the background with nothing playing goes quiet after IDLE_AFTER; back in front, or
