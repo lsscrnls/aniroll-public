@@ -18,8 +18,10 @@ ext_v=$(grep -oE '"version": "[0-9.]+"' discord/extension/manifest.json | grep -
 page_ext=$(grep -oE "EXTENSION_LATEST = '[0-9.]+'" js/presence.js | grep -oE '[0-9.]+')
 [ "$ext_v" = "$page_ext" ] || { echo "extension is $ext_v but js/presence.js EXTENSION_LATEST is $page_ext" >&2; exit 1; }
 if [ -f "$stamp" ] && [ -z "$(find discord -newer "$stamp" -type f | head -1)" ]; then echo "discord: up to date"; exit 0; fi
+# Go that builds the helpers; the server compares it with go.dev once a day (api/sources.js)
+GO_V=1.27.3
 mkdir -p "$out"
-docker run --rm -v "$PWD/discord/helper:/src:ro" -v "$PWD/$out:/out" -w /src -e CGO_ENABLED=0 -e GOFLAGS=-trimpath golang:1.24-alpine sh -c '
+docker run --rm -v "$PWD/discord/helper:/src:ro" -v "$PWD/$out:/out" -w /src -e CGO_ENABLED=0 -e GOFLAGS=-trimpath golang:$GO_V-alpine sh -c '
     set -e
     b() { GOOS=$1 GOARCH=$2 go build -ldflags "-s -w" -o "/out/$3" .; }
     b linux amd64 aniroll-discord-linux-amd64
@@ -35,10 +37,10 @@ rm -f "$out/aniroll-discord-windows.exe" "$out/aniroll-discord-uninstall.exe"  #
 python3 - "$out" <<'PY'
 import hashlib, io, sys, urllib.request, zipfile
 out = sys.argv[1]
-PY_V = '3.14.8'
+PY_V = '3.14.10'
 EMBED = {  # python.org/ftp/python/<version>/python-<version>-embed-<arch>.zip
-    'amd64': ('aniroll-discord-windows.zip', 'a93abe456ab01bd96d7a085b3cdb6566b3063f4241360d114142fbdb07f0a310'),
-    'arm64': ('aniroll-discord-windows-arm64.zip', '155be84ccb57c6331cf0e39001c78a1dfac3be62f403f3ff5f2e29b80dda7ebe'),
+    'amd64': ('aniroll-discord-windows.zip', '90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159'),
+    'arm64': ('aniroll-discord-windows-arm64.zip', 'bbe116bb1248820359cbf25127ac5c7794ea161869d83686cfbc9a45203ff836'),
 }
 script = open('discord/windows/install.ps1', encoding='utf-8').read()
 for arch, (name, want) in EMBED.items():
@@ -63,11 +65,11 @@ cp discord/windows/uninstall.ps1 "$out/uninstall.ps1"
 sign_key="$HOME/.env/aniroll-helper-sign.pem"
 [ -f "$sign_key" ] || { echo "no signing key at $sign_key: helpers that update themselves would not take this build" >&2; exit 1; }
 cp discord/windows/helper.py "$out/helper.py"
-python3 - "$out" "$helper_v" "$win_v" <<'PY'
+python3 - "$out" "$helper_v" "$win_v" "$GO_V" <<'PY'
 import hashlib, json, re, sys
-out, go_v, win_v = sys.argv[1:]
+out, go_v, win_v, toolchain = sys.argv[1:]
 sha = lambda f: hashlib.sha256(open(f'{out}/{f}', 'rb').read()).hexdigest()
-helpers = {p: {'version': go_v, 'sha256': sha(f'aniroll-discord-{p}')}
+helpers = {p: {'version': go_v, 'sha256': sha(f'aniroll-discord-{p}'), 'go': toolchain}
            for p in ('linux-amd64', 'linux-arm64', 'macos-arm64', 'macos-amd64')}
 py_v = re.search(r"PY_V = '([0-9.]+)'", open('discord/build.sh').read()).group(1)  # the Python in the zips
 helpers['windows'] = {'version': win_v, 'sha256': sha('helper.py'), 'python': py_v}

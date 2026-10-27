@@ -41,7 +41,7 @@ require("fs").writeFileSync(process.argv[1], JSON.stringify({ legacy1: { userId:
 node "$here/mockanilist.js" > "$work/mock.log" 2>&1 &
 pids+=($!)
 (cd "$work" && exec env ANILIST_URL=http://127.0.0.1:3099 JF_SECRET=local-test-secret-0123456789abcdef PASSKEY_KEY_FILE="$work/passkey.key" \
-    ANILIST_BUDGET_PER_MIN=200 VERIFY_PAUSE_MS=1000 MAX_SEATS=2 ANIME_MAP_URL= ANIMETHEMES_URL=http://127.0.0.1:3099/animethemes SHAZAM_URL=http://127.0.0.1:3099/shazam TMDB_URL=http://127.0.0.1:3099/tmdb TMDB_TOKEN=test-tmdb node server.js > "$work/server.log" 2>&1) &
+    ANILIST_BUDGET_PER_MIN=200 VERIFY_PAUSE_MS=1000 MAX_SEATS=2 ANIME_MAP_URL= PYTHON_WATCH_SITE= ANIMETHEMES_URL=http://127.0.0.1:3099/animethemes SHAZAM_URL=http://127.0.0.1:3099/shazam TMDB_URL=http://127.0.0.1:3099/tmdb TMDB_TOKEN=test-tmdb node server.js > "$work/server.log" 2>&1) &
 pids+=($!)
 
 for _ in $(seq 50); do

@@ -1,6 +1,10 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.1.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.2.
+
+## 27 October 2026 – A safer Discord helper
+
+- The helper for **AniRoll for Discord** is built with current, patched versions of Python (Windows) and Go (Linux and macOS). On Linux and macOS it updates by itself; on Windows, Settings → Discord shows the update: set it up again the same way.
 
 ## 26 October 2026 – Covers that colour the app
 
