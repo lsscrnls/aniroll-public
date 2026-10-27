@@ -85,6 +85,22 @@ const design = process.env.DESIGN || 'm3';
         });
     } });
     await shot(p, 'list', '#/list');
+    // My List with a Jellyfin library: the first cards are on disk (marked), "On Jellyfin" keeps only them
+    if (want('list-jf')) {
+        await p.evaluate(jf => { for (const [k, v] of Object.entries(jf)) localStorage.setItem(k, v); }, JF_STORAGE);
+        await shot(p, 'list-jf', '#/list', { act: async q => {
+            await q.evaluate(() => {
+                const ids = [...new Set([...document.querySelectorAll('.list-card')].map(c => c.dataset.mediaId))].slice(0, 5);
+                const have = Object.fromEntries(ids.map((id, i) => [id, Date.now() - i * 86400000]));
+                localStorage.setItem('aniroll_jf_animemap', JSON.stringify({ user: localStorage.aniroll_jf_userid, at: Date.now(), online: true, map: {}, have }));
+                document.dispatchEvent(new CustomEvent('aniroll:jf-library'));
+            });
+            await wait(800);
+            await q.screenshot({ path: path.join(OUT, `${theme}-list-jf-marks.png`) });
+            await q.click('#list-jf');
+        } });
+        await p.evaluate(() => { localStorage.setItem('aniroll_list_jf', 'off'); localStorage.removeItem('aniroll_jf_animemap'); });
+    }
     // Scrolled past the hero: its number docks in the app bar
     // Hovering the docked chip: its corners over time (they must never go sharp on the way)
     if (want('dock-hover')) {

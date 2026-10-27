@@ -1,10 +1,13 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.2.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.3.
 
-## 27 October 2026 – A safer Discord helper
+## 27 October 2026 – Your Jellyfin in My List
 
 - The helper for **AniRoll for Discord** is built with current, patched versions of Python (Windows) and Go (Linux and macOS). On Linux and macOS it updates by itself; on Windows, Settings → Discord shows the update: set it up again the same way.
+- With Jellyfin connected, My List marks the shows your Jellyfin has, keeps only those with **On Jellyfin** and sorts by **Recently downloaded**. It counts per season: the first season on disk does not make the second one count.
+- With On Jellyfin on, your list also shows what your Jellyfin has that is not on your list yet.
+- My List filters by **tag** too, next to the genres: the AniList tags your shows share.
 
 ## 26 October 2026 – Covers that colour the app
 
