@@ -17,7 +17,7 @@ const STALE_MS = 24 * 60 * 60 * 1000;
 const MISS_MS = 15 * 60 * 1000;
 
 /** @typedef {{ kind: 'series', id: string, season: number, offset: number } | { kind: 'movie', id: string }} Mapped */
-/** @typedef {{ user: string, at?: number, tried?: number, online?: boolean, map?: Record<string, Mapped>, sent?: string }} Stored */
+/** @typedef {{ user: string, at?: number, tried?: number, online?: boolean, map?: Record<string, Mapped>, have?: Record<string, number>, sent?: string }} Stored */
 
 /** @returns {Stored} */
 function read(userId) {
@@ -38,6 +38,25 @@ function write(s) {
 export function mappedShow(mediaId) {
     const cfg = getConfig();
     return cfg ? read(cfg.userId).map?.[mediaId] || null : null;
+}
+
+// The AniList entries the library has files for -> when the newest of them came in (ms, 0 unknown); null before the
+// first check or without Jellyfin. A series counts only with the entry's own season (and, for a later part sharing
+// a season, more episodes than the parts before it)
+export const LIBRARY_EVENT = 'aniroll:jf-library';
+/** @returns {Record<string, number> | null} */
+export function libraryHave() {
+    const cfg = getConfig();
+    const s = cfg && read(cfg.userId);
+    return s?.at && s.have ? s.have : null;
+}
+
+// My List asks for it: a check when there is none yet, it is a day old, or it predates the downloaded entries
+export function freshLibrary() {
+    const cfg = getConfig();
+    if (!cfg) return;
+    const s = read(cfg.userId);
+    if (!s.at || !s.have || Date.now() - s.at > STALE_MS) checkLibrary().catch(() => {});
 }
 
 // From getStatus (js/jellyfin.js): what the profile menu shows. Back online -> check.
@@ -82,8 +101,14 @@ export function checkLibrary() {
         const avail = cfg && await availability(true);
         if (!cfg || !avail) return false;
         const data = await jfGet(avail.base, `/Users/${encodeURIComponent(cfg.userId)}/Items?IncludeItemTypes=Series,Movie&Recursive=true`
-            + '&fields=ProviderIds&EnableImages=false&EnableUserData=false', cfg.apiKey, 20000);
-        const items = (data?.Items || []).map(i => ({ id: i.Id, name: i.Name || '', movie: i.Type === 'Movie', tvdb: providerId(i, 'tvdb'), tmdb: providerId(i, 'tmdb') }));
+            + '&fields=ProviderIds,DateCreated,DateLastMediaAdded&EnableImages=false&EnableUserData=false', cfg.apiKey, 20000);
+        const when = (i) => Date.parse(i?.DateLastMediaAdded || i?.DateCreated || '') || 0;
+        const items = (data?.Items || []).map(i => ({ id: i.Id, name: i.Name || '', movie: i.Type === 'Movie', tvdb: providerId(i, 'tvdb'), tmdb: providerId(i, 'tmdb'), added: when(i) }));
+        // The seasons with their episode counts, so a show's second season is not "there" with only the first on disk;
+        // without an answer the series alone counts
+        const seasons = await jfGet(avail.base, `/Users/${encodeURIComponent(cfg.userId)}/Items?IncludeItemTypes=Season&Recursive=true`
+            + '&fields=ChildCount,DateCreated,DateLastMediaAdded&EnableImages=false&EnableUserData=false', cfg.apiKey, 20000)
+            .then(d => (d?.Items || []).filter(i => i.SeriesId && Number.isInteger(i.IndexNumber))).catch(() => null);
         const series = items.filter(i => !i.movie);
         const movies = items.filter(i => i.movie);
         const res = await fetch('/api/animemap', {
@@ -110,8 +135,18 @@ export function checkLibrary() {
             else if (byTmdb) map[e.a] = { kind: 'series', id: byTmdb.id, season: e.ms, offset: e.mo || 0 };
             else if (movie) map[e.a] = { kind: 'movie', id: movie.id };
         }
+        /** @type {Record<string, number>} */
+        const have = {};
+        const byId = new Map(items.map(i => [i.id, i]));
+        for (const [a, m] of Object.entries(map)) {
+            if (m.kind === 'movie') { have[a] = byId.get(m.id)?.added || 0; continue; }
+            if (!seasons) { have[a] = byId.get(m.id)?.added || 0; continue; }
+            const season = seasons.find(i => i.SeriesId === m.id && i.IndexNumber === m.season);
+            if (season && (season.ChildCount ?? 1) > m.offset) have[a] = when(season) || byId.get(m.id)?.added || 0;
+        }
         const sent = await sendLibrary(map, items, read(cfg.userId).sent);
-        write({ user: cfg.userId, at: Date.now(), online: true, map, sent });
+        write({ user: cfg.userId, at: Date.now(), online: true, map, have, sent });
+        document.dispatchEvent(new CustomEvent(LIBRARY_EVENT));
         // Shows looked for before (missing, or found by title) are looked up again with this
         refreshMatches(Object.keys(map));
         return true;

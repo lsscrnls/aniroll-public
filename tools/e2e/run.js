@@ -1619,6 +1619,35 @@ function staticServer() {
             && !pageErrors.length, { before, mapFor, button, asked, pageErrors });
         await p.close();
     }
+
+    // My List with a Jellyfin library: "On Jellyfin" keeps the shows it has (season 1 on disk counts, a second
+    // season of the same series with nothing on disk does not), a mark on their covers, "Recently downloaded" to sort by
+    {
+        const { p, pageErrors } = await playerPage(true, true, { library: [
+            { Id: 'series1', Name: 'Other Name', Type: 'Series', ProviderIds: { Tvdb: '4242' }, DateCreated: '2026-10-01T10:00:00Z' },
+            { Id: 'season1', Type: 'Season', SeriesId: 'series1', IndexNumber: 1, ChildCount: 12, DateLastMediaAdded: '2026-10-20T10:00:00Z' }] });
+        await p.route(`${base}/api/animemap`, route => {
+            // 101 and 102: season 1 (on disk); 103: season 2 of the same series (not on disk)
+            const entries = [{ a: 101, tvdb: 4242, ts: 1, to: 0 }, { a: 102, tvdb: 4242, ts: 1, to: 0 }, { a: 103, tvdb: 4242, ts: 2, to: 0 }]
+                .map(e => ({ tmdb: null, ms: null, mo: 0, movie: [], ...e }));
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify({ at: Date.now(), entries }) });
+        });
+        await p.goto(base + '/#/list');
+        await p.waitForFunction(() => !!JSON.parse(localStorage.aniroll_jf_animemap || '{}').have, null, { timeout: 8000 }).catch(() => {});
+        await p.waitForSelector('#list-jf:not([hidden])', { timeout: 5000 }).catch(() => {});
+        const have = await p.evaluate(() => JSON.parse(localStorage.aniroll_jf_animemap || '{}').have || null);
+        const before = await p.evaluate(() => ({ cards: document.querySelectorAll('.list-card').length, marked: [...document.querySelectorAll('.list-card')].filter(c => c.querySelector('.list-card-jf')).map(c => Number(c.dataset.mediaId)),
+            sort: [...document.querySelectorAll('#list-sort option')].some(o => o.value === 'downloaded') }));
+        await p.click('#list-jf').catch(() => {});
+        await p.waitForTimeout(300);
+        const after = await p.evaluate(() => [...new Set([...document.querySelectorAll('#list-content .list-card')].map(c => Number(c.dataset.mediaId)))].sort());
+        await p.evaluate(() => localStorage.setItem('aniroll_list_jf', 'off'));
+        check('my list: "On Jellyfin" keeps the shows the library has (by season), marks their covers, sorts by download',
+            have && '101' in have && '102' in have && !('103' in have) && have['101'] === Date.parse('2026-10-20T10:00:00Z')
+            && before.cards > after.length && before.marked.length > 0 && before.marked.every(id => id === 101 || id === 102) && before.sort
+            && after.length > 0 && after.every(id => id === 101 || id === 102) && !pageErrors.length, { have, before, after, pageErrors });
+        await p.close();
+    }
     }, async () => {
 
     // Stack on: Play button, direct play from the stream URL, reports to Jellyfin, AniList exactly once at 90%

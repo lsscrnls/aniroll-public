@@ -1,8 +1,9 @@
 import * as api from '../api.js';
-import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched, emitListChange, LIST_EVENT, loginState, SKELETON, tintAttrs } from '../store.js';
+import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtScoreDiff, emitWatched, emitListChange, LIST_EVENT, loginState, SKELETON, tintAttrs, renderMediaCard } from '../store.js';
 import { getToken, isLoggedIn } from '../auth.js';
 import { enhanceSelect } from '../select.js';
 import { showScorePrompt } from '../a11y.js';
+import { libraryHave, freshLibrary, LIBRARY_EVENT } from '../player/animemap.js';
 
 // View, sort and the airing filter are remembered per browser; the search text is not
 const VIEW_KEY = 'aniroll_list_view';
@@ -10,6 +11,10 @@ const SORT_KEY = 'aniroll_list_sort';
 const AIRING_KEY = 'aniroll_list_airing';
 const BEHIND_KEY = 'aniroll_list_behind';
 const FORMAT_KEY = 'aniroll_list_format';
+const JF_KEY = 'aniroll_list_jf';
+// A tag counts for a show from this rank on (AniList's 0-100 "how much it is about this"), and is offered
+// once at least two shows of the list carry it
+const TAG_RANK = 50;
 // Anime formats to filter by; TV counts TV shorts too
 const FORMATS = { TV: ['TV', 'TV_SHORT'], MOVIE: ['MOVIE'], OVA: ['OVA'], ONA: ['ONA'], SPECIAL: ['SPECIAL'] };
 const FORMAT_LABELS = { TV: 'TV', MOVIE: 'Movie', OVA: 'OVA', ONA: 'ONA', SPECIAL: 'Special' };
@@ -37,9 +42,14 @@ const SORTS = {
     finished: { label: 'Finished', compare: (a, b) => dateNum(b.completedAt) - dateNum(a.completedAt) },
     mean: { label: 'AniList score', compare: (a, b) => (b.media.meanScore || 0) - (a.media.meanScore || 0) },
     year: { label: 'Release year', compare: (a, b) => dateNum(b.media.startDate) - dateNum(a.media.startDate) },
+    // Only offered with a Jellyfin library (js/player/animemap.js): newest download first, the rest after
+    downloaded: { label: 'Recently downloaded', jellyfin: true, compare: (a, b) => (have?.[b.media.id] ?? -1) - (have?.[a.media.id] ?? -1) },
 };
+// What the Jellyfin library has (AniList id -> when it came in), read when the page draws; null without Jellyfin
+let have = null;
 
 const ICON_LIST = '<svg data-icon="view_list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>';
+const ICON_JF = '<svg data-icon="download_done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19h14"/><path d="m6 11 4 4 8-9"/></svg>';
 const ICON_GRID = '<svg data-icon="grid_view" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>';
 
 function readPref(key, fallback, allowed) {
@@ -72,6 +82,10 @@ export async function render({ params, content }) {
     let airingOnly = readPref(AIRING_KEY, 'off', ['on', 'off']) === 'on';
     let behindOnly = readPref(BEHIND_KEY, 'off', ['on', 'off']) === 'on';
     let genre = '';
+    let tag = '';
+    let jfOnly = readPref(JF_KEY, 'off', ['on', 'off']) === 'on';
+    have = libraryHave();
+    if (SORTS[sort].jellyfin && !have) sort = 'updated';
     let format = readPref(FORMAT_KEY, 'ALL', ['ALL', ...Object.keys(FORMATS)]);
     let search = '';
 
@@ -91,9 +105,11 @@ export async function render({ params, content }) {
         <div class="list-toolbar" id="list-toolbar">
             <input class="glass-input list-search" id="list-search" type="search" placeholder="Search in list…" autocomplete="off" aria-label="Search in list">
             <select class="glass-select" id="list-sort" aria-label="Sort">
-                ${Object.entries(SORTS).map(([key, s]) => `<option value="${key}" ${key === sort ? 'selected' : ''}>${s.label}</option>`).join('')}
+                ${Object.entries(SORTS).filter(([, s]) => !s.jellyfin || have).map(([key, s]) => `<option value="${key}" ${key === sort ? 'selected' : ''}>${s.label}</option>`).join('')}
             </select>
             <select class="glass-select" id="list-genre" aria-label="Genre"><option value="">All genres</option></select>
+            <select class="glass-select" id="list-tag" aria-label="Tag"><option value="">All tags</option></select>
+            <button class="list-chip${jfOnly ? ' active' : ''}" id="list-jf" aria-pressed="${jfOnly}" title="Only shows your Jellyfin has" ${have ? '' : 'hidden'}>On Jellyfin</button>
             <button class="list-chip${airingOnly ? ' active' : ''}" id="list-airing" aria-pressed="${airingOnly}" title="Only shows that are airing right now">Airing</button>
             <button class="list-chip${behindOnly ? ' active' : ''}" id="list-behind" aria-pressed="${behindOnly}" title="Only shows with aired episodes you have not watched">Behind</button>
             <div class="list-formats" id="list-formats" role="group" aria-label="Format">${Object.keys(FORMATS).map(f =>
@@ -105,6 +121,7 @@ export async function render({ params, content }) {
             ${isOwn ? `<button class="list-export" id="list-export" title="Download this list as a MyAnimeList XML file (for MAL or a backup)">Export</button>` : ''}
         </div>
         <div id="list-content" class="list-content"></div>
+        <section id="list-elsewhere" class="list-elsewhere"></section>
         <div id="compare-view" hidden></div>
     </div>
     ${!isOwn && user ? `<button class="compare-fab" id="compare-btn">
@@ -118,6 +135,12 @@ export async function render({ params, content }) {
     const behindChip = document.getElementById('list-behind');
     const genreSelect = document.getElementById('list-genre');
     const formatChips = document.getElementById('list-formats');
+    const tagSelect = document.getElementById('list-tag');
+    const elsewhereEl = document.getElementById('list-elsewhere');
+    const jfChip = document.getElementById('list-jf');
+    // Tags come from the taste query (genres, tags; anime only), not the list itself: fetched once, after the list
+    /** @type {Map<number, any> | null} */
+    let features = null;
 
     let currentType = 'ANIME';
     let lists = null;
@@ -131,6 +154,8 @@ export async function render({ params, content }) {
         airingChip.hidden = type !== 'ANIME';
         behindChip.hidden = type !== 'ANIME';
         formatChips.hidden = type !== 'ANIME';
+        jfChip.hidden = type !== 'ANIME' || !have;
+        showTags(type === 'ANIME' && !!features && tagSelect.options.length > 1);
 
         listContent.classList.remove('is-grid');
         listContent.innerHTML = view === 'grid' ? SKELETON.grid() : SKELETON.rows(8);
@@ -171,7 +196,24 @@ export async function render({ params, content }) {
 
         paintTabs();
         renderEntries();
+        if (type === 'ANIME') loadTags(everything);
     }
+
+    async function loadTags(everything) {
+        try { features ??= await api.getListFeatures(targetUser.id, token); } catch { return; }
+        if (currentType !== 'ANIME' || !features) return;
+        const counts = new Map();
+        for (const e of everything) {
+            for (const t of features.get(e.media.id)?.tags || []) if (t.rank >= TAG_RANK) counts.set(t.name, (counts.get(t.name) || 0) + 1);
+        }
+        const tags = [...counts].filter(([, n]) => n >= 2).map(([name]) => name).sort();
+        if (tag && !tags.includes(tag)) tag = '';
+        tagSelect.innerHTML = `<option value="">All tags</option>` + tags.map(t => `<option value="${esc(t)}"${t === tag ? ' selected' : ''}>${esc(t)}</option>`).join('');
+        showTags(tags.length > 0);
+    }
+    // The menu AniRoll draws over the select (js/select.js) is what shows
+    function showTags(on) { (tagSelect.closest('.glass-menu') || tagSelect).hidden = !on; }
+    const tagged = (e) => (features?.get(e.media.id)?.tags || []).some(t => t.name === tag && t.rank >= TAG_RANK);
 
     function paintTabs() {
         const tabsEl = document.getElementById('list-tabs');
@@ -200,6 +242,8 @@ export async function render({ params, content }) {
         if (airingOnly && currentType === 'ANIME') out = out.filter(e => e.media.nextAiringEpisode);
         if (behindOnly && currentType === 'ANIME') out = out.filter(e => behindOf(e) > 0);
         if (genre) out = out.filter(e => (e.media.genres || []).includes(genre));
+        if (tag && currentType === 'ANIME') out = out.filter(tagged);
+        if (jfOnly && have && currentType === 'ANIME') out = out.filter(e => e.media.id in have);
         if (format !== 'ALL' && currentType === 'ANIME') out = out.filter(e => FORMATS[format].includes(e.media.format));
         return [...out].sort(SORTS[sort].compare);
     }
@@ -219,12 +263,13 @@ export async function render({ params, content }) {
         const pct = total ? (e.progress / total * 100) : 0;
         const airing = airingText(m) ? `<span style="color:var(--success);font-size:0.7rem;margin-left:4px">${airingText(m)}</span>` : '';
         const behind = behindOf(e) ? `<span class="behind-badge" title="Aired, not watched yet">${behindOf(e)} behind</span>` : '';
+        const onJf = currentType === 'ANIME' && have && m.id in have ? '<span class="jf-badge" title="On your Jellyfin">Jellyfin</span>' : '';
         const volumes = currentType === 'MANGA' && (e.progressVolumes || m.volumes) ? ` · Vol ${e.progressVolumes || 0}${m.volumes ? `/${m.volumes}` : ''}` : '';
         return `<div class="list-entry" data-entry-id="${e.id}" data-media-id="${m.id}">
             <img class="list-entry-img" src="${esc(m.coverImage?.large || '')}" alt="" loading="lazy" data-open="${m.id}">
             <div class="list-entry-info">
                 <div class="list-entry-title" data-open="${m.id}" role="button" tabindex="0">${esc(titlePref(m.title))}</div>
-                <div class="list-entry-meta">${api.formatFormat(m.format) || ''}${m.meanScore ? ` · ${m.meanScore}%` : ''}${volumes}${airing}${behind}</div>
+                <div class="list-entry-meta">${api.formatFormat(m.format) || ''}${m.meanScore ? ` · ${m.meanScore}%` : ''}${volumes}${airing}${behind}${onJf}</div>
                 <div class="progress-bar" style="margin-top:4px;width:100%;max-width:200px">
                     <div class="progress-bar-fill" style="width:${pct}%"></div>
                 </div>
@@ -250,6 +295,7 @@ export async function render({ params, content }) {
         return `<div class="media-card list-card" data-entry-id="${e.id}" data-media-id="${m.id}" data-open="${m.id}"${tintAttrs(m)}${own ? '' : ' role="button" tabindex="0"'}>
             <img class="media-card-img" src="${esc(m.coverImage?.large || '')}" alt="" loading="lazy">
             ${e.score ? `<div class="media-card-score" title="Your score">${fmtScore(e.score)}</div>` : ''}
+            ${currentType === 'ANIME' && have && m.id in have ? `<div class="list-card-jf" title="On your Jellyfin">${ICON_JF}</div>` : ''}
             ${isOwn ? `<div class="list-card-actions">
                 <button class="cw-inc" data-action="dec" data-entry="${e.id}" title="One ${unitWord} back" ${e.progress <= 0 ? 'hidden' : ''}>−</button>
                 <button class="cw-inc" data-action="inc" data-entry="${e.id}" title="Mark next ${unitWord} done" ${total && e.progress >= total ? 'hidden' : ''}>+1</button>
@@ -273,11 +319,30 @@ export async function render({ params, content }) {
 
         if (!entries.length) {
             listContent.innerHTML = `<div class="empty-state" style="padding:var(--space-lg)"><div class="empty-state-sub">${all.length ? 'No matching entries' : 'No entries'}</div></div>`;
-            return;
+        } else {
+            listContent.innerHTML = view === 'grid'
+                ? `<div class="media-grid list-grid">${entries.map(gridCard).join('')}</div>`
+                : entries.map(listRow).join('');
         }
-        listContent.innerHTML = view === 'grid'
-            ? `<div class="media-grid list-grid">${entries.map(gridCard).join('')}</div>`
-            : entries.map(listRow).join('');
+        if (elsewhereEl) elsewhereEl.innerHTML = '';
+        paintElsewhere();
+    }
+
+    // With "On Jellyfin" on your own list: what the library has that the list does not, one AniList request for all
+    let elsewhere = null; // Map id -> media, once asked
+    async function paintElsewhere() {
+        if (!isOwn || !jfOnly || !have || currentType !== 'ANIME' || !lists) return;
+        const onList = new Set(lists.flatMap(l => l.entries.map(e => e.media.id)));
+        const ids = Object.keys(have).map(Number).filter(id => !onList.has(id));
+        if (!ids.length) return;
+        if (!elsewhere) {
+            try { elsewhere = await api.getMediaCards(ids, token); } catch { return; }
+        }
+        if (!jfOnly || currentType !== 'ANIME' || !elsewhereEl) return;
+        const shows = ids.map(id => elsewhere.get(id)).filter(m => m && m.type === 'ANIME')
+            .sort((a, b) => (have?.[b.id] ?? 0) - (have?.[a.id] ?? 0));
+        elsewhereEl.innerHTML = shows.length ? `<h2 class="list-elsewhere-title">On Jellyfin, not on your list <small>(${shows.length})</small></h2>
+            <div class="media-grid">${shows.map(m => renderMediaCard(m)).join('')}</div>` : '';
     }
 
     function findEntry(entryId) {
@@ -365,6 +430,28 @@ export async function render({ params, content }) {
             renderEntries();
         }, 120);
     });
+
+    jfChip?.addEventListener('click', () => {
+        jfOnly = !jfOnly;
+        jfChip.classList.toggle('active', jfOnly);
+        jfChip.setAttribute('aria-pressed', String(jfOnly));
+        writePref(JF_KEY, jfOnly ? 'on' : 'off');
+        renderEntries();
+    });
+    enhanceSelect(tagSelect);
+    showTags(false);
+    tagSelect?.addEventListener('change', () => { tag = tagSelect.value; renderEntries(); });
+    // A library check that finishes while the page is open (Jellyfin back on, a day later) shows at once
+    const onLibrary = () => {
+        if (!listContent.isConnected) return document.removeEventListener(LIBRARY_EVENT, onLibrary);
+        have = libraryHave();
+        elsewhere = null;
+        jfChip.hidden = currentType !== 'ANIME' || !have;
+        if (have && sortSelect && !sortSelect.querySelector('option[value="downloaded"]')) sortSelect.add(new Option(SORTS.downloaded.label, 'downloaded'));
+        renderEntries();
+    };
+    document.addEventListener(LIBRARY_EVENT, onLibrary);
+    freshLibrary();
 
     const sortSelect = document.getElementById('list-sort');
     enhanceSelect(sortSelect);

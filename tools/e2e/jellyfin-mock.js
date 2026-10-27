@@ -99,7 +99,9 @@ async function mockJellyfin(page, { anyTitle = false, library = null } = {}) {
             if (url.searchParams.get('AnyProviderIdEquals')) return json({ Items: [{ Id: 'wrong-series', Name: 'Black Torch', ProviderIds: {} }, { Id: 'series1', Name: 'Show 1', ProviderIds: {} }] });
             if (library) {
                 if (!url.searchParams.get('searchTerm')) calls.push({ type: 'libraryList', types: url.searchParams.get('IncludeItemTypes') });
-                return json({ Items: url.searchParams.get('searchTerm') ? [] : library });
+                // Seasons only when asked for them (the library check asks once for series and films, once for seasons)
+                const types = (url.searchParams.get('IncludeItemTypes') || '').split(',');
+                return json({ Items: url.searchParams.get('searchTerm') ? [] : library.filter(i => types.includes(i.Type || 'Series')) });
             }
             const term = (url.searchParams.get('searchTerm') || '').toLowerCase();
             return json({ Items: term === 'show 1' || anyTitle ? [{ Id: 'series1', Name: anyTitle ? url.searchParams.get('searchTerm') : 'Show 1', ProductionYear: anyTitle ? null : 2026 }] : [] });
