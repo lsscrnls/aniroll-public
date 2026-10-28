@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.4.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.5.
 
 ## 27 October 2026 – Your Jellyfin in My List
 
