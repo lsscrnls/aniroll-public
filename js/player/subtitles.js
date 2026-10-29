@@ -10,7 +10,7 @@ import { jfAuth } from '../jellyfin.js';
 //   DVD/DVB pictures      -> not offered (one file in the library)
 //   manager = { list(), current(), select(id | null), delay(), setDelay(seconds), destroy() }; `pick` chooses the first track
 //   delay: seconds the lines come later (negative: earlier), for a release timed off by a bit
-const JASSUB_URL = '../vendor/jassub-2.5.18p2/jassub.js';
+const JASSUB_URL = '../vendor/jassub-2.5.18p3/jassub.js';
 const LIBPGS_URL = '../vendor/libpgs-0.9.0/libpgs.js';
 const LIBPGS_WORKER = new URL('../vendor/libpgs-0.9.0/libpgs.worker.js', import.meta.url).href;
 const ASS = new Set(['ass', 'ssa']);

@@ -1,10 +1,11 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.6.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.7.
 
 ## 29 October 2026 – Ambient light, rebuilt
 
 - In the player, the light in the black bars now falls off like light on a wall: brightest at the picture, fading towards the edge of the screen, without stripes. It glides into each new scene instead of jumping.
+- Styled subtitles stay in place when the player changes size, for example going full screen: they no longer come out too big and cut off at the bottom.
 
 ## 27 October 2026 – Your Jellyfin in My List
 
