@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.9.5';
+export const RELEASE = '1.9.9.6';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -21,6 +21,13 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // its offset) stays hidden until then: what is live already can be announced at a set time. A later release of the
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
+    {
+        id: '2026-10-29.1',
+        title: 'Ambient light, rebuilt',
+        items: [
+            'In the player, the light in the black bars now falls off like light on a wall: brightest at the picture, fading towards the edge of the screen, without stripes. It glides into each new scene instead of jumping.',
+        ],
+    },
     {
         id: '2026-10-27.3',
         title: 'Your Jellyfin in My List',
