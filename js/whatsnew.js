@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.9.6';
+export const RELEASE = '1.9.9.7';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -22,10 +22,11 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
     {
-        id: '2026-10-29.1',
+        id: '2026-10-29.2',
         title: 'Ambient light, rebuilt',
         items: [
             'In the player, the light in the black bars now falls off like light on a wall: brightest at the picture, fading towards the edge of the screen, without stripes. It glides into each new scene instead of jumping.',
+            { rev: 2, text: 'Styled subtitles stay in place when the player changes size, for example going full screen: they no longer come out too big and cut off at the bottom.' },
         ],
     },
     {

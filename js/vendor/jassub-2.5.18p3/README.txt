@@ -3,4 +3,5 @@ JASSUB itself is MIT (LICENSE.txt). The WebAssembly files contain libass (ISC), 
 HarfBuzz (MIT), FriBidi (LGPL-2.1+) and others: npm license field
 "LGPL-2.1-or-later AND (FTL OR GPL-2.0-or-later) AND MIT AND MIT-Modern-Variant AND ISC AND NTP AND Zlib AND BSL-1.0".
 They are served as separate files and can be replaced. default.woff2 is Liberation Sans (SIL OFL 1.1).
-worker/worker.js is patched for Firefox (2D canvas renderer, kept drawing buffer, no desynchronized canvas): see tools/vendor/jassub.sh.
+worker/worker.js is patched for Firefox (2D canvas renderer, kept drawing buffer, no desynchronized canvas) and so that
+a pending canvas resize never outlives a newer one: see tools/vendor/jassub.sh.
