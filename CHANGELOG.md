@@ -1,6 +1,10 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.5.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.6.
+
+## 29 October 2026 – Ambient light, rebuilt
+
+- In the player, the light in the black bars now falls off like light on a wall: brightest at the picture, fading towards the edge of the screen, without stripes. It glides into each new scene instead of jumping.
 
 ## 27 October 2026 – Your Jellyfin in My List
 

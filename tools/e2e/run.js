@@ -1322,15 +1322,18 @@ function staticServer() {
         // On a 21:9 screen the small canvas, blurred at its own size, is scaled up over the whole player
         await p.setViewportSize({ width: 2560, height: 1080 });
         await p.waitForFunction(() => document.getElementById('player').classList.contains('ambient-bars')
-            && Math.abs(document.querySelector('.pl-ambient').getBoundingClientRect().width - document.getElementById('player').clientWidth) < 2, null, { timeout: 5000 }).catch(() => {});
+            && document.querySelector('.pl-ambient').getBoundingClientRect().width >= document.getElementById('player').clientWidth - 1, null, { timeout: 5000 }).catch(() => {});
         const wide = await p.evaluate(() => {
             const c = document.querySelector('.pl-ambient').getBoundingClientRect(), r = document.getElementById('player').getBoundingClientRect();
-            return { bars: document.getElementById('player').classList.contains('ambient-bars'), dx: Math.abs(c.width - r.width), dy: Math.abs(c.height - r.height),
+            // The canvas reaches a margin past the player on every side (against a blur that dims the bars' ends)
+            const covers = c.left <= r.left + 1 && c.top <= r.top + 1 && c.right >= r.right - 1 && c.bottom >= r.bottom - 1;
+            return { bars: document.getElementById('player').classList.contains('ambient-bars'), covers, past: Math.round(r.left - c.left),
+                veil: getComputedStyle(document.querySelector('.pl-ambient-veil')).opacity,
                 blur: getComputedStyle(document.querySelector('.pl-ambient')).getPropertyValue('--amb-blur') };
         });
         if (process.env.E2E_SHOT) await p.screenshot({ path: process.env.E2E_SHOT });
-        check('player: ambient light on 21:9 covers the player from a small blurred canvas',
-            wide.bars && wide.dx < 2 && wide.dy < 2 && parseFloat(wide.blur) > 0 && parseFloat(wide.blur) < 5, wide);
+        check('player: ambient light on 21:9 covers the player from a small blurred canvas, the veil over it',
+            wide.bars && wide.covers && wide.past > 0 && wide.past < 400 && wide.veil === '1' && parseFloat(wide.blur) > 0 && parseFloat(wide.blur) < 5, wide);
         await p.close();
     }
 
