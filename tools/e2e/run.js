@@ -1765,6 +1765,21 @@ function staticServer() {
         faded.back = await p.evaluate(() => !document.querySelector('.pl-skip-segment').hidden);
         check('player: Skip intro goes by itself after 8 s and comes back when seeking back; a Next episode button',
             faded.gone && faded.back && faded.nextBtn, faded);
+        // A line long enough to run under Skip intro moves out of its way (js/player/subdodge.js)
+        await p.mouse.move(640, 300);
+        await p.evaluate(() => {
+            const tr = [...document.getElementById('player-video').textTracks].find(t => t.mode === 'hidden');
+            const t = document.getElementById('player-video').currentTime;
+            tr.addCue(new VTTCue(t, t + 4, 'A line of dialogue that is long enough to reach the button'));
+        });
+        await p.waitForTimeout(700);
+        const dodged = await p.evaluate(() => {
+            const a = document.querySelector('.pl-subs-bottom').getBoundingClientRect();
+            const b = document.querySelector('.pl-skip-segment').getBoundingClientRect();
+            const apart = a.right <= b.left || a.bottom <= b.top;
+            return { apart, translate: document.querySelector('.pl-subs-bottom').style.translate, sub: [a.left, a.right, a.top, a.bottom].map(Math.round), btn: [b.left, b.top].map(Math.round) };
+        });
+        check('player: text subtitles move out from under Skip intro', dodged.apart && !!dodged.translate, dodged);
         await p.click('.pl-skip-segment').catch(() => {});
         await p.waitForTimeout(400);
         const skipped = await p.evaluate(() => ({ t: document.getElementById('player-video').currentTime, hidden: document.querySelector('.pl-skip-segment').hidden }));
@@ -1874,6 +1889,13 @@ function staticServer() {
         await p.waitForSelector('.pl-menu-item:not(.pl-menu-back)', { timeout: 3000 }).catch(() => {});
         const menuItems = await p.$$eval('.pl-menu-item:not(.pl-menu-back)', els => els.map(e => e.textContent.trim()));
         await p.keyboard.press('Escape');
+        // Its bottom-right line would sit under Skip intro: the canvas moves left (the sign with it, for those seconds)
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 3; return v.play(); }).catch(() => {});
+        await p.mouse.move(640, 300);
+        await p.waitForTimeout(1200);
+        const assDodge = await p.evaluate(() => ({ skip: !document.querySelector('.pl-skip-segment').hidden,
+            translate: [...document.querySelectorAll('.pl-subs-canvas')].find(c => !c.hidden)?.style.translate || '' }));
+        check('player: styled subtitles move left out from under Skip intro', assDodge.skip && /^-\d+px( 0px)?$/.test(assDodge.translate), assDodge);
         check('player: styled ASS through JASSUB with the embedded font, text tracks stay off',
             ass.canvas && ass.shown && ass.w > 0 && ass.textTracks === 'disabled' && calls.some(c => c.type === 'ass') && calls.some(c => c.type === 'font' && /Token=/.test(c.auth))
             && menuItems.join('|') === 'Off|English|English (Signs & Songs)', { ...ass, menuItems });
@@ -2342,7 +2364,8 @@ function staticServer() {
     await calm.close();
 
 
-    const back = await visitor({ aniroll_theme: 'dark' });
+    // The move's notice ran until 1 November 2026 (notifyUntil): seen from before then
+    const back = await visitor({ aniroll_theme: 'dark' }, new Date(2026, 9, 30, 12, 0));
     const both = await back.evaluate(() => [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent));
     check('returning visitor who confirmed nothing: every change, oldest (the move) first',
         (await dialogTitle(back)) === 'A few things changed' && both[0] === 'A few things moved' && both.length === CHANGE_COUNT && both[2].startsWith('Roll recommendations') && both[3].startsWith('Material 3') && both[4].startsWith('A new Home') && both[5].startsWith('Starting soon') && both[6].startsWith('Material 3 for everyone') && both[7].startsWith('Browse by tag') && both[8].startsWith('Next episode'), both);

@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.9.7';
+export const RELEASE = '1.9.9.8';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -21,6 +21,13 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // its offset) stays hidden until then: what is live already can be announced at a set time. A later release of the
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
+    {
+        id: '2026-11-03',
+        title: 'Subtitles make room',
+        items: [
+            'When <strong>Skip intro</strong>, <strong>Skip credits</strong> or <strong>Up next</strong> shows up, subtitles that would sit under it move out of the way, to the left, or up when there is no room to the left. Styled subtitles too.',
+        ],
+    },
     {
         id: '2026-10-29.2',
         title: 'Ambient light, rebuilt',

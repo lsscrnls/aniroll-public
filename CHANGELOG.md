@@ -1,6 +1,10 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.7.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.8.
+
+## 3 November 2026 – Subtitles make room
+
+- When **Skip intro**, **Skip credits** or **Up next** shows up, subtitles that would sit under it move out of the way, to the left, or up when there is no room to the left. Styled subtitles too.
 
 ## 29 October 2026 – Ambient light, rebuilt
 
