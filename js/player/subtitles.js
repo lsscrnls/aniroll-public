@@ -1,4 +1,5 @@
 import { jfAuth } from '../jellyfin.js';
+import { dodgeFor, parseAss, assBox } from './subdodge.js';
 
 // Every subtitle of a file behind one list, whatever draws it:
 //   ASS/SSA  -> JASSUB (libass in WebAssembly) with the fonts embedded in the MKV — typesetting, signs,
@@ -9,6 +10,7 @@ import { jfAuth } from '../jellyfin.js';
 //               Stream.sup answers 400). The first request waits while Jellyfin extracts every track (~25 s).
 //   DVD/DVB pictures      -> not offered (one file in the library)
 //   manager = { list(), current(), select(id | null), delay(), setDelay(seconds), destroy() }; `pick` chooses the first track
+//   card: the card at the bottom right while it shows (a DOMRect, else null); lines keep clear of it
 //   delay: seconds the lines come later (negative: earlier), for a release timed off by a bit
 const JASSUB_URL = '../vendor/jassub-2.5.18p3/jassub.js';
 const LIBPGS_URL = '../vendor/libpgs-0.9.0/libpgs.js';
@@ -21,7 +23,7 @@ const kindOf = (codec) => {
     return ASS.has(c) ? 'ass' : PGS.has(c) ? 'pgs' : 'text';
 };
 
-export function createSubtitles({ video, base, cfg, itemId, source, pick = () => undefined, onChange = () => {}, onLoading = () => {}, onAss = () => {} }) {
+export function createSubtitles({ video, base, cfg, itemId, source, pick = () => undefined, onChange = () => {}, onLoading = () => {}, onAss = () => {}, card = () => null }) {
     const streams = (source.MediaStreams || []).filter(s => s.Type === 'Subtitle');
     const url = (s, ext) => `${base}/Videos/${encodeURIComponent(itemId)}/${encodeURIComponent(source.Id)}/Subtitles/${s.Index}/0/Stream.${ext}?ApiKey=${encodeURIComponent(cfg.apiKey)}`;
 
@@ -76,7 +78,45 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         const [top, bottom] = layer.children;
         top.replaceChildren(...cues.filter(atTop).map(lineOf).filter(Boolean));
         bottom.replaceChildren(...cues.filter(c => !atTop(c)).map(lineOf).filter(Boolean));
+        dodge();
     }
+
+    // ----- Out of the way of the card at the bottom right (js/player/subdodge.js) -----
+    const dodges = new Map(); // element -> [x, y] it is moved by
+    let textShown = false;
+    let assScript = null;
+    function place(el, box, { keep = false, now = false } = {}) {
+        const [x0, y0] = dodges.get(el) || [0, 0];
+        const c = card();
+        let next = [0, 0];
+        if (c && box) next = dodgeFor({ left: box.left - x0, right: box.right - x0, top: box.top - y0, bottom: box.bottom - y0 }, c, video.getBoundingClientRect());
+        else if (c && keep) return; // no lines for now: the next ones come where the last ones went
+        const [x, y] = next.map(Math.round);
+        if (x === x0 && y === y0) return;
+        dodges.set(el, [x, y]);
+        // Lines that just came up are put there at once, not seen gliding out from under the card
+        if (now) el.style.transition = 'none';
+        el.style.translate = x || y ? `${x}px ${y}px` : '';
+        if (now) { void el.offsetWidth; el.style.transition = ''; }
+    }
+    function dodge() {
+        if (closed) return;
+        if (layer) {
+            const bottom = layer.children[1];
+            const has = active?.kind === 'text' && bottom.childElementCount > 0;
+            place(bottom, has ? bottom.getBoundingClientRect() : null, { keep: true, now: has && !textShown });
+            textShown = has;
+        }
+        const canvas = jassub?._canvas;
+        if (canvas) {
+            // A line about to start counts already: timeupdate comes 4 times a second
+            const box = active?.kind === 'ass' && !canvas.hidden && assScript?.track === active && card()
+                ? assBox(assScript, video.currentTime - offset, canvas.getBoundingClientRect(), 0.3) : null;
+            place(canvas, box);
+        }
+    }
+    video.addEventListener('timeupdate', dodge);
+    window.addEventListener('resize', dodge);
 
     // One chosen track at a time: loading ends when it is there, fails, or another is chosen
     let loadingFor = null;
@@ -133,6 +173,11 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
             fonts(),
         ]);
         if (closed || ticket !== pending || active !== t) return;
+        // Read once the player is idle: typeset tracks are large
+        assScript = null;
+        (window.requestIdleCallback || setTimeout)(() => {
+            if (!closed && active === t) assScript = { ...parseAss(subContent), track: t };
+        });
         if (jassub) {
             await jassub.ready;
             await jassub.renderer.setTrack(subContent);
@@ -242,6 +287,8 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         },
         destroy() {
             closed = true;
+            video.removeEventListener('timeupdate', dodge);
+            window.removeEventListener('resize', dodge);
             loading(null);
             layer?.remove();
             layer = null;

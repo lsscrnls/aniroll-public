@@ -894,6 +894,16 @@ export function mountControls(root, video, { watchedAt = 0.9, runtime = () => 0,
     paintFullscreen();
 
     return {
+        // The card at the bottom right (Skip intro, Up next, Episode over) while it can be seen, for the subtitles to keep clear of
+        card() {
+            const bar = $('.pl-bottom');
+            for (const el of [$('.pl-next'), $('.pl-end'), skipBtn]) {
+                if (el.hidden) continue;
+                const r = el.getBoundingClientRect();
+                if (r.width && Number(getComputedStyle(el).opacity) * Number(getComputedStyle(bar).opacity) > 0.3) return r;
+            }
+            return null;
+        },
         setSubtitles(manager) {
             subs = manager;
             paintMenuButton();

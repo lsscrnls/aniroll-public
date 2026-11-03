@@ -230,6 +230,7 @@ export async function render({ params, content }) {
         subtitles = createSubtitles({ video, base: avail.base, cfg, itemId: ep.itemId, source,
             pick: (tracks) => preferredSubs(mediaId, tracks),
             onLoading: (on) => controls?.setSubtitlesLoading(on),
+            card: () => controls?.card() || null,
             // Firefox (and Zen) composite the libass canvas over the video with a flicker now and then: said once a session
             onAss: () => {
                 if (!/firefox/i.test(navigator.userAgent)) return;
