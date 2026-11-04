@@ -14,7 +14,7 @@ const DL = `${SITE}/downloads/discord`;
 // The helper's newest version, Linux and macOS (discord/helper/main.go) and Windows (discord/windows/helper.py):
 // an older one is pointed out, once per version
 const HELPER_LATEST = '1.0.4';
-const HELPER_LATEST_WINDOWS = '1.1.2';
+const HELPER_LATEST_WINDOWS = '1.1.3';
 const helperLatest = () => (system() === 'windows' ? HELPER_LATEST_WINDOWS : HELPER_LATEST);
 const NAG_KEY = 'aniroll_discord_nagged';
 // The extension's newest version (discord/extension/manifest.json): an older one is pointed out the same way
