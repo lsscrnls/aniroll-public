@@ -1,6 +1,10 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.8.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.9.
+
+## 4 November 2026 – Discord helper on Python 3.15
+
+- The Windows helper for **AniRoll for Discord** now runs on Python 3.15. Settings → Discord shows the update: set it up again the same way.
 
 ## 3 November 2026 – Subtitles make room
 

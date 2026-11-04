@@ -37,10 +37,10 @@ rm -f "$out/aniroll-discord-windows.exe" "$out/aniroll-discord-uninstall.exe"  #
 python3 - "$out" <<'PY'
 import hashlib, io, sys, urllib.request, zipfile
 out = sys.argv[1]
-PY_V = '3.14.10'
+PY_V = '3.15.2'
 EMBED = {  # python.org/ftp/python/<version>/python-<version>-embed-<arch>.zip
-    'amd64': ('aniroll-discord-windows.zip', '90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159'),
-    'arm64': ('aniroll-discord-windows-arm64.zip', 'bbe116bb1248820359cbf25127ac5c7794ea161869d83686cfbc9a45203ff836'),
+    'amd64': ('aniroll-discord-windows.zip', 'd012f3aa29cf07436dae8aea1fec0fd195c2612a0b059b1f915ae0afb9ad1f62'),
+    'arm64': ('aniroll-discord-windows-arm64.zip', '089eae5e8aba8284c2ce59df008c1dc915af46fd9e8b1227e3a7f315211567c9'),
 }
 script = open('discord/windows/install.ps1', encoding='utf-8').read()
 for arch, (name, want) in EMBED.items():
