@@ -16,7 +16,7 @@ const ADDING = 'aniroll_adding_from';           // the account that was signed i
 const NOTE_KEY = 'aniroll_data_note';           // the one-time note where to delete your data, per account
 
 // The browser's, not an account's: they stay when you switch
-const DEVICE = new Set([LIST_KEY, ADDING, 'aniroll_theme', 'aniroll_accent', 'aniroll_title_lang', 'aniroll_design',
+const DEVICE = new Set([LIST_KEY, ADDING, 'aniroll_theme', 'aniroll_accent', 'aniroll_sounds', 'aniroll_title_lang', 'aniroll_design',
     'aniroll_design_v2', 'aniroll_m3_variant', 'aniroll_m3_seed', 'aniroll_m3_scheme3', 'aniroll_m3_show',
     'aniroll_player_volume', 'aniroll_player_quality', 'aniroll_sub_size',
     'aniroll_ambient', 'aniroll_bitrate_test', 'aniroll_list_view', 'aniroll_list_sort', 'aniroll_list_format',
@@ -191,7 +191,7 @@ export function signOut() {
 export async function deleteMyData() {
     const token = getToken();
     const res = await fetch('/api/me', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `The server answered ${res.status}`);
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'AniRoll’s server didn’t answer. Try again in a moment.');
     api.forgetPendingSaves();
     await leave();
 }

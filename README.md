@@ -8,23 +8,14 @@ Live at **[aniroll.app](https://aniroll.app)**. Log in with AniList; your list s
 
 ![Roll: the reel spins through your Planning list and lands on tonight's show](docs/screenshots/clip-roll.webp)
 
-## Read this first
+> **If you're here to use AniRoll**, read [Using AniRoll](#using-aniroll).
+> **If you're here to understand it**, read [How it works](#how-it-works).
 
-This repository is a **showcase, not a kit**. It shows how AniRoll is built. It is not meant to be
-cloned and run as your own copy. The code is source-available under the
-[PolyForm Noncommercial License 1.0.0](LICENSE): you may read, change and share it for any noncommercial
-purpose; commercial use is not allowed.
+# Using AniRoll
 
-**Everything AniRoll stands on is here**: talking to a rate-limited API straight from the browser, caching that keeps working offline, keeping two accounts in one browser apart, writing to
-someone's list only when that is safe, a small server that holds secrets, a Material 3 Expressive design of its own, and
-no bundler anywhere.
-
-**Three pieces are cut on purpose**: Roll, the Watch Party and the taste match. They are what makes
-AniRoll *AniRoll*. Their files are here as stubs with the same exports, so you can see exactly where
-they plug in and what they get to work with. How they work inside is the part you have to think
-through yourself. [More on the cut](#the-deliberate-cut).
-
-New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start reading.
+Open [aniroll.app](https://aniroll.app) and log in with AniList. There is nothing to install and no
+account of its own: AniRoll reads and writes your AniList list, so everything you do here shows up on
+AniList too, and the other way round. On a phone or computer you can install it as an app from the browser.
 
 ## What it does
 
@@ -42,9 +33,12 @@ New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start read
   what the people you follow are watching (only those who share their calendar; it is off until they turn it on).
 - **Recommendations with a taste match** from your own scores, genres and tags.
 - **Studio and voice actor pages**: everything a studio made, every role a voice actor plays; related shows as covers, spoiler tags only on request.
-- **My List** with format chips, **Social** (your AniList feed), **scores out of 100** whatever your AniList format, installable as a PWA.
+- **My List** with format chips, **Social** (your AniList feed), **scores out of 100** whatever your AniList format.
 - **Material 3 Expressive**, in the colours of the show you watched last: its cover becomes the wallpaper,
-  every surface follows. AniRoll's first design stays available as a legacy option in Settings.
+  every surface follows.
+- **One way of moving, speaking and sounding**: everything moves at the same few speeds, messages say what
+  happened and what you can do, and short marimba tones answer what you just did (never while a video plays;
+  off in Settings → Appearance).
 
 ![Material 3 Expressive: Home themed from the show you're on, widgets, +1 on a card, then Roll](docs/screenshots/clip-m3.webp)
 
@@ -70,6 +64,53 @@ New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start read
 
 Screenshots and clips show a made-up demo account; the shows are real, from AniList.
 
+## What AniRoll keeps about you
+
+Your list lives on AniList; AniRoll's server only steps in for a few things, each listed here.
+
+| What | When | Why | How to remove it |
+|------|------|-----|------------------|
+| Your AniList token, encrypted | Only after you turn on **background sync** (Settings, or when joining a Watch Party) | Moves your list forward while AniRoll is closed: Watch Party guests following the host, episodes finished in Jellyfin | Turn background sync off; a token AniList rejects is deleted too. AniList tokens from this login last about a year, revoking AniRoll on AniList ends it at once |
+| Your Jellyfin address (encrypted; for a server at home this is usually your home IP address or a name pointing to it), user name and API key or sign-in token | When you link Jellyfin to AniRoll | The relay and the Play button | Unlink Jellyfin |
+| A webhook secret, the shows in your Jellyfin library (ids only), episodes waiting to be saved | When you set up live tracking | Live tracking from Jellyfin | Turn live tracking off, which deletes all three; a waiting episode is dropped after 7 days anyway |
+| A few small settings per AniList account | When you change them | The same settings on every device | — |
+| Whether you share your calendar | When you turn it on (Settings → Lists) | People who follow you see what you are watching in their calendar | Turn it off |
+| Watch Party members (AniList name, avatar, episode) | While a party runs | The party itself | Leave or end the party |
+| Shared pages (title, cover, description of a show) | When you share one | The share link preview | — |
+| Error reports (message, page, version, browser name and system, like "Firefox 140 / Linux") | When something breaks in the app | Fixing it | The file is rotated at 1 MB, one older file is kept |
+
+No IP addresses are written anywhere: the web server keeps no access or error log, and error reports carry
+none. Rate limits count requests per address in memory only and forget them within about 20 minutes.
+Your AniList account is the one identity the server knows.
+Watch Party covers and avatars only come from AniList's image server, so a host cannot make guests load
+pictures from a server of their own. Backups of all this are kept for 14 days; after you remove something,
+it is gone from them two weeks later.
+
+The server never sees your AniList password. Without background sync it never writes your token to disk:
+the browser sends it with a request, and the server keeps it in memory for up to 10 minutes, to know who you are.
+AniRoll for Discord sends nothing to AniRoll's server at all: it stays between your browser, a small helper and
+the Discord app on your own computer.
+
+# How it works
+
+## Read this first
+
+This repository is a **showcase, not a kit**. It shows how AniRoll is built. It is not meant to be
+cloned and run as your own copy. The code is source-available under the
+[PolyForm Noncommercial License 1.0.0](LICENSE): you may read, change and share it for any noncommercial
+purpose; commercial use is not allowed.
+
+**Everything AniRoll stands on is here**: talking to a rate-limited API straight from the browser, caching that keeps working offline, keeping two accounts in one browser apart, writing to
+someone's list only when that is safe, a small server that holds secrets, a Material 3 Expressive design of its own, and
+no bundler anywhere.
+
+**Three pieces are cut on purpose**: Roll, the Watch Party and the taste match. They are what makes
+AniRoll *AniRoll*. Their files are here as stubs with the same exports, so you can see exactly where
+they plug in and what they get to work with. How they work inside is the part you have to think
+through yourself. [More on the cut](#the-deliberate-cut).
+
+New to the code? [CONTRIBUTING.md](CONTRIBUTING.md) suggests where to start reading.
+
 ## How it is built
 
 Each section below is a problem AniRoll has to solve, how it solves it, and where to read the code.
@@ -77,7 +118,7 @@ Each section below is a problem AniRoll has to solve, how it solves it, and wher
 ### A rate-limited API, straight from the browser
 
 The browser reads and writes your list straight through the [AniList GraphQL API](https://docs.anilist.co);
-the server only steps in for the few things listed under [What the server keeps](#what-the-server-keeps-about-you). AniList allows about
+the server only steps in for the few things listed under [What AniRoll keeps about you](#what-aniroll-keeps-about-you). AniList allows about
 30 requests a minute when it is under load, and every open tab counts against that. So `js/api.js`
 does not just send queries:
 
@@ -88,6 +129,8 @@ does not just send queries:
 - **One request for identical queries** that are in flight at the same time.
 - **A pause on 429**: for five minutes nothing goes out, reads come from the cache, and changes wait in
   a queue that drains a few at a time once AniList answers again.
+- **Errors in plain words**: AniList's own error texts are written for developers, so `api.js` translates them
+  once, by status, into what happened and what to do; callers branch on `err.status`, never on the wording.
 
 ### One browser, more than one account
 
@@ -126,29 +169,6 @@ What the encryption does and does not do: it protects a leaked backup or data vo
 is not in it. It does not protect against someone who takes over the running server, because key and
 data are both there while it runs. That is why the server keeps an AniList token only when you ask it to.
 
-### What the server keeps about you
-
-| What | When | Why | How to remove it |
-|------|------|-----|------------------|
-| Your AniList token, encrypted | Only after you turn on **background sync** (Settings, or when joining a Watch Party) | Moves your list forward while AniRoll is closed: Watch Party guests following the host, episodes finished in Jellyfin | Turn background sync off; a token AniList rejects is deleted too. AniList tokens from this login last about a year, revoking AniRoll on AniList ends it at once |
-| Your Jellyfin address (encrypted; for a server at home this is usually your home IP address or a name pointing to it), user name and API key or sign-in token | When you link Jellyfin to AniRoll | The relay and the Play button | Unlink Jellyfin |
-| A webhook secret, the shows in your Jellyfin library (ids only), episodes waiting to be saved | When you set up live tracking | Live tracking from Jellyfin | Turn live tracking off, which deletes all three; a waiting episode is dropped after 7 days anyway |
-| A few small settings per AniList account | When you change them | The same settings on every device | — |
-| Whether you share your calendar | When you turn it on (Settings → Lists) | People who follow you see what you are watching in their calendar | Turn it off |
-| Watch Party members (AniList name, avatar, episode) | While a party runs | The party itself | Leave or end the party |
-| Shared pages (title, cover, description of a show) | When you share one | The share link preview | — |
-| Error reports (message, page, version, browser name and system, like "Firefox 140 / Linux") | When something breaks in the app | Fixing it | The file is rotated at 1 MB, one older file is kept |
-
-No IP addresses are written anywhere: the web server keeps no access or error log, and error reports carry
-none. Rate limits count requests per address in memory only and forget them within about 20 minutes.
-Your AniList account is the one identity the server knows.
-Watch Party covers and avatars only come from AniList's image server, so a host cannot make guests load
-pictures from a server of their own. Backups of all this are kept for 14 days; after you remove something,
-it is gone from them two weeks later.
-
-The server never sees your AniList password. Without background sync it never writes your token to disk:
-the browser sends it with a request, and the server keeps it in memory for up to 10 minutes, to know who you are.
-
 ### AniRoll for Discord
 
 An optional browser extension (`discord/extension`) and a small helper program (`discord/helper`, Go) put
@@ -172,12 +192,21 @@ WebAssembly may compile; it still has to come from AniRoll's own files.
 
 ### One design, generated from what you watch
 
-AniRoll is built in Material 3 Expressive (`css/m3.css`, `js/m3.js`). Its whole light and dark scheme
+AniRoll is built in Material 3 Expressive (`css/style.css`, `js/m3.js`). Its whole light and dark scheme
 comes from one seed colour, the cover colour of the show you watched last, through Google's Material
-Color Utilities, in the colour style you pick. `index.html` starts in it, so no other look flashes first;
-`js/design.js` keeps AniRoll's first design as a legacy option. Its wallpaper is that cover, blurred once on a tiny canvas
+Color Utilities, in the colour style you pick. `index.html` starts in it, so no other look flashes first.
+Its wallpaper is that cover, blurred once on a tiny canvas
 instead of with an expensive CSS blur. `js/m3.js` adds what CSS alone can't: the hero, the widgets
-and a cursor that takes the shape of what it points at.
+and a cursor that takes the shape of what it points at. Motion comes from one small set of rules at the top of
+`css/style.css`: three durations and three curves (one for things that move, one for surfaces, one for colour).
+
+### Sounds that answer, and only then
+
+`js/sound.js` plays three short marimba tones: something saved, something went wrong, a roll landed. They are
+real recordings (synthesized tones were tried first and sounded cheap), cut, tuned to one key and given a
+small room by `tools/sound/make.py`, which rebuilds them from the source files. A tone only plays as the answer
+to a click or key in the last few seconds, so a save failing in the background stays silent, and never while a
+video plays or the tab is hidden. The files load on the first click, and not at all with sounds off.
 
 ### Pages that don't trip over each other
 
@@ -199,14 +228,15 @@ to a module in `js/pages/`, and each page exports one `render({ content, params,
 | `js/auth.js` | The AniList login token, kept in `localStorage` |
 | `js/pages/*.js` | One module per page: `home`, `list`, `calendar`, `detail` (the slide-in panel), `social`, `search`, … |
 | `js/upnext.js`, `js/home-cinema.js` | What Home says about your list (next episode, what's waiting, the week) and AniRoll's Home on top of it |
-| `js/design.js`, `js/m3.js`, `css/m3.css` | Material 3's generated palette, its shapes and extra pieces; the legacy switch |
+| `js/design.js`, `js/m3.js` | Material 3's generated palette and the extra pieces it adds to pages |
 | `js/jellyfin.js`, `js/nowplaying.js` | Jellyfin: matching what you played to an AniList entry, the *Now watching* chip |
 | `js/pages/play.js`, `js/player/` | The player: finding the episode, what the browser can play, the stream, its controls, subtitles |
+| `js/sound.js`, `media/sounds/` | The three UI tones and when they may play |
 | `js/vendor/` | Third-party libraries, unchanged and with their version in the name, each with its licence |
 | `js/a11y.js`, `js/select.js` | Dialogs, keyboard activation, styled selects |
 | `js/whatsnew.js` | The changelog and the pop-up for returning visitors |
 | `api/server.js` | The Node backend |
-| `css/style.css`, `css/m3.css` | The base styles (also the legacy design) and Material 3 on top of them |
+| `css/style.css` | All styles: motion and shape rules, the base, then Material 3 on top of it; `m3-icons.css` and `m3-shapes.css` are generated |
 
 ### One action, followed through the code
 
@@ -238,11 +268,13 @@ contain these pieces either. To see them in action, [try AniRoll](https://anirol
 ## How it is checked
 
 - `tools/e2e/`: every page in Chromium (Playwright) against a mocked AniList: navigation, dialogs and
-  keyboard, Material 3 and the legacy design, the changelog, and a check that two accounts in one browser never share
+  keyboard, Material 3, the changelog, and a check that two accounts in one browser never share
   cached answers or queued saves; the player against a mocked Jellyfin (direct play, a failing
   conversion, Quick Connect, styled and Blu-ray subtitles)
 - `tools/api-test/`: the Jellyfin matcher in the server and the browser gives the same answer for the
   same cases, the relay refuses private addresses, posts are escaped, data files survive a crash mid-write
+
+# Credits and license
 
 AniRoll is built with Vanilla JS, [GSAP](https://gsap.com), [Lenis](https://lenis.darkroom.engineering),
 the self-hosted [Inter](https://rsms.me/inter/) font and Material Symbols. All anime data comes from AniList.
@@ -254,7 +286,9 @@ licences, some of them LGPL-2.1-or-later; they ship as separate, replaceable fil
 `js/vendor/jassub-2.5.18p3/`, rebuilt from the published package by `tools/vendor/jassub.sh`. Every
 library's licence text lies next to it in `js/vendor/`.
 
-## License
+The UI tones are made from marimba recordings of the
+[University of Iowa Musical Instrument Samples](https://theremin.music.uiowa.edu/MIS.html), which are free to
+use for any project.
 
 AniRoll's code is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). You may use, change
 and share it for any noncommercial purpose, as long as the licence and its copyright notice travel with it.

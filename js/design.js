@@ -1,7 +1,7 @@
 // @ts-check
 // Material 3 Expressive is AniRoll's design, for everyone and on the landing page (the first, "legacy" design
 // is gone since 1.6; css/style.css is the base it builds on).
-// M3 = css/m3.css (components, shapes, type, motion), js/m3.js (page additions) and a colour scheme generated from
+// M3 = css/style.css (components, shapes, type, motion), js/m3.js (page additions) and a colour scheme generated from
 // its own seed colour (not AniRoll's accent)
 // with Google's Material Color Utilities (2025 spec, the one M3 Expressive uses). The scheme is written as a
 // <style> with a light and a dark block, so System/Light/Dark keep working without recomputing; it is cached
@@ -14,9 +14,6 @@ const VARIANT_KEY = 'aniroll_m3_variant';   // 'tonal' | 'vibrant' | 'expressive
 const SEED_KEY = 'aniroll_m3_seed';         // M3 has its own palette, unrelated to AniRoll's accent colour
 const CACHE_KEY = 'aniroll_m3_scheme3';     // { key, css } — new name when the generated CSS changes
 const SHOW_KEY = 'aniroll_m3_show';         // { color, cover } of the show you're on: the app's "wallpaper" 
-const CSS_HREF = 'css/m3.css';
-// m3.css used to @import these two; as links of their own they load in parallel instead of after it
-const EXTRA_CSS = [['m3-icons-css', 'css/m3-icons.css'], ['m3-shapes-css', 'css/m3-shapes.css']];
 
 // 'show' themes the whole app from the show you're watching, like a desktop themed from its wallpaper
 // (js/m3.js applies it); the others are seeds in the spirit of Google's own M3 palettes
@@ -115,30 +112,6 @@ export async function applyDesign(loggedIn) {
     if (enhancer) enhancer.then(m => m.refresh());
     enhancer ??= import('./m3.js').then(m => { m.setup(); return m; });
 
-    // Stylesheet first; keep the page hidden until it's there, so AniRoll's look never flashes
-    let sheet = null;
-    if (!document.getElementById('m3-css')) {
-        root.classList.add('m3-loading');
-        const link = document.createElement('link');
-        link.id = 'm3-css';
-        link.rel = 'stylesheet';
-        link.href = CSS_HREF;
-        sheet = new Promise(resolve => {
-            const done = () => { root.classList.remove('m3-loading'); resolve(); };
-            link.onload = done;
-            link.onerror = done;
-            setTimeout(done, 3000);
-        });
-        document.head.appendChild(link);
-    }
-    for (const [id, href] of EXTRA_CSS) {
-        if (document.getElementById(id)) continue;
-        const link = document.createElement('link');
-        link.id = id;
-        link.rel = 'stylesheet';
-        link.href = href;
-        document.head.appendChild(link);
-    }
     root.setAttribute('data-design', 'm3');
 
     const key = `${getSeed()}|${getVariant()}`;
@@ -146,7 +119,6 @@ export async function applyDesign(loggedIn) {
     try { cached = JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { /* none */ }
     if (cached?.key === key) {
         writeScheme(cached.css);
-        await sheet;
         return;
     }
     const seed = getSeed();
@@ -155,14 +127,12 @@ export async function applyDesign(loggedIn) {
     if (getVariant() === 'tonal' && (seed === SHOW_SEED || seed === BASELINE)) {
         writeScheme(BASELINE_TONAL_CSS);
         try { localStorage.setItem(CACHE_KEY, JSON.stringify({ key, css: BASELINE_TONAL_CSS })); } catch { /* storage blocked */ }
-        await sheet;
         return;
     }
     if (cached?.css) writeScheme(cached.css); // old colours until the new ones are ready
     const css = await buildSchemeCss(seed === SHOW_SEED ? BASELINE : seed, getVariant());
     writeScheme(css);
     try { localStorage.setItem(CACHE_KEY, JSON.stringify({ key, css })); } catch { /* storage blocked */ }
-    await sheet;
 }
 
 function writeScheme(css) {

@@ -180,13 +180,12 @@ function staticServer() {
     await page.waitForTimeout(800);
     const m3 = await page.evaluate(() => ({
         attr: document.documentElement.dataset.design,
-        css: !!document.querySelector('link#m3-css'),
         primary: getComputedStyle(document.documentElement).getPropertyValue('--md-primary').trim(),
         font: getComputedStyle(document.body).fontFamily,
         variantShown: !document.getElementById('m3-variant').hidden,
     }));
     check('design: Material 3 Expressive is the default (stylesheet, generated palette, Google Sans Flex)',
-        m3.attr === 'm3' && m3.css && /^(#[0-9a-f]{6}|rgb\()/.test(m3.primary) && m3.font.includes('Google Sans Flex') && m3.variantShown, m3);
+        m3.attr === 'm3' && /^(#[0-9a-f]{6}|rgb\()/.test(m3.primary) && m3.font.includes('Google Sans Flex') && m3.variantShown, m3);
     await page.click('[data-variant="vibrant"]');
     await page.waitForTimeout(800);
     const vibrant = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--md-primary').trim());
@@ -195,7 +194,7 @@ function staticServer() {
     const legacy = await page.evaluate(() => ({ toggle: !!document.getElementById('legacy-design'), accent: !!document.getElementById('accent-card') }));
     await page.evaluate(() => localStorage.setItem('aniroll_design_v2', 'aniroll'));
     await page.reload();
-    await page.waitForSelector('link#m3-css', { state: 'attached', timeout: 5000 }).catch(() => {});
+    await page.waitForFunction(() => localStorage.getItem('aniroll_design_v2') === null, null, { timeout: 5000 }).catch(() => {});
     const after = await page.evaluate(() => ({ attr: document.documentElement.dataset.design, stored: localStorage.getItem('aniroll_design_v2') }));
     check('design: no legacy switch or accent colour any more; an old legacy choice lands in Material 3 and is forgotten',
         !legacy.toggle && !legacy.accent && after.attr === 'm3' && after.stored === null, { legacy, after });
@@ -2492,7 +2491,7 @@ function staticServer() {
         check('a day confirmed earlier shows only the items added since', shown.length >= 1 && !shown.some(t => /^The player answers every key/.test(t)), shown);
         await later.close();
     }
-    check('logged out: always Material 3, even with the old legacy choice kept', await grown.evaluate(() => document.documentElement.dataset.design === 'm3' && !!document.querySelector('#m3-css')));
+    check('logged out: always Material 3, even with the old legacy choice kept', await grown.evaluate(() => document.documentElement.dataset.design === 'm3'));
     await grown.close();
 
     const lateAt = new Date(2026, 10, 1, 9, 0);

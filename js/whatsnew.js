@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '1.9.9.9';
+export const RELEASE = '2.0.0';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -21,6 +21,17 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // its offset) stays hidden until then: what is live already can be announced at a set time. A later release of the
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
+    {
+        id: '2026-11-04.2',
+        title: 'AniRoll now feels like it was made in one piece',
+        items: [
+            'Everything moves the same way now: what moves lands with a small bounce, surfaces glide, colours fade. A few speeds instead of dozens, so the app feels calmer and quicker at once.',
+            'When something goes wrong, AniRoll says what happened and what you can do, in plain words. No error codes, no messages written for developers, and the same voice everywhere, Watch Parties included.',
+            'AniRoll has a sound now: short marimba tones, recorded on a real instrument, when something is saved, when something goes wrong and when a roll lands. They only answer what you just did, never play over a video, and turn off in Settings → Appearance.',
+            'Resting the pointer on a cover recolours the app only in My List, where you browse your own shows. Home and Season stay calm.',
+            'And a lot left out: old styles nobody used are gone, so every page has less to load.',
+        ],
+    },
     {
         id: '2026-11-04',
         title: 'Discord helper on Python 3.15',

@@ -1,5 +1,6 @@
 // @ts-check
 import { untilAiring } from './api.js';
+import { play } from './sound.js';
 const ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export function esc(str) { return str ? String(str).replace(/[&<>"']/g, c => ESC_MAP[c]) : ''; }
 
@@ -123,11 +124,19 @@ export function applyAccentColor(hex) {
 
 // action: { label, run } — a button in the toast (Undo); the toast then stays a little longer.
 // Screen readers hear every toast: errors at once (role="alert"), the rest when they are free.
+// What fetch() throws when the network is gone, per browser (Chrome, Firefox, Safari): never shown as is
+const NETWORK = /^(Failed to fetch|NetworkError when attempting|Load failed|Network request failed)/i;
+
 export function toast(message, type = 'info', { action = null, stay = false } = {}) {
+    if (NETWORK.test(message)) {
+        console.warn('toast:', message);
+        message = 'You seem to be offline, or AniRoll can’t be reached. Try again in a moment.';
+    }
     const container = document.getElementById('toast-container');
     if (!container) return;
     const el = document.createElement('div');
     el.className = `toast ${type}`;
+    if (type === 'success' || type === 'error') play(type);
     el.setAttribute('role', type === 'error' ? 'alert' : 'status');
     const text = document.createElement('span');
     text.textContent = message;

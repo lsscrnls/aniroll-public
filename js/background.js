@@ -15,7 +15,7 @@ async function request(method) {
         signal: AbortSignal.timeout(10000),
     });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || `Background sync request failed (${res.status})`);
+    if (!res.ok) throw new Error(body.error || 'Background sync didn’t answer. Try again in a moment.');
     return !!body.enabled;
 }
 

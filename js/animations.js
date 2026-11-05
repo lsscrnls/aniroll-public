@@ -156,7 +156,7 @@ function initMagnetics() {
 function initScrollReveals() {
     if (!window.ScrollTrigger || prefersReducedMotion()) return;
 
-    // Material 3 deals cards, rows and posts in with its own springs (css/m3.css), so they are left out there
+    // Material 3 deals cards, rows and posts in with its own springs (css/style.css), so they are left out there
     const m3 = document.documentElement.dataset.design === 'm3';
     const ownMotion = '.media-card, .activity-card, .list-entry, .schedule-item, .notif-item';
     document.querySelectorAll('.media-card, .activity-card, .list-entry, .schedule-item, .notif-item, .landing-feature, .stat-chart').forEach(el => {

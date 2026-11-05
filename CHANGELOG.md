@@ -1,6 +1,14 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 1.9.9.9.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.
+
+## 4 November 2026 – AniRoll now feels like it was made in one piece
+
+- Everything moves the same way now: what moves lands with a small bounce, surfaces glide, colours fade. A few speeds instead of dozens, so the app feels calmer and quicker at once.
+- When something goes wrong, AniRoll says what happened and what you can do, in plain words. No error codes, no messages written for developers, and the same voice everywhere, Watch Parties included.
+- AniRoll has a sound now: short marimba tones, recorded on a real instrument, when something is saved, when something goes wrong and when a roll lands. They only answer what you just did, never play over a video, and turn off in Settings → Appearance.
+- Resting the pointer on a cover recolours the app only in My List, where you browse your own shows. Home and Season stay calm.
+- And a lot left out: old styles nobody used are gone, so every page has less to load.
 
 ## 4 November 2026 – Discord helper on Python 3.15
 

@@ -285,7 +285,7 @@ function setupRelatedPlan(root, token) {
             toast('Added to Planning', 'success');
         } catch (err) {
             btn.disabled = false;
-            toast(err.queued ? err.message : `AniList: ${err.message}`, 'error');
+            toast(err.message, 'error');
         }
     });
 }

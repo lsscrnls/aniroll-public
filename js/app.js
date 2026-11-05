@@ -331,8 +331,8 @@ async function loadViewer() {
         }
     } catch (err) {
         console.error('Failed to fetch user:', err);
-        if (err.message?.includes('Invalid token')) {
-            toast('Session expired, please log in again', 'error');
+        if (err.status === 401) {
+            toast('Your AniList login ran out. Log in again to continue.', 'error');
             signOut();
             return false;
         }
@@ -754,7 +754,7 @@ async function startAddAccount() {
     try {
         if (await addAccount(CLIENT_ID) === 'same') toast('That is the account you are signed in with', 'info');
     } catch (err) {
-        toast(`Could not add the account: ${err.message}`, 'error');
+        toast('That account didn’t sign in. Try adding it again.', 'error');
     }
 }
 

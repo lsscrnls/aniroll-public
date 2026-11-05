@@ -381,7 +381,7 @@ export async function render({ params, content }) {
             emitListChange({ mediaId: entry.media.id, status: saved.status, progress: saved.progress, score: saved.score });
             toast(score ? `Score saved: ${score}` : 'Score removed', 'success');
             renderEntries();
-        } catch (err) { toast(err.queued ? err.message : err.message, 'error'); }
+        } catch (err) { toast(err.message, 'error'); }
     }
 
     listContent.addEventListener('click', (ev) => {

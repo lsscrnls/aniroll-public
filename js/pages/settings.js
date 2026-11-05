@@ -9,6 +9,7 @@ import { refreshJellyfinStatus } from '../status.js';
 import { mountPresenceSettings } from '../presence.js';
 import { accounts, switchAccount, addAccount, deleteMyData } from '../accounts.js';
 import { ambientOn, setAmbient } from '../player/ambient.js';
+import { soundsOn, setSounds } from '../sound.js';
 import { recapOn, setRecap } from '../player/recap.js';
 import { accountState, saveAccountState } from '../accountstate.js';
 import { hiddenList, setDismissed, syncDismissed } from '../dismissed.js';
@@ -57,6 +58,9 @@ export async function render({ content, query }) {
                     <div class="settings-choices">${VARIANTS.map(v => choice('variant', v.key, variant, v.label)).join('')}</div>
                 </div>`, ' id="m3-card"')}
             ${card('Theme', '', `<div class="settings-choices">${choice('theme', 'system', theme, 'System')}${choice('theme', 'light', theme, 'Light')}${choice('theme', 'dark', theme, 'Dark')}</div>`)}
+            ${card('Sounds', '', `
+                <label class="settings-choice"><input type="checkbox" id="toggle-sounds" ${soundsOn() ? 'checked' : ''}>
+                    <span>Sounds<small>A short tone when something is saved, goes wrong or a roll lands. Never while a video plays.</small></span></label>`)}
             ${card('Title Language', 'Choose how anime and manga titles are displayed', `
                 <div class="settings-choices">${choice('titlelang', 'romaji', titleLang, 'Romaji')}${choice('titlelang', 'english', titleLang, 'English')}${choice('titlelang', 'native', titleLang, 'Native')}</div>`)}
         </div>
@@ -208,6 +212,7 @@ export async function render({ content, query }) {
     });
 
     content.querySelector('#toggle-ambient')?.addEventListener('change', (e) => setAmbient(e.target.checked));
+    content.querySelector('#toggle-sounds')?.addEventListener('change', (e) => setSounds(e.target.checked));
     content.querySelector('#toggle-recap')?.addEventListener('change', (e) => setRecap(e.target.checked));
     content.querySelector('#toggle-autoskip')?.addEventListener('change', (e) => {
         try { localStorage.setItem('aniroll_autoskip_all', e.target.checked ? 'on' : 'off'); } catch { /* not kept */ }
@@ -292,7 +297,7 @@ async function renderPartySyncSettings() {
             toast('Watch Parties keep syncing when AniRoll is closed', 'success');
         } catch (err) {
             box.querySelector('input[value="open"]').checked = true;
-            toast(`Could not turn this on: ${err.message}`, 'error');
+            toast('Background sync didn’t turn on. Parties still sync while AniRoll is open.', 'error');
         }
         paintAccess();
     }));
@@ -667,7 +672,7 @@ async function renderJellyfinSettings() {
         btn.textContent = 'Checking Jellyfin…';
         try {
             const res = await jf.pullFromJellyfin(getState().user, getToken());
-            if (res.skipped === 'rate-limited') toast('AniList is rate limiting right now, try again later', 'error');
+            if (res.skipped === 'rate-limited') toast('AniList is busy right now. Try again in a few minutes.', 'error');
             else if (!res.updated) toast('Nothing to pull — AniList is already up to date', 'success');
             else {
                 for (const c of res.changes) toast(`${c.title}: episode ${c.from} to ${c.to}`, 'success');
@@ -682,7 +687,7 @@ async function renderJellyfinSettings() {
     box.querySelector('#jf-to-account')?.addEventListener('click', async (ev) => {
         ev.target.disabled = true;
         const ok = await jf.saveToAccount();
-        toast(ok ? 'Saved for your AniList account' : 'Could not store it for your account, still this browser only', ok ? 'success' : 'error');
+        toast(ok ? 'Saved for your AniList account' : 'Saved in this browser only. Your account didn’t take it.', ok ? 'success' : 'error');
         renderJellyfinSettings();
     });
 
@@ -878,7 +883,7 @@ function initAccountTab(content) {
         const sw = /** @type {HTMLElement | null} */ (el.closest('[data-switch]'));
         if (sw) return switchAccount(Number(sw.dataset.switch));
         if (el.closest('[data-add-account]')) {
-            const result = await addAccount(CLIENT_ID).catch(err => { toast(`Could not add the account: ${err.message}`, 'error'); return null; });
+            const result = await addAccount(CLIENT_ID).catch(err => { toast('That account didn’t sign in. Try adding it again.', 'error'); return null; });
             if (result === 'same') toast('That is the account you are signed in with', 'info');
             return;
         }
@@ -899,7 +904,7 @@ function initAccountTab(content) {
             await deleteMyData();
         } catch (err) {
             del.disabled = false;
-            toast(`Could not delete: ${err.message}`, 'error');
+            toast('Your data wasn’t deleted. Try again in a moment.', 'error');
         }
     });
 }
