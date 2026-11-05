@@ -1,6 +1,11 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.1.
+
+## 5 November 2026 – Subtitles glide again
+
+- In the player, subtitles move smoothly out of the way of **Skip intro** and **Up next** again, instead of jumping.
+- The first visit loads a little faster: the styles are a third smaller on the way.
 
 ## 4 November 2026 – AniRoll now feels like it was made in one piece
 
