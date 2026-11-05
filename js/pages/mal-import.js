@@ -328,9 +328,9 @@ async function openOnAniList(malId, type) {
     try {
         const id = (await api.resolveMalIds([malId], type)).get(malId);
         if (id) window.__openDetailPanel(id);
-        else toast('Not found on AniList', 'error');
+        else toast('This one isn’t on AniList.', 'error');
     } catch {
-        toast('Could not find on AniList', 'error');
+        toast('AniList didn’t answer. Try again in a moment.', 'error');
     }
 }
 

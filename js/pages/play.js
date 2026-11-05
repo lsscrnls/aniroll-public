@@ -1052,7 +1052,7 @@ function endCard(media, mediaId, episode, token) {
                 emitListChange({ mediaId: sequel.id, status: 'PLANNING', progress: 0 });
             } catch (err) {
                 btn.disabled = false;
-                toast(err.queued ? err.message : `AniList: ${err.message}`, 'error');
+                toast(err.message, 'error');
             }
         },
     };
@@ -1107,7 +1107,7 @@ async function saveEpisode(media, mediaId, episode, token) {
         toast(saved.status === 'COMPLETED' ? `${titlePref(media.title)} completed` : `Episode ${saved.progress} saved to AniList`, 'success');
         return saved;
     } catch (err) {
-        toast(err.queued ? err.message : `AniList: ${err.message}`, 'error');
+        toast(err.message, 'error');
         return null;
     }
 }
@@ -1127,7 +1127,7 @@ function scorePrompt(media, saved, token) {
                 toast(`Scored ${titlePref(media.title)} ${score}`, 'success');
             } catch (err) {
                 btn.disabled = false;
-                toast(err.queued ? err.message : `AniList: ${err.message}`, 'error');
+                toast(err.message, 'error');
             }
         },
     };

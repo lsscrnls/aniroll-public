@@ -1366,7 +1366,7 @@ function adminAction(body) {
         saveSeatSettings();
     } else if (action === 'addVip') {
         const id = Number(body.id);
-        if (!Number.isInteger(id) || id < 1) return { status: 400, error: 'No such AniList user' };
+        if (!Number.isInteger(id) || id < 1) return { status: 400, error: 'There’s no AniList user with that name.' };
         if (!isVip(id)) seatSettings.vips.push({ id, name: str(body.name, 40) || String(id) });
         saveSeatSettings();
     } else if (action === 'removeVip') {
@@ -1402,13 +1402,13 @@ function adminAction(body) {
 const ACCOUNT_WRITES_PER_MIN = 120;
 function tooManyWrites(res, userId, bucket = 'account-write', max = ACCOUNT_WRITES_PER_MIN) {
     if (!overLimit(bucket, String(userId), max, 60000)) return false;
-    json(res, 429, { error: 'Too many changes, try again in a minute' });
+    json(res, 429, { error: 'That was a lot of changes at once. Try again in a minute.' });
     return true;
 }
 
 // The answer for a request whose account could not be confirmed (auth.status !== 'ok')
 function refuseAuth(res, auth) {
-    if (auth.status === 'limited') return json(res, 429, { error: 'Too many sign-in checks, try again in a minute' });
+    if (auth.status === 'limited') return json(res, 429, { error: 'That was a lot of sign-ins at once. Try again in a minute.' });
     if (auth.status === 'unreachable') return json(res, 503, { error: 'AniList unreachable, cannot verify your account right now' });
     return json(res, 401, { error: 'Login required' });
 }
@@ -1732,7 +1732,7 @@ async function handle(req, res) {
     // against AniList here, so a stored preview is only replaced by a confirmed account —
     // otherwise anyone could put their own text on /a/<id> for every popular title.
     if (pathname === '/share/anime' && req.method === 'POST') {
-        if (overLimit('share', clientIp(req), 20, 10 * 60000)) return json(res, 429, { error: 'Too many shares, try again later' });
+        if (overLimit('share', clientIp(req), 20, 10 * 60000)) return json(res, 429, { error: 'That was a lot of sharing. Try again in ten minutes.' });
         const body = await readBody(req);
         const id = parseInt(body.id);
         const title = str(body.title, 200).trim();
@@ -1766,9 +1766,9 @@ async function handle(req, res) {
     // Public read-only state — clients ask every minute whether to stay quiet
     // A seat in the app: claimed and kept with each heartbeat, given back on logout
     if (pathname === '/api/seat' && (req.method === 'POST' || req.method === 'DELETE')) {
-        if (overLimit('seat-ip', clientIp(req), 60, 60000)) return json(res, 429, { error: 'Too many requests' });
+        if (overLimit('seat-ip', clientIp(req), 60, 60000)) return json(res, 429, { error: 'That was a lot at once. Wait a minute and try again.' });
         const owner = await seatOwner(req);
-        if (!owner) return json(res, 401, { error: 'Not signed in' });
+        if (!owner) return json(res, 401, { error: 'Log in with AniList to continue.' });
         if (req.method === 'DELETE') {
             seats.delete(owner.key);
             seatQueue.delete(owner.key);
@@ -1781,16 +1781,16 @@ async function handle(req, res) {
     }
 
     if (pathname === '/api/admin/stats' && req.method === 'GET') {
-        if (overLimit('admin-ip', clientIp(req), 30, 60000)) return json(res, 429, { error: 'Too many requests' });
+        if (overLimit('admin-ip', clientIp(req), 30, 60000)) return json(res, 429, { error: 'That was a lot at once. Wait a minute and try again.' });
         const owner = await seatOwner(req);
-        if (!owner) return json(res, 401, { error: 'Not signed in' });
+        if (!owner) return json(res, 401, { error: 'Log in with AniList to continue.' });
         if (owner.key !== ADMIN_KEY) return json(res, 403, { error: 'Not for you' });
         return json(res, 200, adminStats());
     }
     if (pathname === '/api/admin/action' && req.method === 'POST') {
-        if (overLimit('admin-ip', clientIp(req), 30, 60000)) return json(res, 429, { error: 'Too many requests' });
+        if (overLimit('admin-ip', clientIp(req), 30, 60000)) return json(res, 429, { error: 'That was a lot at once. Wait a minute and try again.' });
         const owner = await seatOwner(req);
-        if (!owner) return json(res, 401, { error: 'Not signed in' });
+        if (!owner) return json(res, 401, { error: 'Log in with AniList to continue.' });
         if (owner.key !== ADMIN_KEY) return json(res, 403, { error: 'Not for you' });
         const done = adminAction(await readBody(req));
         return done.status === 200 ? json(res, 200, adminStats()) : json(res, done.status, { error: done.error });
@@ -1940,7 +1940,7 @@ async function handle(req, res) {
     if (pathname === '/api/me/dna-card' && req.method === 'POST') {
         const auth = await verifyViewer(req);
         if (auth.status !== 'ok') return refuseAuth(res, auth);
-        if (overLimit('dna-card', String(auth.viewer.id), 10, 10 * 60000)) return json(res, 429, { error: 'Too many cards, try again later' });
+        if (overLimit('dna-card', String(auth.viewer.id), 10, 10 * 60000)) return json(res, 429, { error: 'That was a lot of cards. Try again in ten minutes.' });
         const image = await readRaw(req, DNA_MAX_BYTES);
         // JPEG only, checked by its first bytes rather than what the request claims
         if (!image || image.length < 1000 || image[0] !== 0xff || image[1] !== 0xd8 || image[2] !== 0xff) {
@@ -2094,7 +2094,7 @@ async function handle(req, res) {
         // unconfirmed calls get a small allowance per IP and in total, so the relay can't be used as a proxy.
         if (auth.status === 'unreachable'
             && (overLimit('relay-ip', clientIp(req), RELAY_UNVERIFIED_PER_IP, 60000) || overLimit('relay', 'all', RELAY_UNVERIFIED_TOTAL, 60000))) {
-            return json(res, 429, { error: 'AniList cannot confirm your account right now, try again in a few minutes' });
+            return json(res, 429, { error: 'AniList can’t confirm your account right now. Try again in a few minutes.' });
         }
 
         const body = await readBody(req);
@@ -2138,7 +2138,7 @@ async function handle(req, res) {
 const server = http.createServer(function(req, res) {
     handle(req, res).catch(function(err) {
         console.error(err);
-        if (!res.headersSent) json(res, 500, { error: 'Server error' });
+        if (!res.headersSent) json(res, 500, { error: 'AniRoll’s server ran into a problem. Try again in a moment.' });
     });
 });
 

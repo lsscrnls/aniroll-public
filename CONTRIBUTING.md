@@ -33,7 +33,7 @@ Reading needs nothing installed. A path that builds up step by step:
    (the README walks through it).
 6. **`api/server.js`**, section by section (`// =====` marks each one), with **`js/jellyfin.js`** next to
    it: the Jellyfin matcher exists in both, with the same rules.
-7. For the look: **`js/design.js`**, **`js/m3.js`** and **`css/m3.css`**.
+7. For the look: **`js/design.js`**, **`js/m3.js`** and **`css/style.css`**.
 8. The player: **`js/pages/play.js`**, then **`js/player/profile.js`** (what the browser can play) and
    **`js/player/subtitles.js`**. `tools/e2e/jellyfin-mock.js` shows the Jellyfin answers it expects.
 

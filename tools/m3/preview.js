@@ -68,7 +68,32 @@ const design = process.env.DESIGN || 'm3';
         await settle(p);
         if (act) { await act(p); await wait(1500); await settle(p); }
         await p.screenshot({ path: path.join(OUT, `${theme}-${name}.png`), fullPage: full });
+        if (process.env.STYLES) await dumpStyles(p, name);
         console.log('shot', name);
+    }
+    // STYLES=<label>: every element's computed style per shot, so a CSS refactor can be diffed exactly (tools/m3/stylediff.js)
+    async function dumpStyles(p, name) {
+        const styles = await p.evaluate(() => {
+            const key = el => {
+                const parts = [];
+                for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
+                    const i = e.parentElement ? [...e.parentElement.children].indexOf(e) : 0;
+                    parts.unshift(`${e.tagName.toLowerCase()}${e.id ? '#' + e.id : ''}:${i}`);
+                }
+                return parts.join('>');
+            };
+            const out = {};
+            for (const el of [document.documentElement, ...document.querySelectorAll('body *')]) {
+                if (el.closest('svg') && el.tagName !== 'svg') continue;
+                const cs = getComputedStyle(el), s = {};
+                for (const prop of cs) s[prop] = cs.getPropertyValue(prop);
+                out[key(el)] = s;
+            }
+            return out;
+        });
+        const dir = path.join(OUT, 'styles', process.env.STYLES);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, `${theme}-${name}.json`), JSON.stringify(styles));
     }
 
     const p = await open(false);
@@ -143,7 +168,6 @@ const design = process.env.DESIGN || 'm3';
         const b = await q.locator('.media-card.is-holo').first().boundingBox();
         if (b) { await q.mouse.move(b.x + b.width * .3, b.y + b.height * .2); await q.mouse.move(b.x + b.width * .8, b.y + b.height * .25, { steps: 5 }); }
     } });
-    await shot(p, 'season-peek', '#/season', { ms: 6000, act: async (q) => { await q.hover('.media-card[data-color] >> nth=4'); await wait(1500); } });
     // Resting on a card lends the app its cover and colours
     await shot(p, 'list-peek', '#/list', { act: async (q) => { await q.hover('.list-card[data-color] >> nth=1'); await wait(1500); } });
     await shot(p, 'roll', '#/roll', { ms: 6000, act: async q => { await q.click('#roll-btn'); await wait(300); await settle(q); } });

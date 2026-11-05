@@ -373,6 +373,21 @@ if (aniListOff) {
     if (document.body) badge(); else addEventListener('DOMContentLoaded', badge);
 }
 
+// AniList's own error text ("Not Found.", "Invalid token", "validation") is written for developers and
+// reached the user through toast(err.message). Translate it once here; callers branch on err.status,
+// the original text stays in err.raw and the console.
+function aniListError(e, httpStatus) {
+    const raw = e?.message || '';
+    const status = e?.status || httpStatus;
+    console.warn('AniList:', status, raw);
+    const message =
+        status === 401 || /invalid token/i.test(raw) ? 'Your AniList login ran out. Log in again to continue.'
+        : status === 404 || /not found/i.test(raw) ? 'That isn’t on AniList anymore.'
+        : status >= 500 ? 'AniList isn’t answering right now. Try again in a moment.'
+        : 'AniList didn’t accept that. Try again in a moment.';
+    return Object.assign(new Error(message), { status: status === 401 || /invalid token/i.test(raw) ? 401 : status, raw });
+}
+
 async function query(q, variables = {}, token = null) {
     if (aniListOff) throw Object.assign(new Error('AniList isn’t answering right now'), { unavailable: true });
     if (isRateLimited()) throw rateLimitError();
@@ -404,12 +419,12 @@ async function query(q, variables = {}, token = null) {
     if (res.status === 403 || res.status >= 500) {
         const body = await res.json().catch(() => null);
         if (!body?.errors && !body?.data) throw Object.assign(new Error('AniList isn’t answering right now'), { unavailable: true });
-        if (body.errors) throw new Error(body.errors[0]?.message || 'API Error');
+        if (body.errors) throw aniListError(body.errors[0], res.status);
         return body.data;
     }
 
     const json = await res.json();
-    if (json.errors) throw new Error(json.errors[0]?.message || 'API Error');
+    if (json.errors) throw aniListError(json.errors[0], res.status);
     aniListAnsweredAt = Date.now();
     return json.data;
 }
@@ -1018,7 +1033,7 @@ export async function getUserMediaProgress(user, mediaId, token = null) {
         `, vars, token);
         return data.MediaList;
     } catch (err) {
-        if (/not found/i.test(err.message)) return null;
+        if (err.status === 404) return null;
         throw err;
     }
 }

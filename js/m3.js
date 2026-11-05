@@ -3,7 +3,7 @@
 // - the navigation rail gets Roll as its FAB
 // - Home opens with a hero moment: the show you're on, the next episode as a huge number, a shaped cover
 // - colour from content: a show's cover colour recolours its surroundings (detail panel, the whole app on a
-//   detail page, the Roll stage, the Home hero), with a smooth blend (@property in m3.css)
+//   detail page, the Roll stage, the Home hero), with a smooth blend (@property in css/style.css)
 // - container transform: a tapped cover grows into the detail panel (View Transitions, where supported)
 // - every page carries its name on <body data-m3-page>
 // - like a desktop themed from its wallpaper: the show you're on becomes the app's blurred wallpaper and,
@@ -99,10 +99,10 @@ export function setup() {
     cleanups.push(() => { window.removeEventListener('hashchange', onRoute); delete document.body.dataset.m3Page; setScope(document.documentElement, null); });
 
     // Resting the pointer on a tinted card lends the whole app its cover and colours; off the cards, they go back.
-    // Not on a show's own page: that one already wears its show
+    // Only on My List, where you browse your own shows at rest; elsewhere it made the app restless
     // Only with a real pointer (a tap opens the show anyway) and only after a short rest, so sweeping across stays calm
     const onPeek = (e) => {
-        if (isShowPage() || !matchMedia('(hover: hover)').matches) return;
+        if (!onList() || !matchMedia('(hover: hover)').matches) return;
         const card = /** @type {HTMLElement | null} */ (e.target.closest?.('.media-card[data-color]') || null);
         if (card === peek) return;
         clearTimeout(peekTimer);
@@ -112,7 +112,7 @@ export function setup() {
         // Work out the colours now, while the pointer settles, so the switch itself costs nothing
         if (card) contentScheme(card.dataset.color);
         peekTimer = setTimeout(() => {
-            if (isShowPage()) return;
+            if (!onList()) return;
             const root = document.documentElement;
             root.classList.add('m3-peek');
             snapColours(() => {
@@ -373,9 +373,8 @@ async function snapColours(change) {
     }
 }
 
-function isShowPage() {
-    const page = document.body.dataset.m3Page;
-    return page === 'anime' || page === 'manga';
+function onList() {
+    return document.body.dataset.m3Page === 'list';
 }
 
 // Settings changed the palette: re-apply the show's colours (or drop them)

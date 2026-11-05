@@ -185,7 +185,7 @@ async function viaProxy(cfg, path, method) {
         if (res.status === 400 && isPrivateUrl(cfg.url)) {
             throw new Error('This browser cannot reach that home address directly, and AniRoll only relays public addresses. Connect with the address your server has on the internet, then enter the home one under "Local address on this device".');
         }
-        throw new Error(body.error || `Relay failed (${res.status})`);
+        throw new Error(body.error || 'Jellyfin didn’t answer through AniRoll. Try again in a moment.');
     }
     return { status: body.status, data: body.data };
 }
@@ -455,7 +455,7 @@ function setHookSecret(secret) {
 async function hookRequest(method) {
     const res = await fetch('/api/jellyfin/hook', { method, headers: authHeaders(), signal: AbortSignal.timeout(10000) });
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || `Webhook request failed (${res.status})`);
+    if (!res.ok) throw new Error(body.error || 'The Jellyfin connection didn’t save. Try again in a moment.');
     setHookSecret(body.secret);
     return body;
 }
