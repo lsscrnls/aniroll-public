@@ -3897,7 +3897,7 @@ body.player-open .cursor { display: none !important; }
     -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 .pl-subs-top, .pl-subs-bottom { display: flex; flex-direction: column; align-items: center; gap: 0.12em; max-width: 100%; }
 /* translate: out of the way of Skip intro / Up next (js/player/subdodge.js) */
-.pl-subs-bottom { transition: transform var(--duration) var(--pl-var(--md-standard), var(--md-standard)), translate var(--duration) var(--pl-var(--md-standard), var(--md-standard)); }
+.pl-subs-bottom { transition: transform var(--duration) var(--md-standard), translate var(--duration) var(--md-standard); }
 .pl-subs-line { max-width: min(100%, 34em); white-space: pre-line; text-wrap: balance; overflow-wrap: break-word;
     text-shadow: 0 0 0.06em #000, 0.055em 0 0.03em #000, -0.055em 0 0.03em #000, 0 0.055em 0.03em #000, 0 -0.055em 0.03em #000,
         0.04em 0.04em 0.03em #000, -0.04em 0.04em 0.03em #000, 0.04em -0.04em 0.03em #000, -0.04em -0.04em 0.03em #000,

@@ -1,0 +1,8 @@
+{
+  "name": "aniroll-cssmin",
+  "private": true,
+  "description": "Minifies the stylesheets in the deploy copy (scripts/deploy.sh); the repo keeps them readable",
+  "dependencies": {
+    "lightningcss": "1.30.1"
+  }
+}
