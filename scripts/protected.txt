@@ -12,3 +12,4 @@ js/touches.js
 js/sources.js
 api/sources.js
 js/tint.js
+js/tint-home.js

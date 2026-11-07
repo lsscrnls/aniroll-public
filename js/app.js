@@ -9,7 +9,7 @@ import { initBackNav } from './backnav.js';
 import { initKeyHelp } from './keyhelp.js';
 import { noteVisitor, maybeShowMoveNotice, openChangelog, renderChangelog, hasUnread } from './whatsnew.js';
 import { refreshPendingStatus, refreshJellyfinStatus } from './status.js';
-import { applyDesign } from './design.js';
+import { applyDesign, savedLook } from './design.js';
 import { startPresence } from './presence.js';
 import { watchForUpdate } from './update.js';
 import { accounts, rememberAccount, switchAccount, addAccount, finishInPopup, resumeAfterCancelledAdd, signOut, dataNoteDue } from './accounts.js';
@@ -83,6 +83,8 @@ async function init() {
     // Before the router: the first page is where going back stops
     initBackNav();
     initKeyHelp();
+    // A look kept from last time can bring its own pages: it is ready before the first one draws
+    if (savedLook()) await import('./touches.js').then(m => m.startTouches()).catch(() => { /* not essential */ });
     startRouter();
     watchForUpdate(BUILD);
     if (isLoggedIn() && dataNoteDue()) {

@@ -5,6 +5,8 @@
 
 export function tintOn() { return null; }
 
-export function startTint() { return null; }
+export async function startTint() { return null; }
 
-export async function toggleTint(from) { return null; }
+export async function toggleTint() { return null; }
+
+export function broadcastNow(now = new Date()) { return null; }

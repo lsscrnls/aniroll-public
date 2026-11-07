@@ -17,7 +17,18 @@ export function route(pattern, handler) {
         paramNames.push(name);
         return '([^/]+)';
     });
-    routes.push({ regex: new RegExp(`^${regexStr}$`), paramNames, handler });
+    routes.push({ pattern, regex: new RegExp(`^${regexStr}$`), paramNames, handler });
+}
+
+// Another look can bring its own version of a page: the same pattern, a handler like route()'s, null to give
+// the page back. The page on screen is drawn again either way
+const overrides = new Map();
+let started = false;
+export function overridePage(pattern, handler) {
+    handler ? overrides.set(pattern, handler) : overrides.delete(pattern);
+    const hash = window.location.hash.slice(1) || '/';
+    if (started && routes.some(r => r.pattern === pattern && r.regex.test(hash.split('?')[0]))) return resolve();
+    return Promise.resolve();
 }
 
 export function navigate(path) {
@@ -56,7 +67,7 @@ export async function resolve() {
                 || !!document.activeElement.closest?.('.nav-links, .mobile-tabbar');
 
             try {
-                const cleanup = await r.handler({ params, query, content });
+                const cleanup = await (overrides.get(r.pattern) || r.handler)({ params, query, content });
                 if (id !== navId) {
                     // Superseded while loading: stop its timers right away
                     if (typeof cleanup === 'function') cleanup();
@@ -119,6 +130,7 @@ function updateActiveNav(path) {
 // Moving on with an unsent reply or post asks first: the old address goes back in place (no new
 // history step) while the question is open, and on "Discard" the move happens after all
 export function startRouter() {
+    started = true;
     let shown = location.hash;
     window.addEventListener('hashchange', async () => {
         const target = location.hash;

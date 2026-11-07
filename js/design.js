@@ -103,11 +103,34 @@ export async function previewSeed(hex) {
     writeScheme(css);
 }
 
+// Another look can take over the whole page: { design, css }, kept so js/look.js puts it on before the first
+// paint. While one is set, M3 steps aside completely (no colours, no page additions). null gives M3 back.
+const LOOK_KEY = 'aniroll_look';
+export function savedLook() {
+    try {
+        if (!localStorage.getItem('aniroll_token')) return null; // the landing page keeps the default
+        const look = JSON.parse(localStorage.getItem(LOOK_KEY) || 'null');
+        return look && /^[a-z0-9-]{1,24}$/.test(look.design) && typeof look.css === 'string' ? look : null;
+    } catch { return null; }
+}
+export function setLook(look, loggedIn) {
+    try { look ? localStorage.setItem(LOOK_KEY, JSON.stringify(look)) : localStorage.removeItem(LOOK_KEY); } catch { /* this tab only */ }
+    if (!look) document.getElementById('look-cache')?.remove();
+    return applyDesign(loggedIn, look);
+}
+
 // index.html starts in M3 with its stylesheet; this adds the colours and the page additions (loggedIn: kept
-// for the callers, it no longer changes anything)
-export async function applyDesign(loggedIn) {
+// for the callers, it no longer changes anything). `look`: the one just set, also when storage is blocked
+export async function applyDesign(loggedIn, look = savedLook()) {
     const root = document.documentElement;
     try { OLD_DESIGN_KEYS.forEach(k => localStorage.removeItem(k)); } catch { /* nothing kept */ }
+    if (look) {
+        root.setAttribute('data-design', look.design);
+        enhancer?.then(m => m.teardown());
+        enhancer = null;
+        document.getElementById('m3-scheme')?.remove();
+        return;
+    }
     // Page additions only M3 has (hero, search bar, rail FAB ...)
     if (enhancer) enhancer.then(m => m.refresh());
     enhancer ??= import('./m3.js').then(m => { m.setup(); return m; });
