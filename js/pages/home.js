@@ -29,6 +29,30 @@ export async function render({ content }) {
             <p class="home-catchup" id="home-catchup" hidden></p>
             <div id="continue-watching" class="scroll-row">${renderSkeletonCards(6)}</div>
         </section>
+        ${extrasHtml()}
+    </div>`;
+
+    loadContinueWatching(token);
+    loadFriendAndPopular(token);
+    loadRecommendations(token);
+    initPopularToggle();
+    initFriendsTabs();
+    initFriendsRowActions(token);
+
+    const removeFab = addWatchPartyFab();
+    const stopNow = mountNowPlaying();
+    return () => {
+        removeFab();
+        stopNow();
+        stopCinema();
+        clearTimeout(friendsRetryTimer);
+        window.removeEventListener(LIST_EVENT, continueListHandler);
+    };
+}
+
+// Starting soon, Friends and Recommended: Home's own markup, and the same for a home laid out differently
+function extrasHtml() {
+    return `
         <section class="home-section starting-soon" id="starting-soon" hidden>
             <div class="section-header">
                 <h2 class="section-title">Starting soon</h2>
@@ -60,25 +84,29 @@ export async function render({ content }) {
                 <h2 class="section-title">Recommended for You</h2>
             </div>
             <div id="recommendations-row" class="scroll-row">${renderSkeletonCards(6)}</div>
-        </section>
-    </div>`;
+        </section>`;
+}
 
-    loadContinueWatching(token);
+// For a home page that draws the rest itself: the three sections go into `host` and load as they do here.
+// Starting soon fills from the Planning list the caller already has, through soon(planning).
+export function mountExtras(host) {
+    const token = getToken();
+    host.innerHTML = extrasHtml();
     loadFriendAndPopular(token);
     loadRecommendations(token);
     initPopularToggle();
     initFriendsTabs();
     initFriendsRowActions(token);
-
-    const removeFab = addWatchPartyFab();
-    const stopNow = mountNowPlaying();
-    return () => {
-        removeFab();
-        stopNow();
-        stopCinema();
-        clearTimeout(friendsRetryTimer);
-        window.removeEventListener(LIST_EVENT, continueListHandler);
+    return {
+        soon: (planning) => renderStartingSoon(planning),
+        stop: () => clearTimeout(friendsRetryTimer),
     };
+}
+
+// What the Watch Party button does: back to the running party, else pick a show for a new one
+export function openParty() {
+    if (getActiveParty()) window.location.hash = '#/watchparty';
+    else showAnimePickerForParty();
 }
 
 // Live "now watching" card from the Jellyfin webhook — only once live tracking is set up
@@ -105,14 +133,7 @@ function addWatchPartyFab() {
             <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>
         </svg>
         <span class="wp-fab-label">Watch Party</span>`;
-    fab.addEventListener('click', () => {
-        const active = getActiveParty();
-        if (active) {
-            window.location.hash = '#/watchparty';
-        } else {
-            showAnimePickerForParty();
-        }
-    });
+    fab.addEventListener('click', openParty);
     document.body.appendChild(fab);
 
     return () => {
