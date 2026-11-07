@@ -48,6 +48,11 @@ const SORTS = {
 // What the Jellyfin library has (AniList id -> when it came in), read when the page draws; null without Jellyfin
 let have = null;
 
+// Another way to draw the entries: { row(entry, ctx) -> html, changed?(el, entry, ctx) }. Rows keep
+// data-entry-id, and -/+1 buttons keep data-action/data-entry, so saving works the same. null: the usual views
+let rowLook = null;
+export function setRowLook(look) { rowLook = look; }
+
 const ICON_LIST = '<svg data-icon="view_list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>';
 const ICON_JF = '<svg data-icon="download_done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19h14"/><path d="m6 11 4 4 8-9"/></svg>';
 const ICON_GRID = '<svg data-icon="grid_view" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>';
@@ -315,12 +320,14 @@ export async function render({ params, content }) {
         // Roll picks from your own Planning anime; offer it right where that list is
         const rollBar = document.getElementById('list-roll');
         if (rollBar) rollBar.hidden = !(isOwn && currentType === 'ANIME' && lists[activeIndex]?.status === 'PLANNING' && all.length > 1);
-        listContent.classList.toggle('is-grid', view === 'grid' && entries.length > 0);
+        listContent.classList.toggle('is-grid', !rowLook && view === 'grid' && entries.length > 0);
+        listContent.classList.toggle('has-look', !!rowLook);
 
         if (!entries.length) {
             listContent.innerHTML = `<div class="empty-state" style="padding:var(--space-lg)"><div class="empty-state-sub">${all.length ? 'No matching entries' : 'No entries'}</div></div>`;
         } else {
-            listContent.innerHTML = view === 'grid'
+            listContent.innerHTML = rowLook ? entries.map(e => rowLook.row(e, lookCtx())).join('')
+                : view === 'grid'
                 ? `<div class="media-grid list-grid">${entries.map(gridCard).join('')}</div>`
                 : entries.map(listRow).join('');
         }
@@ -354,8 +361,19 @@ export async function render({ params, content }) {
     }
 
     // An entry can sit in several custom lists — update every copy that is on screen
+    function lookCtx() { return { own: !!isOwn, type: currentType, have }; }
     function updateEntryViews(entry) {
         const max = totalOf(entry);
+        if (rowLook) {
+            listContent.querySelectorAll(`[data-entry-id="${entry.id}"]`).forEach(el => {
+                const box = document.createElement('div');
+                box.innerHTML = rowLook.row(entry, lookCtx());
+                const fresh = /** @type {HTMLElement} */ (box.firstElementChild);
+                el.replaceWith(fresh);
+                rowLook.changed?.(fresh, entry, lookCtx());
+            });
+            return;
+        }
         listContent.querySelectorAll(`[data-entry-id="${entry.id}"]`).forEach(el => {
             const text = el.querySelector('.progress-text');
             if (text) text.textContent = `${entry.progress}/${max || '?'}`;
