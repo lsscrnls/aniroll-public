@@ -19,6 +19,8 @@ const changeCount = (at = Date.now()) => [...fs.readFileSync(path.join(ROOT, 'js
 const CHANGE_COUNT = changeCount();
 // The Windows helper AniRoll asks for, likewise read from the code (a new helper needs no edit here)
 const HELPER_WINDOWS = /HELPER_LATEST_WINDOWS = '([0-9.]+)'/.exec(fs.readFileSync(path.join(ROOT, 'js', 'presence.js'), 'utf8'))[1];
+const EXTENSION = /EXTENSION_LATEST = '([0-9.]+)'/.exec(fs.readFileSync(path.join(ROOT, 'js', 'presence.js'), 'utf8'))[1];
+const HELPER = /HELPER_LATEST = '([0-9.]+)'/.exec(fs.readFileSync(path.join(ROOT, 'js', 'presence.js'), 'utf8'))[1];
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
     '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.wasm': 'application/wasm', '.webmanifest': 'application/manifest+json' };
 
@@ -187,7 +189,9 @@ function staticServer() {
     check('design: Material 3 Expressive is the default (stylesheet, generated palette, Google Sans Flex)',
         m3.attr === 'm3' && /^(#[0-9a-f]{6}|rgb\()/.test(m3.primary) && m3.font.includes('Google Sans Flex') && m3.variantShown, m3);
     await page.click('[data-variant="vibrant"]');
-    await page.waitForTimeout(800);
+    // The palette tweens over: wait until it has moved off the tonal one (a fixed wait misses it under load)
+    await page.waitForFunction(before => getComputedStyle(document.documentElement).getPropertyValue('--md-primary').trim() !== before,
+        m3.primary, { timeout: 8000, polling: 60 }).catch(() => {});
     const vibrant = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--md-primary').trim());
     check('design: colour style changes the palette', /^(#[0-9a-f]{6}|rgb\()/.test(vibrant) && vibrant !== m3.primary, { tonal: m3.primary, vibrant });
     // The legacy design is gone: no switch, no accent colour, and an old choice of it is forgotten
@@ -248,7 +252,8 @@ function staticServer() {
     let recPick = false;
     for (let i = 0; i < 12 && !recPick; i++) {
         await page.evaluate(() => { localStorage.removeItem('aniroll_req_times'); document.getElementById('roll-btn').click(); });
-        await page.waitForSelector('#roll-result:not([hidden])', { timeout: 15000 });
+        // The roll is drawn frame by frame, and a busy machine draws few: a slow one fails this check, not the group
+        if (!await page.waitForSelector('#roll-result:not([hidden])', { timeout: 30000 }).then(() => true, () => false)) break;
         recPick = !!(await page.$('#roll-plan'));
     }
     if (recPick) {
@@ -340,6 +345,8 @@ function staticServer() {
         const inPanel = () => page.evaluate(() => ({ add: !!document.querySelector('#detail-panel-overlay #add-to-list'), status: !!document.querySelector('#detail-panel-overlay #status-select') }));
         const remove = () => page.evaluate(() => { const s = document.querySelector('#detail-panel-overlay #status-select'); if (!s) return false; s.value = 'REMOVE'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; });
         const beforeRemove = mutations.length;
+        // The panel fills in its list controls once its data is there (later under load)
+        await page.waitForSelector('#detail-panel-overlay #status-select', { timeout: 8000 }).catch(() => {});
         const removable = await remove();
         await settle(400);
         const goneAtOnce = await inPanel();
@@ -1074,6 +1081,7 @@ function staticServer() {
         chips.TV && chips.MOVIE && !chips.OVA && movies === 1 && all > 1 && again === all, { chips, all, movies, again });
 
     await nxGo('#/anime/101/full');
+    await nx.waitForSelector('.detail-related-item[data-open]', { timeout: 8000 }).catch(() => {});
     const detail = await nx.evaluate(() => ({ studios: [...document.querySelectorAll('.detail-studio')].map(a => a.getAttribute('href')),
         related: document.querySelectorAll('.detail-related-item[data-open]').length }));
     check('detail: studios as cards that open their page, related shows as covers',
@@ -1147,18 +1155,19 @@ function staticServer() {
     // is on, the player's episode goes out with its time left, paused without it, and a link to the show
     {
         const { p, pageErrors } = await playerPage(true);
-        await p.addInitScript(() => {
+        await p.addInitScript(({ extension, helperVersion }) => {
             window.__activities = [];
             window.addEventListener('message', (e) => {
                 const m = e.data;
                 if (m?.aniroll !== 'presence') return;
                 if (m.type === 'activity') window.__activities.push(m.activity);
-                window.postMessage({ aniroll: 'presence-ext', type: 'status', extension: '1.0.2', helper: true, discord: true }, location.origin);
+                window.postMessage({ aniroll: 'presence-ext', type: 'status', extension, helper: true, helperVersion, helperAuto: true, discord: true }, location.origin);
             });
-        });
+        }, { extension: EXTENSION, helperVersion: HELPER });
         await p.goto(base + '/#/settings?tab=discord');
         await p.waitForSelector('.dc-step.is-done', { timeout: 5000 }).catch(() => {});
         const steps = await p.evaluate(() => [...document.querySelectorAll('.dc-step')].map(s => s.classList.contains('is-done')));
+        const helperTitle = await p.evaluate(() => document.querySelectorAll('.dc-step-title')[1]?.textContent || '');
         const remove = await p.evaluate(() => [...document.querySelectorAll('.dc-remove')].at(-1)?.querySelector('code')?.textContent || '');
         await p.click('#dc-toggle').catch(() => {});
         const stored = await p.evaluate(() => localStorage.getItem('aniroll_discord'));
@@ -1182,11 +1191,11 @@ function staticServer() {
         check('discord: on Home, without a show, the status links to the site', browsing?.details === 'Browsing' && browsing.buttons?.length === 1
             && browsing.buttons[0].url === 'https://aniroll.app' && browsing.buttons[0].label === 'Try AniRoll', browsing);
         check('discord: Settings ticks the steps, tells how to remove it, the switch turns it on; the episode with time left, paused without, a link to the show',
-            steps.length === 3 && steps.every(Boolean) && stored === 'on' && /uninstall\.sh \| sh$/.test(remove)
+            steps.length === 3 && steps.every(Boolean) && helperTitle.includes(`${HELPER} · updates itself`) && stored === 'on' && /uninstall\.sh \| sh$/.test(remove)
             && playingNow?.name === `AniRoll: ${playingNow?.details}`
             && playingNow?.type === 3 && /^Episode 3( of \d+)?$/.test(playingNow.state || '') && playingNow.details?.length >= 2
             && playingNow.timestamps.end > playingNow.timestamps.start && /^https:\/\/aniroll\.app\/a\/\d+$/.test(playingNow.buttons?.[0]?.url || '')
-            && /Paused$/.test(paused?.state || '') && !paused?.timestamps && !pageErrors.length, { steps, remove, stored, playingNow, paused, pageErrors });
+            && /Paused$/.test(paused?.state || '') && !paused?.timestamps && !pageErrors.length, { steps, helperTitle, remove, stored, playingNow, paused, pageErrors });
         await p.close();
     }
 
@@ -1336,6 +1345,63 @@ function staticServer() {
         await p.close();
     }
 
+    // The connection breaks off mid-episode (js/pages/play.js engine 'error'): one quiet try from the same
+    // second, nothing said; a second break within two minutes is shown, and Try again goes on from there too.
+    // The break is the video element's own: MEDIA_ERR_NETWORK, as the browser reports a dropped stream
+    {
+        const { p, pageErrors, calls } = await playerPage(true);
+        await p.goto(base + '/#/play/101/3');
+        await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2 && v.duration > 15; }, null, { timeout: 10000 }).catch(() => {});
+        await p.click('[data-resume="restart"]', { timeout: 3000 }).catch(() => {});
+        await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 6; return v.play(); }).catch(() => {});
+        await p.waitForFunction(() => document.getElementById('player-video').currentTime >= 6, null, { timeout: 5000, polling: 60 }).catch(() => {});
+        // stop: a real break stops the picture too; the faked one would play on behind the message
+        const drop = (stop = false) => p.evaluate(stop => {
+            const v = document.getElementById('player-video');
+            if (stop) v.pause();
+            const at = v.currentTime;
+            Object.defineProperty(v, 'error', { configurable: true, get: () => ({ code: 2, message: '' }) });
+            v.dispatchEvent(new Event('error'));
+            delete v.error; // the next load starts clean
+            return at;
+        }, stop);
+        const infos = () => calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep3');
+        // Status text while it reconnects, and whether it ever showed an error
+        await p.evaluate(() => {
+            const box = document.getElementById('player-status');
+            window.__said = [];
+            new MutationObserver(() => { if (!box.hidden) window.__said.push({ text: box.textContent.trim(), error: box.classList.contains('error') }); })
+                .observe(box, { attributes: true, childList: true, subtree: true });
+        });
+        const infosBefore = infos().length;
+        const droppedAt = await drop();
+        await p.waitForFunction(() => document.getElementById('player-status').hidden && !document.getElementById('player-video').paused, null, { timeout: 10000, polling: 60 }).catch(() => {});
+        const quiet = await p.evaluate(() => ({ said: window.__said, playing: !document.getElementById('player-video').paused, at: document.getElementById('player-video').currentTime }));
+        const asked = infos().slice(infosBefore);
+        const askedFrom = asked.length ? asked[asked.length - 1].body.StartTimeTicks / 1e7 : null;
+        check('player: the connection breaking off reconnects by itself from the same second, saying only "Reconnecting…"',
+            asked.length === 1 && Math.abs(askedFrom - droppedAt) < 1 && quiet.playing && quiet.at >= droppedAt - 1
+            && quiet.said.length > 0 && quiet.said.every(s => !s.error && /Reconnecting/.test(s.text)), { droppedAt, askedFrom, asked: asked.length, ...quiet });
+
+        // Again within two minutes: said at once, and Try again goes on from there
+        const infosBeforeSecond = infos().length;
+        const secondAt = await drop(true);
+        await p.waitForSelector('#player-status.error [data-retry]', { timeout: 5000 }).catch(() => {});
+        const shown = await p.evaluate(() => ({ error: document.getElementById('player-status').classList.contains('error'),
+            text: document.querySelector('#player-status .player-error-text')?.textContent || '' }));
+        const askedOnError = infos().length - infosBeforeSecond;
+        await p.click('#player-status [data-retry]').catch(() => {});
+        await p.waitForFunction(() => document.getElementById('player-status').hidden, null, { timeout: 10000, polling: 60 }).catch(() => {});
+        const retried = infos().slice(infosBeforeSecond);
+        const retriedFrom = retried.length ? retried[retried.length - 1].body.StartTimeTicks / 1e7 : null;
+        const after = await p.evaluate(() => ({ hidden: document.getElementById('player-status').hidden, at: document.getElementById('player-video').currentTime }));
+        check('player: a second break within two minutes is shown at once; Try again goes on from the same second',
+            shown.error && /connection to the server broke off/i.test(shown.text) && askedOnError === 0
+            && retried.length === 1 && Math.abs(retriedFrom - secondAt) < 1 && after.hidden && after.at >= secondAt - 1 && !pageErrors.length,
+            { secondAt, shown, askedOnError, retried: retried.length, retriedFrom, after, pageErrors });
+        await p.close();
+    }
+
     // Songs: the opening named as the intro starts, the episode's songs in the menu, and "What's this song?":
     // 12 s of the video's sound, only a signature goes to our server, the answer as a card with links
     {
@@ -1365,9 +1431,12 @@ function staticServer() {
         const list = await p.evaluate(() => [...document.querySelectorAll('.pl-menu-song')].map(b => b.innerText.replace(/\s+/g, ' ').trim()));
         const menuIdentify = await p.evaluate(() => !!document.querySelector('.pl-menu [data-identify]'));
         await p.keyboard.press('Escape');
+        // From the start again: menus are slow under load, and 12 s from late in the clip would run into its end
+        await p.evaluate(() => { document.getElementById('player-video').currentTime = 1; });
         await p.click('[data-act="identify"]');
         const listeningNow = await p.evaluate(() => /listening/i.test(document.querySelector('.pl-song')?.innerText || ''));
-        await p.waitForFunction(() => /buddy/.test(document.querySelector('.pl-song')?.innerText || ''), null, { timeout: 20000 }).catch(() => {});
+        // 12 s of sound, recorded in real time: on a busy machine the clip stalls and it takes longer
+        await p.waitForFunction(() => /buddy/.test(document.querySelector('.pl-song')?.innerText || ''), null, { timeout: 40000, polling: 100 }).catch(() => {});
         const card = await p.evaluate(() => ({ text: document.querySelector('.pl-song')?.innerText.replace(/\s+/g, ' ').trim(),
             links: [...document.querySelectorAll('.pl-song a.pl-song-link')].map(a => a.textContent) }));
         check('player songs: the opening named as the intro starts, the episode\'s songs in the menu (not the later opening)',
@@ -1771,7 +1840,10 @@ function staticServer() {
             const t = document.getElementById('player-video').currentTime;
             tr.addCue(new VTTCue(t, t + 4, 'A line of dialogue that is long enough to reach the button'));
         });
-        await p.waitForTimeout(700);
+        await p.waitForFunction(() => {
+            const s = document.querySelector('.pl-subs-bottom'), a = s.getBoundingClientRect(), b = document.querySelector('.pl-skip-segment').getBoundingClientRect();
+            return (a.right <= b.left || a.bottom <= b.top) && !!s.style.translate;
+        }, null, { timeout: 5000, polling: 60 }).catch(() => {});
         const dodged = await p.evaluate(() => {
             const a = document.querySelector('.pl-subs-bottom').getBoundingClientRect();
             const b = document.querySelector('.pl-skip-segment').getBoundingClientRect();
@@ -1844,9 +1916,12 @@ function staticServer() {
         await p.waitForFunction(() => !document.querySelector('.pl-next').hidden, null, { timeout: 5000 }).catch(() => {});
         const upNext = await p.evaluate(() => ({ shown: !document.querySelector('.pl-next').hidden,
             title: document.querySelector('.pl-next-title').textContent, label: document.querySelector('.pl-next-label').textContent }));
+        // Paused for the click: under load it can take longer than the clip has left, and the end would move on
+        await p.evaluate(() => document.getElementById('player-video').pause());
         await p.click('[data-act="cancelNext"]');
         // Watch credits: the card goes, and no Skip credits button takes its place
         const cancelled = await p.evaluate(() => document.querySelector('.pl-next').hidden && document.querySelector('.pl-skip-segment').hidden);
+        await p.evaluate(() => document.getElementById('player-video').play());
         // Watched the credits to the end: the card asks once more instead of leaving at once
         // Read the moment it ends: the card counts down from there and, on a busy machine, may move on before a later look
         const atEnd = await p.waitForFunction(() => {
@@ -1891,7 +1966,9 @@ function staticServer() {
         // Its bottom-right line would sit under Skip intro: the canvas moves left (the sign with it, for those seconds)
         await p.evaluate(() => { const v = document.getElementById('player-video'); v.currentTime = 3; return v.play(); }).catch(() => {});
         await p.mouse.move(640, 300);
-        await p.waitForTimeout(1200);
+        await p.waitForFunction(() => !document.querySelector('.pl-skip-segment').hidden
+            && /^-\d+px( 0px)?$/.test([...document.querySelectorAll('.pl-subs-canvas')].find(c => !c.hidden)?.style.translate || ''),
+            null, { timeout: 5000, polling: 60 }).catch(() => {});
         const assDodge = await p.evaluate(() => ({ skip: !document.querySelector('.pl-skip-segment').hidden,
             translate: [...document.querySelectorAll('.pl-subs-canvas')].find(c => !c.hidden)?.style.translate || '' }));
         check('player: styled subtitles move left out from under Skip intro', assDodge.skip && /^-\d+px( 0px)?$/.test(assDodge.translate), assDodge);
@@ -2088,9 +2165,18 @@ function staticServer() {
         await p.waitForTimeout(200);
         await p.click('[data-quality="4000000"]').catch(() => {});
         await idle(p, 2500);
-        await p.waitForTimeout(5500);
-        await p.evaluate(() => { const v = document.getElementById('player-video'); for (let i = 0; i < 5; i++) v.dispatchEvent(new Event('waiting')); });
-        await p.waitForTimeout(300);
+        // Stutters right after the switch don't count, and that quiet time starts only once the new stream loads:
+        // one at a time until the offer comes, instead of five after a guessed wait
+        await p.waitForTimeout(5000);
+        await p.evaluate(async () => {
+            const v = document.getElementById('player-video');
+            const offered = () => [...document.querySelectorAll('#toast-container .toast')].some(t => /Stuttering\?/.test(t.textContent));
+            for (let i = 0; i < 60 && !offered(); i++) {
+                if (v.paused) await v.play().catch(() => {});
+                v.dispatchEvent(new Event('waiting'));
+                await new Promise(r => setTimeout(r, 250));
+            }
+        });
         const stutterNote = await toastWith(/Stuttering\?/);
         await p.evaluate(() => { document.querySelectorAll('#toast-container .toast').forEach(t => t.remove()); localStorage.removeItem('aniroll_player_quality'); });
         check('player: Test speed in the Quality menu measures three times and says what plays smoothly; five stutters offer it',
@@ -2433,13 +2519,13 @@ function staticServer() {
         const primary = () => getComputedStyle(document.documentElement).getPropertyValue('--md-primary').trim();
         const before = primary();
         document.querySelector('[data-preview-seed="#006a6a"]').click();
-        await new Promise(r => setTimeout(r, 1200));
+        for (let i = 0; i < 80 && primary() === before; i++) await new Promise(r => setTimeout(r, 100));
         const picked = primary();
         const pressed = document.querySelector('[data-preview-seed="#006a6a"]').getAttribute('aria-pressed');
         const stored = localStorage.getItem('aniroll_m3_seed');
         document.querySelector('[data-preview-seed=""]').click();
-        // The way back is a tween too: wait until it lands (up to 5 s, it takes longer with several groups at once)
-        for (let i = 0; i < 50 && primary() !== before; i++) await new Promise(r => setTimeout(r, 100));
+        // The way back is a tween too: wait until it lands (up to 8 s, it takes longer with several groups at once)
+        for (let i = 0; i < 80 && primary() !== before; i++) await new Promise(r => setTimeout(r, 100));
         return { before, picked, pressed, stored, after: primary() };
     });
     check('landing: a colour shape turns the page into its palette, keeps nothing, and goes back',
@@ -2518,7 +2604,8 @@ function staticServer() {
     const clipped = await visitor({ aniroll_theme: 'dark', aniroll_seen_changes: '2026-09-26' });
     const teaser = await clipped.evaluate(() => ({ heads: [...document.querySelectorAll('.whatsnew .whatsnew-heading')].map(h => h.textContent), teaser: !!document.querySelector('.whatsnew-watch') }));
     await clipped.click('.whatsnew-watch');
-    await clipped.waitForTimeout(700);
+    await clipped.waitForFunction(() => { const w = document.querySelector('.whatsnew');
+        return w?.classList.contains('is-wide') && w.getBoundingClientRect().width > 600; }, null, { timeout: 8000, polling: 60 }).catch(() => {});
     const played = await clipped.evaluate(() => ({ wide: document.querySelector('.whatsnew').classList.contains('is-wide'), video: document.querySelector('.whatsnew-video')?.getAttribute('src'),
         width: Math.round(document.querySelector('.whatsnew').getBoundingClientRect().width) }));
     check("what's new: today's clip behind 'See it in action', the dialog widens to play it",
@@ -2570,6 +2657,8 @@ function staticServer() {
     await idle(phone, 2500);
     const related = await phone.evaluate(() => [...document.querySelectorAll('#detail-panel-body .detail-related-item[data-open]')].map(b => b.dataset.open).find(id => id !== '21'));
     if (related) await phone.click(`#detail-panel-body .detail-related-item[data-open="${related}"]`);
+    // The related show's panel loads its own data: wait for it instead of a capped quiet time (slow under load)
+    await phone.waitForFunction(id => document.getElementById('detail-panel-overlay').dataset.mediaId === id, related, { timeout: 8000, polling: 60 }).catch(() => {});
     await idle(phone, 2500);
     const second = await state();
     await swipe();

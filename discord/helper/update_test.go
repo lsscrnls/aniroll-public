@@ -53,6 +53,9 @@ func TestSelfUpdate(t *testing.T) {
 	if err := selfUpdate(); err != nil || got() != "new helper" {
 		t.Fatalf("update: %v, %q", err, got())
 	}
+	if stagedVersion() != "9.0.0" {
+		t.Fatalf("staged: %q", stagedVersion())
+	}
 	if !newer("1.0.10", "1.0.9") || newer("1.0.3", "1.0.3") || newer("1.0.2", "1.0.3") {
 		t.Fatal("newer")
 	}

@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	version  = "1.0.4"
+	version  = "1.0.5"
 	hostName = "app.aniroll.discord"
 	clientID = "1558496660953501827"
 	// Discord takes five updates in twenty seconds; one every five keeps clear of that, and in between
@@ -132,7 +132,14 @@ func runHost() {
 		lastSent time.Time
 		up       = false
 	)
-	report := func() { send(map[string]any{"type": "status", "discord": dc != nil, "version": version}) }
+	// auto_update and staged for Settings → Discord: whether it keeps itself up to date, and a newer
+	// version already put in place that the next start runs
+	shown := ""
+	report := func() {
+		shown = stagedVersion()
+		send(map[string]any{"type": "status", "discord": dc != nil, "version": version,
+			"auto_update": loadSettings().AutoUpdate, "staged": shown})
+	}
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	lastTry := time.Time{}
@@ -163,7 +170,7 @@ func runHost() {
 				dirty = true
 			}
 		}
-		if (dc != nil) != up {
+		if (dc != nil) != up || stagedVersion() != shown {
 			up = dc != nil
 			report()
 		}

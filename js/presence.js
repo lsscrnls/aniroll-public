@@ -13,26 +13,34 @@ const LOGO = `${SITE}/icons/icon-512.png`;
 const DL = `${SITE}/downloads/discord`;
 // The helper's newest version, Linux and macOS (discord/helper/main.go) and Windows (discord/windows/helper.py):
 // an older one is pointed out, once per version
-const HELPER_LATEST = '1.0.4';
-const HELPER_LATEST_WINDOWS = '1.1.3';
+const HELPER_LATEST = '1.0.5';
+const HELPER_LATEST_WINDOWS = '1.1.5';
 const helperLatest = () => (system() === 'windows' ? HELPER_LATEST_WINDOWS : HELPER_LATEST);
 const NAG_KEY = 'aniroll_discord_nagged';
 // The extension's newest version (discord/extension/manifest.json): an older one is pointed out the same way
-const EXTENSION_LATEST = '1.0.2';
+const EXTENSION_LATEST = '1.0.3';
 const EXT_NAG_KEY = 'aniroll_discord_ext_nagged';
-// The Chrome Web Store, offered once it hands out EXTENSION_LATEST (asked via /api/discord/store, the store
-// takes a few days to review each version); until then the download, loaded by hand
+// The Chrome Web Store (asked via /api/discord/store), offered once it lists the extension. It takes a few days
+// to review each version: until it hands out EXTENSION_LATEST, Chromium browsers are measured against the
+// version it has, so nobody is told to update to one they cannot get yet
 const CHROME_STORE = 'https://chromewebstore.google.com/detail/hmhmljkgppjpmmoodiboockbboniipcj';
 /** @type {Promise<boolean> | null} */
 let storeCheck = null;
 let storeReady = false;
+let storeVersion = '';
 function checkStore() {
     storeCheck ||= fetch('/api/discord/store', { signal: AbortSignal.timeout(6000) })
         .then(r => (r.ok ? r.json() : null))
-        .then(d => (storeReady = !!d?.chrome && !older(String(d.chrome), EXTENSION_LATEST)))
-        .catch(() => false);
+        .then(d => {
+            // No answer: asked again next time (Settings, the next status)
+            if (!d) return (storeCheck = null, false);
+            storeVersion = d.chrome ? String(d.chrome).slice(0, 20) : '';
+            return (storeReady = !!storeVersion);
+        })
+        .catch(() => (storeCheck = null, false));
     return storeCheck;
 }
+const extensionLatest = () => (!firefox() && storeVersion && older(storeVersion, EXTENSION_LATEST) ? storeVersion : EXTENSION_LATEST);
 // Firefox, Zen, LibreWolf: signed by Mozilla, installed from here (discord/sign-firefox.sh)
 const FIREFOX_ADDON = `${DL}/aniroll-discord-firefox.xpi`;
 
@@ -43,7 +51,7 @@ let video = null;
 let looking = null;      // the show on screen (aniroll:media-shown)
 let party = null;        // the Watch Party you are in (aniroll:party)
 let note = null;         // a line from elsewhere in AniRoll (aniroll:activity, detail { details, state } or null)
-/** @type {{ extension?: string, helper?: boolean, helperVersion?: string, discord?: boolean } | null} */
+/** @type {{ extension?: string, helper?: boolean, helperVersion?: string, helperAuto?: boolean | null, helperStaged?: string, discord?: boolean } | null} */
 let ext = null;          // the extension's last word
 let idle = false;        // in the background for a while with nothing playing: no status
 let idleTimer = 0;
@@ -217,7 +225,14 @@ export function startPresence() {
     window.addEventListener('message', (e) => {
         if (e.source !== window || e.data?.aniroll !== 'presence-ext' || e.data.type !== 'status') return;
         const first = !ext;
-        ext = { extension: e.data.extension, helper: !!e.data.helper, helperVersion: String(e.data.helperVersion || ''), discord: !!e.data.discord };
+        ext = {
+            extension: e.data.extension, helper: !!e.data.helper, helperVersion: String(e.data.helperVersion || ''),
+            // Extension 1.0.3 and helpers from 1.0.5 / 1.1.5 on: whether it updates itself (null: too old to say)
+            // and a newer version it already put in place, run from its next start
+            helperAuto: typeof e.data.helperAuto === 'boolean' ? e.data.helperAuto : null,
+            helperStaged: String(e.data.helperStaged || '').slice(0, 20),
+            discord: !!e.data.discord,
+        };
         nagOutdated();
         // The extension just arrived (or came back): it has not heard anything yet
         if (first) sent = '';
@@ -237,14 +252,17 @@ function older(version, than) {
     }
     return false;
 }
-const helperOutdated = () => !!ext?.helper && older(ext.helperVersion || '', helperLatest());
-const extensionOutdated = () => !!ext && older(ext.extension || '', EXTENSION_LATEST);
+// A newer helper already put in place (staged) counts: it only waits for the browser to start it
+const helperOutdated = () => !!ext?.helper && older(ext.helperVersion || '', helperLatest())
+    && (!ext.helperStaged || older(ext.helperStaged, helperLatest()));
+const extensionOutdated = () => !!ext && older(ext.extension || '', extensionLatest());
 
 // Once per new version, and only for people who use it: a note with the way to Settings
-function nagOutdated() {
+async function nagOutdated() {
     if (!presenceOn()) return;
+    if (!firefox()) await checkStore();
     const nags = [];
-    if (extensionOutdated()) nags.push({ key: EXT_NAG_KEY, version: EXTENSION_LATEST, what: 'the browser extension' });
+    if (extensionOutdated()) nags.push({ key: EXT_NAG_KEY, version: extensionLatest(), what: 'the browser extension' });
     if (helperOutdated()) nags.push({ key: NAG_KEY, version: helperLatest(), what: 'its helper' });
     const due = nags.filter(n => { try { return localStorage.getItem(n.key) !== n.version; } catch { return false; } });
     if (!due.length) return;
@@ -273,6 +291,13 @@ function stepHtml(n, done, title, body) {
         <div class="dc-step-body"><div class="dc-step-title">${title}${done ? '<span class="dc-sr"> (done)</span>' : ''}</div>${done ? '' : body}</div>
     </li>`;
 }
+
+// The version the extension or the helper says it runs, behind its step ("The helper on this computer 1.1.5 ·
+// updates itself"); a helper too old to say whether it updates itself leaves that out
+const versionTag = (v, auto = null) => {
+    const bits = [v ? esc(v) : '', auto === true ? 'updates itself' : auto === false ? 'updated by hand' : ''].filter(Boolean);
+    return bits.length ? ` <span class="dc-step-ver">${bits.join(' · ')}</span>` : '';
+};
 
 /** @param {HTMLElement} box */
 export function mountPresenceSettings(box) {
@@ -327,20 +352,23 @@ export function mountPresenceSettings(box) {
         const hasHelper = !!ext?.helper;
         const outdated = helperOutdated();
         const on = presenceOn();
+        // A newer helper already put in place by updating itself, waiting for the next start
+        const staged = hasHelper && ext?.helperStaged && older(ext.helperVersion, ext.helperStaged) ? ext.helperStaged : '';
         box.innerHTML = `
             <ol class="dc-steps">
-                ${stepHtml(1, hasExt && !extensionOutdated(), extensionOutdated() ? `An update for the extension (${esc(ext?.extension || '')} → ${EXTENSION_LATEST})` : 'The AniRoll for Discord extension', extensionBody())}
-                ${stepHtml(2, hasHelper && !outdated, outdated ? `An update for the helper (${esc(ext?.helperVersion || '')} → ${helperLatest()})` : 'The helper on this computer',
+                ${stepHtml(1, hasExt && !extensionOutdated(), extensionOutdated() ? `An update for the extension (${esc(ext?.extension || '')} → ${extensionLatest()})` : `The AniRoll for Discord extension${versionTag(ext?.extension)}`, extensionBody())}
+                ${stepHtml(2, hasHelper && !outdated, outdated ? `An update for the helper (${esc(ext?.helperVersion || '')} → ${helperLatest()})` : `The helper on this computer${hasHelper ? versionTag(ext?.helperVersion, ext?.helperAuto) : ''}`,
                     !hasExt ? '<p class="settings-hint">After the extension.</p>'
                         : outdated ? `<p class="settings-hint">Set it up again the same way; it replaces the old one. Reload AniRoll afterwards.</p>${helperBody()}` : helperBody())}
                 ${stepHtml(3, hasHelper && !!ext?.discord, 'The Discord app, running', hasHelper ? '<p class="settings-hint">Open Discord on this computer (the app, not the website).</p>' : '<p class="settings-hint">After the helper.</p>')}
             </ol>
+            ${staged ? `<p class="settings-hint dc-staged">Helper ${esc(staged)} is ready: close every AniRoll tab and open AniRoll again to start it.</p>` : ''}
             <label class="settings-choice"><input type="checkbox" id="dc-toggle" ${on ? 'checked' : ''}>
                 <span>Show what I do in AniRoll in my Discord status</span></label>
             <p class="settings-hint">The episode you watch (with the time left), the show you look at, your Watch Party with a button to join it. Stays on this computer: AniRoll's server never sees it.</p>
             ${hasExt ? '' : '<button class="glass-btn glass-btn-secondary glass-btn-sm" type="button" data-dc-check>Check again</button>'}
-            ${os === 'windows' || os === 'mac' || os === 'linux' ? `<details class="dc-remove">
-                <summary>Updating the helper by itself</summary>
+            ${os === 'windows' || os === 'mac' || os === 'linux' ? `<details class="dc-remove"${hasHelper && ext?.helperAuto === false ? ' open' : ''}>
+                <summary>Updating the helper by itself${hasHelper && ext?.helperAuto != null ? `: ${ext.helperAuto ? 'on' : 'off'}` : ''}</summary>
                 <p class="settings-hint">When it is on, the helper looks for a new version each time AniRoll talks to it and puts it in place in the background. Turn it on or off in ${os === 'windows' ? 'PowerShell' : 'a terminal'}:</p>
                 ${copyLine(autoLine('on'))}${copyLine(autoLine('off'))}
             </details>` : ''}
