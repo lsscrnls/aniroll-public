@@ -153,7 +153,7 @@ function renderDetailHTML(media) {
                 <img src="${media.coverImage?.extraLarge || media.coverImage?.large}" alt="${esc(titlePref(media.title))}">
             </div>
             <div class="detail-info">
-                <h1 class="detail-title">${esc(titlePref(media.title))}</h1>
+                <h1 class="detail-title" data-t="${esc(titlePref(media.title))}"><span>${esc(titlePref(media.title))}</span></h1>
                 ${media.title?.english && media.title.english !== titlePref(media.title) ? `<div class="detail-sub">${esc(media.title.english)}</div>` : ''}
                 ${media.title?.native ? `<div class="detail-sub" style="font-size:0.85rem">${esc(media.title.native)}</div>` : ''}
                 ${scoreHtml(media)}
