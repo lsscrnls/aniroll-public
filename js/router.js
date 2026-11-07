@@ -31,6 +31,11 @@ export function overridePage(pattern, handler) {
     return Promise.resolve();
 }
 
+// The current page drawn again (a no-op before the router has started)
+export function redraw() {
+    return started ? resolve() : Promise.resolve();
+}
+
 export function navigate(path) {
     window.location.hash = path;
 }

@@ -5,6 +5,9 @@
 // The Roll page (#/roll): picks tonight's show from your Planning list, optionally with recommended
 // titles that are not on your list yet, and plays the reel (js/reel.js) to reveal it.
 
+// Lets another look draw the roll its own way instead of the reel; null brings the reel back.
+export function setRollLook(look) { return null; }
+
 // Draws the page into `content`, like every page (see js/router.js).
 export async function render({ content }) {
     content.innerHTML = '<div class="page-enter"><p class="empty-state">This part of AniRoll is not in the public source. Try it on aniroll.app.</p></div>';

@@ -3,8 +3,16 @@
 // What it is for, and what each export promises, is described below; how it works is the part left out.
 
 
+export function dayStart(seconds) { return null; }
+
+export function tvTime(seconds) { return null; }
+
 export async function render({ content }) {
     content.innerHTML = '<div class="page-enter"><p class="empty-state">This part of AniRoll is not in the public source. Try it on aniroll.app.</p></div>';
 }
+
+export function staticRun(scr, ms = 0) { return null; }
+
+export function osd(scr, text) { return null; }
 
 export const HOME_STYLE = '';
