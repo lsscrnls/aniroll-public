@@ -178,6 +178,7 @@ const design = process.env.DESIGN || 'm3';
     await shot(p, 'social', '#/social', { ms: 5000 });
     await shot(p, 'notifications', '#/notifications', { ms: 4000 });
     await shot(p, 'settings', '#/settings?tab=appearance', { ms: 2500 });
+    await shot(p, 'settings-jf', '#/settings?tab=jellyfin', { ms: 2500 });
     await shot(p, 'profile', '#/profile', { ms: 5000 });
     await shot(p, 'full', '#/anime/154587/full', { ms: 6000, full: true });
     await shot(p, 'studio', '#/studio/11', { ms: 6000 });
