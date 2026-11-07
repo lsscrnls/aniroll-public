@@ -22,7 +22,7 @@ else
         case "$f" in
             js/pages/play.js|js/player/*|tools/e2e/jellyfin-mock.js|tools/e2e/media/*) picked+=(player) ;;
             js/pages/watchparty.js) picked+=(party) ;;
-            js/drift.js|js/pages/shelf.js|js/touches.js|js/tint.js|tools/e2e/private.js) picked+=(private) ;;
+            js/drift.js|js/pages/shelf.js|js/touches.js|js/tint.js|js/tint-home.js|tools/e2e/private.js) picked+=(private) ;;
             js/whatsnew.js|js/landing.js) picked+=(misc) ;;
             js/seat.js|js/pages/admin.js) picked+=(seats) ;;
             js/pages/studio.js|js/pages/season.js) picked+=(discover) ;;
