@@ -19,7 +19,7 @@ export function nowLabel(s) {
     return s.type === 'Movie' ? sessionTitle(s) : `${sessionTitle(s)} · E${s.episode ?? '?'}`;
 }
 
-function trackingText(s, trackAt) {
+export function trackingText(s, trackAt) {
     if (s.tracked === 'saved') return s.rewatch ? 'Saved to AniList as a rewatch' : 'Saved to AniList';
     if (s.tracked === 'already') return 'Already on your AniList';
     if (s.tracked === 'completed') {
@@ -34,9 +34,9 @@ function trackingText(s, trackAt) {
 }
 
 // Not matched on AniList: a series can be linked by hand (movies cannot, they have no episodes to offset)
-const unmatched = (s) => s.type === 'Episode' && (s.tracked === 'unmatched' || s.unmatched === 'not-found');
+export const unmatched = (s) => s.type === 'Episode' && (s.tracked === 'unmatched' || s.unmatched === 'not-found');
 
-function minutesLeft(s) {
+export function minutesLeft(s) {
     if (!s.runtime || s.stopped) return '';
     const min = Math.max(0, Math.round((s.runtime - s.position) / TICKS_PER_MIN));
     return min ? `${min} min left` : '';
