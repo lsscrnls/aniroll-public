@@ -16,7 +16,7 @@ import threading
 import time
 import urllib.request
 
-VERSION = '1.1.3'
+VERSION = '1.1.5'
 CLIENT_ID = '1558496660953501827'
 # Discord takes five updates in twenty seconds; one every five keeps clear of that, and in between
 # only the newest one counts
@@ -290,7 +290,12 @@ def run_host(stdin=None, connect=Discord):
     up = False
 
     def report():
-        send({'type': 'status', 'discord': dc is not None, 'version': VERSION})
+        # auto_update and staged for Settings → Discord: whether it keeps itself up to date, and a newer
+        # version already put in place that the next start runs
+        send({'type': 'status', 'discord': dc is not None, 'version': VERSION,
+              'auto_update': bool(load_settings().get('auto_update')), 'staged': staged[0]})
+
+    shown = ''
 
     while True:
         try:
@@ -316,8 +321,9 @@ def run_host(stdin=None, connect=Discord):
                 dirty = True
             except Exception:  # noqa: BLE001 — Discord not running (yet)
                 dc = None
-        if (dc is not None) != up:
+        if (dc is not None) != up or staged[0] != shown:
             up = dc is not None
+            shown = staged[0]
             report()
         if dc is not None and dirty and (last_sent == 0 or now - last_sent >= MIN_GAP):
             try:
@@ -333,12 +339,13 @@ def run_host(stdin=None, connect=Discord):
 # ===== Updating itself (as discord/helper/update.go) =====
 # When turned on, each start by a browser asks aniroll.app for the newest helper.py and, when it is newer,
 # puts it in place; the next start runs it. update.json only counts with a valid signature from
-# discord/build.sh (the key stays on the build computer). A new Python needs install.ps1 again.
+# discord/build.sh (the key stays on the build computer). Python itself is only renewed by install.ps1.
 
 UPDATE_BASE = 'https://aniroll.app/downloads/discord'
 UPDATE_KEY = 'KQq/4EjU2jq2ZFoMGDUq/906uoMOCJEMQnBJsfesTC0='
 HERE = os.path.dirname(os.path.abspath(__file__))
 SETTINGS = os.path.join(HERE, 'settings.json')
+staged = ['']  # the version self_update put in place, run from the next start
 
 # Ed25519 (RFC 8032, verifying only): the standard library has none
 _P = 2 ** 255 - 19
@@ -436,6 +443,16 @@ def newer(a, b):
     return x + [0] * (n - len(x)) > y + [0] * (n - len(y))
 
 
+def wanted(h, python=None):
+    """Whether update.json's Windows entry is worth taking: newer, and this Python is at least the one it needs.
+    helper.py keeps to the standard library, so a newer Python in the zips does not hold it back (until 1.1.3 the
+    Python had to match exactly, and as each release raised it the helper never updated by itself)"""
+    if not isinstance(h, dict) or not newer(str(h.get('version', '')), VERSION):
+        return False
+    need = str(h.get('python_min') or h.get('python') or '')
+    return bool(need) and not newer(need, python or platform.python_version())
+
+
 def _fetch(url, limit):
     with urllib.request.urlopen(url, timeout=60) as r:
         data = r.read(limit + 1)
@@ -455,7 +472,7 @@ def self_update():
         if not ed25519_ok(base64.b64decode(UPDATE_KEY), body, sig):
             return
         h = json.loads(body).get('helpers', {}).get('windows', {})
-        if not newer(str(h.get('version', '')), VERSION) or h.get('python') != platform.python_version():
+        if not wanted(h):
             return
         code = _fetch(UPDATE_BASE + '/helper.py', 1 << 20)
         if hashlib.sha256(code).hexdigest() != h.get('sha256'):
@@ -464,6 +481,7 @@ def self_update():
         with open(tmp, 'wb') as f:
             f.write(code)
         os.replace(tmp, os.path.join(HERE, 'helper.py'))
+        staged[0] = str(h.get('version', ''))[:20]
     except Exception:  # noqa: BLE001 — offline, server away: next time
         pass
 

@@ -67,6 +67,8 @@ const design = process.env.DESIGN || 'm3';
         await wait(ms);
         await settle(p);
         if (act) { await act(p); await wait(1500); await settle(p); }
+        // The M3 cursor stays where the last click left it (a ring on the button: "Roll Ogain"); a screenshot shows the page, not the mouse
+        await p.addStyleTag({ content: '.m3-cursor { display: none !important; }' });
         await p.screenshot({ path: path.join(OUT, `${theme}-${name}.png`), fullPage: full });
         if (process.env.STYLES) await dumpStyles(p, name);
         console.log('shot', name);

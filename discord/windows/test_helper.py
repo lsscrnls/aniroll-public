@@ -77,6 +77,25 @@ def read_frame(stream):
 
 
 @unittest.skipIf(os.name == 'nt', 'the stand-in for Discord uses a Unix socket')
+class Update(unittest.TestCase):
+    def test_wanted(self):
+        up = lambda v, **k: {'version': v, 'sha256': 'x', **k}
+        cases = [
+            (up('9.9.9', python='3.15.2', python_min='3.14'), '3.14.8', True),   # an older Python than the zips'
+            (up('9.9.9', python='3.15.2', python_min='3.14'), '3.15.2', True),
+            (up('9.9.9', python='3.15.2', python_min='3.16'), '3.15.2', False),  # needs a newer Python
+            (up('9.9.9', python='3.15.2'), '3.15.2', True),                      # no python_min: the old field
+            (up('9.9.9', python='3.15.2'), '3.15.9', True),
+            (up('9.9.9'), '3.15.2', False),                                      # says nothing about Python
+            (up(helper.VERSION, python_min='3.14'), '3.15.2', False),            # not newer
+            (up('0.1', python_min='3.14'), '3.15.2', False),
+            ('nonsense', '3.15.2', False),
+        ]
+        for h, py, want in cases:
+            with self.subTest(h=h, py=py):
+                self.assertEqual(helper.wanted(h, py), want)
+
+
 class Host(unittest.TestCase):
     def test_browser_to_discord(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -89,6 +108,8 @@ class Host(unittest.TestCase):
                 first = read_frame(p.stdout)
                 self.assertEqual(first['type'], 'status')
                 self.assertEqual(first['version'], helper.VERSION)
+                self.assertIs(first['auto_update'], False)  # no settings.json next to the helper here
+                self.assertEqual(first['staged'], '')
                 # Discord is found on the first round, after the answer to hello
                 if not first['discord']:
                     self.assertTrue(read_frame(p.stdout)['discord'])

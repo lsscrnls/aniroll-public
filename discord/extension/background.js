@@ -10,10 +10,12 @@ let helper = null;       // the native port while the helper runs
 let helperUp = false;    // it answered
 let discordUp = false;
 let helperVersion = ''; // what the helper says it is, so AniRoll can tell when it is out of date
+let helperAuto = null;   // whether it updates itself (null: a helper too old to say)
+let helperStaged = '';   // a newer version it put in place, run from its next start
 let triedAt = 0;
 
 function status() {
-    return { type: 'status', extension: VERSION, helper: helperUp, helperVersion, discord: discordUp };
+    return { type: 'status', extension: VERSION, helper: helperUp, helperVersion, helperAuto, helperStaged, discord: discordUp };
 }
 
 function tellPages() {
@@ -36,6 +38,8 @@ function startHelper() {
         helperUp = true;
         discordUp = !!msg.discord;
         helperVersion = typeof msg.version === 'string' ? msg.version.slice(0, 20) : '';
+        helperAuto = typeof msg.auto_update === 'boolean' ? msg.auto_update : null;
+        helperStaged = typeof msg.staged === 'string' ? msg.staged.slice(0, 20) : '';
         tellPages();
     });
     helper.onDisconnect.addListener(() => {
@@ -43,6 +47,8 @@ function startHelper() {
         helperUp = false;
         discordUp = false;
         helperVersion = '';
+        helperAuto = null;
+        helperStaged = '';
         tellPages();
     });
     helper.postMessage({ type: 'hello' });

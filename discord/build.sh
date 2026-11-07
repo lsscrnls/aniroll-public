@@ -72,7 +72,9 @@ sha = lambda f: hashlib.sha256(open(f'{out}/{f}', 'rb').read()).hexdigest()
 helpers = {p: {'version': go_v, 'sha256': sha(f'aniroll-discord-{p}'), 'go': toolchain}
            for p in ('linux-amd64', 'linux-arm64', 'macos-arm64', 'macos-amd64')}
 py_v = re.search(r"PY_V = '([0-9.]+)'", open('discord/build.sh').read()).group(1)  # the Python in the zips
-helpers['windows'] = {'version': win_v, 'sha256': sha('helper.py'), 'python': py_v}
+# "python": the Python in the zips, which helpers up to 1.1.3 want exactly; from 1.1.4 on "python_min" counts,
+# the oldest Python helper.py runs on (the first one shipped, so every install so far takes it)
+helpers['windows'] = {'version': win_v, 'sha256': sha('helper.py'), 'python': py_v, 'python_min': '3.14'}
 open(f'{out}/update.json', 'w').write(json.dumps({'helpers': helpers}, indent=1) + '\n')
 PY
 openssl pkeyutl -sign -inkey "$sign_key" -rawin -in "$out/update.json" | base64 -w0 > "$out/update.sig"

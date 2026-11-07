@@ -5064,6 +5064,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 .dc-step-body { min-width: 0; flex: 1; display: grid; gap: 6px; justify-items: start; }
 .dc-step-title { font-weight: 600; padding-top: 4px; }
 .dc-step.is-done .dc-step-title { color: var(--text-secondary); }
+.dc-step-ver { font-weight: 400; font-variant-numeric: tabular-nums; color: var(--text-secondary); margin-left: 4px; }
 .dc-list { margin: 0; padding-left: 1.2em; }
 .dc-list code, .dc-copy code { font-size: 0.8rem; }
 .dc-copy { display: flex; gap: var(--space-sm); align-items: center; max-width: 100%; }

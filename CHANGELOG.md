@@ -1,6 +1,16 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.1.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.6.
+
+## 7 November 2026 – Discord on Chrome catches up
+
+- **AniRoll for Discord** 1.0.3 is now in the Chrome Web Store, so Chrome, Edge and Brave now show your helper version and its update state in **Settings → Discord** too. Chrome updates the extension by itself.
+
+## 6 November 2026 – A steadier song finder
+
+- **What's this song?** in the player no longer trips over itself on slower devices when it finishes listening.
+- On Windows, **AniRoll for Discord** now really keeps itself up to date when you let it. Once more by hand with the line from Settings → Discord, after that it updates by itself.
+- **Settings → Discord** shows which versions of the extension and the helper you run, whether the helper keeps itself up to date, and when a new one is ready to start.
 
 ## 5 November 2026 – Subtitles glide again
 

@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -136,6 +137,14 @@ func fetch(client *http.Client, url string, max int64) ([]byte, error) {
 	return b, err
 }
 
+// staged is the version selfUpdate put in place, which the next start runs (for Settings → Discord)
+var staged atomic.Value
+
+func stagedVersion() string {
+	v, _ := staged.Load().(string)
+	return v
+}
+
 // selfUpdate puts the newest helper in place when updating by itself is on; quiet on any failure,
 // the next start tries again
 func selfUpdate() error {
@@ -186,5 +195,6 @@ func selfUpdate() error {
 		os.Remove(tmp)
 		return err
 	}
+	staged.Store(h.Version)
 	return nil
 }

@@ -83,10 +83,20 @@ async function record(video, { onProgress, signal } = {}) {
     const mute = ctx.createGain();
     mute.gain.value = 0;
     await new Promise((resolve, reject) => {
-        const stop = () => { node.disconnect(); source.disconnect(node); mute.disconnect(); };
-        signal?.addEventListener('abort', () => { stop(); reject(new DOMException('Stopped', 'AbortError')); }, { once: true });
+        // Once only: buffers already queued still arrive after the last one, and a later abort (the card
+        // closed, the next episode) would disconnect again, which throws
+        let stopped = false;
+        const stop = () => {
+            if (stopped) return;
+            stopped = true;
+            node.onaudioprocess = null;
+            signal?.removeEventListener('abort', onAbort);
+            node.disconnect(); source.disconnect(node); mute.disconnect();
+        };
+        const onAbort = () => { stop(); reject(new DOMException('Stopped', 'AbortError')); };
+        signal?.addEventListener('abort', onAbort, { once: true });
         node.onaudioprocess = (ev) => {
-            if (video.paused) return; // only what plays counts
+            if (stopped || video.paused) return; // only what plays counts
             const a = ev.inputBuffer.getChannelData(0);
             const b = ev.inputBuffer.numberOfChannels > 1 ? ev.inputBuffer.getChannelData(1) : a;
             const n = Math.min(a.length, want - at);
