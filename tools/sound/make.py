@@ -44,22 +44,22 @@ def onsets(x, count):
         out.append(k * 240)
     return out
 
-def pitch(seg):
+def pitch(seg, lo=150):
     # The lowest partial at least a fifth as strong as the strongest one; the strongest is often an overtone
     a = seg[int(0.03 * SR):int(0.33 * SR)].mean(1); a = a * np.hanning(len(a))
     f = np.abs(np.fft.rfft(a, 1 << 17)); fr = np.fft.rfftfreq(1 << 17, 1 / SR)
-    band = (fr > 150) & (fr < 9000); fb, ff = fr[band], f[band]
+    band = (fr > lo) & (fr < 9000); fb, ff = fr[band], f[band]
     peaks = [i for i in range(1, len(ff) - 1) if ff[i] >= ff[i - 1] and ff[i] >= ff[i + 1] and ff[i] > ff.max() * 0.2]
     return 69 + 12 * np.log2(fb[peaks[0]] / 440)
 
-def find(path, wanted):
+def find(path, wanted, lo=150):
     # The order in the file can't be trusted (a rattle counts, a note is missed, everything after shifts by one),
     # so measure every attack and keep, per wanted note, the loudest one that measures as that note.
     x = load(path); best = {}
     for s0 in onsets(x, 40):
         seg = x[max(0, s0 - int(0.004 * SR)):s0 + int(3 * SR)]
         if len(seg) < int(0.4 * SR): continue
-        got = pitch(seg); midi = round(got); level = np.abs(seg[:int(0.2 * SR)]).max()
+        got = pitch(seg, lo); midi = round(got); level = np.abs(seg[:int(0.2 * SR)]).max()
         if midi in wanted and abs(got - midi) < 0.4 and level > best.get(midi, (0,))[0]: best[midi] = (level, seg, got)
     missing = wanted - best.keys()
     if missing: sys.exit(f'{path.name}: notes {sorted(missing)} not found')
@@ -96,16 +96,17 @@ def build(notes, seq, ir):
     f = int(0.03 * SR); y[-f:] *= np.linspace(1, 0, f)[:, None]
     return y.astype(np.float32)
 
-with tempfile.TemporaryDirectory() as tmp:
-    notes = {}
-    for name, wanted in FILES.items():
-        p = Path(tmp) / name
-        subprocess.run(['curl', '-sfL', '-o', str(p), BASE + name], check=True)
-        notes.update(find(p, wanted))
-OUT.mkdir(parents=True, exist_ok=True)
-ir = room()
-for name, seq in TONES.items():
-    y = build(notes, seq, ir)
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(SR), '-ac', '2', '-i', '-',
-                    '-c:a', 'libmp3lame', '-b:a', '160k', str(OUT / f'{name}.mp3')], input=y.tobytes(), check=True)
-    print(f'{name}.mp3: peak {20 * np.log10(np.abs(y).max()):.1f} dBFS, {len(y) / SR:.2f} s')
+if __name__ == '__main__':   # make-dash.py borrows the functions above
+    with tempfile.TemporaryDirectory() as tmp:
+        notes = {}
+        for name, wanted in FILES.items():
+            p = Path(tmp) / name
+            subprocess.run(['curl', '-sfL', '-o', str(p), BASE + name], check=True)
+            notes.update(find(p, wanted))
+    OUT.mkdir(parents=True, exist_ok=True)
+    ir = room()
+    for name, seq in TONES.items():
+        y = build(notes, seq, ir)
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(SR), '-ac', '2', '-i', '-',
+                        '-c:a', 'libmp3lame', '-b:a', '160k', str(OUT / f'{name}.mp3')], input=y.tobytes(), check=True)
+        print(f'{name}.mp3: peak {20 * np.log10(np.abs(y).max()):.1f} dBFS, {len(y) / SR:.2f} s')

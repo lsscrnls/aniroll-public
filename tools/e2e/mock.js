@@ -22,6 +22,8 @@ const LIST_STATUSES = ['CURRENT', 'PLANNING', 'COMPLETED', 'PAUSED', 'DROPPED', 
 const ACTIVITY_TYPES = ['ANIME_LIST', 'TEXT', 'ANIME_LIST', 'MANGA_LIST'];
 const NOTIFICATION_TYPES = ['AIRING', 'FOLLOWING', 'RELATED_MEDIA_ADDITION', 'ACTIVITY_REPLY'];
 const TEXT = 'A post with **bold**, a list:\n- one\n- two\nand https://anilist.co/anime/21 as a card.';
+// AniList spoilers in posts: a labelled inline one, one nested in another, a block
+const SPOILERS = '\nIt ends with ~!{Ending} Bobby leaves !~ and ~! outer ~! inner !~ !~ too.\n~!\nThe whole twist\n!~';
 
 function scalar(name, parent, index, path) {
     const n = name.toLowerCase();
@@ -49,7 +51,8 @@ function scalar(name, parent, index, path) {
     if (n === 'countryoforigin') return 'JP';
     if (n === 'scoreformat') return 'POINT_100';
     if (n === 'titlelanguage') return 'ROMAJI';
-    if (n === 'text' || n === 'description' || n === 'about') return TEXT;
+    if (n === 'text') return TEXT + SPOILERS;
+    if (n === 'description' || n === 'about') return TEXT;
     if (n === 'context' || n === 'reason') return ' aired';
     if (n === 'siteurl' || n === 'url') return 'https://anilist.co/anime/21';
     if (n === 'site') return 'Crunchyroll';

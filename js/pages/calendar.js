@@ -18,6 +18,10 @@ const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 
 const dayKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 const sameDay = (a, b) => dayKey(a) === dayKey(b);
 
+// Another look can draw the week itself (gridLook.week(grid, week)); the controls, loading and filters stay this page's
+let gridLook = null;
+export function setGridLook(look) { gridLook = look; }
+
 export async function render({ content, query: q }) {
     const token = getToken();
     const now = new Date();
@@ -396,6 +400,15 @@ export async function render({ content, query: q }) {
                 : 'Your friends\' calendars could not be loaded.'}</div></div>`;
             return;
         }
+        if (gridLook && view === 'week') {
+            gridLook.week(grid, {
+                days, items: filtered, today, showImages,
+                stand: standingOf, isFinale, epLabel, timeOf,
+                onList: (item) => userOnList.has(item.media?.id),
+                friendsOf: (item) => (filter === 'friends' ? watchersOf(item) : []),
+            });
+            return;
+        }
         if (isMobile) grid.innerHTML = renderAgenda(days, byDay, today);
         else if (view === 'week') grid.innerHTML = renderWeek(days, byDay, today);
         else grid.innerHTML = renderMonth(days, byDay, today);
@@ -439,14 +452,19 @@ export async function render({ content, query: q }) {
     }
 
     // Where you stand with a show on your list, next to one of its episodes
-    function standing(item) {
+    // kind: planning, done, next or behind; null when it is not on your list
+    function standingOf(item) {
         const entry = userEntries.get(item.media?.id);
-        if (!entry) return '';
-        if (entry.status === 'PLANNING') return '<span class="calendar-week-you">Planning</span>';
+        if (!entry) return null;
+        if (entry.status === 'PLANNING') return { kind: 'planning', text: 'Planning' };
         const behind = item.episode - 1 - entry.progress;
-        if (entry.progress >= item.episode) return '<span class="calendar-week-you done">Watched</span>';
-        if (behind <= 0) return '<span class="calendar-week-you next">Next up</span>';
-        return `<span class="calendar-week-you behind">${behind} behind</span>`;
+        if (entry.progress >= item.episode) return { kind: 'done', text: 'Watched' };
+        if (behind <= 0) return { kind: 'next', text: 'Next up' };
+        return { kind: 'behind', text: `${behind} behind` };
+    }
+    function standing(item) {
+        const s = standingOf(item);
+        return s ? `<span class="calendar-week-you${s.kind === 'planning' ? '' : ` ${s.kind}`}">${s.text}</span>` : '';
     }
 
     // Desktop week: seven equal columns across the width, each a small agenda with time, full

@@ -6,6 +6,11 @@ import { getToken, isLoggedIn } from '../auth.js';
 import { getActiveParty, startParty, createPartyLink } from './watchparty.js';
 import { showConfirm } from '../a11y.js';
 import { dismissedIds, setDismissed } from '../dismissed.js';
+import { play } from '../sound.js';
+
+// Another look can rearrange the filled page or sheet (js/tint.js); null for the plain one
+let pageLook = null;
+export function setPageLook(look) { pageLook = look; }
 
 export async function renderPanel(id, container) {
     const token = getToken();
@@ -21,6 +26,7 @@ export async function renderPanel(id, container) {
     setupDetailTabs(container);
     setupRelatedPlan(container, token);
     loadPlayButton(media, container);
+    pageLook?.(media, container, { where: 'panel' });
     // From TMDB while AniList is down: friends and your match need AniList, so they wait for it
     if (media.fallback) return;
     loadWatchOrder(media, container);
@@ -43,6 +49,7 @@ export async function render({ params, content }) {
     setupDetailTabs(content);
     setupRelatedPlan(content, token);
     loadPlayButton(media, content);
+    pageLook?.(media, content, { where: 'page' });
     // From TMDB while AniList is down: friends and your match need AniList, so they wait for it
     if (media.fallback) return;
     loadWatchOrder(media, content);
@@ -640,6 +647,7 @@ function setupListActions(media, token, root = document) {
         if (max && progress >= max) return;
         progress++;
         updateProgressDisplay(progress, max, root);
+        play('step');                                         // only some sound sets have one
         saveProgress();
     });
 

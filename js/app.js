@@ -103,6 +103,8 @@ async function init() {
         import('./pages/watchparty.js').then(async m => {
             if (!localStorage.getItem('aniroll_watchparty')) await m.restoreHostParty();
             m.renderPartyPill();
+            // A party moved your list while you weren't watching (or the host removed you): offer the undo
+            m.checkPartyUndo();
         });
     }
     // The Jellyfin connection belongs to the AniList account, so pull it in on this device

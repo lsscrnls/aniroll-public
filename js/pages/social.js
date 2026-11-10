@@ -3,6 +3,11 @@ import { getState, toast, esc, titlePref, emptyIcon, loginState, SKELETON, undoa
 import { getToken, isLoggedIn } from '../auth.js';
 import { matchDna } from '../dna.js';
 import { freshMatch, keepMatch } from '../dnamatches.js';
+import { parseSpoilers } from '../spoiler.js';
+
+// Another look can add to each post's row and draw every post as a row (js/tint.js); null for the plain one
+let feedLook = null;
+export function setFeedLook(look) { feedLook = look; }
 
 export async function render({ content }) {
     const token = getToken();
@@ -71,7 +76,9 @@ export async function render({ content }) {
             await countRewatches(result.activities, rewatchRuns, token);
 
             const html = groupByPerson(collapseRuns(result.activities.filter(a => a)))
-                .map(a => (a.type === 'GROUP' ? renderGroup(a) : renderActivity(a)))
+                .map(a => (a.type === 'GROUP' ? renderGroup(a)
+                    : feedLook && a.user?.id ? renderGroup({ type: 'GROUP', id: `g${a.id}`, user: a.user, createdAt: a.createdAt, items: [a] })
+                    : renderActivity(a)))
                 .join('');
 
             // Added below, not redrawn: a reply being typed further up stays
@@ -129,7 +136,11 @@ export async function render({ content }) {
                 socialContent.dataset.mediaLinks = '1';
                 socialContent.addEventListener('click', (e) => {
                     // A hidden spoiler swallows the first click — nothing inside opens by accident
-                    const spoiler = e.target.closest('.activity-spoiler:not(.revealed)');
+                    // (the outermost hidden one: a spoiler inside a hidden spoiler can't be seen yet)
+                    let spoiler = e.target.closest('.activity-spoiler:not(.revealed)');
+                    while (spoiler?.parentElement?.closest('.activity-spoiler:not(.revealed)')) {
+                        spoiler = spoiler.parentElement.closest('.activity-spoiler:not(.revealed)');
+                    }
                     if (spoiler) {
                         e.preventDefault();
                         spoiler.classList.add('revealed');
@@ -333,13 +344,39 @@ function formatInline(line) {
     return s.replace(/⟦(\d+)⟧/g, (_, i) => tokens[i]);
 }
 
-// Spoilers ~!…!~ can span several lines and contain links or cards, so they are split off
-// first and their inside is rendered like any other text, hidden until clicked.
+// Spoilers ~!…!~ (js/spoiler.js) can nest, carry a label and contain links or cards, so they are
+// split off first and their inside is rendered like any other text, hidden until clicked.
+// A block spoiler gets the full line markup inside; an inline one stays on its line.
 // ~~~…~~~ centres its content the same way (AniList uses it a lot around images).
 function formatActivityText(text) {
-    return splitBlocks(text, /~!([\s\S]*?)!~/,
-        inner => `<span class="activity-spoiler" title="Spoiler — click to show">${formatCentered(inner)}</span>`,
-        formatCentered);
+    return renderSpoilerNodes(parseSpoilers(text), false);
+}
+
+function renderSpoilerNodes(nodes, inline) {
+    return nodes.map((n, i) => {
+        if (n.type === 'spoiler') return renderSpoiler(n, inline);
+        // A block separates itself, so the line breaks right around it would only add blank lines
+        let t = n.text;
+        if (nodes[i - 1]?.block) t = t.replace(/^[ \t]*\n/, '');
+        if (nodes[i + 1]?.block) t = t.replace(/\n[ \t]*$/, '');
+        return inline ? formatInline(t) : formatCentered(t);
+    }).join('');
+}
+
+function renderSpoiler(n, inline) {
+    const block = n.block && !inline;
+    const tag = block ? 'div' : 'span';
+    const cls = `activity-spoiler${block ? ' is-block' : ''}${n.label ? ' has-label' : ''}`;
+    const label = n.label || block ? `<span class="spoiler-label">${esc(n.label || 'Spoiler')}</span>` : '';
+    // Inside a block the line breaks right after the opening and before the closing are its own edges
+    const children = n.children.map((c, i, all) => {
+        if (!block || c.type !== 'text') return c;
+        let text = c.text;
+        if (i === 0) text = text.replace(/^[ \t]*\n/, '');
+        if (i === all.length - 1) text = text.replace(/\n[ \t]*$/, '');
+        return { ...c, text };
+    });
+    return `<${tag} class="${cls}" title="Spoiler — click to show">${label}<${tag} class="spoiler-body">${renderSpoilerNodes(children, !block)}</${tag}></${tag}>`;
 }
 
 function formatCentered(text) {
@@ -725,13 +762,13 @@ function renderGroup(group) {
     const items = group.items;
     const plain = items.every(a => a.type !== 'TEXT' && /^(watched episode|read chapter)/i.test(a.status || ''));
     const manga = items.every(a => a.type === 'MANGA_LIST');
-    const summary = plain ? `${manga ? 'Read' : 'Watched'} ${items.length} ${manga ? 'titles' : 'shows'}` : `${items.length} updates`;
+    const summary = items.length < 2 ? '' : plain ? `${manga ? 'Read' : 'Watched'} ${items.length} ${manga ? 'titles' : 'shows'}` : `${items.length} updates`;
     return `<div class="activity-group">
         <div class="activity-header">
             <img class="activity-avatar" src="${group.user?.avatar?.medium || ''}" alt="${esc(group.user?.name)}" data-go="/user/${esc(group.user?.name)}">
             <div>
                 <a href="#/user/${esc(group.user?.name)}" class="activity-user">${esc(group.user?.name)}</a>
-                <div class="activity-time">${summary} · ${api.timeAgo(group.createdAt)}</div>
+                <div class="activity-time">${summary ? `${summary} · ` : ''}${api.timeAgo(group.createdAt)}</div>
             </div>
         </div>
         <div class="activity-rows">${items.map(a => renderRow(a, api.timeAgo(group.createdAt))).join('')}</div>
@@ -767,6 +804,7 @@ function renderRow(a, groupTime) {
                 <div class="activity-text">${formatActivityText(a.text || '')}</div>
             </div>
             ${when}
+            ${feedLook?.extra(a) || ''}
             ${renderActivityActions(a, 'TEXT_ACTIVITY')}
         </div>`;
     }
@@ -781,6 +819,7 @@ function renderRow(a, groupTime) {
             </div>
         </div>
         ${when}
+        ${feedLook?.extra(a) || ''}
         ${ahead ? `<button type="button" class="activity-ahead" title="You have not got this far yet">${esc(ahead)}</button>` : ''}
         ${renderActivityActions(a, 'ACTIVITY')}
     </div>`;

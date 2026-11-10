@@ -43,6 +43,13 @@ export function leaveJoinedParty() { return null; }
 // Starts following the host in the background; js/app.js calls it once on start.
 export function initGuestSync() { return null; }
 
+// Offers (a toast) to take back what a party did to your list while you were not watching
+// or after the host removed you; js/app.js calls it once on start.
+export async function checkPartyUndo({ force = false } = {}) { return null; }
+
+// The dialog listing what parties changed on your list lately, each with Undo.
+export async function openPartyUndo() { return null; }
+
 // Catches up with the host right away.
 export async function syncGuestNow(pushed) { return null; }
 

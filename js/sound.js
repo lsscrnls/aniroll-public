@@ -4,13 +4,24 @@
 // Silent while any video plays, while the tab is hidden, before the first click (browsers keep audio locked
 // until then) and for toasts that don't answer a recent click or key (a background save failing).
 
+// A look can bring a set of its own (setSoundSet): a folder under media/sounds/ and which file each name plays. A name
+// the set leaves out stays silent, so callers may ask for sounds only some sets have ('step', 'tick').
+
 const KEY = 'aniroll_sounds';
-const NAMES = ['success', 'error', 'land'];
+const MARIMBA = { dir: '', files: { success: 'success', error: 'error', land: 'land' } };
 const VOLUME = 0.5;
 const ANSWER_MS = 5000;
 
-let ctx = null, out = null, loading = false, lastGesture = 0, pending = null;
-const buffers = {};
+let ctx = null, out = null, loading = false, lastGesture = 0, pending = null, set = MARIMBA, generation = 0;
+let buffers = {};
+
+/** @param {string | null} dir @param {Record<string, string>} [files] name → file (without .mp3) */
+export function setSoundSet(dir, files) {
+    const next = dir && files ? { dir: `${dir}/`, files } : MARIMBA;
+    if (next.dir === set.dir) return;
+    set = next; buffers = {}; loading = false; pending = null; generation++;
+    if (soundsOn()) load();
+}
 
 export const soundsOn = () => { try { return localStorage.getItem(KEY) !== 'off'; } catch { return true; } };
 export function setSounds(on) {
@@ -24,11 +35,16 @@ export function setSounds(on) {
 function load() {
     if (loading || !ctx) return;
     loading = true;
-    for (const name of NAMES) {
-        fetch(`media/sounds/${name}.mp3`)
+    const { dir, files } = set, gen = generation, names = Object.keys(files);
+    for (const file of new Set(Object.values(files))) {
+        fetch(`media/sounds/${dir}${file}.mp3`)
             .then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
             .then(b => ctx.decodeAudioData(b))
-            .then(buf => { buffers[name] = buf; if (pending === name) { pending = null; play(name); } })
+            .then(buf => {
+                if (gen !== generation) return;               // the set changed while this loaded
+                for (const name of names) if (files[name] === file) buffers[name] = buf;
+                if (pending && files[pending] === file) { const p = pending; pending = null; play(p); }
+            })
             .catch(() => {});                                 // no sound is fine, a broken page is not
     }
 }
@@ -52,13 +68,15 @@ globalThis.addEventListener?.('keydown', unlock, { capture: true, passive: true 
 
 const videoPlaying = () => [...document.querySelectorAll('video')].some(v => !v.paused && !v.ended);
 
-// late: the tone ends something the user started earlier (the roll lands seconds after the click)
-export function play(name, { late = false } = {}) {
+// late: the tone ends something the user started earlier (the roll lands seconds after the click). gain: 0-1, for
+// sounds that repeat and swell or fade (the needle's ticks)
+export function play(name, { late = false, gain = 1 } = {}) {
     const buf = buffers[name];
     if (!buf || ctx?.state !== 'running' || !soundsOn() || document.hidden || videoPlaying()) return;
     if (!late && performance.now() - lastGesture > ANSWER_MS) return;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.connect(out);
+    if (gain === 1) src.connect(out);
+    else { const g = ctx.createGain(); g.gain.value = gain; src.connect(g).connect(out); }
     src.start();
 }

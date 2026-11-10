@@ -3,6 +3,7 @@ import { getState, toast, esc, titlePref, statusLabel, emptyIcon, fmtScore, fmtS
 import { getToken, isLoggedIn } from '../auth.js';
 import { enhanceSelect } from '../select.js';
 import { showScorePrompt } from '../a11y.js';
+import { play } from '../sound.js';
 import { libraryHave, freshLibrary, LIBRARY_EVENT } from '../player/animemap.js';
 
 // View, sort and the airing filter are remembered per browser; the search text is not
@@ -421,7 +422,7 @@ export async function render({ params, content }) {
 
         entry.progress = next;
         updateEntryViews(entry);
-        if (btn.dataset.action === 'inc') emitWatched(entry.media, next);
+        if (btn.dataset.action === 'inc') { emitWatched(entry.media, next); play('step'); }   // only some sound sets have one
 
         const target = next;
         chains.set(entry.id, (chains.get(entry.id) || Promise.resolve()).then(async () => {
