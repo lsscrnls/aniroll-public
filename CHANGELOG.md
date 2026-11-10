@@ -1,6 +1,18 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.6.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.8.
+
+## 10 November 2026 – Spoilers the way AniList writes them now
+
+- Spoilers in posts and replies can now carry a **label**, like “Ending spoiler”. You see the label and decide whether to open it.
+- A spoiler on its own line now sits in a **clearly marked box**, so you can tell where it starts and ends.
+- A spoiler inside another spoiler no longer gives itself away early: the outer one opens first.
+
+## 9 November 2026 – Watch Party: forgot to leave? Take it back
+
+- Hosts can now **remove a member** from their Watch Party, for when someone forgot to leave. They can join again with the invite link.
+- Did a party move your list while you weren't watching? AniRoll now offers to **take it back** on your next visit: per anime or all at once, back to how your list was before you joined, and the list activity the party posted for you is deleted. Posts your friends already replied to stay.
+- You can take back a party's progress for at least 24 hours, from the toast or from the Watch Party page.
 
 ## 7 November 2026 – Discord on Chrome catches up
 

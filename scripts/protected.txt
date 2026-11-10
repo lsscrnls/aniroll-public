@@ -15,3 +15,6 @@ js/tint.js
 js/tint-home.js
 js/tint-list.js
 js/tint-roll.js
+js/tint-guide.js
+js/tint-detail.js
+js/tint-social.js

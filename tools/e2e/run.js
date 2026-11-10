@@ -430,6 +430,31 @@ function staticServer() {
     // Social: markdown renders, replies open, "Reply" mentions the author
     await go('#/social');
     check('social: list markup in a post', !!(await page.$('.activity-text .activity-list li')));
+    // Spoilers: the label stands in for hidden text, nested ones open from the outside in, a block is a box
+    const spoil = await page.evaluate(() => {
+        const post = [...document.querySelectorAll('.activity-text')].find(e => e.querySelector('.activity-spoiler.is-block'));
+        if (!post) return null;
+        const labelled = post.querySelector('.activity-spoiler.has-label');
+        const outer = [...post.querySelectorAll('.activity-spoiler')].find(s => s.querySelector('.activity-spoiler'));
+        const inner = outer?.querySelector('.activity-spoiler');
+        const block = post.querySelector('.activity-spoiler.is-block');
+        const shown = (el) => el.checkVisibility({ visibilityProperty: true });
+        const r = {
+            label: labelled?.querySelector('.spoiler-label')?.textContent,
+            labelShown: labelled && shown(labelled.querySelector('.spoiler-label')),
+            bodyHidden: labelled && !shown(labelled.querySelector('.spoiler-body')),
+            blockTag: block?.tagName, blockHidden: block && !shown(block.querySelector('.spoiler-body')),
+        };
+        inner?.click();
+        r.outerFirst = outer?.classList.contains('revealed') && !inner.classList.contains('revealed');
+        inner?.click();
+        r.innerSecond = inner?.classList.contains('revealed');
+        labelled?.click();
+        r.labelOpens = labelled && shown(labelled.querySelector('.spoiler-body')) && !shown(labelled.querySelector('.spoiler-label'));
+        return r;
+    });
+    check('social: spoilers (label, nesting, block)', spoil?.label === 'Ending' && spoil.labelShown && spoil.bodyHidden && spoil.blockTag === 'DIV'
+        && spoil.blockHidden && spoil.outerFirst && spoil.innerSecond && spoil.labelOpens, spoil);
     const toggle = await page.$('.reply-toggle');
     if (toggle) {
         await toggle.click();
@@ -995,6 +1020,84 @@ function staticServer() {
         check('watch party button: picks from every list; a show from Planning goes on Watching and the party starts',
             tabs[0] === 'Watching' && tabs.includes('Planning') && pickedStatus === 'PLANNING' && saves.some(v => v.status === 'CURRENT') && !!created, { tabs, pickedStatus, saves, created });
         await fp.close();
+    }
+
+    // Kick and undo: the host removes a member who forgot to leave; a guest whose list a party moved while
+    // they were away gets a toast on start, the dialog, and the undo puts the entry back and deletes the posts
+    {
+        const kp = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+        kp.on('pageerror', e => errors.push(`watch party kick/undo: ${e.message}`));
+        const hosted = { hostName: VIEWER.name, hostKey: 'k', mediaId: 21, mediaTitle: 'One Piece', active: true, hostProgress: 5, hostProgressAt: Date.now(),
+            startedAt: Date.now(), startEp: 2, coverImage: '', members: [{ name: 'Forgetful', id: 77, avatar: '', progress: 5 }] };
+        const undoItems = [{ mediaId: 21, title: 'One Piece', cover: '', host: 'Hosty', joinedAt: Date.now() - 3600e3, lastAt: Date.now() - 600e3,
+            until: Date.now() + 23 * 3600e3, before: { exists: true, status: 'PLANNING', progress: 1, repeat: 0, startedAt: null, completedAt: null },
+            after: 99999, kicked: false, missed: { from: 3, to: 5 }, offer: true }];
+        const kicks = [];
+        const marks = [];
+        const gql = [];
+        await kp.route('https://graphql.anilist.co/**', route => {
+            const body = route.request().postDataJSON();
+            gql.push(body);
+            route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(body)) });
+        });
+        await kp.route(`${base}/api/**`, route => {
+            const req = route.request();
+            const p = new URL(req.url()).pathname;
+            if (p === '/api/parties/undo') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ items: undoItems }) });
+            if (p.startsWith('/api/parties/undo/')) {
+                marks.push({ path: p, ...req.postDataJSON() });
+                return route.fulfill({ contentType: 'application/json', body: '{"items":[]}' });
+            }
+            if (p.endsWith('/kick')) {
+                kicks.push({ key: req.headers()['x-host-key'], ...req.postDataJSON() });
+                hosted.members = [];
+                hosted.kicked = [{ name: 'Forgetful', at: Date.now() }];
+                return route.fulfill({ contentType: 'application/json', body: JSON.stringify(hosted) });
+            }
+            if (p.endsWith('/events')) return route.fulfill({ contentType: 'text/event-stream', body: `retry: 60000\ndata: ${JSON.stringify(hosted)}\n\n` });
+            if (p === '/api/parties/mine' || p.startsWith('/api/party/')) return route.fulfill({ contentType: 'application/json', body: JSON.stringify(hosted) });
+            route.fulfill({ status: p === '/api/maintenance' ? 200 : 404, contentType: 'application/json', body: '{"maintenance":false}' });
+        });
+        await kp.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
+        await kp.addInitScript(({ id, name }) => {
+            localStorage.setItem('aniroll_token', 'e2e-token');
+            localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+            localStorage.setItem('aniroll_user_ts', String(Date.now()));
+            localStorage.setItem('aniroll_seen_changes', '9999');
+            localStorage.setItem('aniroll_watchparty', JSON.stringify({ hostName: name, mediaId: 21, hostKey: 'k', mediaTitle: 'One Piece', startEp: 2 }));
+        }, VIEWER);
+        await kp.goto(base + `/#/watchparty?host=${VIEWER.name}&anime=21`);
+        await kp.waitForSelector('[data-kick="Forgetful"]', { timeout: 8000 }).catch(() => {});
+        await kp.evaluate(() => document.querySelector('[data-kick="Forgetful"]')?.click());
+        await kp.waitForSelector('#modal-confirm', { timeout: 3000 }).catch(() => {});
+        await kp.evaluate(() => document.getElementById('modal-confirm')?.click());
+        await kp.waitForFunction(() => !document.querySelector('[data-kick="Forgetful"]'), null, { timeout: 3000 }).catch(() => {});
+        const leftIn = await kp.evaluate(() => !!document.querySelector('[data-kick="Forgetful"]'));
+        check('watch party: the host removes a member (× and confirm), with the host key',
+            kicks.length === 1 && kicks[0].name === 'Forgetful' && kicks[0].key === 'k' && !leftIn, { kicks, leftIn });
+
+        // On start: the toast offers the undo, Review opens the dialog
+        const review = kp.locator('.toast-action:has-text("Review")');
+        await review.first().waitFor({ timeout: 6000 }).catch(() => {});
+        const toastText = await kp.evaluate(() => document.getElementById('toast-container')?.innerText || '');
+        await kp.evaluate(() => [...document.querySelectorAll('.toast-action')].find(b => b.textContent === 'Review')?.click());
+        await kp.waitForSelector('.wp-undo-item', { timeout: 4000 }).catch(() => {});
+        const dialog = await kp.evaluate(() => document.querySelector('#modal-container .modal-content')?.innerText.replace(/\s+/g, ' ') || '');
+        if (process.env.E2E_SHOT) await kp.locator('#modal-container .modal-content').screenshot({ path: process.env.E2E_SHOT.replace(/\.png$/, '-undo.png') }).catch(() => {});
+        gql.length = 0;
+        await kp.evaluate(() => document.querySelector('[data-undo="21"]')?.click());
+        await kp.waitForFunction(() => /back the way it was/.test(document.getElementById('toast-container')?.innerText || ''), null, { timeout: 6000 }).catch(() => {});
+        const save = gql.find(b => /SaveMediaListEntry/.test(b.query || ''));
+        const askedPosts = gql.find(b => /activities\(userId/.test(b.query || ''));
+        check('watch party undo: offered on start for steps while away, the dialog says before and after',
+            /moved One Piece to episode 5/.test(toastText) && /Moved while you were away: episode 3 → 5/.test(dialog) && /Before: Planning, episode 1/.test(dialog),
+            { toastText, dialog: dialog.slice(0, 300) });
+        check('watch party undo: the entry goes back (status, episode, dates), the posts since joining are looked up, the server is told',
+            save?.variables?.status === 'PLANNING' && save.variables.progress === 1 && save.variables.startedAt?.year === null
+            && askedPosts?.variables?.mediaId === 21 && askedPosts.variables.since === Math.floor(undoItems[0].joinedAt / 1000) - 60
+            && marks.some(m => m.path === '/api/parties/undo/21' && m.action === 'done'),
+            { save: save?.variables, posts: askedPosts?.variables, marks });
+        await kp.close();
     }
 
     };

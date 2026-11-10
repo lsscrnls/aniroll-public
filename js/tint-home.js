@@ -11,8 +11,4 @@ export async function render({ content }) {
     content.innerHTML = '<div class="page-enter"><p class="empty-state">This part of AniRoll is not in the public source. Try it on aniroll.app.</p></div>';
 }
 
-export function staticRun(scr, ms = 0) { return null; }
-
-export function osd(scr, text) { return null; }
-
 export const HOME_STYLE = '';

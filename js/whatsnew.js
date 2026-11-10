@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '2.0.0.6';
+export const RELEASE = '2.0.0.8';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -21,6 +21,24 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // its offset) stays hidden until then: what is live already can be announced at a set time. A later release of the
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
+    {
+        id: '2026-11-10',
+        title: 'Spoilers the way AniList writes them now',
+        items: [
+            'Spoilers in posts and replies can now carry a <strong>label</strong>, like “Ending spoiler”. You see the label and decide whether to open it.',
+            'A spoiler on its own line now sits in a <strong>clearly marked box</strong>, so you can tell where it starts and ends.',
+            'A spoiler inside another spoiler no longer gives itself away early: the outer one opens first.',
+        ],
+    },
+    {
+        id: '2026-11-09',
+        title: 'Watch Party: forgot to leave? Take it back',
+        items: [
+            'Hosts can now <strong>remove a member</strong> from their Watch Party, for when someone forgot to leave. They can join again with the invite link.',
+            'Did a party move your list while you weren\'t watching? AniRoll now offers to <strong>take it back</strong> on your next visit: per anime or all at once, back to how your list was before you joined, and the list activity the party posted for you is deleted. Posts your friends already replied to stay.',
+            'You can take back a party\'s progress for at least 24 hours, from the toast or from the Watch Party page.',
+        ],
+    },
     {
         id: '2026-11-07',
         title: 'Discord on Chrome catches up',

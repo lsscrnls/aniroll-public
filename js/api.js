@@ -1078,6 +1078,22 @@ export async function resolveMalIds(malIds, type) {
     return result;
 }
 
+// Your own list activities for one show since `since` (epoch seconds), newest first: what a Watch Party
+// undo takes back. replyCount, so posts others already answered can be left alone.
+export async function getOwnListActivities(userId, mediaId, since, token) {
+    if (!userId || !mediaId) throw new Error('getOwnListActivities: userId and mediaId are required');
+    const data = await query(`
+        query ($userId: Int, $mediaId: Int, $since: Int) {
+            Page(perPage: 50) {
+                activities(userId: $userId, mediaId: $mediaId, type: ANIME_LIST, createdAt_greater: $since, sort: [ID_DESC]) {
+                    ... on ListActivity { id createdAt status progress replyCount }
+                }
+            }
+        }
+    `, { userId, mediaId, since }, token);
+    return (data.Page?.activities || []).filter(a => a?.id);
+}
+
 export async function deleteMediaListEntry(id, token) {
     const data = await query(`
         mutation ($id: Int) { DeleteMediaListEntry(id: $id) { deleted } }
@@ -1130,7 +1146,7 @@ const ACTIVITY_FIELDS = `
                     ... on ListActivity {
                         id type status progress
                         user { id name avatar { medium } }
-                        media { id title { userPreferred english romaji native } coverImage { large } type format isAdult mediaListEntry { status progress } }
+                        media { id title { userPreferred english romaji native } coverImage { large } type format episodes chapters isAdult mediaListEntry { status progress } }
                         likes { id name avatar { medium } }
                         likeCount isLiked createdAt replyCount
                     }
