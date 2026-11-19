@@ -179,17 +179,33 @@ export async function render({ params, content }) {
             return (autoNow = Math.min(autoBitrate, upload || Infinity, fallbackFor(avail.base) || Infinity));
         };
         // PlaybackInfo under the cap for this quality; session.cap is what it was asked with
-        const infoFor = async (itemId, at, { audioIndex = null, quality = session.quality } = {}) => {
+        const cappedInfo = async (itemId, at, { audioIndex = null, quality = session.quality, remux = false } = {}) => {
             const cap = await bitrateFor(quality);
             session.cap = cap;
-            const got = await playbackInfo(avail, cfg, itemId, at, { audioIndex, maxBitrate: cap });
+            const got = await playbackInfo(avail, cfg, itemId, at, { audioIndex, maxBitrate: cap, remux });
             const src = got.MediaSources?.[0];
             if (quality !== 'auto' || avail.local || !src?.Bitrate || videoConverted(src) || src.Bitrate <= cap * HEADROOM || src.Bitrate > cap) return got;
             const lower = stepBelow(Math.min(cap, src.Bitrate));
-            const again = lower ? await playbackInfo(avail, cfg, itemId, at, { audioIndex, maxBitrate: lower }).catch(() => null) : null;
+            const again = lower ? await playbackInfo(avail, cfg, itemId, at, { audioIndex, maxBitrate: lower, remux }).catch(() => null) : null;
             if (!again?.MediaSources?.[0]) return got;
             session.cap = lower;
             return again;
+        };
+        // Played as it is, the file sounds with its first audio track whatever was asked: the browser cannot
+        // pick another (Devilman Crybaby, 2026-11-11: Japanese chosen, the English dub heard). Then Jellyfin
+        // repackages it with the track asked for: copied, not converted
+        let fileFirstAudio = null; // known after the first answer: later asks go straight to the repackaged file
+        const infoFor = async (itemId, at, opts = {}) => {
+            if (opts.audioIndex != null && fileFirstAudio != null && opts.audioIndex !== fileFirstAudio) {
+                return cappedInfo(itemId, at, { ...opts, remux: true });
+            }
+            const got = await cappedInfo(itemId, at, opts);
+            const src = got.MediaSources?.[0];
+            if (src) fileFirstAudio = firstAudio(src);
+            const audio = opts.audioIndex ?? src?.DefaultAudioStreamIndex ?? null;
+            if (!src || !needsRemux(src, audio)) return got;
+            const again = await cappedInfo(itemId, at, { ...opts, audioIndex: audio, remux: true }).catch(() => null);
+            return again?.MediaSources?.[0]?.TranscodingUrl ? again : got;
         };
         let info = await infoFor(ep.itemId, startTime);
         if (closed) return cleanup;
@@ -898,8 +914,19 @@ function rememberSubs(mediaId, track) {
     setShowPref(SUBS_PREF_KEY, mediaId, track ? { lang: track.lang, title: track.title, label: track.label, forced: track.forced } : { off: true });
 }
 
-// maxBitrate: the quality chosen, else what the way to the server carries
-async function playbackInfo(avail, cfg, itemId, startTime, { audioIndex = null, maxBitrate = null } = {}) {
+// The file's own first audio track: the one a browser plays when it gets the file as it is
+function firstAudio(source) {
+    const ids = audioList(source).map(t => t.id);
+    return ids.length ? Math.min(...ids) : null;
+}
+
+// Whether the track asked for would be lost in direct play
+function needsRemux(source, audioIndex) {
+    return !source.TranscodingUrl && audioIndex != null && audioIndex !== firstAudio(source);
+}
+
+// maxBitrate: the quality chosen, else what the way to the server carries; remux: never the file as it is
+async function playbackInfo(avail, cfg, itemId, startTime, { audioIndex = null, maxBitrate = null, remux = false } = {}) {
     const bitrate = maxBitrate || (avail.local ? LOCAL_BITRATE : PUBLIC_BITRATE);
     // The track goes in the query: Jellyfin 12 ignores AudioStreamIndex in the body and takes the one it
     // remembered for the user instead — the previous choice, since AniRoll reports it (seen 2026-09-30)
@@ -913,7 +940,7 @@ async function playbackInfo(avail, cfg, itemId, startTime, { audioIndex = null, 
             DeviceProfile: deviceProfile(bitrate),
             MaxStreamingBitrate: bitrate,
             StartTimeTicks: Math.round(startTime * TICKS),
-            EnableDirectPlay: true,
+            EnableDirectPlay: !remux,
             EnableDirectStream: true,
             EnableTranscoding: true,
             AutoOpenLiveStream: true,

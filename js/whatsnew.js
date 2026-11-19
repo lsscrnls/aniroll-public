@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '2.0.0.8';
+export const RELEASE = '2.0.0.14';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -22,12 +22,42 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
     {
-        id: '2026-11-10',
+        id: '2026-11-19',
+        title: 'Security fixes',
+        items: [
+            'AniRoll now checks more carefully who may change what, and a shared connect link asks before it connects.',
+        ],
+    },
+    {
+        id: '2026-11-17',
+        title: 'The picture stays with styled subtitles on',
+        items: [
+            'In some browsers on Windows, the picture went black once the player controls hid, while the styled subtitles kept showing. Styled subtitles are now drawn the way Firefox already drew them, and the picture stays.',
+        ],
+    },
+    {
+        id: '2026-11-12',
+        title: 'Subtitles up top stay in view',
+        items: [
+            'When the player controls show, subtitles at the top of the picture now move <strong>down</strong> out of the way instead of up under the top bar. Lines at the bottom still move up.',
+        ],
+    },
+    {
+        id: '2026-11-11',
+        title: 'Dual audio plays the track you picked',
+        items: [
+            'In shows with two audio tracks, the player sometimes said <strong>Japanese</strong> but played the English dub. It now always plays the track you picked.',
+            { rev: 2, text: 'The helper for <strong>AniRoll for Discord</strong> on Linux and macOS is built with the newest Go release. It updates by itself.' },
+        ],
+    },
+    {
+        id: '2026-11-10.2',
         title: 'Spoilers the way AniList writes them now',
         items: [
             'Spoilers in posts and replies can now carry a <strong>label</strong>, like “Ending spoiler”. You see the label and decide whether to open it.',
             'A spoiler on its own line now sits in a <strong>clearly marked box</strong>, so you can tell where it starts and ends.',
             'A spoiler inside another spoiler no longer gives itself away early: the outer one opens first.',
+            { rev: 2, text: '<strong>Roll again</strong> right after a pick no longer spins past the last cover into an empty window.' },
         ],
     },
     {

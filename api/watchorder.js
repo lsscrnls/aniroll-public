@@ -10,18 +10,24 @@ const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_PARTS = 60;
 const MAX_STEPS = 15;
 const MAX_KEPT = 4000;
+// Anyone can ask, without logging in, so watch order must not eat the server's AniList budget (C10):
+// a walk only takes a step while budgetOpen() (server.js keeps half the budget for itself), all walks
+// together take at most STEPS_PER_MIN steps, and ids AniList does not know are remembered for a day.
+const STEPS_PER_MIN = 15; // one longest walk (MAX_STEPS)
+const MISS_KEEP_MS = 24 * 60 * 60 * 1000;
+const MAX_MISSES = 5000;
 
 const QUERY = `query ($ids: [Int]) { Page(perPage: 50) { media(id_in: $ids, type: ANIME) {
     id format status episodes startDate { year month day } title { userPreferred romaji english native } coverImage { medium }
     relations { edges { relationType(version: 2) node { id type format } } }
 } } }`;
 
-module.exports = function watchOrder({ dataDir, readJson, writeJson, json, overLimit, clientIp, anilist }) {
+module.exports = function watchOrder({ dataDir, readJson, writeJson, json, overLimit, clientIp, anilist, budgetOpen }) {
     const file = path.join(dataDir, 'watchorder.json');
     const running = new Map(); // id -> promise, so a franchise is walked once when many ask at once
 
-    // { byId: { id: key }, orders: { key: { at, release, story, same, media } } }
-    const load = () => { const all = readJson(file); return { byId: all.byId || {}, orders: all.orders || {} }; };
+    // { byId: { id: key }, orders: { key: { at, release, story, same, media } }, misses: { id: at } }
+    const load = () => { const all = readJson(file); return { byId: all.byId || {}, orders: all.orders || {}, misses: all.misses || {} }; };
 
     const dateKey = (m) => {
         const d = m.startDate || {};
@@ -34,6 +40,8 @@ module.exports = function watchOrder({ dataDir, readJson, writeJson, json, overL
         const parts = new Map();
         let next = [startId];
         for (let step = 0; next.length && step < MAX_STEPS && parts.size < MAX_PARTS; step++) {
+            // Checked before every step: half a walk is no answer, so it fails as "AniList busy"
+            if (!budgetOpen() || overLimit('watchorder-steps', 'all', STEPS_PER_MIN, 60000)) throw new Error('busy');
             const body = await anilist(QUERY, { ids: next.slice(0, 50) });
             const found = body?.data?.Page?.media || [];
             const more = new Set();
@@ -85,7 +93,17 @@ module.exports = function watchOrder({ dataDir, readJson, writeJson, json, overL
 
     async function compute(id) {
         const parts = await walk(id);
-        if (!parts.has(id)) return null;
+        if (!parts.has(id)) {
+            // Not an anime AniList knows: remembered, so asking again costs nothing
+            const all = load();
+            const ids = Object.keys(all.misses);
+            if (ids.length >= MAX_MISSES) {
+                for (const k of ids.sort((a, b) => all.misses[a] - all.misses[b]).slice(0, Math.ceil(MAX_MISSES / 10))) delete all.misses[k];
+            }
+            all.misses[id] = Date.now();
+            writeJson(file, all, { pretty: false });
+            return null;
+        }
         const result = { at: Date.now(), ...orders(parts) };
         const all = load();
         const key = String(Math.min(...parts.keys()));
@@ -109,6 +127,7 @@ module.exports = function watchOrder({ dataDir, readJson, writeJson, json, overL
         const all = load();
         const kept = all.orders[all.byId[id]];
         if (kept && Date.now() - kept.at < KEEP_MS && kept.media[id]) return json(res, 200, kept);
+        if (all.misses[id] && Date.now() - all.misses[id] < MISS_KEEP_MS) return json(res, 404, { error: 'No such anime' });
         if (overLimit('watchorder-ip', clientIp(req), 10, 60000)) return json(res, 429, { error: 'Too many requests, try again in a minute' });
         try {
             if (!running.has(id)) running.set(id, compute(id).finally(() => running.delete(id)));

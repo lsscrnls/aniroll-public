@@ -933,23 +933,34 @@ async function trackSession(userId, session) {
 
 // The webhook plugin sends every user's playback to a destination unless "select your user" was
 // ticked. Events of someone else (a friend on the same server) must not move this account along.
-// Templates from before the user field, and accounts without a stored Jellyfin user, send or
-// know nothing to compare: those are let through as before.
-function hookUserMatches(userId, eventUser) {
+// Templates from before the user field send nothing to compare: those are let through as before.
+// The hook remembers its Jellyfin user (jfUser), so the filter keeps working when the account's stored
+// Jellyfin config is gone or unreadable (Disconnect): it used to let everyone through then. A hook that
+// never knew one (no config ever) takes the first user it hears from.
+function hookUserMatches(userId, eventUser, secret) {
     const norm = (v) => String(v || '').replace(/-/g, '').toLowerCase();
     if (!norm(eventUser) || /^\{\{/.test(eventUser)) return true;
     let own = null;
-    try { own = jfEntry(loadJellyfin(), String(userId)); } catch { /* unreadable: let it through */ }
-    if (!own || !norm(own.userId)) return true;
-    return norm(own.userId) === norm(eventUser);
+    try { own = jfEntry(loadJellyfin(), String(userId)); } catch { /* unreadable: the hook's own below */ }
+    const hooks = loadPrivate(HOOK_FILE);
+    const hook = hooks[secret];
+    const bind = (jfUser) => { if (hook && hook.jfUser !== jfUser) { hook.jfUser = jfUser; savePrivate(HOOK_FILE, hooks); } };
+    if (own && norm(own.userId)) {
+        const ok = norm(own.userId) === norm(eventUser);
+        if (ok) bind(norm(own.userId));
+        return ok;
+    }
+    if (hook?.jfUser) return hook.jfUser === norm(eventUser);
+    bind(norm(eventUser));
+    return true;
 }
 
-async function handleJellyfinEvent(userId, body) {
+async function handleJellyfinEvent(userId, body, secret) {
     const event = hookField(body, 'event', 40);
     const type = hookField(body, 'type', 20);
     const itemId = hookField(body, 'itemId', 64);
     if (!/^Playback(Start|Progress|Stop)$/.test(event) || !['Episode', 'Movie'].includes(type) || !itemId) return;
-    if (!hookUserMatches(userId, hookField(body, 'userId', 64))) return;
+    if (!hookUserMatches(userId, hookField(body, 'userId', 64), secret)) return;
     hookSeen.set(userId, Date.now());
 
     const num = (name) => {
@@ -1154,8 +1165,11 @@ async function verifyViewer(req) {
     const known = knownViewer(hash);
     if (Date.now() < verifyPausedUntil) return known ? { status: 'ok', viewer: known, known: true } : { status: 'unreachable' };
 
-    if (overLimit('verify-ip', clientIp(req), VERIFY_PER_IP_PER_MIN, 60000)) return { status: 'limited' };
-    if (overLimit('verify', 'all', VERIFY_PER_MIN, 60000)) return { status: 'limited' };
+    // Over a cap, a token AniList confirmed before keeps its account, as in an outage: random tokens from a
+    // couple of addresses can fill the caps, and must not lock out everyone whose 10-minute cache ran out
+    if (overLimit('verify-ip', clientIp(req), VERIFY_PER_IP_PER_MIN, 60000) || overLimit('verify', 'all', VERIFY_PER_MIN, 60000)) {
+        return known ? { status: 'ok', viewer: known, known: true } : { status: 'limited' };
+    }
 
     try {
         const res = await fetch(ANILIST_URL, {
@@ -1181,6 +1195,8 @@ async function verifyViewer(req) {
             if (rejectedTokens.size > 5000) rejectedTokens.clear();
             rejectedTokens.set(hash, Date.now());
             if (knownViewers.delete(hash)) saveKnownViewers();
+            // A refused token loses its cached seat (and admin) identity too, or it would come back in the next outage
+            seatOwners.delete(hash);
             return { status: 'invalid' };
         }
     } catch { verifyStatus = 0; /* unreachable below */ }
@@ -1264,7 +1280,9 @@ async function seatOwner(req) {
         seatOwners.set(hash, owner);
         return owner;
     }
-    if (auth.status === 'missing' || auth.status === 'invalid') return null;
+    // Only a real outage falls back. "limited" is something a caller can cause on purpose (ten junk
+    // tokens from one IP), so it must not hand out a seat for an unchecked token.
+    if (auth.status !== 'unreachable') return null;
     // AniList could not be asked: the account known for this token, else the token itself
     const known = seatOwners.get(hash);
     if (known && Date.now() - known.at < SEAT_OWNER_TTL_MS) return known;
@@ -1274,7 +1292,6 @@ async function seatOwner(req) {
 // ===== Admin: how busy AniRoll is, for its owner only =====
 // A sample a minute of the last 24 hours (seats, VIPs, queue, requests, Jellyfin playback), kept in
 // data/admin-stats.json so a restart does not wipe the day; plus a snapshot of right now.
-const ADMIN_KEY = `vip:${ADMIN_ID}`; // checked on the server; the page only hides the link
 const STATS_FILE = path.join(DATA_DIR, 'admin-stats.json');
 const STATS_KEEP = 24 * 60;
 const startedAt = Date.now();
@@ -1411,6 +1428,18 @@ function refuseAuth(res, auth) {
     if (auth.status === 'limited') return json(res, 429, { error: 'That was a lot of sign-ins at once. Try again in a minute.' });
     if (auth.status === 'unreachable') return json(res, 503, { error: 'AniList unreachable, cannot verify your account right now' });
     return json(res, 401, { error: 'Login required' });
+}
+
+// The admin routes: only the owner, and only as AniList confirms them right now. Neither the outage
+// fallbacks (seatOwners, knownViewers) nor a cached guess may stand in, so a revoked owner token
+// cannot reach the admin page while AniList is down. The price: during a long outage the admin page
+// waits until AniList answers again (a check within the last 10 minutes still counts).
+async function liveOwner(req, res) {
+    const auth = await verifyViewer(req);
+    if (auth.status !== 'ok' || auth.known) { refuseAuth(res, auth.status === 'ok' ? { status: 'unreachable' } : auth); return false; }
+    if (auth.viewer.id !== ADMIN_ID) { json(res, 403, { error: 'Not for you' }); return false; }
+    seatNames.set(`vip:${ADMIN_ID}`, str(auth.viewer.name, 40)); // as seatOwner did: the admin view names its owner
+    return true;
 }
 
 // A local dev server, on any port. Parsed, not prefix-matched: "http://localhost.evil.test" is not local
@@ -1646,7 +1675,10 @@ const sources = require('./sources')({ dataDir: DATA_DIR, readJson, writeJson, v
 const passkeys = require('./passkeys')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer,
     refuseAuth, isVip, tokenHash, bearerToken, rememberViewer, allowedOrigin: ALLOWED_ORIGIN, isLocalOrigin, str, passkeySeal, passkeyOpen, decryptSecret });
 // Release and story order of a franchise (api/watchorder.js), from the server's own AniList budget
-const watchOrder = require('./watchorder')({ dataDir: DATA_DIR, readJson, writeJson, json, overLimit, clientIp, anilist });
+// Anyone may ask, so it only spends AniList calls while half the budget is still free (the rest stays for sync,
+// parties and friends)
+const watchOrder = require('./watchorder')({ dataDir: DATA_DIR, readJson, writeJson, json, overLimit, clientIp, anilist,
+    budgetOpen: () => Date.now() >= anilistPausedUntil && serverCalls.filter(t => Date.now() - t < 60000).length < SERVER_BUDGET_PER_MIN / 2 });
 const fallback = require('./fallback')({ dataDir: DATA_DIR, readJson, writeJson, json, readBody, overLimit, clientIp, verifyViewer,
     refuseAuth, isVip, animeMap });
 
@@ -1782,16 +1814,12 @@ async function handle(req, res) {
 
     if (pathname === '/api/admin/stats' && req.method === 'GET') {
         if (overLimit('admin-ip', clientIp(req), 30, 60000)) return json(res, 429, { error: 'That was a lot at once. Wait a minute and try again.' });
-        const owner = await seatOwner(req);
-        if (!owner) return json(res, 401, { error: 'Log in with AniList to continue.' });
-        if (owner.key !== ADMIN_KEY) return json(res, 403, { error: 'Not for you' });
+        if (!(await liveOwner(req, res))) return;
         return json(res, 200, adminStats());
     }
     if (pathname === '/api/admin/action' && req.method === 'POST') {
         if (overLimit('admin-ip', clientIp(req), 30, 60000)) return json(res, 429, { error: 'That was a lot at once. Wait a minute and try again.' });
-        const owner = await seatOwner(req);
-        if (!owner) return json(res, 401, { error: 'Log in with AniList to continue.' });
-        if (owner.key !== ADMIN_KEY) return json(res, 403, { error: 'Not for you' });
+        if (!(await liveOwner(req, res))) return;
         const done = adminAction(await readBody(req));
         return done.status === 200 ? json(res, 200, adminStats()) : json(res, done.status, { error: done.error });
     }
@@ -1866,7 +1894,7 @@ async function handle(req, res) {
         hookHits.set(userId, hits);
         const body = await readBody(req);
         // Answer right away; Jellyfin does not wait for AniList
-        handleJellyfinEvent(userId, body).catch(e => console.error('jellyfin event failed:', e.message));
+        handleJellyfinEvent(userId, body, hookPost[1]).catch(e => console.error('jellyfin event failed:', e.message));
         return json(res, 200, { ok: true });
     }
 
@@ -1906,7 +1934,12 @@ async function handle(req, res) {
         if (tooManyWrites(res, userId)) return;
         const all = loadPrivate(HOOK_FILE);
         for (const secret of Object.keys(all)) if (all[secret].userId === userId) delete all[secret];
-        if (req.method === 'POST') all[crypto.randomBytes(24).toString('hex')] = { userId, createdAt: Date.now() };
+        if (req.method === 'POST') {
+            // Bound to the Jellyfin user right away where the account has one stored (see hookUserMatches)
+            let jfUser;
+            try { jfUser = String(jfEntry(loadJellyfin(), String(userId))?.userId || '').replace(/-/g, '').toLowerCase() || undefined; } catch { /* learnt from the first event */ }
+            all[crypto.randomBytes(24).toString('hex')] = { userId, createdAt: Date.now(), ...(jfUser ? { jfUser } : {}) };
+        }
         savePrivate(HOOK_FILE, all);
         if (req.method === 'DELETE') {
             animeMap.forgetLibrary(userId);
@@ -1952,6 +1985,10 @@ async function handle(req, res) {
         if (!type) return json(res, 400, { error: 'type is required' });
         const id = String(auth.viewer.id);
         const name = String(auth.viewer.name || '');
+        // Names are given up and taken by others. A link that already shows someone else's card is only taken
+        // over with a name AniList just confirmed, not with the month-old one the outage fallback remembers (C6)
+        const holder = readJson(DNA_FILE)[name.toLowerCase()];
+        if (holder && holder.id !== id && auth.known) return refuseAuth(res, { status: 'unreachable' });
         ensureDataDir();
         fs.mkdirSync(DNA_DIR, { recursive: true });
         const file = path.join(DNA_DIR, `${id}.jpg`);

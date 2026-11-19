@@ -22,8 +22,8 @@ const time = (s) => {
 };
 const num = (v, d = 0) => (Number.isFinite(Number(v)) && v !== '' ? Number(v) : d);
 
-// The dialogue of an ASS/SSA script: only lines libass sets at the bottom by itself ({\pos}, {\move} and
-// drawings are signs placed by hand, they stay where the release put them)
+// The dialogue of an ASS/SSA script: only lines libass sets at the bottom or the top by itself ({\pos}, {\move}
+// and drawings are signs placed by hand, they stay where the release put them). `top`: an {\an7-9} line
 export function parseAss(text) {
     const info = {};
     const styles = new Map();
@@ -63,12 +63,13 @@ export function parseAss(text) {
         const s = styles.get(e.style) || styles.get(e.style?.replace(/^\*/, '')) || styles.get('Default') || {};
         const an = /\\an(\d)/.exec(e.text);
         const align = an ? Number(an[1]) : num(s.alignment, 2);
-        if (align < 1 || align > 3) continue;
+        const top = align >= 7 && align <= 9;
+        if (!top && (align < 1 || align > 3)) continue;
         const rows = e.text.replace(/\{[^}]*\}/g, '').replace(/\\h/g, ' ').split(/\\[Nn]/).map(r => r.trim()).filter(Boolean);
         if (!rows.length) continue;
         const fs = /\\fs(\d+(?:\.\d+)?)/.exec(e.text);
         out.push({
-            start: time(e.start), end: time(e.end), align, rows,
+            start: time(e.start), end: time(e.end), align, top, rows,
             size: fs ? Number(fs[1]) : num(s.fontsize, 20),
             font: s.fontname || 'sans-serif',
             bold: s.bold && s.bold !== '0',
@@ -83,6 +84,20 @@ export function parseAss(text) {
     return { resX, resY, lines: out };
 }
 
+// Which way the lines on screen at t (or starting within `lead` s) give way to the controls: 'up' for lines at
+// the bottom, 'down' for lines only at the top, '' for both (the canvas moves as one, signs included), null for
+// none (it stays where it is, so it does not bob in the gaps between lines)
+export function assLift(script, t, lead = 0) {
+    let bottom = false;
+    let top = false;
+    for (const l of script.lines) {
+        if (l.start > t + lead || t >= l.end) continue;
+        if (l.top) top = true; else bottom = true;
+        if (top && bottom) return '';
+    }
+    return bottom ? 'up' : top ? 'down' : null;
+}
+
 let measure = null;
 const textWidth = (row, font) => {
     measure ||= document.createElement('canvas').getContext('2d');
@@ -92,7 +107,7 @@ const textWidth = (row, font) => {
 
 // Where the bottom lines on screen at script time t (or starting within `lead` s) are drawn, on a canvas at `rect` (null: none)
 export function assBox(script, t, rect, lead = 0) {
-    const now = script.lines.filter(l => l.start <= t + lead && t < l.end);
+    const now = script.lines.filter(l => !l.top && l.start <= t + lead && t < l.end);
     if (!now.length || !rect.width) return null;
     const sx = rect.width / script.resX;
     const sy = rect.height / script.resY;

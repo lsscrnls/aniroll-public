@@ -19,7 +19,7 @@ page_ext=$(grep -oE "EXTENSION_LATEST = '[0-9.]+'" js/presence.js | grep -oE '[0
 [ "$ext_v" = "$page_ext" ] || { echo "extension is $ext_v but js/presence.js EXTENSION_LATEST is $page_ext" >&2; exit 1; }
 if [ -f "$stamp" ] && [ -z "$(find discord -newer "$stamp" -type f | head -1)" ]; then echo "discord: up to date"; exit 0; fi
 # Go that builds the helpers; the server compares it with go.dev once a day (api/sources.js)
-GO_V=1.27.3
+GO_V=1.27.4
 mkdir -p "$out"
 docker run --rm -v "$PWD/discord/helper:/src:ro" -v "$PWD/$out:/out" -w /src -e CGO_ENABLED=0 -e GOFLAGS=-trimpath golang:$GO_V-alpine sh -c '
     set -e

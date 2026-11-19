@@ -13,7 +13,7 @@ const SUP = fs.readFileSync(path.join(__dirname, 'media', 'sub.sup'));
 // The repository (deploy.sh points this at the obfuscated copy)
 const ROOT = path.join(__dirname, '..', '..');
 // Any font does for the embedded-font path: JASSUB's own default face
-const FONT = fs.readFileSync(path.join(ROOT, 'js', 'vendor', 'jassub-2.5.18p3', 'default.woff2'));
+const FONT = fs.readFileSync(path.join(ROOT, 'js', 'vendor', 'jassub-2.5.18p4', 'default.woff2'));
 // Any picture does for the episode thumbnails
 const THUMB = fs.readFileSync(path.join(ROOT, 'og-image-v4.jpg'));
 const ASS_SCRIPT = `[Script Info]\nScriptType: v4.00+\nPlayResX: 640\nPlayResY: 360\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Liberation Sans,36,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,20,20,20,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:19.00,Default,,0,0,0,,{\\an8\\pos(320,60)}A styled sign\nDialogue: 0,0:00:00.00,0:00:19.00,Default,,0,0,0,,{\\an3}Down right\n`;
@@ -146,6 +146,10 @@ async function mockJellyfin(page, { anyTitle = false, library = null } = {}) {
             const source = mediaSource(info[1]);
             const audio = asked != null ? Number(asked) : lastAudio;
             if (audio != null && source.MediaStreams.some(s => s.Type === 'Audio' && s.Index === audio)) source.DefaultAudioStreamIndex = audio;
+            // Direct play turned off: the file repackaged into HLS, with the track asked for
+            if (req.postDataJSON()?.EnableDirectPlay === false && !source.TranscodingUrl) {
+                source.TranscodingUrl = `/videos/${info[1]}/remux/master.m3u8?MediaSourceId=${info[1]}&AudioStreamIndex=${source.DefaultAudioStreamIndex}&VideoCodec=vp9&TranscodeReasons=DirectPlayError&ApiKey=x`;
+            }
             return json({ MediaSources: [source], PlaySessionId: `ps-${info[1]}` });
         }
         if (/^\/Videos\/ep\d+\/stream$/.test(p)) {
@@ -173,6 +177,17 @@ async function mockJellyfin(page, { anyTitle = false, library = null } = {}) {
         if (/\/Subtitles\/\d+\/0\/Stream\.vtt$/.test(p)) {
             calls.push({ type: 'vtt', item: p.split('/')[2] });
             return route.fulfill({ status: 200, headers: CORS, contentType: 'text/vtt', body: 'WEBVTT\n\n00:00:00.000 --> 00:00:19.000\nHello from <i>Jellyfin</i>\n\n00:00:00.000 --> 00:00:19.000\n{\\an8}A sign up top\n' });
+        }
+        // The file repackaged (dual audio, another track than the first): a real fMP4 HLS of the clip
+        if (/^\/videos\/ep\d+\/remux\/master\.m3u8$/.test(p)) {
+            calls.push({ type: 'remux', item: p.split('/')[2], audio: Number(url.searchParams.get('AudioStreamIndex')) });
+            return route.fulfill({ status: 200, headers: CORS, contentType: 'application/vnd.apple.mpegurl',
+                body: '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=200000,CODECS="vp09.00.10.08,opus",RESOLUTION=320x180\nmain.m3u8\n' });
+        }
+        const remuxFile = p.match(/^\/videos\/ep\d+\/remux\/(main\.m3u8|init\.mp4|\d\.mp4)$/);
+        if (remuxFile) {
+            return route.fulfill({ status: 200, headers: CORS, contentType: remuxFile[1].endsWith('m3u8') ? 'application/vnd.apple.mpegurl' : 'video/mp4',
+                body: fs.readFileSync(path.join(__dirname, 'media', 'remux', remuxFile[1])) });
         }
         // The playlists come back fine, the first segment fails with 500 — as when ffmpeg finds no GPU memory
         if (/\/master\.m3u8$/.test(p)) {

@@ -38,6 +38,11 @@ const enc = Buffer.concat([ci.update("old-token", "utf8"), ci.final()]);
 const sealed = [iv.toString("base64"), ci.getAuthTag().toString("base64"), enc.toString("base64")].join(".");
 require("fs").writeFileSync(process.argv[1], JSON.stringify({ legacy1: { userId: 4242, sealed, label: "Old", created: 1, pk: "", alg: -7, rpId: "localhost" } }));
 ' "$work/data/passkeys.json"
+# An owner token AniList confirmed an hour ago and now refuses (the mock does not know it)
+node -e '
+const h = require("crypto").createHash("sha256").update("revoked-owner-token").digest("hex");
+require("fs").writeFileSync(process.argv[1], JSON.stringify({ [h]: { v: { id: 6649000, name: "hexlux", avatar: { medium: "" } }, at: Date.now() - 3600e3 } }));
+' "$work/data/known-viewers.json"
 node "$here/mockanilist.js" > "$work/mock.log" 2>&1 &
 pids+=($!)
 (cd "$work" && exec env ANILIST_URL=http://127.0.0.1:3099 JF_SECRET=local-test-secret-0123456789abcdef PASSKEY_KEY_FILE="$work/passkey.key" \

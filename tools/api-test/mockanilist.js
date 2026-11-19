@@ -67,6 +67,7 @@ function send(res, code, body) {
 let themeAsks = 0;
 let shazamAsks = 0;
 let shazamBusy = false;
+let shazamNext = null;
 http.createServer((req, res) => {
     if (req.url === '/__state') return send(res, 200, { lists, log });
     // AnimeThemes and Shazam stand-ins for api/songs.js
@@ -81,10 +82,14 @@ http.createServer((req, res) => {
     }
     if (req.url === '/__themeasks') return send(res, 200, { asks: themeAsks });
     if (req.url === '/__shazam429') { shazamBusy = true; return send(res, 200, {}); }
+    // The next answer names another song (someone asking with a signature of a different track)
+    if (req.url.startsWith('/__shazamnext?')) { shazamNext = new URL(req.url, 'http://x').searchParams.get('title'); return send(res, 200, {}); }
     if (req.url.startsWith('/shazam/discovery/v5/')) {
         shazamAsks++;
         if (shazamBusy) { shazamBusy = false; res.writeHead(429, { 'Retry-After': '120' }); return res.end(); }
-        return send(res, 200, { matches: [{}], track: { title: 'buddy', subtitle: 'kensuke ushio', url: 'https://www.shazam.com/track/1/buddy',
+        const title = shazamNext || 'buddy';
+        shazamNext = null;
+        return send(res, 200, { matches: [{}], track: { title, subtitle: 'kensuke ushio', url: 'https://www.shazam.com/track/1/buddy',
             images: { coverart: 'https://is1-ssl.mzstatic.com/image/a.jpg' },
             hub: { options: [{ actions: [{ uri: 'intent://music.apple.com/us/album/buddy/1?i=2#Intent;scheme=https;end' }] }] } } });
     }

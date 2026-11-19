@@ -1,5 +1,5 @@
 import { jfAuth } from '../jellyfin.js';
-import { dodgeFor, parseAss, assBox } from './subdodge.js';
+import { dodgeFor, parseAss, assBox, assLift } from './subdodge.js';
 
 // Every subtitle of a file behind one list, whatever draws it:
 //   ASS/SSA  -> JASSUB (libass in WebAssembly) with the fonts embedded in the MKV — typesetting, signs,
@@ -12,8 +12,13 @@ import { dodgeFor, parseAss, assBox } from './subdodge.js';
 //   manager = { list(), current(), select(id | null), delay(), setDelay(seconds), destroy() }; `pick` chooses the first track
 //   card: the card at the bottom right while it shows (a DOMRect, else null); lines keep clear of it
 //   delay: seconds the lines come later (negative: earlier), for a release timed off by a bit
-const JASSUB_URL = '../vendor/jassub-2.5.18p3/jassub.js';
+const JASSUB_URL = '../vendor/jassub-2.5.18p4/jassub.js';
 const LIBPGS_URL = '../vendor/libpgs-0.9.0/libpgs.js';
+// For a test on Windows, where JASSUB draws in 2D and in sync (tools/vendor/jassub.sh): localStorage aniroll_jassub
+// "webgl", "desync" or "webgl desync" turns that part back on (the worker reads it from its URL)
+const JASSUB_TEST = (() => { try { return localStorage.getItem('aniroll_jassub') || ''; } catch { return ''; } })();
+const JASSUB_WORKER = JASSUB_TEST
+    ? new URL(`../vendor/jassub-2.5.18p4/worker/worker.js?r=${encodeURIComponent(JASSUB_TEST)}`, import.meta.url).href : undefined;
 const LIBPGS_WORKER = new URL('../vendor/libpgs-0.9.0/libpgs.worker.js', import.meta.url).href;
 const ASS = new Set(['ass', 'ssa']);
 const PGS = new Set(['pgssub', 'pgs']);
@@ -113,6 +118,12 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
             const box = active?.kind === 'ass' && !canvas.hidden && assScript?.track === active && card()
                 ? assBox(assScript, video.currentTime - offset, canvas.getBoundingClientRect(), 0.3) : null;
             place(canvas, box);
+            // While the controls show, the canvas moves out of their way (css .pl-subs-canvas[data-lift]): up for
+            // lines at the bottom, down for lines up top, which rising would push under the top bar. Until the
+            // script is read it rises, as before
+            const lift = active?.kind === 'ass' && assScript?.track === active
+                ? assLift(assScript, video.currentTime - offset, 0.3) : 'up';
+            if (lift !== null && canvas.dataset.lift !== lift) canvas.dataset.lift = lift;
         }
     }
     video.addEventListener('timeupdate', dodge);
@@ -190,6 +201,7 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
             timeOffset: -offset,
             // No "allow fonts" prompt: embedded fonts and the default face are enough
             queryFonts: false,
+            workerUrl: JASSUB_WORKER,
         });
         jassub._canvas.classList.add('pl-subs-canvas');
         onAss();

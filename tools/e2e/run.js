@@ -268,13 +268,21 @@ function staticServer() {
     // A round of rolls hands out every show once before any comes again (a shuffle bag, remembered in
     // aniroll_roll_seen): four rolls from a fresh start, four different shows
     await page.evaluate(() => localStorage.removeItem('aniroll_roll_seen'));
-    const winners = [];
+    const winners = [], landings = [];
     for (let i = 0; i < 4; i++) {
         await page.evaluate(() => { localStorage.removeItem('aniroll_req_times'); document.getElementById('roll-btn').click(); });
         await page.waitForSelector('#roll-result:not([hidden])', { timeout: 15000 });
         winners.push(await page.evaluate(() => JSON.parse(localStorage.getItem('aniroll_roll_seen') || '[]').at(-1)));
+        // Rolled again right away, the window is still bouncing: the reel must still stop on the winner, not past it
+        landings.push(await page.evaluate(() => {
+            const reel = document.getElementById('roll-reel');
+            const y = new DOMMatrix(getComputedStyle(reel).transform).m42;
+            const want = -(reel.children.length - 1) * parseFloat(getComputedStyle(reel.firstElementChild).height);
+            return Math.round(y - want);
+        }));
     }
     check('Roll: no show comes up twice until the others had their turn', new Set(winners).size === winners.length && winners.every(Boolean), winners);
+    check('Roll: quick rolls in a row still land on the winner\'s cover', landings.every(d => d === 0), landings);
     await page.close();
     }, async () => {
     const { page, mutations, settle, go, panelOpen, closePanel } = await mainPage();
@@ -2185,11 +2193,20 @@ function staticServer() {
         await idle(p, 3000);
         const nextAsked = calls.filter(c => c.type === 'PlaybackInfo' && c.item === 'ep7').map(c => c.audio);
         const reportedAudio = calls.filter(c => c.type === 'Playing' && c.body?.ItemId === 'ep7').map(c => c.body.AudioStreamIndex);
+        // A track other than the file's first: never the file as it is (the browser would play the first),
+        // Jellyfin repackages it with that track — on the switch and when the next episode starts with the dub
+        const remuxed = calls.filter(c => c.type === 'remux').map(c => `${c.item}:${c.audio}`);
+        const noDirect = calls.filter(c => c.type === 'PlaybackInfo' && c.body?.EnableDirectPlay === false).map(c => `${c.item}:${c.audio}`);
+        const nextMethod = await p.evaluate(() => document.getElementById('player-method')?.textContent);
         check('player: audio tracks in the menu, switching asks Jellyfin for that track from the same spot, the show remembers the dub',
             audioMenu.titles.join() === 'Audio,Subtitles,Timing,Size' && audioMenu.audio.join('|') === 'Japanese - Opus - Stereo:true|English - Opus - Stereo:false'
             && asked.join() === ',5' && dubbed.time > 4 && checkedAfter === '5'
             && Object.values(dubbed.pref).some(v => v.lang === 'eng') && reportedAudio.includes(5) && !reportedAudio.includes(1),
             { audioMenu, asked, dubbed, checkedAfter, nextAsked, reportedAudio });
+        check('player: the dub (not the first track) is repackaged by Jellyfin, never played from the file as it is',
+            remuxed.includes('ep6:5') && remuxed.includes('ep7:5') && noDirect.join() === 'ep6:5,ep7:5'
+            && nextAsked.join() === ',5' && nextMethod === 'Server repackages the file',
+            { remuxed, noDirect, nextAsked, nextMethod });
 
         // Quality & stats: Auto (measured), Maximum and Jellyfin's bitrate steps; a step asks Jellyfin again under that
         // bitrate from the same spot and is kept; I shows the stats for nerds
@@ -2246,7 +2263,8 @@ function staticServer() {
         await p.keyboard.press('Escape');
         await p.evaluate(() => localStorage.removeItem('aniroll_jf_upload'));
         check('player: away from home Auto leaves room for peaks under the upload set, steps down after buffering, kept per server, Auto again forgets it',
-            upAsked.join() === '20000000,15000000' && stallAsked.join() === '10000000' && Object.values(fallback)[0]?.bps === 10e6
+            // twice: the show plays the dub, so the file as it is first, then repackaged with that track
+            upAsked.join() === '20000000,15000000,20000000,15000000' && stallAsked.join() === '10000000' && Object.values(fallback)[0]?.bps === 10e6
             && /^Auto \(10 Mbps\)/.test(autoLabel) && forgotten === 0, { upAsked, stallAsked, fallback, autoLabel, forgotten });
 
         // Test speed in the Quality menu: three downloads from Jellyfin, the result as a note; stuttering five

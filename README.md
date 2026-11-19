@@ -283,7 +283,7 @@ The player uses [hls.js](https://github.com/video-dev/hls.js) (Apache-2.0),
 [libpgs](https://github.com/Arcus92/libpgs-js) (MIT) and [JASSUB](https://github.com/ThaUnknown/jassub) (MIT).
 JASSUB's WebAssembly contains libass, FreeType, HarfBuzz, FriBidi and other libraries under their own
 licences, some of them LGPL-2.1-or-later; they ship as separate, replaceable files in
-`js/vendor/jassub-2.5.18p3/`, rebuilt from the published package by `tools/vendor/jassub.sh`. Every
+`js/vendor/jassub-2.5.18p4/`, rebuilt from the published package by `tools/vendor/jassub.sh`. Every
 library's licence text lies next to it in `js/vendor/`.
 
 The UI tones are made from marimba recordings of the

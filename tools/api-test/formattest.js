@@ -3,9 +3,11 @@
 const { loadFunctions } = require('./source');
 
 const { esc } = loadFunctions('js/store.js', ['ESC_MAP', 'esc']);
+// Spoilers are parsed in js/spoiler.js (an import of social.js), so they come along from there
+const { parseSpoilers } = loadFunctions('js/spoiler.js', ['MAX_DEPTH', 'LABEL', 'parseSpoilers', 'build']);
 const f = loadFunctions('js/pages/social.js',
     ['MEDIA_URL', 'HEADING', 'RULE', 'BULLET', 'NUMBERED', 'QUOTE', 'mediaLinkAttrs', 'formatInline',
-        'formatActivityText', 'formatCentered', 'splitBlocks', 'formatActivityLines'], { esc });
+        'formatActivityText', 'renderSpoilerNodes', 'renderSpoiler', 'formatCentered', 'splitBlocks', 'formatActivityLines'], { esc, parseSpoilers });
 const render = f.formatActivityText;
 
 let failed = 0;
@@ -31,7 +33,7 @@ has('centred block, also across lines', '~~~\nimg(https://x.test/a.png)\n~~~', '
 has('no blank lines around a centred block', 'before\n~~~\nmiddle\n~~~\nafter', 'before<div class="activity-center">middle</div>after');
 has('inline code keeps links and emphasis out', 'run `__init__ https://a.test`', '<code class="activity-code">__init__ https://a.test</code>');
 has('formatting inside list items', '- **bold** @someone', '<li><strong>bold</strong> <a href="#/user/someone"');
-has('spoiler around a list', '~!\n- secret\n!~', '<span class="activity-spoiler"', '<li>secret</li>');
+has('spoiler around a list', '~!\n- secret\n!~', '<div class="activity-spoiler is-block"', '<li>secret</li>');
 check('italics at line start is not a list', !render('*wow* great').includes('<ul'), render('*wow* great'));
 check('negative number is not a list', !render('-5 degrees').includes('<ul'), render('-5 degrees'));
 check('hashtag is not a heading', !render('#1 anime').includes('activity-heading'), render('#1 anime'));

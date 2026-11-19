@@ -111,19 +111,42 @@ module.exports = function songs({ dataDir, readJson, writeJson, json, readBody, 
     function spotKey(media, episode) {
         return Number.isInteger(media) && media > 0 && Number.isInteger(episode) && episode >= 0 ? `${media}/${episode}` : null;
     }
+    // Each kept answer remembers who got it from Shazam (a hash of the account id, by). One that two accounts
+    // got goes first, and a single ask can add an answer next to it but never push it out: one account
+    // cannot replace what others confirmed (C9). Answers from before this have no by and count as one.
+    const confirmed = (s) => (s.by || []).length >= 2;
+    const sameSong = (a, b) => String(a?.title).toLowerCase() === String(b?.title).toLowerCase()
+        && String(a?.artist).toLowerCase() === String(b?.artist).toLowerCase();
+    const askerOf = (id) => crypto.createHash('sha256').update('aniroll-song-asker:' + id).digest('hex').slice(0, 16);
     function keptSong(key, at) {
         if (!key) return null;
         const list = readJson(spotsFile)[key] || [];
         let best = null;
-        for (const s of list) if (Math.abs(s.at - at) <= SPOT_NEAR_S && (!best || Math.abs(s.at - at) < Math.abs(best.at - at))) best = s;
+        const better = (s) => !best || confirmed(s) > confirmed(best)
+            || (confirmed(s) === confirmed(best) && Math.abs(s.at - at) < Math.abs(best.at - at));
+        for (const s of list) if (Math.abs(s.at - at) <= SPOT_NEAR_S && better(s)) best = s;
         return best?.song || null;
     }
-    function keepSong(key, at, song) {
+    function keepSong(key, at, song, asker) {
         if (!key) return;
         const all = readJson(spotsFile);
-        const list = (Object.hasOwn(all, key) ? all[key] : []).filter(s => Math.abs(s.at - at) > SPOT_NEAR_S / 2);
-        list.push({ at, song, kept: Date.now() });
-        all[key] = list.slice(-40);
+        const list = Object.hasOwn(all, key) ? all[key] : [];
+        const near = (s) => Math.abs(s.at - at) <= SPOT_NEAR_S / 2;
+        const same = list.find(s => near(s) && sameSong(s.song, song));
+        if (same) {
+            same.by = [...new Set([...(same.by || []), asker])].slice(-5);
+            same.kept = Date.now();
+            all[key] = list;
+        } else {
+            const kept = list.filter(s => !near(s) || confirmed(s));
+            kept.push({ at, song, by: [asker], kept: Date.now() });
+            all[key] = kept;
+        }
+        // At most 40 a show and episode; what others confirmed is the last to go
+        const mine = all[key];
+        const sure = mine.filter(confirmed).slice(-40);
+        const room = 40 - sure.length;
+        all[key] = [...sure, ...(room > 0 ? mine.filter(s => !confirmed(s)).slice(-room) : [])].sort((x, y) => x.at - y.at);
         const keys = Object.keys(all);
         if (keys.length > MAX_SPOTS) {
             const last = (k) => Math.max(...all[k].map(s => s.kept || 0));
@@ -194,7 +217,7 @@ module.exports = function songs({ dataDir, readJson, writeJson, json, readBody, 
         let answer;
         try { answer = await askShazam(uri, Math.round(samplems)); } catch { return json(res, 502, { error: 'Shazam did not answer, try again' }); }
         if (answer.busy) return busy(res);
-        if (answer.song) { counts.found++; keepSong(key, at, answer.song); }
+        if (answer.song) { counts.found++; keepSong(key, at, answer.song, askerOf(user)); }
         json(res, 200, { song: answer.song });
     }
 

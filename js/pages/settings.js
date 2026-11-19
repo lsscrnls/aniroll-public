@@ -496,12 +496,17 @@ async function renderJellyfinSettings() {
             renderJellyfinSettings();
         });
         // An invite link from a friend (#/settings?tab=jellyfin&server=…), or signing in again after the
-        // old sign-in expired: the address is filled in, and the code is asked for right away
-        const invited = new URLSearchParams(location.hash.split('?')[1] || '').get('server') || box.dataset.prefill || '';
+        // old sign-in expired: the address is filled in. Only for the own server is the code asked for right
+        // away. A link's server is whoever made the link, and Quick Connect is approved by that same server,
+        // so connecting to it waits for a click and a yes that names it.
+        const own = box.dataset.prefill || '';
+        const invited = own || new URLSearchParams(location.hash.split('?')[1] || '').get('server') || '';
+        let linkHost = '';
         if (invited && /^https?:\/\//i.test(invited)) {
             box.querySelector('#jf-url').value = invited;
             delete box.dataset.prefill;
-            if (mode === 'code' && !box.dataset.autoAsked) {
+            if (!own) { try { linkHost = new URL(invited).host; } catch { /* not a URL: connect says so */ } }
+            if (own && mode === 'code' && !box.dataset.autoAsked) {
                 box.dataset.autoAsked = '1';
                 setTimeout(() => box.querySelector('#jf-connect')?.click(), 0);
             }
@@ -516,6 +521,17 @@ async function renderJellyfinSettings() {
 
         btn.addEventListener('click', async () => {
             stopPolling();
+            let host = '';
+            try { host = new URL(box.querySelector('#jf-url').value).host; } catch { /* connect says so */ }
+            if (linkHost && host === linkHost) {
+                const ok = await showConfirm({
+                    title: 'Connect to this Jellyfin server?',
+                    message: `${host} came from a link. Connect only if it is your own server or one you trust: it then sees what you watch, and AniRoll moves your AniList list by what it reports.`,
+                    confirmText: 'Connect',
+                });
+                if (!ok) return;
+                linkHost = '';
+            }
             btn.disabled = true;
             btn.textContent = mode === 'key' ? 'Connecting…' : 'Asking Jellyfin…';
             try {

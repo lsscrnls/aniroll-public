@@ -1,12 +1,30 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.8.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.14.
+
+## 19 November 2026 – Security fixes
+
+- AniRoll now checks more carefully who may change what, and a shared connect link asks before it connects.
+
+## 17 November 2026 – The picture stays with styled subtitles on
+
+- In some browsers on Windows, the picture went black once the player controls hid, while the styled subtitles kept showing. Styled subtitles are now drawn the way Firefox already drew them, and the picture stays.
+
+## 12 November 2026 – Subtitles up top stay in view
+
+- When the player controls show, subtitles at the top of the picture now move **down** out of the way instead of up under the top bar. Lines at the bottom still move up.
+
+## 11 November 2026 – Dual audio plays the track you picked
+
+- In shows with two audio tracks, the player sometimes said **Japanese** but played the English dub. It now always plays the track you picked.
+- The helper for **AniRoll for Discord** on Linux and macOS is built with the newest Go release. It updates by itself.
 
 ## 10 November 2026 – Spoilers the way AniList writes them now
 
 - Spoilers in posts and replies can now carry a **label**, like “Ending spoiler”. You see the label and decide whether to open it.
 - A spoiler on its own line now sits in a **clearly marked box**, so you can tell where it starts and ends.
 - A spoiler inside another spoiler no longer gives itself away early: the outer one opens first.
+- **Roll again** right after a pick no longer spins past the last cover into an empty window.
 
 ## 9 November 2026 – Watch Party: forgot to leave? Take it back
 
