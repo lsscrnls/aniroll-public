@@ -2,7 +2,7 @@
 import { esc } from '../store.js';
 import { getConfig } from '../jellyfin.js';
 import { availability } from './availability.js';
-import { findEpisode } from './library.js';
+import { findEpisode, listEpisodes } from './library.js';
 
 const ICON_EPISODES = '<svg data-icon="list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>';
 const ICON_PLAY = '<svg data-icon="play_arrow" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:18px;height:18px;vertical-align:-4px;margin-right:6px"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
@@ -11,23 +11,36 @@ const ICON_PLAY = '<svg data-icon="play_arrow" viewBox="0 0 24 24" fill="current
 // skipped). Fills `slot` only when the server answers and has that episode: nothing waits for it and
 // nothing shows when Jellyfin is off. `prefix` names the classes (detail-play, wp-play, …);
 // `isCurrent` says no once a newer call wants another episode; `episodes: false` leaves out the list
-// button, `size` adds a class to both. Resolves true when the button is shown.
+// button, `size` adds a class to both. Episode not there (the newest one is watched): only "Episodes",
+// when Jellyfin has any. Resolves true when something is shown.
 export async function mountPlayButton(slot, media, episode, { prefix = 'detail', isCurrent = () => true, episodes = true, size = '' } = {}) {
     if (!slot || media.type !== 'ANIME' || !(episode > 0) || !getConfig()) return false;
     try {
         const avail = await availability();
         if (!avail) return false;
         const found = await findEpisode(avail.base, media, episode);
-        if (!found || !slot.isConnected || !isCurrent()) return false;
-        const resume = found.positionTicks > 0 && !found.played;
+        if (!slot.isConnected || !isCurrent()) return false;
         const movie = media.format === 'MOVIE';
-        const label = movie ? (resume ? 'Resume' : 'Play') : `${resume ? 'Resume' : 'Play'} episode ${episode}`;
-        slot.innerHTML = `<a class="glass-btn glass-btn-primary ${size} ${prefix}-play" href="#/play/${media.id}/${episode}">${ICON_PLAY}${esc(label)}</a>`
-            + (movie || !episodes ? '' : `<button class="glass-btn glass-btn-secondary ${size} ${prefix}-episodes" type="button">${ICON_EPISODES}Episodes</button>`);
-        slot.querySelector(`.${prefix}-episodes`)?.addEventListener('click', async () => {
+        const episodesBtn = movie || !episodes ? '' : `<button class="glass-btn glass-btn-secondary ${size} ${prefix}-episodes" type="button">${ICON_EPISODES}Episodes</button>`;
+        const wireEpisodes = () => slot.querySelector(`.${prefix}-episodes`)?.addEventListener('click', async () => {
             const { openEpisodes } = await import('./episodes.js');
             openEpisodes(media, avail.base);
         });
+        if (!found) {
+            // The next one is not out (or not in Jellyfin) yet, e.g. the newest episode is watched: the
+            // ones Jellyfin has stay one click away for a rewatch
+            if (!episodesBtn) return false;
+            const have = await listEpisodes(avail.base, media).catch(() => []);
+            if (!have.length || !slot.isConnected || !isCurrent()) return false;
+            slot.innerHTML = episodesBtn;
+            wireEpisodes();
+            slot.hidden = false;
+            return true;
+        }
+        const resume = found.positionTicks > 0 && !found.played;
+        const label = movie ? (resume ? 'Resume' : 'Play') : `${resume ? 'Resume' : 'Play'} episode ${episode}`;
+        slot.innerHTML = `<a class="glass-btn glass-btn-primary ${size} ${prefix}-play" href="#/play/${media.id}/${episode}">${ICON_PLAY}${esc(label)}</a>` + episodesBtn;
+        wireEpisodes();
         slot.hidden = false;
         return true;
     } catch (err) {

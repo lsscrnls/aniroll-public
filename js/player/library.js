@@ -209,6 +209,14 @@ export async function findEpisode(base, media, episode) {
     return hit ? toEpisode(hit, base, offset) : null;
 }
 
+// The Jellyfin series or movie an AniList show plays from (its id, for a metadata refresh), or null
+export async function showItemId(base, media) {
+    const cfg = getConfig();
+    if (!cfg || !media?.id) return null;
+    const show = await showFor(base, cfg, media);
+    return show?.id || null;
+}
+
 // episodeEnd: the last episode of a file that holds more than one ("E05-E06" -> 6), else null.
 // image: the episode's still from Jellyfin, when base is given and it has one
 // offset: Jellyfin episodes before this AniList entry's first (a linked later part): numbers are AniList's

@@ -607,6 +607,15 @@ async function renderJellyfinSettings() {
             <p class="dot-label jf-hint">Away from home the player stays below it, so a file with big jumps in its bitrate is converted instead of stuttering. Saved for your account.</p>
         </div>
         ${linksHtml()}
+        <div class="jf-local" id="jf-maint" hidden>
+            <div class="jf-local-label">Library metadata</div>
+            <div class="jf-actions">
+                <button class="glass-btn glass-btn-secondary glass-btn-sm" data-refresh="scan">Scan for new files</button>
+                <button class="glass-btn glass-btn-secondary glass-btn-sm" data-refresh="missing">Find missing metadata</button>
+                <button class="glass-btn glass-btn-secondary glass-btn-sm" data-refresh="all">Replace all metadata</button>
+            </div>
+            <p class="dot-label jf-hint">For every library on the server. Missing metadata also reads episodes in again that Jellyfin only half took in, for example when it stopped during an import. Jellyfin works on it in the background; one show at a time is in the player's episode list.</p>
+        </div>
         <div class="jf-actions">
             <button class="glass-btn glass-btn-secondary glass-btn-sm" id="jf-sign-in-again" hidden>Sign in again</button>
             <button class="glass-btn glass-btn-secondary glass-btn-sm" id="jf-invite" title="A link for a friend: it opens AniRoll's Jellyfin settings with this server filled in">Invite a friend</button>
@@ -626,7 +635,36 @@ async function renderJellyfinSettings() {
             : `Not connected · ${status.error}`;
         const again = box.querySelector('#jf-sign-in-again');
         if (again) again.hidden = !status.expired;
+        const maint = box.querySelector('#jf-maint');
+        if (maint) maint.hidden = !(status.state === 'connected' && status.admin);
     };
+    box.querySelector('#jf-maint')?.addEventListener('click', async (ev) => {
+        const btn = /** @type {HTMLButtonElement | null} */ (ev.target.closest('[data-refresh]'));
+        if (!btn) return;
+        const mode = /** @type {'scan' | 'missing' | 'all'} */ (btn.dataset.refresh);
+        if (mode === 'all') {
+            const ok = await showConfirm({
+                title: 'Replace all metadata?',
+                message: 'Jellyfin fetches titles, descriptions and episode names for every show and movie again and overwrites what it has, including changes made by hand. On a big library this takes a long time. Images stay.',
+                confirmText: 'Replace all',
+            });
+            if (!ok) return;
+        }
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Asking Jellyfin…';
+        try {
+            const n = await jf.refreshLibrary(mode);
+            toast(mode === 'scan' ? 'Jellyfin is scanning your libraries'
+                : `Jellyfin is refreshing ${n} ${n === 1 ? 'library' : 'libraries'} in the background`, 'success');
+            // A show added by the scan: the player looks up the ones it had not found again
+            if (mode === 'scan') (await import('../player/library.js')).refreshMatches([]);
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+        btn.disabled = false;
+        btn.textContent = label;
+    });
     box.querySelector('#jf-sign-in-again')?.addEventListener('click', async () => {
         box.dataset.prefill = cfg.url;
         box.dataset.mode = 'code';

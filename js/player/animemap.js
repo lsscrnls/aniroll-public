@@ -15,15 +15,18 @@ import { jfGet, refreshMatches } from './library.js';
 const KEY = 'aniroll_jf_animemap';
 const STALE_MS = 24 * 60 * 60 * 1000;
 const MISS_MS = 15 * 60 * 1000;
+// Raised when the rules change what a check finds (2: specials): a map from older rules counts as no check,
+// so the next page load runs one instead of waiting a day (Shahal stayed "not there" after the 2.0.0.18 deploy)
+const RULES = 2;
 
 /** @typedef {{ kind: 'series', id: string, season: number, offset: number } | { kind: 'movie', id: string }} Mapped */
-/** @typedef {{ user: string, at?: number, tried?: number, online?: boolean, map?: Record<string, Mapped>, have?: Record<string, number>, sent?: string }} Stored */
+/** @typedef {{ user: string, rules?: number, at?: number, tried?: number, online?: boolean, map?: Record<string, Mapped>, have?: Record<string, number>, sent?: string }} Stored */
 
 /** @returns {Stored} */
 function read(userId) {
     try {
         const s = JSON.parse(localStorage.getItem(KEY) || '{}');
-        return s.user === userId ? s : { user: userId };
+        return s.user === userId && s.rules === RULES ? s : { user: userId };
     } catch {
         return { user: userId };
     }
@@ -31,7 +34,7 @@ function read(userId) {
 
 /** @param {Stored} s */
 function write(s) {
-    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* full or blocked: titles only */ }
+    try { localStorage.setItem(KEY, JSON.stringify({ ...s, rules: RULES })); } catch { /* full or blocked: titles only */ }
 }
 
 /** @returns {Mapped | null} the Jellyfin show the last check found for this AniList entry */
@@ -127,9 +130,10 @@ export function checkLibrary() {
         /** @type {Record<string, Mapped>} */
         const map = {};
         for (const e of entries) {
-            // TVDB first: Sonarr names the files after it, so its seasons are the folders. Specials (season 0) are left out.
-            const byTvdb = e.tvdb && e.ts > 0 && series.find(i => i.tvdb === e.tvdb);
-            const byTmdb = !byTvdb && e.tmdb && e.ms > 0 && series.find(i => i.tmdb === e.tmdb);
+            // TVDB first: Sonarr names the files after it, so its seasons are the folders. Specials (season 0) count
+            // too: the list gives an OVA its exact place there (Seraph of the End's Shahal = S00E11, offset 10)
+            const byTvdb = e.tvdb && Number.isInteger(e.ts) && series.find(i => i.tvdb === e.tvdb);
+            const byTmdb = !byTvdb && e.tmdb && Number.isInteger(e.ms) && series.find(i => i.tmdb === e.tmdb);
             const movie = movies.find(i => i.tmdb && (e.movie || []).includes(i.tmdb));
             if (byTvdb) map[e.a] = { kind: 'series', id: byTvdb.id, season: e.ts, offset: e.to || 0 };
             else if (byTmdb) map[e.a] = { kind: 'series', id: byTmdb.id, season: e.ms, offset: e.mo || 0 };
@@ -138,8 +142,20 @@ export function checkLibrary() {
         /** @type {Record<string, number>} */
         const have = {};
         const byId = new Map(items.map(i => [i.id, i]));
+        // Specials: a season 0 holds many entries' episodes with gaps, so its size says nothing; the entry's own first
+        // episode has to be there. Asked only when the check mapped one; without an answer no special counts.
+        const specials = Object.values(map).some(m => m.kind === 'series' && m.season === 0)
+            ? await jfGet(avail.base, `/Users/${encodeURIComponent(cfg.userId)}/Items?IncludeItemTypes=Episode&Recursive=true&ParentIndexNumber=0`
+                + '&fields=DateCreated&EnableImages=false&EnableUserData=false', cfg.apiKey, 20000)
+                .then(d => (d?.Items || []).filter(i => i.SeriesId && i.ParentIndexNumber === 0 && Number.isInteger(i.IndexNumber))).catch(() => [])
+            : [];
         for (const [a, m] of Object.entries(map)) {
             if (m.kind === 'movie') { have[a] = byId.get(m.id)?.added || 0; continue; }
+            if (m.season === 0) {
+                const ep = specials.find(i => i.SeriesId === m.id && i.IndexNumber === m.offset + 1);
+                if (ep) have[a] = when(ep) || byId.get(m.id)?.added || 0;
+                continue;
+            }
             if (!seasons) { have[a] = byId.get(m.id)?.added || 0; continue; }
             const season = seasons.find(i => i.SeriesId === m.id && i.IndexNumber === m.season);
             if (season && (season.ChildCount ?? 1) > m.offset) have[a] = when(season) || byId.get(m.id)?.added || 0;

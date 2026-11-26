@@ -600,6 +600,7 @@ export async function getStaff(id, page = 1, token = null) {
         query ($id: Int, $page: Int) {
             Staff(id: $id) {
                 id name { full native } image { large } primaryOccupations homeTown
+                height { initial { metric imperial } min { metric imperial } max { metric imperial } }
                 dateOfBirth { year month day } dateOfDeath { year month day }
                 characterMedia(page: $page, perPage: 30, sort: [POPULARITY_DESC]) {
                     pageInfo { hasNextPage total }
@@ -633,8 +634,8 @@ async function getMediaFromAniList(id, token) {
                         mediaRecommendation { id title { userPreferred english romaji native } coverImage { large } meanScore format type episodes mediaListEntry { status } }
                     }
                 }
-                # Every studio with its role, in one field: AniList answers a second studios(...) in the same
-                # query with the first one's arguments (checked 2026-09-27), so it is asked once, here
+                # Every studio with its role, in one field. Until the changelog of 23 Nov 2026 AniList answered a
+                # second studios(...) with the first one's arguments; that is fixed, and one field is still all it takes
                 studios { edges { isMain node { id name isAnimationStudio } } }
                 relations { edges {
                     relationType(version: 2)

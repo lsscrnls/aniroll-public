@@ -126,6 +126,12 @@ module.exports = function animeMap({ dataDir, writeJson, readJson, json, readBod
         const list = map[`${normTitle(splitYear(info.series).title)}|${season}`];
         if (!list) return null;
         const episode = info.episode || 1;
+        // Specials have gaps and no end per entry here: only an entry's own first episode counts (S00E12 is not
+        // episode 2 of the S00E11 OVA)
+        if (season === 0) {
+            const hit = list.find(([, offset]) => offset + 1 === episode);
+            return hit ? { mediaId: hit[0], offset: hit[1] } : null;
+        }
         const fits = list.filter(([, offset]) => offset < episode).sort((a, b) => b[1] - a[1]);
         return fits.length ? { mediaId: fits[0][0], offset: fits[0][1] } : null;
     }

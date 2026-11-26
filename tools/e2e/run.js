@@ -989,6 +989,57 @@ function staticServer() {
         await sw.close();
     }
 
+    // A "Come along" guest stays when our server is briefly down (a deploy), and when they come back after the
+    // switch's pointer expired (laptop shut over an hour): the host's running party still lists them, so they move there
+    {
+        const sw = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+        sw.on('pageerror', e => errors.push(`watch party follow, gone: ${e.message}`));
+        let mode = 'up';
+        const first = { ...party, hostName: 'Hosty', hostKey: undefined, active: true, members: [], hostProgress: 3 };
+        const next = { hostName: 'Hosty', mediaId: 101, mediaTitle: 'Next Show', active: true, members: [{ name: VIEWER.name, avatar: '', follow: true }],
+            hostProgress: 0, startedAt: Date.now(), startEp: 0, evening: [] };
+        await sw.route('https://graphql.anilist.co/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(respond(route.request().postDataJSON())) }));
+        await sw.route(`${base}/api/**`, route => {
+            const p = new URL(route.request().url()).pathname;
+            if (!p.startsWith('/api/party/')) return route.fulfill({ status: p === '/api/maintenance' ? 200 : 404, contentType: 'application/json', body: '{"maintenance":false}' });
+            if (mode === 'down') return route.fulfill({ status: 502, contentType: 'text/html', body: '<h1>Bad gateway</h1>' });
+            const id = p.match(/^\/api\/party\/[^/]+\/(\d+)/)?.[1];
+            const at = mode === 'up' ? first : (id === '101' || !id ? next : null);
+            if (p.endsWith('/events')) return route.fulfill({ status: at ? 200 : 404, contentType: 'text/event-stream', body: at ? `retry: 500\ndata: ${JSON.stringify(at)}\n\n` : '' });
+            route.fulfill({ status: at ? 200 : 404, contentType: 'application/json', body: JSON.stringify(at || { active: false }) });
+        });
+        await sw.route(/cdn|googleapis|gstatic|aniskip/, route => route.abort());
+        await sw.addInitScript(({ id, name }) => {
+            localStorage.setItem('aniroll_token', 'e2e-token');
+            localStorage.setItem('aniroll_user', JSON.stringify({ id, name, avatar: { medium: '' }, options: {}, mediaListOptions: { scoreFormat: 'POINT_100' } }));
+            localStorage.setItem('aniroll_user_ts', String(Date.now()));
+            localStorage.setItem('aniroll_seen_changes', '9999');
+        }, VIEWER);
+        await sw.goto(base + '/#/watchparty?host=Hosty&anime=21');
+        await idle(sw, 3000);
+        if (await sw.locator('button:has-text("Join Watch Party")').count()) {
+            await sw.locator('button:has-text("Join Watch Party")').first().click();
+            await sw.waitForTimeout(1000);
+            await sw.locator('#wp-follow').check().catch(() => {});
+            if (await sw.locator('#wp-bg-open').count()) await sw.click('#wp-bg-open');
+            await sw.waitForFunction(() => !!localStorage.getItem('aniroll_joined_party'), null, { timeout: 8000 }).catch(() => {});
+        }
+        const looked = () => sw.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+        const joined = () => sw.evaluate(() => JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null'));
+        const before = await joined();
+        mode = 'down';
+        for (let i = 0; i < 4; i++) { await looked(); await sw.waitForTimeout(400); }
+        const afterDown = await joined();
+        mode = 'gone';
+        for (let i = 0; i < 4; i++) { await looked(); await sw.waitForTimeout(400); }
+        await sw.waitForFunction(() => JSON.parse(localStorage.getItem('aniroll_joined_party') || 'null')?.mediaId === 101, null, { timeout: 8000 }).catch(() => {});
+        const afterGone = await joined();
+        check('watch party follow: a "Come along" guest stays through a server outage and finds the party after the switch pointer expired',
+            before?.follow === true && afterDown?.mediaId === before.mediaId && afterDown.mediaId !== 101 && afterGone?.mediaId === 101,
+            { afterDown: afterDown && { mediaId: afterDown.mediaId, follow: afterDown.follow }, afterGone: afterGone && { mediaId: afterGone.mediaId } });
+        await sw.close();
+    }
+
     // Home's Watch Party button picks from every list, like Switch anime: a show from Planning goes on Watching
     {
         const fp = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -1758,6 +1809,78 @@ function staticServer() {
             !form.password && /Quick Connect/.test(form.button) && code === '482913' && /Connected/.test(done.state || '') && done.kind === 'user'
             && done.token === 'qc-token' && done.local && calls.some(c => c.type === 'qcAuth' && c.body?.Secret === 'qc-secret') && !pageErrors.length,
             { form, code, done, pageErrors });
+        await p.close();
+    }
+
+    // An episode Jellyfin only half read in (it stopped during the import): an admin gets "Refresh in Jellyfin",
+    // the player waits for the episode and starts it; a friend without admin rights never sees the button
+    {
+        const { p, pageErrors, calls } = await playerPage(true, true, { admin: true, halfRead: 12 });
+        await p.goto(base + '/#/play/101/12');
+        await p.waitForSelector('[data-jf-refresh]:not([hidden])', { timeout: 10000 }).catch(() => {});
+        const before = await p.evaluate(() => ({ text: document.getElementById('player-status')?.textContent.trim(),
+            button: !!document.querySelector('[data-jf-refresh]:not([hidden])') }));
+        check('player, half-read episode: says it is not in Jellyfin, an admin gets Refresh in Jellyfin',
+            /not in your Jellyfin/.test(before.text || '') && before.button, before);
+        await p.click('[data-jf-refresh]').catch(() => {});
+        await p.waitForFunction(() => { const v = document.getElementById('player-video'); return v && v.readyState >= 2; }, null, { timeout: 12000 }).catch(() => {});
+        const after = await p.evaluate(() => ({ ready: document.getElementById('player-video')?.readyState || 0,
+            label: document.getElementById('player-episode')?.textContent || '' }));
+        const asked = calls.filter(c => c.type === 'refresh');
+        check('player, half-read episode: Refresh asks Jellyfin for missing metadata of the series, then the episode plays',
+            asked.length === 1 && asked[0].item === 'series1' && asked[0].query.Recursive === 'true' && asked[0].query.ReplaceAllMetadata === 'false'
+                && after.ready >= 2 && /Episode 12/.test(after.label), { asked, after });
+        await p.click('#player-episodes').catch(() => {});
+        const epBtn = await p.waitForSelector('.ep-refresh:not([hidden])', { timeout: 4000 }).then(() => true, () => false);
+        check('player, admin: the episode list has Refresh metadata', epBtn, epBtn);
+        check('player, half-read episode: no errors', !pageErrors.length, pageErrors);
+        await p.close();
+    }
+    // The next episode is not in Jellyfin (the newest one is watched): no Play, but Episodes stays for a rewatch
+    {
+        const { p, pageErrors } = await playerPage(true, true, { without: [2] });
+        await p.goto(base + '/#/anime/101/full');
+        await p.waitForSelector('.detail-episodes', { timeout: 8000 }).catch(() => {});
+        const btns = await p.evaluate(() => ({ play: !!document.querySelector('.detail-play'), episodes: !!document.querySelector('.detail-episodes'),
+            slotHidden: document.getElementById('detail-play')?.hidden }));
+        await p.click('.detail-episodes').catch(() => {});
+        await p.waitForSelector('.ep-row', { timeout: 5000 }).catch(() => {});
+        const rows = await p.evaluate(() => document.querySelectorAll('.ep-row').length);
+        check('detail: next episode not in Jellyfin yet: no Play button, Episodes still opens the list',
+            !btns.play && btns.episodes && btns.slotHidden === false && rows === 10 && !pageErrors.length, { btns, rows, pageErrors });
+        await p.close();
+    }
+
+    // Settings: an admin refreshes every library (each one as its own item) or scans for new files
+    {
+        const { p, pageErrors, calls } = await playerPage(true, true, { admin: true });
+        await p.goto(base + '/#/settings?tab=jellyfin');
+        const shown = await p.waitForSelector('#jf-maint:not([hidden])', { timeout: 10000 }).then(() => true, () => false);
+        await p.click('#jf-maint [data-refresh="missing"]').catch(() => {});
+        await p.waitForTimeout(800);
+        await p.click('#jf-maint [data-refresh="scan"]').catch(() => {});
+        await p.waitForTimeout(800);
+        const libs = calls.filter(c => c.type === 'refresh').map(c => `${c.item}:${c.query.ReplaceAllMetadata}`);
+        check('settings, Jellyfin admin: Find missing metadata refreshes every library, Scan for new files scans',
+            shown && libs.join() === 'lib-anime:false,lib-movies:false' && calls.some(c => c.type === 'scan') && !pageErrors.length, { shown, libs, pageErrors });
+        await p.close();
+    }
+    {
+        const { p, pageErrors, calls } = await playerPage(true, true, { halfRead: 12 });
+        await p.goto(base + '/#/play/101/12');
+        await p.waitForSelector('#player-status.error', { timeout: 10000 }).catch(() => {});
+        await p.waitForTimeout(800);
+        const friend = await p.evaluate(() => ({ text: document.getElementById('player-status')?.textContent.trim(),
+            button: !!document.querySelector('[data-jf-refresh]:not([hidden])') }));
+        await p.click('#player-episodes').catch(() => {});
+        await p.waitForTimeout(800);
+        const epBtn = await p.evaluate(() => !!document.querySelector('.ep-refresh:not([hidden])'));
+        await p.goto(base + '/#/settings?tab=jellyfin');
+        await p.waitForSelector('#jf-settings-dot.jf-dot-on', { timeout: 10000 }).catch(() => {});
+        friend.settings = await p.evaluate(() => !document.getElementById('jf-maint')?.hidden);
+        check('player, not an admin: no refresh buttons, nothing sent to Jellyfin',
+            /not in your Jellyfin/.test(friend.text || '') && !friend.button && !epBtn && friend.settings === false && !calls.some(c => c.type === 'refresh') && !pageErrors.length,
+            { friend, epBtn, pageErrors });
         await p.close();
     }
 

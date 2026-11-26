@@ -8,7 +8,7 @@ import { prefersReducedMotion } from './animations.js';
 import { accountState, saveAccountState } from './accountstate.js';
 
 // The version people see; scripts/release.sh counts it up (caches are busted by scripts/fingerprint.js)
-export const RELEASE = '2.0.0.14';
+export const RELEASE = '2.0.0.20';
 const SEEN_KEY = 'aniroll_seen_changes';
 // Set when a new browser was marked up to date by itself: the account's own answer replaces it
 const AUTO_KEY = 'aniroll_seen_auto';
@@ -21,6 +21,37 @@ const AUTO_KEY = 'aniroll_seen_auto';
 // its offset) stays hidden until then: what is live already can be announced at a set time. A later release of the
 // day counts (its id) only once one of its items shows.
 const CHANGES = [
+    {
+        id: '2026-11-26.2',
+        title: 'Come along stays come along',
+        items: [
+            'Watch Party: guests who chose <strong>Come along</strong> no longer drop out of the party when AniRoll\'s server is briefly unreachable, or when they come back more than an hour after the host switched shows.',
+            { rev: 2, text: 'Styled subtitles with lines at the top and the bottom at once now both glide out of the way of the controls: the top ones down, the bottom ones up.' },
+        ],
+    },
+    {
+        id: '2026-11-25',
+        title: 'OVAs and specials from your Jellyfin',
+        items: [
+            'An OVA or special that Jellyfin keeps under a show\'s <strong>Specials</strong> now plays in AniRoll and counts as there, like Seraph of the End\'s <em>Vampire Shahal</em> (episode 11 of the specials).',
+        ],
+    },
+    {
+        id: '2026-11-23',
+        title: 'Voice actors show their height',
+        items: [
+            'A voice actor\'s page now shows their <strong>height</strong> in centimetres and feet, if AniList has one. Only a few people have one so far.',
+        ],
+    },
+    {
+        id: '2026-11-21.2',
+        title: 'Refresh Jellyfin metadata from AniRoll',
+        items: [
+            'If you run your own Jellyfin server, you can now refresh its metadata from AniRoll: for the whole library under <strong>Settings → Jellyfin</strong>, and for one show in the player\'s episode list.',
+            'When an episode is missing because Jellyfin only half read it in, the player offers <strong>Refresh in Jellyfin</strong> and starts the episode as soon as it is there.',
+            { rev: 2, text: 'A show\'s page keeps the <strong>Episodes</strong> button when you have seen the newest episode, so a rewatch is still one click away.' },
+        ],
+    },
     {
         id: '2026-11-19',
         title: 'Security fixes',

@@ -123,9 +123,65 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
             // script is read it rises, as before
             const lift = active?.kind === 'ass' && assScript?.track === active
                 ? assLift(assScript, video.currentTime - offset, 0.3) : 'up';
-            if (lift !== null && canvas.dataset.lift !== lift) canvas.dataset.lift = lift;
+            // Lines at both ends: one canvas cannot move two ways, so libass gets wider margins instead. That holds
+            // until the controls hide, else lines leaving would hand back to the canvas mid-way and jump
+            const spread = active?.kind === 'ass' && !player?.classList.contains('is-idle') && (spreading || lift === '');
+            if (spread !== spreading) {
+                spreading = spread;
+                // A canvas already moved glides home while the margins open: lines it moved the right way stay put
+                if (spread) canvas.dataset.lift = '';
+                spreadMargins(spread);
+            }
+            if (!spreading && lift !== null && canvas.dataset.lift !== lift) canvas.dataset.lift = lift;
         }
     }
+    const player = video.closest('.player');
+    let spreading = false;
+    let ownStyles = null; // the track's styles as the release wrote them
+    let spreadTicket = 0;
+    let spreadBy = 0; // script units the margins are open by right now
+    // The canvas's own curve (--m3-gentle, evenly spaced points), so both kinds of moving look alike
+    function ease(canvas, p) {
+        const pts = getComputedStyle(canvas).getPropertyValue('--m3-gentle').match(/-?\d*\.?\d+/g)?.map(Number);
+        if (!pts || pts.length < 2) return 1 - (1 - p) ** 3;
+        const at = p * (pts.length - 1);
+        const k = Math.min(pts.length - 2, Math.floor(at));
+        return pts[k] + (pts[k + 1] - pts[k]) * (at - k);
+    }
+    // Glides frame by frame over the canvas's transition time; a new call takes over from wherever this one got
+    async function spreadMargins(on) {
+        const ticket = ++spreadTicket;
+        const canvas = jassub?._canvas;
+        if (!canvas || !assScript) return;
+        ownStyles ||= await jassub.renderer.getStyles();
+        if (ticket !== spreadTicket || closed) return;
+        // The same distance the canvas moves (css .pl-subs-canvas): clamp(28px, 6vh, 72px), in script units
+        const px = Math.min(72, Math.max(28, innerHeight * 0.06));
+        const to = on ? Math.round(px * assScript.resY / (canvas.getBoundingClientRect().height || innerHeight)) : 0;
+        const from = spreadBy;
+        const d = getComputedStyle(canvas).transitionDuration.split(',')[0].trim();
+        const ms = parseFloat(d) * (d.endsWith('ms') ? 1 : 1000) || 0;
+        const start = performance.now();
+        for (;;) {
+            const p = ms ? Math.min(1, (performance.now() - start) / ms) : 1;
+            const by = Math.round(from + (to - from) * ease(canvas, p));
+            if (by !== spreadBy) {
+                spreadBy = by;
+                await Promise.all(ownStyles.map((s, i) => jassub.renderer.setStyle({ ...s, MarginV: s.MarginV + by }, i)));
+                if (ticket !== spreadTicket || closed) return;
+                // libass keeps laying lines out from the old styles until its frame size changes: one pixel off and
+                // back (resize() puts it back and draws, which paused nothing else would)
+                const { width, height } = canvas;
+                await jassub.renderer._resizeCanvas(width, height + 1, jassub._videoWidth || width, jassub._videoHeight || height);
+                await jassub.resize();
+            }
+            if (p === 1) return;
+            await new Promise(requestAnimationFrame);
+            if (ticket !== spreadTicket || closed) return;
+        }
+    }
+    const controlsSeen = new MutationObserver(dodge);
+    if (player) controlsSeen.observe(player, { attributes: true, attributeFilter: ['class'] });
     video.addEventListener('timeupdate', dodge);
     window.addEventListener('resize', dodge);
 
@@ -191,6 +247,10 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         });
         if (jassub) {
             await jassub.ready;
+            spreadTicket++;
+            spreading = false;
+            ownStyles = null;
+            spreadBy = 0;
             await jassub.renderer.setTrack(subContent);
             return;
         }
@@ -299,6 +359,7 @@ export function createSubtitles({ video, base, cfg, itemId, source, pick = () =>
         },
         destroy() {
             closed = true;
+            controlsSeen.disconnect();
             video.removeEventListener('timeupdate', dodge);
             window.removeEventListener('resize', dodge);
             loading(null);

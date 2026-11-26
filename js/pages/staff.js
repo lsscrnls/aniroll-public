@@ -8,6 +8,22 @@ import { getToken, isLoggedIn } from '../auth.js';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const fuzzyDate = d => d?.year ? [d.day, d.month ? MONTHS[d.month - 1] : null, d.year].filter(Boolean).join(' ') : null;
 
+// AniList's height (changelog 23 Nov 2026): min and max make a range, equal ones are one height; `initial` is
+// a known starting height when the final one is not. Few people have one yet, so most pages show none.
+/** @param {{ metric?: number | null, imperial?: string | null } | null | undefined} v */
+const oneHeight = v => v?.metric ? [`${Math.round(v.metric * 10) / 10} cm`, v.imperial].filter(Boolean).join(' / ') : null;
+/** @param {{ initial?: any, min?: any, max?: any } | null | undefined} h */
+export function heightText(h) {
+    const lo = h?.min?.metric ? h.min : null, hi = h?.max?.metric ? h.max : null;
+    if (lo && hi && lo.metric !== hi.metric) {
+        const cm = `${Math.round(lo.metric * 10) / 10}–${Math.round(hi.metric * 10) / 10} cm`;
+        return lo.imperial && hi.imperial ? `${cm} / ${lo.imperial}–${hi.imperial}` : cm;
+    }
+    if (lo || hi) return oneHeight(lo || hi);
+    const first = oneHeight(h?.initial);
+    return first ? `${first} at first` : null;
+}
+
 export async function render({ params, content }) {
     const token = getToken();
     const id = parseInt(params.id);
@@ -31,6 +47,7 @@ export async function render({ params, content }) {
                     fuzzyDate(staff.dateOfBirth) && `Born ${fuzzyDate(staff.dateOfBirth)}`,
                     fuzzyDate(staff.dateOfDeath) && `Died ${fuzzyDate(staff.dateOfDeath)}`,
                     staff.homeTown,
+                    heightText(staff.height) && `Height ${heightText(staff.height)}`,
                 ].filter(Boolean);
                 content.querySelector('#staff-head').innerHTML = `
                     <img class="staff-photo" src="${esc(staff.image?.large || '')}" alt="">

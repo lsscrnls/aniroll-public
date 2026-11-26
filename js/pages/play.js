@@ -1,9 +1,9 @@
 import * as api from '../api.js';
 import { getState, toast, esc, titlePref, emitListChange, emitWatched } from '../store.js';
 import { getToken, isLoggedIn } from '../auth.js';
-import { getConfig, jfAuth, deviceId, TRACKED_EVENT } from '../jellyfin.js';
+import { getConfig, jfAuth, deviceId, TRACKED_EVENT, canManageLibrary, refreshItem } from '../jellyfin.js';
 import { availability, syncUpload, bitrateTest } from '../player/availability.js';
-import { findEpisode, jfGet } from '../player/library.js';
+import { findEpisode, jfGet, showItemId } from '../player/library.js';
 import { deviceProfile } from '../player/profile.js';
 import { HtmlVideoEngine } from '../player/engine.js';
 import { controlsHtml, mountControls, icon } from '../player/controls.js';
@@ -65,7 +65,8 @@ export async function render({ params, content }) {
     let subtitles = null;
     let offTracked = () => {};
 
-    const status = (text, { error = false } = {}) => {
+    // refresh: the episode is not in Jellyfin; an admin gets a button that has Jellyfin read the show in again
+    const status = (text, { error = false, refresh = false } = {}) => {
         const box = $('player-status');
         if (!box) return;
         box.hidden = !text;
@@ -73,19 +74,48 @@ export async function render({ params, content }) {
         $('player')?.classList.toggle('is-loading', !!text && !error);
         $('player')?.classList.toggle('has-error', error);
         box.innerHTML = text ? (error
-            ? `<p class="player-error-text">${esc(text)}</p><div class="pl-actions"><button class="pl-pill pl-pill-tonal" data-retry>Try again</button><a class="pl-pill" href="#/anime/${mediaId}">Back to the show</a></div>`
+            ? `<p class="player-error-text">${esc(text)}</p><div class="pl-actions">${refresh ? '<button class="pl-pill pl-pill-tonal" data-jf-refresh hidden>Refresh in Jellyfin</button>' : ''}<button class="pl-pill pl-pill-tonal" data-retry>Try again</button><a class="pl-pill" href="#/anime/${mediaId}">Back to the show</a></div>`
             : `<div class="pl-spinner" aria-hidden="true"></div><p>${esc(text)}</p>`) : '';
+        if (refresh) canManageLibrary().then(ok => { const b = box.querySelector('[data-jf-refresh]'); if (b) b.hidden = !ok; }).catch(() => {});
     };
+    let missingFor = null; // { media, base } while the episode is not in Jellyfin
 
     // Try again: once playing, from the very second it stopped; before that, the same page from the start
     // (the server may be free again)
     let retryInPlace = null;
     content.addEventListener('click', (ev) => {
+        if (ev.target.closest('[data-jf-refresh]') && missingFor) return refreshMissing(missingFor);
         if (!ev.target.closest('[data-retry]')) return;
         if (retryInPlace) return retryInPlace();
         cleanup();
         window.dispatchEvent(new HashChangeEvent('hashchange'));
     });
+
+    // Jellyfin refreshes the show in the background: ask for the episode every 3 s, for up to 90 s, and
+    // start it as soon as it is there
+    const refreshMissing = async ({ media, base }) => {
+        try {
+            const id = await showItemId(base, media);
+            if (!id) throw new Error('Jellyfin has no show to refresh for this one. Scan the library in Settings first');
+            await refreshItem(id, 'missing', base);
+        } catch (err) {
+            if (!closed) status(err.message, { error: true, refresh: true });
+            return;
+        }
+        const started = Date.now();
+        while (!closed && Date.now() - started < 90000) {
+            status('Jellyfin is reading the show in again…');
+            await new Promise(r => setTimeout(r, 3000));
+            if (closed) return;
+            const ep = await findEpisode(base, media, episode).catch(() => null);
+            if (ep) {
+                cleanup();
+                window.dispatchEvent(new HashChangeEvent('hashchange'));
+                return;
+            }
+        }
+        if (!closed) status(`Jellyfin still has no episode ${episode}. Check the file in Jellyfin, or scan the library in Settings`, { error: true, refresh: true });
+    };
 
     // Going back returns to where the Play button was, when there is such a place
     $('player-back').addEventListener('click', (ev) => {
@@ -151,7 +181,10 @@ export async function render({ params, content }) {
         status('Finding the episode…');
         const ep = await findEpisode(avail.base, media, episode);
         if (closed) return cleanup;
-        if (!ep) throw new Error(`Episode ${episode} is not in your Jellyfin library`);
+        if (!ep) {
+            missingFor = { media, base: avail.base };
+            throw Object.assign(new Error(`Episode ${episode} is not in your Jellyfin library`), { missingEpisode: true });
+        }
         session.itemId = ep.itemId;
         session.runtime = ep.runTimeTicks ? ep.runTimeTicks / TICKS : 0;
         // A file with two episodes ("E05-E06") counts as both: AniList gets 6, Up next is episode 7
@@ -534,7 +567,7 @@ export async function render({ params, content }) {
         }
         engine.play().catch(() => { /* autoplay refused: the controls are there */ });
     } catch (err) {
-        if (!closed) status(err.message || 'Playback failed', { error: true });
+        if (!closed) status(err.message || 'Playback failed', { error: true, refresh: !!err.missingEpisode });
     }
     return cleanup;
 }

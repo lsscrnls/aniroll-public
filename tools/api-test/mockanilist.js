@@ -23,6 +23,7 @@ const MEDIA = {
     // Same name twice: the 2020 pilot and its 2026 series, told apart by "(2026)" (seasonYear is null for ONAs)
     401: { id: 401, episodes: 1, format: 'ONA', seasonYear: null, startDate: { year: 2020 }, synonyms: [], title: { romaji: 'Jiyi Guanli Ju', english: 'False Memory', userPreferred: 'Jiyi Guanli Ju' }, coverImage: { large: 'https://s4.anilist.co/fm2020.jpg' } },
     402: { id: 402, episodes: 7, format: 'ONA', seasonYear: null, startDate: { year: 2026 }, synonyms: [], title: { romaji: 'Jiyi Guanli Ju (2026)', english: 'False Memory (2026)', userPreferred: 'Jiyi Guanli Ju (2026)' }, coverImage: { large: 'https://s4.anilist.co/fm2026.jpg' } },
+    106: { id: 106, episodes: 1, format: 'OVA', seasonYear: 2016, synonyms: [], title: { romaji: 'Owari no Seraph: Kyuuketsuki Shahal', english: 'Seraph of the End: Vampire Shahal', userPreferred: 'Owari no Seraph: Kyuuketsuki Shahal' }, coverImage: { large: 'https://s4.anilist.co/shahal.jpg' } },
     300: { id: 300, episodes: 12, format: 'TV', seasonYear: 2024, synonyms: [], title: { romaji: 'Party Show', english: 'Party Show', userPreferred: 'Party Show' }, coverImage: { large: 'https://s4.anilist.co/party.jpg' } },
 };
 const LONG_AGO = Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
@@ -33,6 +34,7 @@ const lists = {
         103: { status: 'COMPLETED', progress: 12, repeat: 0, updatedAt: LONG_AGO },
         104: { status: 'COMPLETED', progress: 1, repeat: 0, updatedAt: LONG_AGO },
         401: { status: 'COMPLETED', progress: 1, repeat: 0, updatedAt: LONG_AGO },
+        106: { status: 'PLANNING', progress: 0, repeat: 0, updatedAt: LONG_AGO },
     },
     2: { 300: { status: 'CURRENT', progress: 1, repeat: 0, updatedAt: LONG_AGO } },
     3: {},

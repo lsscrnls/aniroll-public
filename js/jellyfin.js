@@ -307,9 +307,12 @@ export async function getStatus(force = false) {
     try {
         // A sign-in token is an ordinary user: the full system info may be admin-only
         const info = await request(cfg, cfg.kind === 'user' ? '/System/Info/Public' : '/System/Info');
+        // An API key is always an admin's; a sign-in is one when Jellyfin's policy says so
+        let admin = cfg.kind !== 'user';
         if (cfg.kind === 'user' && info.status === 200) {
             const me = await request(cfg, '/Users/Me');
             if (me.status !== 200) info.status = me.status;
+            admin = !!me.data?.Policy?.IsAdministrator;
         }
         if (info.status === 200 && info.data) {
             value = {
@@ -317,6 +320,7 @@ export async function getStatus(force = false) {
                 serverName: info.data.ServerName || cfg.serverName,
                 version: info.data.Version || '',
                 userName: cfg.userName,
+                admin,
             };
         } else {
             // A Quick Connect sign-in ends when it is signed out in Jellyfin or runs out: say so, it is fixed with a new code
@@ -331,6 +335,58 @@ export async function getStatus(force = false) {
     // Back online after being off: the player's library check runs (js/player/animemap.js)
     import('./player/animemap.js').then(m => m.noteStatus(value.state === 'connected')).catch(() => {});
     return value;
+}
+
+// Only a Jellyfin admin may scan the library or refresh metadata (Jellyfin answers 403 otherwise)
+export async function canManageLibrary() {
+    const s = await getStatus();
+    return s.state === 'connected' && !!s.admin;
+}
+
+// The modes of Jellyfin's own "Refresh metadata" dialog. 'missing' fills in what a show lacks and probes
+// files again (an episode half read in when Jellyfin stopped gets its number back); 'all' replaces every
+// field from the providers, images stay. Jellyfin answers at once and works in the background.
+const REFRESH_MODES = {
+    missing: 'MetadataRefreshMode=FullRefresh&ImageRefreshMode=FullRefresh&ReplaceAllMetadata=false&ReplaceAllImages=false',
+    all: 'MetadataRefreshMode=FullRefresh&ImageRefreshMode=FullRefresh&ReplaceAllMetadata=true&ReplaceAllImages=false',
+};
+
+/** @param {number} status */
+function refreshError(status) {
+    if (status === 401 || status === 403) return new Error('Only a Jellyfin admin can refresh metadata');
+    if (status === 404) return new Error('Jellyfin no longer has this item, scan the library first');
+    return new Error(`Jellyfin answered ${status}`);
+}
+
+// One series or movie and everything in it. base: the address the player uses (the local one at home)
+/** @param {string} itemId @param {'missing' | 'all'} [mode] @param {string} [base] */
+export async function refreshItem(itemId, mode = 'missing', base) {
+    const cfg = getConfig();
+    if (!cfg) throw new Error('Jellyfin is not connected');
+    const path = `/Items/${encodeURIComponent(itemId)}/Refresh?Recursive=true&${REFRESH_MODES[mode] || REFRESH_MODES.missing}`;
+    const r = base && base !== cfg.url
+        ? await fetch(base + path, { method: 'POST', headers: jfAuth(cfg.apiKey), signal: AbortSignal.timeout(8000) })
+            .then(res => ({ status: res.status }), () => request(cfg, path, 'POST'))
+        : await request(cfg, path, 'POST');
+    if (r.status !== 204 && r.status !== 200) throw refreshError(r.status);
+}
+
+// The whole server. 'scan' = Jellyfin's "Scan all libraries" (new, changed and removed files);
+// 'missing' / 'all' refresh each library like refreshItem. -> number of libraries
+/** @param {'scan' | 'missing' | 'all'} mode */
+export async function refreshLibrary(mode) {
+    const cfg = getConfig();
+    if (!cfg) throw new Error('Jellyfin is not connected');
+    if (mode === 'scan') {
+        const r = await request(cfg, '/Library/Refresh', 'POST');
+        if (r.status !== 204 && r.status !== 200) throw refreshError(r.status);
+        return 0;
+    }
+    const folders = await request(cfg, '/Library/VirtualFolders');
+    if (folders.status !== 200) throw refreshError(folders.status);
+    const ids = (Array.isArray(folders.data) ? folders.data : []).map(f => f?.ItemId).filter(Boolean);
+    for (const id of ids) await refreshItem(id, mode);
+    return ids.length;
 }
 
 

@@ -4680,6 +4680,7 @@ body.player-open .cursor { display: none !important; }
 /* ===== Episodes (js/player/episodes.js): every episode Jellyfin has, to start any of them ===== */
 .ep-dialog { max-width: 640px; width: 94%; display: flex; flex-direction: column; overflow: hidden; padding: var(--space-xl); }
 .ep-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); }
+.ep-refresh { margin-left: auto; flex: none; }
 .ep-heading { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ep-seasons { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-sm); margin: var(--space-md) 0; }
 .ep-seasons:empty { display: none; }

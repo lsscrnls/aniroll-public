@@ -68,8 +68,13 @@ function mediaSource(id) {
 // Installs the mock on a Playwright page. Returns what the app sent, to check against.
 // anyTitle: every search finds the series (screenshots with real show names)
 // library: what a listing of the whole library answers; searches then find nothing (a title Jellyfin names differently)
-async function mockJellyfin(page, { anyTitle = false, library = null } = {}) {
+// admin: the signed-in user is a Jellyfin admin (may refresh metadata)
+// halfRead: this episode of season 1 was only half read in (Jellyfin stopped during the import): no number,
+// no season, until the series is refreshed
+// without: episodes of season 1 Jellyfin does not have (the next one not out yet)
+async function mockJellyfin(page, { anyTitle = false, library = null, admin = false, halfRead = 0, without = [] } = {}) {
     const calls = [];
+    let refreshed = false;
     let lastAudio = null; // the track Jellyfin "remembers" from the reports
     await page.route(`${JF_URL}/**`, async route => {
         const req = route.request();
@@ -93,7 +98,19 @@ async function mockJellyfin(page, { anyTitle = false, library = null } = {}) {
             calls.push({ type: 'qcAuth', body: req.postDataJSON() });
             return json({ AccessToken: 'qc-token', User: { Id: JF_USER, Name: 'friend', ServerName: 'E2E Jellyfin' } });
         }
-        if (p === '/Users/Me') return json({ Id: JF_USER, Name: 'friend' });
+        if (p === '/Users/Me') return json({ Id: JF_USER, Name: 'friend', Policy: { IsAdministrator: admin } });
+        if (p === '/Library/VirtualFolders') return admin ? json([{ Name: 'Anime', ItemId: 'lib-anime' }, { Name: 'Movies', ItemId: 'lib-movies' }]) : route.fulfill({ status: 403, headers: CORS });
+        if (p === '/Library/Refresh' && req.method() === 'POST') {
+            calls.push({ type: 'scan' });
+            return route.fulfill({ status: admin ? 204 : 403, headers: CORS });
+        }
+        const refresh = p.match(/^\/Items\/([^/]+)\/Refresh$/);
+        if (refresh && req.method() === 'POST') {
+            calls.push({ type: 'refresh', item: refresh[1], query: Object.fromEntries(url.searchParams) });
+            if (!admin) return route.fulfill({ status: 403, headers: CORS });
+            if (refresh[1] === 'series1') refreshed = true;
+            return route.fulfill({ status: 204, headers: CORS });
+        }
         if (p === `/Users/${JF_USER}/Items`) {
             // Like Jellyfin 12: an unknown provider filter is ignored and the whole library comes back
             if (url.searchParams.get('AnyProviderIdEquals')) return json({ Items: [{ Id: 'wrong-series', Name: 'Black Torch', ProviderIds: {} }, { Id: 'series1', Name: 'Show 1', ProviderIds: {} }] });
@@ -109,7 +126,8 @@ async function mockJellyfin(page, { anyTitle = false, library = null } = {}) {
         // Like Jellyfin: ?season= narrows to that season, without it every season comes back
         if (p === '/Shows/series1/Episodes') {
             const season = Number(url.searchParams.get('season'));
-            const all = [...SEASON_1, ...SEASON_2];
+            const all = [...SEASON_1.filter(e => !without.includes(e.IndexNumber)), ...SEASON_2].map(e => halfRead && !refreshed && e.ParentIndexNumber === 1 && e.IndexNumber === halfRead
+                ? { ...e, Name: 'Show 1', IndexNumber: undefined, ParentIndexNumber: undefined, RunTimeTicks: undefined } : e);
             return json({ Items: season ? all.filter(e => e.ParentIndexNumber === season) : all });
         }
         // "Played" set by AniRoll (the AniList progress mirrored to Jellyfin)

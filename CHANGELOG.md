@@ -1,6 +1,25 @@
 # Changelog
 
-What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.14.
+What changed in AniRoll, newest first: the same as "What's new" in the app. Current release: 2.0.0.20.
+
+## 26 November 2026 – Come along stays come along
+
+- Watch Party: guests who chose **Come along** no longer drop out of the party when AniRoll's server is briefly unreachable, or when they come back more than an hour after the host switched shows.
+- Styled subtitles with lines at the top and the bottom at once now both glide out of the way of the controls: the top ones down, the bottom ones up.
+
+## 25 November 2026 – OVAs and specials from your Jellyfin
+
+- An OVA or special that Jellyfin keeps under a show's **Specials** now plays in AniRoll and counts as there, like Seraph of the End's *Vampire Shahal* (episode 11 of the specials).
+
+## 23 November 2026 – Voice actors show their height
+
+- A voice actor's page now shows their **height** in centimetres and feet, if AniList has one. Only a few people have one so far.
+
+## 21 November 2026 – Refresh Jellyfin metadata from AniRoll
+
+- If you run your own Jellyfin server, you can now refresh its metadata from AniRoll: for the whole library under **Settings → Jellyfin**, and for one show in the player's episode list.
+- When an episode is missing because Jellyfin only half read it in, the player offers **Refresh in Jellyfin** and starts the episode as soon as it is there.
+- A show's page keeps the **Episodes** button when you have seen the newest episode, so a rewatch is still one click away.
 
 ## 19 November 2026 – Security fixes
 

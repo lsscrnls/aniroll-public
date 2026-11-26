@@ -1,8 +1,9 @@
 import * as api from '../api.js';
-import { esc, titlePref } from '../store.js';
+import { esc, titlePref, toast } from '../store.js';
 import { getToken } from '../auth.js';
 import { openDialog } from '../a11y.js';
-import { listEpisodes } from './library.js';
+import { listEpisodes, showItemId } from './library.js';
+import { canManageLibrary, refreshItem } from '../jellyfin.js';
 
 // "Episodes": every episode of a show that Jellyfin has, to start any of them — a rewatch, one skipped,
 // one further back than where the list stands. AniList keeps each season as its own entry, so the
@@ -60,6 +61,7 @@ export function openEpisodes(media, base, { current = 0 } = {}) {
         <div class="modal-content ep-dialog">
             <div class="ep-head">
                 <h3 class="modal-title ep-heading"></h3>
+                <button class="glass-btn glass-btn-secondary glass-btn-sm ep-refresh" data-refresh hidden title="Has Jellyfin look for missing metadata of this show and read its files in again">Refresh metadata</button>
                 <button class="glass-btn glass-btn-secondary glass-btn-sm ep-close" data-close aria-label="Close">Close</button>
             </div>
             <div class="ep-seasons"></div>
@@ -84,6 +86,7 @@ export function openEpisodes(media, base, { current = 0 } = {}) {
 
     async function show(m) {
         const mine = ++ticket;
+        shown = m;
         box.querySelector('.ep-heading').textContent = titlePref(m.title);
         const { before, after } = neighbours(m);
         box.querySelector('.ep-seasons').innerHTML = [
@@ -118,6 +121,27 @@ export function openEpisodes(media, base, { current = 0 } = {}) {
         } catch {
             btn.disabled = false;
         }
+    });
+
+    // Admins only: Jellyfin refreshes the show shown in the background, the list follows twice
+    let shown = media;
+    const refreshBtn = /** @type {HTMLButtonElement} */ (box.querySelector('[data-refresh]'));
+    canManageLibrary().then(ok => { refreshBtn.hidden = !ok; }).catch(() => {});
+    refreshBtn.addEventListener('click', async () => {
+        refreshBtn.disabled = true;
+        try {
+            const id = await showItemId(base, shown);
+            if (!id) throw new Error('Jellyfin has no show for this one. Scan the library in Settings first');
+            await refreshItem(id, 'missing', base);
+            toast('Jellyfin is refreshing the show', 'success');
+            const m = shown;
+            for (const wait of [5000, 15000]) {
+                setTimeout(() => { if (box.isConnected && shown === m) show(m); }, wait);
+            }
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+        setTimeout(() => { refreshBtn.disabled = false; }, 15000);
     });
 
     show(media);
